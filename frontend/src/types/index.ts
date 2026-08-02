@@ -45,6 +45,7 @@ export interface LoginFormData {
   email: string;
   password: string;
   rememberMe: boolean;
+  role: string;
 }
 
 export interface SignupFormData {
@@ -53,6 +54,7 @@ export interface SignupFormData {
   email: string;
   password: string;
   confirmPassword: string;
+  role: string;
 }
 
 export type AuthFormData = LoginFormData | SignupFormData;

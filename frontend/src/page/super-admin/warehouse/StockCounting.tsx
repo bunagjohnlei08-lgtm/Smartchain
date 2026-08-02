@@ -11,7 +11,7 @@ import {
   Clock,
   RefreshCw
 } from 'lucide-react';
-import PageContainer from '../../components/layout/PageContainer';
+import PageContainer from '@/components/layout/PageContainer';
 
 // ============================================
 // TYPES
@@ -117,13 +117,13 @@ const SearchInput: React.FC<{
   placeholder?: string;
 }> = ({ value, onChange, placeholder = 'Search...' }) => (
   <div className="relative flex-1 min-w-[200px]">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all"
+      className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
     />
   </div>
 );
@@ -138,7 +138,7 @@ const FilterSelect: React.FC<{
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all appearance-none cursor-pointer"
+      className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all appearance-none cursor-pointer"
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>{opt}</option>
@@ -175,8 +175,8 @@ const Pagination: React.FC<{
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-[#263244] bg-[#0B1220]/30">
-      <div className="text-sm text-[#94A3B8]">
+      <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-[#0B1220]/30">
+      <div className="text-sm text-slate-400">
         Showing <span className="text-white font-medium">{start}</span> to{' '}
         <span className="text-white font-medium">{end}</span> of{' '}
         <span className="text-white font-medium">{totalItems}</span> items
@@ -185,7 +185,7 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -196,7 +196,7 @@ const Pagination: React.FC<{
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
                 ? 'bg-[#5B8CFF] text-white'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]'
+                : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
             }`}
           >
             {page}
@@ -205,7 +205,7 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -247,13 +247,13 @@ const StockCounting: React.FC = () => {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-white">Stock Counting</h1>
-          <p className="text-[#94A3B8] text-sm mt-2">
+          <p className="text-slate-400 text-sm mt-2">
             Manage cycle counts, physical inventory, and stock reconciliation.
           </p>
         </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-[#162033] border border-[#263244] rounded-2xl p-5">
+      <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5">
         <div className="flex flex-wrap items-center gap-4">
           <SearchInput
             value={search}
@@ -270,7 +270,7 @@ const StockCounting: React.FC = () => {
             onChange={setStatusFilter}
             options={countStatuses}
           />
-          <button className="px-3.5 py-2.5 border border-[#263244] rounded-xl text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all flex items-center gap-1.5 text-sm ml-auto">
+          <button className="px-3.5 py-2.5 border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all flex items-center gap-1.5 text-sm ml-auto">
             <Download className="w-4 h-4" /> Export Results
           </button>
           <button className="px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-1.5"
@@ -281,30 +281,29 @@ const StockCounting: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-[#162033] border border-[#263244] rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-[#0B1220]/50 border-b border-[#263244]">
+      <div className="w-full overflow-x-auto rounded-xl border border-slate-800 bg-[#0F172A]">
+        <table className="w-full min-w-[950px] text-left text-sm">
+            <thead className="bg-[#0B1220]/50 border-b border-slate-800">
               <tr>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Warehouse</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Product</th>
-                <th className="px-6 py-4 text-right text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Cycle Count</th>
-                <th className="px-6 py-4 text-right text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Physical Count</th>
-                <th className="px-6 py-4 text-right text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Variance</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Assigned Staff</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Warehouse</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Product</th>
+                <th className="px-6 py-4 text-right text-slate-400 text-xs font-medium uppercase tracking-wider">Cycle Count</th>
+                <th className="px-6 py-4 text-right text-slate-400 text-xs font-medium uppercase tracking-wider">Physical Count</th>
+                <th className="px-6 py-4 text-right text-slate-400 text-xs font-medium uppercase tracking-wider">Variance</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Assigned Staff</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Date</th>
+                <th className="px-6 py-4 text-center text-slate-400 text-xs font-medium uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedCounts.map((count) => (
-                <tr key={count.id} className="border-b border-[#1E293B] hover:bg-[#1E293B]/30 transition-all duration-150 group">
+                <tr key={count.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all duration-150 group">
                   <td className="px-6 py-4 text-white text-sm">{count.warehouse}</td>
                   <td className="px-6 py-4">
                     <div>
                       <p className="text-white text-sm font-medium">{count.productName}</p>
-                      <p className="text-[#94A3B8] text-xs">{count.sku}</p>
+                      <p className="text-slate-400 text-xs">{count.sku}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right text-white text-sm">{count.cycleCount}</td>
@@ -317,14 +316,14 @@ const StockCounting: React.FC = () => {
                     {count.variance > 0 ? '+' : ''}{count.variance}
                   </td>
                   <td className="px-6 py-4"><StatusBadge status={count.status} /></td>
-                  <td className="px-6 py-4 text-[#94A3B8] text-sm">{count.assignedStaff}</td>
-                  <td className="px-6 py-4 text-[#64748B] text-sm">{count.date}</td>
+                  <td className="px-6 py-4 text-slate-400 text-sm">{count.assignedStaff}</td>
+                  <td className="px-6 py-4 text-slate-500 text-sm">{count.date}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-1">
-                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-all">
+                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-slate-500 hover:text-white transition-all">
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-all">
+                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-slate-500 hover:text-white transition-all">
                         <Edit className="w-4 h-4" />
                       </button>
                     </div>
@@ -333,7 +332,6 @@ const StockCounting: React.FC = () => {
               ))}
             </tbody>
           </table>
-        </div>
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}

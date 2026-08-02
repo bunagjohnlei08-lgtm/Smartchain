@@ -1,9 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import PageContainer from '../components/layout/PageContainer';
 import {
-  Plus,
+  UserPlus,
   Search,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   User,
@@ -12,20 +10,14 @@ import {
   UserX,
   Clock,
   AlertCircle,
-  Eye,
-  Edit,
-  Key,
-  Lock,
-  Trash2,
-  X,
   Check,
-  MoreVertical,
   Download,
-  RefreshCw,
   Warehouse,
-  ChevronRight as ChevronBreadcrumb
+  Edit,
+  Eye,
+  X,
+  Filter
 } from 'lucide-react';
-
 
 interface User {
   id: string;
@@ -55,10 +47,6 @@ interface UserFilters {
   sortBy: keyof User;
   sortOrder: 'asc' | 'desc';
 }
-
-// ============================================
-// MOCK DATA
-// ============================================
 
 const mockUsers: User[] = [
   {
@@ -148,20 +136,11 @@ const mockUsers: User[] = [
   }
 ];
 
-// ============================================
-// CONSTANTS
-// ============================================
-
 const departments = ['All Departments', 'Purchasing', 'Warehouse', 'Procurement', 'Inventory', 'Logistics'];
 const roles = ['All Roles', 'ADMIN', 'MANAGER', 'USER', 'VIEWER'];
 const warehouses = ['All Warehouses', 'WH-PAMP', 'WH-MNL', 'WH-CEB', 'WH-DVO'];
 const statusOptions = ['All Status', 'Active', 'Inactive', 'Pending', 'Suspended'];
 
-// ============================================
-// COMPONENTS
-// ============================================
-
-// ----- Status Badge -----
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const config = {
     Active: { color: 'text-green-400 bg-green-400/10 border-green-400/20', icon: Check },
@@ -170,73 +149,60 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     Suspended: { color: 'text-red-400 bg-red-400/10 border-red-400/20', icon: AlertCircle }
   };
   const { color, icon: Icon } = config[status as keyof typeof config] || config.Inactive;
-    return (
-     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${color} transition-colors duration-150`}>
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${color} transition-colors duration-150`}>
       <Icon className="w-3 h-3" />
       {status}
     </span>
-    );
+  );
 };
 
-// ----- KPI Card -----
 const KPICard: React.FC<{
   label: string;
   value: number;
   icon: React.ReactNode;
-  trend?: { value: string; positive: boolean };
-}> = ({ label, value, icon, trend }) => (
-  <div className="bg-[#162033] border border-[#263244] rounded-2xl shadow-sm p-5 h-full flex flex-col justify-between gap-4 transition-colors duration-150 hover:border-[#5B8CFF]/30">
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-[#94A3B8] text-[11px] font-semibold uppercase tracking-widest leading-none">{label}</p>
-        <p className="text-2xl font-bold text-white mt-2.5 leading-none">{value}</p>
+}> = ({ label, value, icon }) => (
+  <div className="bg-[#162033] border border-[#263244] rounded-2xl p-5 hover:border-[#5B8CFF]/30 transition-all duration-200 h-full flex flex-col">
+    <div className="flex items-start justify-between flex-1">
+      <div>
+        <p className="text-[#94A3B8] text-xs font-medium uppercase tracking-wider">{label}</p>
+        <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
       </div>
-      <div className="p-2 bg-[#0E1624] rounded-lg shrink-0">
+      <div className="p-2.5 bg-[#0E1624] rounded-lg shrink-0">
         {icon}
       </div>
-    </div>
-    <div className="flex items-center gap-1.5 pt-3 border-t border-[#263244]/50 min-h-[20px]">
-      {trend && (
-        <>
-          <span className={`text-xs font-medium ${trend.positive ? 'text-green-400' : 'text-red-400'}`}>
-            {trend.positive ? '↑' : '↓'} {trend.value}
-          </span>
-          <span className="text-[#64748B] text-xs">vs last month</span>
-        </>
-      )}
     </div>
   </div>
 );
 
-// ----- Search Input -----
 const SearchInput: React.FC<{
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-}> = ({ value, onChange, placeholder = 'Search...' }) => (
-  <div className="relative w-full sm:flex-1 sm:min-w-65">
-    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B] transition-colors duration-200" />
+  className?: string;
+}> = ({ value, onChange, placeholder = 'Search...', className = '' }) => (
+  <div className={`relative flex-1 min-w-[180px] ${className}`}>
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full h-11 bg-[#0E1624] border border-[#263244] rounded-lg pl-10 pr-4 text-sm text-white placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-200"
+      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all"
     />
   </div>
 );
 
-// ----- Filter Select -----
 const FilterSelect: React.FC<{
   value: string;
   onChange: (value: string) => void;
   options: string[];
 }> = ({ value, onChange, options }) => (
-  <div className="w-full sm:w-[168px] shrink-0">
+  <div className="min-w-[130px]">
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-11 bg-[#0E1624] border border-[#263244] rounded-lg px-3.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-200 appearance-none cursor-pointer"
+      className="w-full bg-[#0B1220] border border-[#1E293B] px-3 py-2 text-xs rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-200 appearance-none cursor-pointer"
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>{opt}</option>
@@ -245,7 +211,6 @@ const FilterSelect: React.FC<{
   </div>
 );
 
-// ----- Pagination -----
 const Pagination: React.FC<{
   currentPage: number;
   totalPages: number;
@@ -272,18 +237,18 @@ const Pagination: React.FC<{
 
   if (totalItems === 0) return null;
 
-return (
-    <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-t border-[#263244] bg-[#0B1220]/30">
+  return (
+    <div className="flex items-center justify-between px-6 py-4 border-t border-[#263244] bg-[#0B1220]/30">
       <div className="text-sm text-[#94A3B8]">
         Showing <span className="text-white font-medium">{start}</span> to{' '}
         <span className="text-white font-medium">{end}</span> of{' '}
         <span className="text-white font-medium">{totalItems}</span> users
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -291,7 +256,7 @@ return (
           <button
             key={page}
             onClick={() => onPageChange(page)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors duration-200 ${
+            className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
                 ? 'bg-[#5B8CFF] text-white'
                 : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]'
@@ -300,21 +265,10 @@ return (
             {page}
           </button>
         ))}
-        {totalPages > 5 && currentPage < totalPages - 2 && (
-          <>
-            <span className="text-[#64748B] px-1">…</span>
-            <button
-              onClick={() => onPageChange(totalPages)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-sm text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-colors duration-200"
-            >
-              {totalPages}
-            </button>
-          </>
-        )}
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -323,91 +277,52 @@ return (
   );
 };
 
-// ----- User Table Row -----
 const UserTableRow: React.FC<{
   user: User;
-  onView: (user: User) => void;
   onEdit: (user: User) => void;
-  onResetPassword: (user: User) => void;
-  onToggleStatus: (user: User) => void;
-  onDelete: (user: User) => void;
-}> = ({ user, onView, onEdit, onResetPassword, onToggleStatus, onDelete }) => {
-  const [showActions, setShowActions] = useState(false);
-
-  return (
-    <tr className="border-b border-[#1E293B] hover:bg-[#1E293B]/40 transition-colors duration-200 group">
-      <td className="px-3 py-3 align-middle">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#5B8CFF]/20 border border-[#5B8CFF]/30 flex items-center justify-center text-sm font-semibold text-[#5B8CFF] shrink-0">
-            {user.firstName.charAt(0)}{user.lastName.charAt(0) || ''}
-          </div>
-          <div className="min-w-0">
-            <p className="text-white text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
-            <p className="text-[#94A3B8] text-xs truncate">{user.email}</p>
-          </div>
+  onView: (user: User) => void;
+}> = ({ user, onEdit, onView }) => (
+  <tr className="hover:bg-[#1E293B]/40 transition-colors duration-200 group">
+    <td className="px-6 py-4 whitespace-nowrap">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-[#5B8CFF]/20 border border-[#5B8CFF]/30 flex items-center justify-center text-sm font-semibold text-[#5B8CFF] shrink-0">
+          {user.firstName.charAt(0)}{user.lastName.charAt(0) || ''}
         </div>
-      </td>
-      <td className="px-3 py-3 align-middle text-[#94A3B8] text-sm font-mono whitespace-nowrap">{user.employeeId}</td>
-      <td className="px-3 py-3 align-middle text-[#94A3B8] text-sm whitespace-nowrap">{user.department}</td>
-      <td className="px-3 py-3 align-middle">
-        <span className="inline-flex px-2 py-0.5 rounded-lg text-xs font-medium bg-[#5B8CFF]/10 text-[#5B8CFF] border border-[#5B8CFF]/20 whitespace-nowrap">
-          {user.role}
-        </span>
-      </td>
-      <td className="px-3 py-3 align-middle text-[#94A3B8] text-sm whitespace-nowrap">{user.branch}</td>
-      <td className="px-3 py-3 align-middle text-[#94A3B8] text-sm whitespace-nowrap">{user.warehouse}</td>
-      <td className="px-3 py-3 align-middle"><StatusBadge status={user.status} /></td>
-      <td className="px-3 py-3 align-middle text-[#64748B] text-sm whitespace-nowrap">{user.lastLogin}</td>
-      <td className="px-3 py-3 align-middle">
-        <div className="relative flex justify-end">
-          <button
-            onClick={() => setShowActions(!showActions)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-colors duration-200"
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
-{showActions && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-[#162033] border border-[#263244] rounded-xl shadow-xl z-20 py-1.5 overflow-hidden animate-in fade-in">
-              <button
-                onClick={() => { onView(user); setShowActions(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#94A3B8] hover:bg-[#1E293B] hover:text-white transition-colors duration-200"
-              >
-                <Eye className="w-4 h-4" /> View Profile
-              </button>
-              <button
-                onClick={() => { onEdit(user); setShowActions(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#94A3B8] hover:bg-[#1E293B] hover:text-white transition-colors duration-200"
-              >
-                <Edit className="w-4 h-4" /> Edit User
-              </button>
-              <button
-                onClick={() => { onResetPassword(user); setShowActions(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#94A3B8] hover:bg-[#1E293B] hover:text-white transition-colors duration-200"
-              >
-                <Key className="w-4 h-4" /> Reset Password
-              </button>
-              <button
-                onClick={() => { onToggleStatus(user); setShowActions(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#94A3B8] hover:bg-[#1E293B] hover:text-white transition-colors duration-200"
-              >
-                <Lock className="w-4 h-4" /> {user.status === 'Active' ? 'Deactivate' : 'Activate'}
-              </button>
-              <div className="border-t border-[#263244] my-1.5" />
-              <button
-                onClick={() => { onDelete(user); setShowActions(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-[#1E293B] hover:text-red-300 transition-colors duration-200"
-              >
-                <Trash2 className="w-4 h-4" /> Delete User
-              </button>
-            </div>
-          )}
+        <div className="min-w-0">
+          <p className="text-white text-sm font-medium truncate">{user.firstName} {user.lastName}</p>
+          <p className="text-[#94A3B8] text-xs truncate">{user.email}</p>
         </div>
-      </td>
-    </tr>
-  );
-};
+      </div>
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap">{user.employeeId}</td>
+    <td className="px-6 py-4 whitespace-nowrap">{user.department}</td>
+    <td className="px-6 py-4 whitespace-nowrap">
+      <span className="inline-flex px-2.5 py-1 rounded-lg text-xs font-medium bg-[#5B8CFF]/10 text-[#5B8CFF] border border-[#5B8CFF]/20">
+        {user.role}
+      </span>
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap">{user.branch}</td>
+    <td className="px-6 py-4 whitespace-nowrap">{user.warehouse}</td>
+    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={user.status} /></td>
+    <td className="px-6 py-4 whitespace-nowrap">
+      <div className="flex items-center gap-1 justify-end">
+        <button
+          onClick={() => onView(user)}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E293B] transition-colors duration-150"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => onEdit(user)}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E293B] transition-colors duration-150"
+        >
+          <Edit className="w-4 h-4" />
+        </button>
+      </div>
+    </td>
+  </tr>
+);
 
-// ----- Create/Edit User Modal -----
 const UserModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -641,7 +556,6 @@ const UserModal: React.FC<{
   );
 };
 
-// ----- User Profile Drawer -----
 const UserProfileDrawer: React.FC<{
   user: User | null;
   isOpen: boolean;
@@ -716,12 +630,7 @@ const UserProfileDrawer: React.FC<{
   );
 };
 
-// ============================================
-// MAIN USER MANAGEMENT COMPONENT
-// ============================================
-
 const UserManagement: React.FC = () => {
-  // State
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [filters, setFilters] = useState<UserFilters>({
     search: '',
@@ -739,7 +648,6 @@ const UserManagement: React.FC = () => {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [viewUser, setViewUser] = useState<User | null>(null);
 
-  // Filtered & sorted users
   const filteredUsers = useMemo(() => {
     let result = users.filter((u) => {
       const search = filters.search.toLowerCase();
@@ -766,14 +674,12 @@ const UserManagement: React.FC = () => {
     return result;
   }, [users, filters]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredUsers.slice(start, start + itemsPerPage);
   }, [filteredUsers, currentPage, itemsPerPage]);
 
-  // Handlers
   const handleCreateUser = (data: Partial<User>) => {
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
@@ -801,21 +707,6 @@ const UserManagement: React.FC = () => {
     setEditUser(null);
   };
 
-  const handleDeleteUser = (user: User) => {
-    if (window.confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
-      setUsers(users.filter((u) => u.id !== user.id));
-    }
-  };
-
-  const handleToggleStatus = (user: User) => {
-    const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
-    setUsers(users.map((u) => (u.id === user.id ? { ...u, status: newStatus, updatedAt: new Date().toISOString().split('T')[0] } : u)));
-  };
-
-  const handleResetPassword = (user: User) => {
-    alert(`Password reset link has been sent to ${user.email}`);
-  };
-
   const resetFilters = () => {
     setFilters({
       search: '',
@@ -829,231 +720,172 @@ const UserManagement: React.FC = () => {
     setCurrentPage(1);
   };
 
-  // KPI data
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => u.status === 'Active').length;
   const pendingUsers = users.filter((u) => u.status === 'Pending').length;
   const suspendedUsers = users.filter((u) => u.status === 'Suspended').length;
 
- return (
-      <PageContainer>
-        {/* Main Content - Centered with max width and proper spacing */}
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+  return (
+    <div className="w-full space-y-6 text-white">
+      {/* 1. PAGE HEADER */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
+        <p className="text-xs text-slate-400 mt-1">
+          Manage employee accounts, roles, warehouse assignments, departments, and system permissions.
+        </p>
+      </div>
 
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-sm text-[#64748B] hover:text-white transition-colors duration-200 cursor-pointer">Dashboard</span>
-            <ChevronBreadcrumb className="w-4 h-4 text-[#64748B]" />
-            <span className="text-sm text-[#64748B] hover:text-white transition-colors duration-200 cursor-pointer">Administration</span>
-            <ChevronBreadcrumb className="w-4 h-4 text-[#64748B]" />
-            <span className="text-base font-semibold text-white">User Management</span>
+      {/* 2. STAT CARDS (4 Columns) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* TOTAL USERS */}
+        <div className="bg-[#0F172A]/80 border border-[#1E293B] rounded-xl p-4 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">TOTAL USERS</p>
+            <h3 className="text-2xl font-bold text-white mt-1">5</h3>
           </div>
-
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight leading-tight mb-2">
-              User Management
-            </h1>
-            <p className="text-sm text-[#94A3B8] max-w-2xl leading-relaxed">
-              Manage employee accounts, roles, warehouse assignments, departments, and system permissions.
-            </p>
+          <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <Users className="w-5 h-5"/>
           </div>
+        </div>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-               <KPICard label="Total Users" value={totalUsers} icon={<Users className="w-5 h-5 text-[#5B8CFF]" />} />
-               <KPICard
-                 label="Active Users"
-                 value={activeUsers}
-                 icon={<UserCheck className="w-5 h-5 text-[#22C55E]" />}
-                 trend={{ value: '12%', positive: true }}
-               />
-               <KPICard
-                 label="Pending Approval"
-                 value={pendingUsers}
-                 icon={<Clock className="w-5 h-5 text-[#F59E0B]" />}
-                 trend={{ value: '5%', positive: false }}
-               />
-               <KPICard label="Suspended Accounts" value={suspendedUsers} icon={<AlertCircle className="w-5 h-5 text-[#EF4444]" />} />
-</div>
+        {/* ACTIVE USERS */}
+        <div className="bg-[#0F172A]/80 border border-[#1E293B] rounded-xl p-4 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">ACTIVE USERS</p>
+            <h3 className="text-2xl font-bold text-white mt-1">3</h3>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <UserCheck className="w-5 h-5"/>
+          </div>
+        </div>
 
-{/* Toolbar - Unified row: Search, All Departments, All Roles, All Warehouses, All Status, Reset, Export, Create User */}
-            <div className="bg-[#162033] border border-[#263244] rounded-2xl shadow-sm">
-              <div className="px-6 py-4 sm:px-6">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="min-w-0">
-                    <SearchInput
-                      value={filters.search}
-                      onChange={(val) => setFilters({ ...filters, search: val })}
-                      placeholder="Search Users..."
-                    />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <FilterSelect
-                      value={filters.department}
-                      onChange={(val) => setFilters({ ...filters, department: val })}
-                      options={departments}
-                    />
-                    <FilterSelect
-                      value={filters.role}
-                      onChange={(val) => setFilters({ ...filters, role: val })}
-                      options={roles}
-                    />
-                    <FilterSelect
-                      value={filters.warehouse}
-                      onChange={(val) => setFilters({ ...filters, warehouse: val })}
-                      options={warehouses}
-                    />
-                    <FilterSelect
-                      value={filters.status}
-                      onChange={(val) => setFilters({ ...filters, status: val })}
-                      options={statusOptions}
-                    />
+        {/* PENDING APPROVAL */}
+        <div className="bg-[#0F172A]/80 border border-[#1E293B] rounded-xl p-4 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">PENDING APPROVAL</p>
+            <h3 className="text-2xl font-bold text-white mt-1">1</h3>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <Clock className="w-5 h-5"/>
+          </div>
+        </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        onClick={resetFilters}
-                        className="h-10 px-4 border border-[#263244] rounded-lg text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-colors duration-200 flex items-center gap-2 text-sm font-medium"
-                      >
-                        <RefreshCw className="w-4 h-4" /> Reset
-                      </button>
-                      <button
-                        className="h-10 px-4 border border-[#263244] rounded-lg text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-colors duration-200 flex items-center gap-2 text-sm font-medium"
-                      >
-                        <Download className="w-4 h-4" /> Export
-                      </button>
-                      <button
-                        onClick={() => setShowCreateModal(true)}
-                        className="h-10 px-4 rounded-lg text-sm font-medium transition-opacity duration-200 flex items-center gap-2"
-                        style={{ backgroundColor: '#5B8CFF', color: '#FFFFFF' }}
-                      >
-                        <Plus className="w-4 h-4" />
-                        Create User
-                      </button>
+        {/* SUSPENDED ACCOUNTS */}
+        <div className="bg-[#0F172A]/80 border border-[#1E293B] rounded-xl p-4 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">SUSPENDED ACCOUNTS</p>
+            <h3 className="text-2xl font-bold text-white mt-1">0</h3>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+            <AlertCircle className="w-5 h-5"/>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. TOOLBAR (Search, Filters, Export, New User) */}
+      <div className="bg-[#0F172A]/80 border border-[#1E293B] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        {/* Search Bar */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400"/>
+          <input
+            type="text"
+            placeholder="Search users..."
+            className="w-full bg-[#131C2E] border border-[#1E293B] rounded-lg pl-9 pr-4 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <select className="bg-[#131C2E] border border-[#1E293B] text-xs text-slate-300 rounded-lg px-3 py-1.5 focus:outline-none">
+            <option>All Status</option>
+            <option>Active</option>
+            <option>Inactive</option>
+            <option>Pending</option>
+          </select>
+
+          <select className="bg-[#131C2E] border border-[#1E293B] text-xs text-slate-300 rounded-lg px-3 py-1.5 focus:outline-none">
+            <option>All Roles</option>
+            <option>Admin</option>
+            <option>Manager</option>
+            <option>User</option>
+            <option>Viewer</option>
+          </select>
+
+          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#131C2E] border border-[#1E293B] text-xs font-medium text-slate-300 rounded-lg hover:bg-slate-800 transition">
+            <Filter className="w-3.5 h-3.5"/> Filter
+          </button>
+
+          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#131C2E] border border-[#1E293B] text-xs font-medium text-slate-300 rounded-lg hover:bg-slate-800 transition">
+            <Download className="w-3.5 h-3.5"/> Export
+          </button>
+
+          <button className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white rounded-lg transition shadow-lg shadow-blue-600/20">
+            <UserPlus className="w-3.5 h-3.5"/> + New User
+          </button>
+        </div>
+      </div>
+
+      {/* 4. TABLE CONTAINER */}
+      <div className="bg-[#0F172A]/80 border border-[#1E293B] rounded-xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-300 border-collapse">
+            <thead className="bg-[#131C2E] border-b border-[#1E293B] text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <tr>
+                <th className="px-6 py-4 whitespace-nowrap">USER</th>
+                <th className="px-6 py-4 whitespace-nowrap">EMPLOYEE ID</th>
+                <th className="px-6 py-4 whitespace-nowrap">DEPARTMENT</th>
+                <th className="px-6 py-4 whitespace-nowrap">ROLE</th>
+                <th className="px-6 py-4 whitespace-nowrap">BRANCH</th>
+                <th className="px-6 py-4 whitespace-nowrap">WAREHOUSE</th>
+                <th className="px-6 py-4 whitespace-nowrap">STATUS</th>
+                <th className="px-6 py-4 whitespace-nowrap text-right">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]/60">
+              {users.map((u) => (
+                <tr key={u.id} className="hover:bg-[#131C2E]/50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/30">
+                        {u.firstName.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-white text-xs">{u.firstName} {u.lastName}</div>
+                        <div className="text-[10px] text-slate-400">{u.email}</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          {/* Table Card */}
-          <div className="bg-[#162033] border border-[#263244] rounded-2xl shadow-sm">
-             <div className="w-full overflow-x-auto">
-               <table className="w-full min-w-max">
-                <thead className="sticky top-0 bg-[#162033] z-10 border-b border-[#263244]">
-                  <tr>
-                    {[
-                      { key: 'name', label: 'User' },
-                      { key: 'employeeId', label: 'Employee ID' },
-                      { key: 'department', label: 'Department' },
-                      { key: 'role', label: 'Role' },
-                      { key: 'branch', label: 'Branch' },
-                      { key: 'warehouse', label: 'Warehouse' },
-                      { key: 'status', label: 'Status' },
-                      { key: 'lastLogin', label: 'Last Login' },
-                      { key: 'actions', label: 'Actions' }
-                    ].map((col) => (
-                      <th
-                        key={col.key}
-                         className="px-3 py-3 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider cursor-pointer hover:text-white transition-colors duration-150 select-none whitespace-nowrap"
-                        onClick={() => {
-                          if (col.key !== 'actions') {
-                            const sortBy = col.key as keyof User;
-                            setFilters({
-                              ...filters,
-                              sortBy,
-                              sortOrder: filters.sortBy === sortBy && filters.sortOrder === 'asc' ? 'desc' : 'asc'
-                            });
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          {col.label}
-                          {col.key !== 'actions' && filters.sortBy === col.key && (
-                            <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${filters.sortOrder === 'asc' ? '' : 'rotate-180'}`} />
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    // Loading skeleton
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <tr key={i} className="border-b border-[#1E293B]">
-                          <td colSpan={9} className="px-3 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-[#1E293B] animate-pulse" />
-                            <div className="space-y-2 flex-1">
-                              <div className="h-3.5 bg-[#1E293B] rounded-lg w-32 animate-pulse" />
-                              <div className="h-2.5 bg-[#1E293B] rounded-lg w-48 animate-pulse" />
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : paginatedUsers.length > 0 ? (
-                    paginatedUsers.map((user) => (
-                      <UserTableRow
-                        key={user.id}
-                        user={user}
-                        onView={setViewUser}
-                        onEdit={setEditUser}
-                        onResetPassword={handleResetPassword}
-                        onToggleStatus={handleToggleStatus}
-                        onDelete={handleDeleteUser}
-                      />
-                    ))
-                  ) : (
-                    <tr>
-                         <td colSpan={9} className="px-3 py-16 text-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <User className="w-12 h-12 text-[#64748B]" />
-                          <p className="text-[#94A3B8] font-medium">No users found matching your filters</p>
-                          <button
-                            onClick={resetFilters}
-                            className="text-[#5B8CFF] hover:text-[#6B9BFF] text-sm transition-colors duration-150 font-medium"
-                          >
-                            Clear all filters
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              totalItems={filteredUsers.length}
-              itemsPerPage={itemsPerPage}
-            />
-           </div>
-         </div>
-
-         {/* Modals & Drawer */}
-      <UserModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSave={handleCreateUser}
-      />
-      <UserModal
-        isOpen={!!editUser}
-        onClose={() => setEditUser(null)}
-        user={editUser}
-        onSave={handleEditUser}
-      />
-      <UserProfileDrawer
-        user={viewUser}
-        isOpen={!!viewUser}
-        onClose={() => setViewUser(null)}
-      />
-    </PageContainer>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-slate-300 font-mono text-[11px]">{u.employeeId}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-slate-300">{u.department}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-slate-300">{u.branch}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-slate-300">{u.warehouse}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${
+                      u.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                      u.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                      'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                    }`}>
+                      • {u.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex items-center justify-end gap-2 text-slate-400">
+                      <button className="p-1 hover:text-white transition"><Eye className="w-4 h-4"/></button>
+                      <button className="p-1 hover:text-white transition"><Edit className="w-4 h-4"/></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 };
 

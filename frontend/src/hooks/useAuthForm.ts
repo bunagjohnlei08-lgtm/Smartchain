@@ -10,6 +10,7 @@ type FormState = {
   password: string;
   confirmPassword: string;
   rememberMe: boolean;
+  role: string;
 };
 
 type Action =
@@ -19,9 +20,9 @@ type Action =
 
 const getInitialState = (mode: AuthMode): FormState => {
   if (mode === 'login') {
-    return { mode: 'login', name: '', email: '', password: '', confirmPassword: '', rememberMe: false };
+    return { mode: 'login', name: '', email: '', password: '', confirmPassword: '', rememberMe: false, role: '' };
   }
-  return { mode: 'signup', name: '', email: '', password: '', confirmPassword: '', rememberMe: false };
+  return { mode: 'signup', name: '', email: '', password: '', confirmPassword: '', rememberMe: false, role: '' };
 };
 
 const validate = (state: FormState): FieldErrors => {
@@ -35,6 +36,11 @@ const validate = (state: FormState): FieldErrors => {
     errors.password = 'Password is required';
   } else if (state.password.length < 6) {
     errors.password = 'Password must be at least 6 characters';
+  }
+  if (state.mode === 'login') {
+    if (!state.role) {
+      errors.role = 'Please select a role';
+    }
   }
   if (state.mode === 'signup') {
     if (!state.name.trim()) {
@@ -124,6 +130,7 @@ export const useAuthForm = ({
             email: state.email,
             password: state.password,
             rememberMe: state.rememberMe,
+            role: state.role,
           });
         } else if (state.mode === 'signup' && onSignup) {
           onSignup({
@@ -132,6 +139,7 @@ export const useAuthForm = ({
             email: state.email,
             password: state.password,
             confirmPassword: state.confirmPassword,
+            role: state.role,
           });
         }
       }, 1000);

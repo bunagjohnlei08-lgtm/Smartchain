@@ -164,52 +164,52 @@ const KPICard: React.FC<{
   subtitle?: string;
   icon: React.ReactNode;
 }> = ({ label, value, subtitle, icon }) => (
-  <div className="bg-[#162033] border border-[#263244] rounded-2xl p-5 hover:border-[#5B8CFF]/30 transition-all duration-200 h-full flex flex-col">
-    <div className="flex items-start justify-between flex-1">
-      <div>
-        <p className="text-[#94A3B8] text-xs font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-        {subtitle && <p className="text-[#64748B] text-xs mt-1">{subtitle}</p>}
+   <div className="bg-[#0F172A] border border-slate-800 text-white rounded-2xl p-5 hover:border-blue-500/30 transition-all duration-200 h-full flex flex-col">
+      <div className="flex items-start justify-between flex-1">
+        <div>
+          <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
+          <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
+          {subtitle && <p className="text-slate-500 text-xs mt-1">{subtitle}</p>}
+        </div>
+        <div className="p-2.5 bg-[#0E1624] rounded-lg shrink-0">{icon}</div>
       </div>
-      <div className="p-2.5 bg-[#0E1624] rounded-lg shrink-0">{icon}</div>
     </div>
-  </div>
-);
+ );
 
 const SearchInput: React.FC<{
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
 }> = ({ value, onChange, placeholder = 'Search...' }) => (
-  <div className="relative flex-1 min-w-[180px]">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all"
-    />
-  </div>
-);
+   <div className="relative flex-1 min-w-[180px]">
+     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+     <input
+       type="text"
+       value={value}
+       onChange={(e) => onChange(e.target.value)}
+       placeholder={placeholder}
+       className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+     />
+   </div>
+ );
 
 const FilterSelect: React.FC<{
   value: string;
   onChange: (value: string) => void;
   options: string[];
 }> = ({ value, onChange, options }) => (
-  <div className="min-w-[130px]">
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all appearance-none cursor-pointer"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>{opt}</option>
-      ))}
-    </select>
-  </div>
-);
+   <div className="min-w-[130px]">
+     <select
+       value={value}
+       onChange={(e) => onChange(e.target.value)}
+       className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+     >
+       {options.map((opt) => (
+         <option key={opt} value={opt}>{opt}</option>
+       ))}
+     </select>
+   </div>
+ );
 
 const Pagination: React.FC<{
   currentPage: number;
@@ -238,8 +238,8 @@ const Pagination: React.FC<{
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-[#263244] bg-[#0B1220]/30">
-      <div className="text-sm text-[#94A3B8]">
+    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-[#0B1220]/30">
+      <div className="text-sm text-slate-400">
         Showing <span className="text-white font-medium">{start}</span> to{' '}
         <span className="text-white font-medium">{end}</span> of{' '}
         <span className="text-white font-medium">{totalItems}</span> items
@@ -248,7 +248,7 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -259,7 +259,7 @@ const Pagination: React.FC<{
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
                 ? 'bg-[#5B8CFF] text-white'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]'
+                : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
             }`}
           >
             {page}
@@ -268,7 +268,7 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -316,10 +316,10 @@ const Procurement: React.FC = () => {
   const totalCost = mockProcurementRequests.reduce((sum, r) => sum + r.estimatedCost, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 font-sans">
       <div>
         <h1 className="text-2xl font-bold text-white">Procurement & Sourcing</h1>
-        <p className="text-[#94A3B8] text-sm mt-1">
+        <p className="text-slate-400 text-sm mt-1">
           Manage procurement requests, approvals, and purchasing activities across the supply chain.
         </p>
       </div>
@@ -351,7 +351,7 @@ const Procurement: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-[#162033] border border-[#263244] rounded-2xl p-4">
+      <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-4">
         <div className="flex flex-wrap items-center gap-3">
           <SearchInput value={search} onChange={setSearch} placeholder="Search requests..." />
           <FilterSelect value={statusFilter} onChange={setStatusFilter} options={procurementStatuses} />
@@ -362,37 +362,37 @@ const Procurement: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-[#162033] border border-[#263244] rounded-2xl overflow-hidden">
+      <div className="bg-[#0F172A] border border-slate-800 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-[#0B1220]/50 border-b border-[#263244]">
+            <thead className="bg-[#0B1220]/50 border-b border-slate-800">
               <tr>
-                <th className="px-5 py-3.5 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">PR #</th>
-                <th className="px-5 py-3.5 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Request Title</th>
-                <th className="px-5 py-3.5 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Supplier</th>
-                <th className="px-5 py-3.5 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Requested By</th>
-                <th className="px-5 py-3.5 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Priority</th>
-                <th className="px-5 py-3.5 text-right text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Est. Cost</th>
-                <th className="px-5 py-3.5 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Status</th>
-                <th className="px-5 py-3.5 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Date</th>
-                <th className="px-5 py-3.5 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Actions</th>
+                <th className="px-5 py-3.5 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">PR #</th>
+                <th className="px-5 py-3.5 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Request Title</th>
+                <th className="px-5 py-3.5 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Supplier</th>
+                <th className="px-5 py-3.5 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Requested By</th>
+                <th className="px-5 py-3.5 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Priority</th>
+                <th className="px-5 py-3.5 text-right text-slate-400 text-xs font-medium uppercase tracking-wider">Est. Cost</th>
+                <th className="px-5 py-3.5 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Status</th>
+                <th className="px-5 py-3.5 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Date</th>
+                <th className="px-5 py-3.5 text-center text-slate-400 text-xs font-medium uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedRequests.map((req) => (
-                <tr key={req.id} className="border-b border-[#1E293B] hover:bg-[#1E293B]/30 transition-all duration-150 group">
+                <tr key={req.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all duration-150 group">
                   <td className="px-5 py-3.5 text-white text-sm font-medium">{req.prNumber}</td>
                   <td className="px-5 py-3.5 text-white text-sm">{req.title}</td>
-                  <td className="px-5 py-3.5 text-[#94A3B8] text-sm">{req.supplier}</td>
-                  <td className="px-5 py-3.5 text-[#94A3B8] text-sm">{req.requestedBy}</td>
+                  <td className="px-5 py-3.5 text-slate-400 text-sm">{req.supplier}</td>
+                  <td className="px-5 py-3.5 text-slate-400 text-sm">{req.requestedBy}</td>
                   <td className="px-5 py-3.5"><PriorityBadge priority={req.priority} /></td>
                   <td className="px-5 py-3.5 text-right text-white text-sm">₱{req.estimatedCost.toLocaleString()}</td>
                   <td className="px-5 py-3.5"><StatusBadge status={req.status} /></td>
-                  <td className="px-5 py-3.5 text-[#64748B] text-sm">{req.dateRequested}</td>
+                  <td className="px-5 py-3.5 text-slate-500 text-sm">{req.dateRequested}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-center gap-1">
-                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-all"><Eye className="w-4 h-4" /></button>
-                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-all"><Edit className="w-4 h-4" /></button>
+                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-slate-500 hover:text-white transition-all"><Eye className="w-4 h-4" /></button>
+                      <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-slate-500 hover:text-white transition-all"><Edit className="w-4 h-4" /></button>
                       {req.status === 'Pending' && (
                         <>
                           <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-green-400 hover:text-green-300 transition-all"><CheckCircle className="w-4 h-4" /></button>

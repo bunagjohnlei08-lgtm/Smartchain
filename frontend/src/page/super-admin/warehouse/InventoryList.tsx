@@ -23,7 +23,7 @@ import {
 
 import StockCounting from './StockCounting';
 import ManageLocations from './ManageLocations';
-import PageContainer from '../../components/layout/PageContainer';
+import PageContainer from '@/components/layout/PageContainer';
 
 // ============================================
 // TYPES
@@ -163,19 +163,19 @@ const KPICard: React.FC<{
   subtitle: string;
   icon: React.ReactNode;
 }> = ({ label, value, subtitle, icon }) => (
-  <div className="bg-[#162033] border border-[#263244] rounded-2xl p-4 hover:border-[#5B8CFF]/30 transition-all duration-200 h-full flex flex-col">
-    <div className="flex items-start justify-between flex-1">
-      <div>
-        <p className="text-[#94A3B8] text-[10px] font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-2xl font-bold text-white mt-1">{value}</p>
-        <p className="text-[#64748B] text-[11px] mt-0.5">{subtitle}</p>
-      </div>
-      <div className="p-2 bg-[#0E1624] rounded-lg shrink-0">
-        {icon}
-      </div>
-    </div>
-  </div>
-);
+   <div className="bg-[#0F172A] border border-slate-800 text-white rounded-2xl p-4 hover:border-blue-500/30 transition-all duration-200 h-full flex flex-col">
+     <div className="flex items-start justify-between flex-1">
+       <div>
+         <p className="text-slate-400 text-[10px] font-medium uppercase tracking-wider">{label}</p>
+         <p className="text-2xl font-bold text-white mt-1">{value}</p>
+         <p className="text-slate-500 text-[11px] mt-0.5">{subtitle}</p>
+       </div>
+       <div className="p-2 bg-[#0E1624] rounded-lg shrink-0">
+         {icon}
+       </div>
+     </div>
+   </div>
+ );
 
 // ----- Search Input -----
 const SearchInput: React.FC<{
@@ -183,17 +183,17 @@ const SearchInput: React.FC<{
   onChange: (value: string) => void;
   placeholder?: string;
 }> = ({ value, onChange, placeholder = 'Search...' }) => (
-  <div className="relative flex-1 min-w-[200px]">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all"
-    />
-  </div>
-);
+   <div className="relative flex-1 min-w-[200px]">
+     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+     <input
+       type="text"
+       value={value}
+       onChange={(e) => onChange(e.target.value)}
+       placeholder={placeholder}
+       className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+     />
+   </div>
+ );
 
 // ----- Filter Select -----
 const FilterSelect: React.FC<{
@@ -201,18 +201,18 @@ const FilterSelect: React.FC<{
   onChange: (value: string) => void;
   options: string[];
 }> = ({ value, onChange, options }) => (
-  <div className="min-w-[140px]">
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all appearance-none cursor-pointer"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>{opt}</option>
-      ))}
-    </select>
-  </div>
-);
+   <div className="min-w-[140px]">
+     <select
+       value={value}
+       onChange={(e) => onChange(e.target.value)}
+       className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+     >
+       {options.map((opt) => (
+         <option key={opt} value={opt}>{opt}</option>
+       ))}
+     </select>
+   </div>
+ );
 
 // ----- Pagination -----
 const Pagination: React.FC<{
@@ -242,8 +242,8 @@ const Pagination: React.FC<{
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-[#263244] bg-[#0B1220]/30">
-      <div className="text-sm text-[#94A3B8]">
+    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-[#0B1220]/30">
+      <div className="text-sm text-slate-400">
         Showing <span className="text-white font-medium">{start}</span> to{' '}
         <span className="text-white font-medium">{end}</span> of{' '}
         <span className="text-white font-medium">{totalItems}</span> items
@@ -252,7 +252,7 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -263,7 +263,7 @@ const Pagination: React.FC<{
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
                 ? 'bg-[#5B8CFF] text-white'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]'
+                : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
             }`}
           >
             {page}
@@ -272,7 +272,7 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="p-1.5 rounded-xl border border-[#263244] text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -291,7 +291,6 @@ const InventoryList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(15);
-  const [activeTab, setActiveTab] = useState<'balances' | 'audit'>('balances');
 
   const filteredItems = useMemo(() => {
     return mockInventory.filter(item => {
@@ -320,15 +319,15 @@ const InventoryList: React.FC = () => {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <div className="flex items-center gap-1.5 text-sm text-[#94A3B8] mb-1">
+            <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-1">
             <span>Dashboard</span>
             <ChevronRight className="w-3.5 h-3.5" />
             <span>Warehouse</span>
             <ChevronRight className="w-3.5 h-3.5" />
             <span className="text-white font-medium">Inventory List</span>
           </div>
-           <h1 className="text-2xl font-bold text-white">Inventory List</h1>
-           <p className="text-[#94A3B8] text-sm mt-2">
+            <h1 className="text-2xl font-bold text-white">Inventory List</h1>
+           <p className="text-slate-400 text-sm mt-2">
             Monitor stock levels, warehouse inventory, and stock movements.
           </p>
         </div>
@@ -355,34 +354,9 @@ const InventoryList: React.FC = () => {
         />
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-[#263244]">
-        <div className="flex gap-6">
-          <button
-            onClick={() => setActiveTab('balances')}
-            className={`pb-3 text-sm font-medium transition-all relative ${
-              activeTab === 'balances'
-                ? 'text-white border-b-2 border-[#5B8CFF]'
-                : 'text-[#94A3B8] hover:text-white'
-            }`}
-          >
-            Stock Balances
-          </button>
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`pb-3 text-sm font-medium transition-all relative ${
-              activeTab === 'audit'
-                ? 'text-white border-b-2 border-[#5B8CFF]'
-                : 'text-[#94A3B8] hover:text-white'
-            }`}
-          >
-            Transaction Audit Logs
-          </button>
-        </div>
-      </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-[#162033] border border-[#263244] rounded-2xl p-5">
+      <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5">
         <div className="flex flex-wrap items-center gap-4">
           <SearchInput
             value={search}
@@ -399,7 +373,7 @@ const InventoryList: React.FC = () => {
             onChange={setStatusFilter}
             options={statuses}
           />
-          <button className="px-3.5 py-2.5 border border-[#263244] rounded-xl text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all flex items-center gap-1.5 text-sm ml-auto">
+          <button className="px-3.5 py-2.5 border border-slate-800 text-slate-400 hover:text-white hover:bg-[#1E293B] transition-all flex items-center gap-1.5 text-sm ml-auto">
             <Download className="w-4 h-4" /> Export
           </button>
           <button
@@ -412,38 +386,38 @@ const InventoryList: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-[#162033] border border-[#263244] rounded-2xl overflow-hidden">
+      <div className="bg-[#0F172A] border border-slate-800 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto relative">
           <table className="w-full">
-            <thead className="bg-[#0B1220]/50 border-b border-[#263244] sticky top-0 z-10">
+            <thead className="bg-[#0B1220]/50 border-b border-slate-800 sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Warehouse</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">SKU / Product</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Bin Location</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Batch / Lot</th>
-                <th className="px-6 py-4 text-right text-[#94A3B8] text-xs font-medium uppercase tracking-wider">In Stock Qty</th>
-                <th className="px-6 py-4 text-left text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Warehouse</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">SKU / Product</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Bin Location</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Batch / Lot</th>
+                <th className="px-6 py-4 text-right text-slate-400 text-xs font-medium uppercase tracking-wider">In Stock Qty</th>
+                <th className="px-6 py-4 text-left text-slate-400 text-xs font-medium uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-center text-slate-400 text-xs font-medium uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedItems.map((item) => (
-                <tr key={item.id} className="border-b border-[#1E293B] hover:bg-[#1E293B]/30 transition-all duration-200 group">
+                <tr key={item.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all duration-200 group">
                   <td className="px-6 py-4 text-white text-sm">{item.warehouse}</td>
                   <td className="px-6 py-4">
                     <div>
                       <p className="text-white text-sm font-medium">{item.productName}</p>
-                      <p className="text-[#94A3B8] text-xs">{item.sku}</p>
+                      <p className="text-slate-400 text-xs">{item.sku}</p>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-[#94A3B8] text-sm">{item.binLocation}</td>
+                  <td className="px-6 py-4 text-slate-400 text-sm">{item.binLocation}</td>
                   <td className="px-6 py-4">
                     {item.serialTracked ? (
                       <span className="text-[11px] text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-lg border border-blue-400/20">
                         Serial Tracked
                       </span>
                     ) : (
-                      <span className="text-[#64748B] text-sm">—</span>
+                      <span className="text-slate-500 text-sm">—</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -452,13 +426,13 @@ const InventoryList: React.FC = () => {
                   <td className="px-6 py-4"><StatusBadge status={item.status} /></td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-0.5">
-                      <button className="p-1.5 rounded-md hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-colors">
+                      <button className="p-1.5 rounded-md hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
                         <Eye className="w-3.5 h-3.5" />
                       </button>
-                      <button className="p-1.5 rounded-md hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-colors">
+                      <button className="p-1.5 rounded-md hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
                         <Edit className="w-3.5 h-3.5" />
                       </button>
-                      <button className="p-1.5 rounded-md hover:bg-[#1E293B] text-[#64748B] hover:text-red-400 transition-colors">
+                      <button className="p-1.5 rounded-md hover:bg-slate-800 text-slate-500 hover:text-red-400 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -489,25 +463,25 @@ const WarehouseModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'locations' | 'counting'>('inventory');
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#091018]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0B0F19]">
       <main className="flex-1 overflow-y-auto py-6">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-[#94A3B8] text-sm mb-6">
-            <span>SmartChain</span>
+          <div className="flex items-center gap-2 text-slate-400 text-sm mb-6">
+            <span>Dashboard</span>
             <ChevronBreadcrumb className="w-4 h-4" />
             <span className="text-white font-medium">Warehouse</span>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="border-b border-[#263244] mb-6">
+          <div className="border-b border-slate-800 mb-6">
             <div className="flex gap-6">
               <button
                 onClick={() => setActiveTab('inventory')}
                 className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
                   activeTab === 'inventory'
                     ? 'text-white border-b-2 border-[#5B8CFF]'
-                    : 'text-[#94A3B8] hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Package className="w-4 h-4" />
@@ -518,7 +492,7 @@ const WarehouseModule: React.FC = () => {
                 className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
                   activeTab === 'locations'
                     ? 'text-white border-b-2 border-[#5B8CFF]'
-                    : 'text-[#94A3B8] hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <MapPin className="w-4 h-4" />
@@ -529,7 +503,7 @@ const WarehouseModule: React.FC = () => {
                 className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
                   activeTab === 'counting'
                     ? 'text-white border-b-2 border-[#5B8CFF]'
-                    : 'text-[#94A3B8] hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <ClipboardList className="w-4 h-4" />

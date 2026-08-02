@@ -22,8 +22,24 @@ const LoginPage: React.FC = () => {
     handleCancel,
   } = useAuthForm({
     initialMode: 'login',
-    onLogin: () => navigate('/dashboard'),
-    onSignup: () => navigate('/dashboard'),
+    onLogin: (data) => {
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', data.role);
+      if (data.role === 'super_admin') {
+        navigate('/super-admin/dashboard');
+      } else {
+        navigate('/admin/dashboard');
+      }
+    },
+    onSignup: (data) => {
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', data.role);
+      if (data.role === 'super_admin') {
+        navigate('/super-admin/dashboard');
+      } else {
+        navigate('/admin/dashboard');
+      }
+    },
   });
 
   return (
@@ -73,6 +89,25 @@ const LoginPage: React.FC = () => {
           required
           showPasswordToggle
         />
+
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium" style={{ color: '#A2AAB8' }}>
+            Role
+          </label>
+          <select
+            value={formData.role}
+            onChange={(e) => updateField('role', e.target.value)}
+            className="w-full bg-[#091018] border border-[#2A3447] rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+            style={{ color: '#F5F7FA' }}
+          >
+            <option value="" disabled>
+              Select a role
+            </option>
+            <option value="super_admin">Super Admin</option>
+            <option value="admin">Admin</option>
+          </select>
+          {errors.role && <p className="text-xs text-red-400">{errors.role}</p>}
+        </div>
 
         {mode === 'signup' && (
           <FormInput

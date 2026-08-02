@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
-import PageContainer from '../../components/layout/PageContainer';
+import PageContainer from '@/components/layout/PageContainer';
 
 // ============================================
 // TYPES
@@ -105,13 +105,13 @@ const SearchInput: React.FC<{
   placeholder?: string;
 }> = ({ value, onChange, placeholder = 'Search...' }) => (
   <div className="relative flex-1 min-w-[200px]">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all"
+      className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
     />
   </div>
 );
@@ -126,7 +126,7 @@ const FilterSelect: React.FC<{
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#0E1624] border border-[#263244] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-all appearance-none cursor-pointer"
+      className="w-full bg-[#0E1624] text-white border border-[#263244] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all appearance-none cursor-pointer"
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>{opt}</option>
@@ -156,13 +156,13 @@ const ManageLocations: React.FC = () => {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-white">Manage Locations</h1>
-          <p className="text-[#94A3B8] text-sm mt-2">
+          <p className="text-slate-400 text-sm mt-2">
             View and manage warehouse locations, rack assignments, and capacity utilization.
           </p>
         </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-[#162033] border border-[#263244] rounded-2xl p-5">
+      <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5">
         <div className="flex flex-wrap items-center gap-4">
           <SearchInput
             value={search}
@@ -190,41 +190,41 @@ const ManageLocations: React.FC = () => {
                              'text-green-400';
 
           return (
-            <div key={location.id} className="bg-[#162033] border border-[#263244] rounded-2xl p-5 hover:border-[#5B8CFF]/30 transition-all duration-200">
+            <div key={location.id} className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 hover:border-blue-500/30 transition-all duration-200">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-white font-semibold text-lg">{location.name}</h3>
-                  <p className="text-[#94A3B8] text-sm">{location.code}</p>
+                  <p className="text-slate-400 text-sm">{location.code}</p>
                 </div>
                 <StatusBadge status={location.status} />
               </div>
 
               <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="bg-[#0E1624] rounded-xl p-3 text-center">
-                  <p className="text-[#64748B] text-xs">Rack</p>
+                  <p className="text-slate-400 text-xs">Rack</p>
                   <p className="text-white font-medium">{location.rack}</p>
                 </div>
                 <div className="bg-[#0E1624] rounded-xl p-3 text-center">
-                  <p className="text-[#64748B] text-xs">Shelf</p>
+                  <p className="text-slate-400 text-xs">Shelf</p>
                   <p className="text-white font-medium">{location.shelf}</p>
                 </div>
                 <div className="bg-[#0E1624] rounded-xl p-3 text-center">
-                  <p className="text-[#64748B] text-xs">Bin</p>
+                  <p className="text-slate-400 text-xs">Bin</p>
                   <p className="text-white font-medium">{location.bin}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#94A3B8]">Capacity</span>
+                  <span className="text-slate-400">Capacity</span>
                   <span className="text-white">{location.capacity} units</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#94A3B8]">Utilized</span>
+                  <span className="text-slate-400">Utilized</span>
                   <span className="text-white">{location.utilized} units</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#94A3B8]">Available</span>
+                  <span className="text-slate-400">Available</span>
                   <span className={`font-medium ${statusColor}`}>{location.available} units</span>
                 </div>
                 <div className="w-full bg-[#0E1624] rounded-full h-1.5 mt-1">
@@ -240,11 +240,11 @@ const ManageLocations: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-[#263244]">
-                <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-white transition-all">
+              <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-slate-800">
+                <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-slate-400 hover:text-white transition-all">
                   <Edit className="w-4 h-4" />
                 </button>
-                <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-red-400 transition-all">
+                <button className="p-1.5 rounded-lg hover:bg-[#1E293B] text-slate-400 hover:text-red-400 transition-all">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
