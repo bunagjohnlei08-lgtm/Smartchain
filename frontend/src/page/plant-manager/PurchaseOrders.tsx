@@ -1,17 +1,14 @@
-// src/page/admin/PurchaseOrders.tsx
+// src/page/plant-manager/PurchaseOrders.tsx
 import React, { useState, useMemo } from 'react';
 import {
   Search,
   Plus,
   ChevronRight,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon,
   Download,
   Printer,
   RefreshCw,
-  Eye,
-  Edit,
-  MoreVertical,
-  ChevronLeft,
-  ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
 
 // ============================================
@@ -22,6 +19,8 @@ interface PurchaseOrder {
   id: string;
   poNumber: string;
   supplier: string;
+  warehouse: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   expectedDelivery: string;
   items: number;
   totalCost: number;
@@ -38,6 +37,8 @@ const mockPurchaseOrders: PurchaseOrder[] = [
     id: '1',
     poNumber: 'PO-2058',
     supplier: 'Northwind Traders',
+    warehouse: 'WH-Alpha',
+    priority: 'High',
     expectedDelivery: '2026-08-06',
     items: 14,
     totalCost: 24860,
@@ -48,6 +49,8 @@ const mockPurchaseOrders: PurchaseOrder[] = [
     id: '2',
     poNumber: 'PO-2057',
     supplier: 'Kraft Industrial',
+    warehouse: 'WH-Beta',
+    priority: 'Medium',
     expectedDelivery: '2026-08-04',
     items: 9,
     totalCost: 18240,
@@ -58,6 +61,8 @@ const mockPurchaseOrders: PurchaseOrder[] = [
     id: '3',
     poNumber: 'PO-2056',
     supplier: 'Apex Components',
+    warehouse: 'WH-Gamma',
+    priority: 'Low',
     expectedDelivery: '2026-08-11',
     items: 6,
     totalCost: 9410,
@@ -68,6 +73,8 @@ const mockPurchaseOrders: PurchaseOrder[] = [
     id: '4',
     poNumber: 'PO-2055',
     supplier: 'Cebu Logistics Co.',
+    warehouse: 'WH-Alpha',
+    priority: 'Urgent',
     expectedDelivery: '2026-07-30',
     items: 11,
     totalCost: 12760,
@@ -78,6 +85,8 @@ const mockPurchaseOrders: PurchaseOrder[] = [
     id: '5',
     poNumber: 'PO-2054',
     supplier: 'Meridian Supply',
+    warehouse: 'WH-Delta',
+    priority: 'Medium',
     expectedDelivery: '2026-07-28',
     items: 4,
     totalCost: 6480,
@@ -88,6 +97,8 @@ const mockPurchaseOrders: PurchaseOrder[] = [
     id: '6',
     poNumber: 'PO-2053',
     supplier: 'Northwind Traders',
+    warehouse: 'WH-Beta',
+    priority: 'Low',
     expectedDelivery: '2026-07-25',
     items: 3,
     totalCost: 3120,
@@ -101,6 +112,9 @@ const mockPurchaseOrders: PurchaseOrder[] = [
 // ============================================
 
 const statusOptions = ['All', 'Draft', 'Pending', 'Approved', 'Partially Received', 'Completed', 'Cancelled'];
+const warehouseOptions = ['All', 'WH-Alpha', 'WH-Beta', 'WH-Gamma', 'WH-Delta'];
+const supplierOptions = ['All', 'Northwind Traders', 'Kraft Industrial', 'Apex Components', 'Cebu Logistics Co.', 'Meridian Supply'];
+const priorityOptions = ['All', 'Low', 'Medium', 'High', 'Urgent'];
 
 // ============================================
 // HELPER COMPONENTS
@@ -108,7 +122,7 @@ const statusOptions = ['All', 'Draft', 'Pending', 'Approved', 'Partially Receive
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const config: Record<string, { color: string; dotColor: string }> = {
-    Draft: { color: 'text-gray-400 bg-slate-500/10 border-slate-500/20', dotColor: 'bg-slate-400' },
+    Draft: { color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', dotColor: 'bg-slate-400' },
     Pending: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', dotColor: 'bg-amber-400' },
     Approved: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', dotColor: 'bg-emerald-400' },
     'Partially Received': { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', dotColor: 'bg-blue-400' },
@@ -132,6 +146,9 @@ const PurchaseOrders: React.FC = () => {
   // State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [warehouseFilter, setWarehouseFilter] = useState('All');
+  const [supplierFilter, setSupplierFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -140,9 +157,12 @@ const PurchaseOrders: React.FC = () => {
         order.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.supplier.toLowerCase().includes(searchQuery.toLowerCase());
       const matchStatus = statusFilter === 'All' || order.status === statusFilter;
-      return matchSearch && matchStatus;
+      const matchWarehouse = warehouseFilter === 'All' || order.warehouse === warehouseFilter;
+      const matchSupplier = supplierFilter === 'All' || order.supplier === supplierFilter;
+      const matchPriority = priorityFilter === 'All' || order.priority === priorityFilter;
+      return matchSearch && matchStatus && matchWarehouse && matchSupplier && matchPriority;
     });
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, warehouseFilter, supplierFilter, priorityFilter]);
 
   // KPI counts
   const kpiCounts = useMemo(() => {
@@ -157,8 +177,8 @@ const PurchaseOrders: React.FC = () => {
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#0a0e17] text-slate-100">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-400">
-        <span>Admin</span>
+      <div className="flex items-center gap-2 text-sm text-slate-400">
+        <span>Plant Manager</span>
         <ChevronRight className="w-4 h-4" />
         <span className="text-slate-100">Purchase Orders</span>
       </div>
@@ -167,7 +187,7 @@ const PurchaseOrders: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Purchase Orders</h1>
-          <p className="text-sm text-gray-400">Replenishment orders from draft through completion</p>
+          <p className="text-sm text-slate-400">Replenishment orders from draft through completion</p>
         </div>
         <button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
           <Plus className="w-4 h-4" /> Create PO
@@ -181,51 +201,52 @@ const PurchaseOrders: React.FC = () => {
             key={status}
             className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-4 text-center hover:border-slate-600 transition-colors"
           >
-            <p className="text-xs text-gray-400 uppercase tracking-wider">{status}</p>
+            <p className="text-xs text-slate-400 uppercase tracking-wider">{status}</p>
             <p className="text-2xl font-bold text-white mt-1">{kpiCounts[status] || 0}</p>
           </div>
         ))}
       </div>
 
-      {/* Filter Bar & Search */}
-      <div className="bg-[#0f172a]/60 border border-[#1e293b] rounded-2xl p-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap items-center gap-1 bg-[#1e293b]/50 rounded-full p-1">
-            {statusOptions.map((status) => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  statusFilter === status
-                    ? 'bg-cyan-500 text-slate-950'
-                    : 'text-gray-400 hover:text-slate-100'
-                }`}
-              >
-                {status}
-              </button>
-            ))}
+      {/* Filter Bar */}
+      <div className="w-full flex flex-nowrap items-center justify-between gap-4 p-4 bg-[#0d1322] rounded-xl border border-gray-800/50 overflow-x-auto">
+        {/* Status Pills (Left) */}
+        <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
+          {statusOptions.map((status) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                statusFilter === status
+                  ? 'bg-cyan-500 text-slate-950'
+                  : 'bg-[#090d16] border border-gray-800 text-gray-300 hover:text-white hover:border-gray-700'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Bar & Action Icons (Right) */}
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search PO or supplier"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-[#090d16] border border-gray-800 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 w-48 xl:w-56"
+            />
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search PO or supplier"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[#0f172a] border border-[#1e293b] rounded-xl pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 w-full sm:w-56"
-              />
-            </div>
-            <button className="p-2 rounded-xl hover:bg-[#1e293b] transition-colors text-gray-400 hover:text-slate-100">
-              <Download className="w-4 h-4" />
-            </button>
-            <button className="p-2 rounded-xl hover:bg-[#1e293b] transition-colors text-gray-400 hover:text-slate-100">
-              <Printer className="w-4 h-4" />
-            </button>
-            <button className="p-2 rounded-xl hover:bg-[#1e293b] transition-colors text-gray-400 hover:text-slate-100">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
+          <button className="p-2.5 rounded-xl border border-gray-800 text-slate-400 hover:text-white hover:border-gray-700 transition-colors" title="Download">
+            <Download className="w-4 h-4" />
+          </button>
+          <button className="p-2.5 rounded-xl border border-gray-800 text-slate-400 hover:text-white hover:border-gray-700 transition-colors" title="Print">
+            <Printer className="w-4 h-4" />
+          </button>
+          <button className="p-2.5 rounded-xl border border-gray-800 text-slate-400 hover:text-white hover:border-gray-700 transition-colors" title="Refresh">
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -235,25 +256,25 @@ const PurchaseOrders: React.FC = () => {
           <table className="w-full min-w-[800px]">
             <thead className="bg-[#1e293b]/50 border-b border-[#1e293b]">
               <tr>
-                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   PO Number
                 </th>
-                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Supplier
                 </th>
-                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Expected delivery
                 </th>
-                <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-gray-400">
+                <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Items
                 </th>
-                <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-gray-400">
+                <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Total cost
                 </th>
-                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Created by
                 </th>
-                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Status
                 </th>
               </tr>
@@ -267,19 +288,19 @@ const PurchaseOrders: React.FC = () => {
                   <td className="px-5 py-3.5 text-sm font-medium text-white">
                     {order.poNumber}
                   </td>
-                  <td className="px-5 py-3.5 text-sm text-gray-300">
+                  <td className="px-5 py-3.5 text-sm text-slate-300">
                     {order.supplier}
                   </td>
-                  <td className="px-5 py-3.5 text-sm text-gray-300">
+                  <td className="px-5 py-3.5 text-sm text-slate-300">
                     {order.expectedDelivery}
                   </td>
-                  <td className="px-5 py-3.5 text-right text-sm text-gray-300">
+                  <td className="px-5 py-3.5 text-right text-sm text-slate-300">
                     {order.items}
                   </td>
                   <td className="px-5 py-3.5 text-right text-sm font-medium text-white">
                     ${order.totalCost.toLocaleString()}
                   </td>
-                  <td className="px-5 py-3.5 text-sm text-gray-300">
+                  <td className="px-5 py-3.5 text-sm text-slate-300">
                     {order.createdBy}
                   </td>
                   <td className="px-5 py-3.5">
@@ -289,7 +310,7 @@ const PurchaseOrders: React.FC = () => {
               ))}
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
                     No purchase orders found matching your criteria.
                   </td>
                 </tr>
@@ -300,19 +321,19 @@ const PurchaseOrders: React.FC = () => {
 
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#1e293b] bg-[#0f172a]/30">
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-slate-400">
             Showing <span className="text-white font-medium">1</span> to{' '}
             <span className="text-white font-medium">{filteredOrders.length}</span> of{' '}
             <span className="text-white font-medium">{mockPurchaseOrders.length}</span> results
           </div>
           <div className="flex items-center gap-1">
-            <button className="p-1.5 rounded-xl border border-[#1e293b] text-gray-400 hover:text-white hover:bg-[#1e293b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <button className="p-1.5 rounded-xl border border-[#1e293b] text-slate-400 hover:text-white hover:bg-[#1e293b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
               1
             </button>
-            <button className="p-1.5 rounded-xl border border-[#1e293b] text-gray-400 hover:text-white hover:bg-[#1e293b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <button className="p-1.5 rounded-xl border border-[#1e293b] text-slate-400 hover:text-white hover:bg-[#1e293b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronRightIcon className="w-4 h-4" />
             </button>
           </div>

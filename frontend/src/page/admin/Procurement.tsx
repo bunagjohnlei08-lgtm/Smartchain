@@ -201,13 +201,13 @@ const supplierSummary: SupplierSummary[] = [
        ? 'text-emerald-400'
        : trend === 'down'
        ? 'text-red-400'
-       : 'text-slate-400';
+       : 'text-gray-400';
 
    return (
      <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5 shadow-sm">
        <div className="flex items-start justify-between">
          <div>
-           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+           <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
              {label}
            </p>
            <p className="text-2xl font-bold text-white mt-1.5">
@@ -256,13 +256,13 @@ const Procurement: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">
             Procurement
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-gray-400">
             Requests, approvals and inbound scheduling
           </p>
         </div>
         <button
           onClick={() => setShowExportModal(true)}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-slate-700 text-slate-300 hover:bg-slate-800"
+          className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-slate-700 text-gray-300 hover:bg-slate-800"
         >
           <Download className="w-4 h-4" /> Export summary
         </button>
@@ -295,7 +295,7 @@ const Procurement: React.FC = () => {
           label="Active Suppliers"
           value={activeSuppliers}
           indicator="stable vs last period"
-          icon={<Truck className="w-5 h-5 text-slate-400" />}
+          icon={<Truck className="w-5 h-5 text-gray-400" />}
           trend="stable"
         />
       </div>
@@ -310,7 +310,7 @@ const Procurement: React.FC = () => {
                 <h3 className="text-lg font-semibold text-white">
                   Pending Requests
                 </h3>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-gray-400">
                   Awaiting purchasing decision
                 </p>
               </div>
@@ -331,17 +331,17 @@ const Procurement: React.FC = () => {
                     </h4>
                     <StatusBadge status={req.status} />
                   </div>
-                  <p className="text-xs text-slate-400 mb-2">
+                  <p className="text-xs text-gray-400 mb-2">
                     {req.reference} · {req.location}
                   </p>
-                  <div className="flex items-center gap-4 text-sm text-slate-300 mb-3">
+                  <div className="flex items-center gap-4 text-sm text-gray-300 mb-3">
                     <span>Qty {req.qty}</span>
                     <span>Needed {req.needed}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleRequestAction(req.id, 'Decline')}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-700 text-slate-300 hover:bg-slate-800 transition-all"
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-700 text-gray-300 hover:bg-slate-800 transition-all"
                     >
                       Decline
                     </button>
@@ -366,7 +366,7 @@ const Procurement: React.FC = () => {
                 <h3 className="text-lg font-semibold text-white">
                   Receiving Schedule
                 </h3>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-gray-400">
                   Today's dock assignments
                 </p>
               </div>
@@ -394,14 +394,14 @@ const Procurement: React.FC = () => {
                       <p className="text-sm font-medium text-white">
                         {item.poNumber} · {item.dock}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-gray-400">
                         {item.supplier}
                       </p>
                       <div className="mt-1">
                         <StatusBadge status={item.status} />
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-300 whitespace-nowrap ml-4">
+                    <span className="text-sm font-medium text-gray-300 whitespace-nowrap ml-4">
                       {item.time}
                     </span>
                   </div>
@@ -419,7 +419,7 @@ const Procurement: React.FC = () => {
             <h3 className="text-lg font-semibold text-white">
               Supplier Summary
             </h3>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-gray-400">
               Fill rate and quality across active vendors
             </p>
           </div>
@@ -438,7 +438,7 @@ const Procurement: React.FC = () => {
                 <h4 className="text-sm font-semibold text-white">
                   {supplier.name}
                 </h4>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-gray-400">
                   {supplier.orders} orders
                 </span>
               </div>
@@ -446,7 +446,7 @@ const Procurement: React.FC = () => {
               <div className="space-y-2">
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-slate-300">On-time</span>
+                    <span className="text-gray-300">On-time</span>
                     <span className="font-medium text-white">
                       {supplier.onTime}%
                     </span>
@@ -469,7 +469,7 @@ const Procurement: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-slate-300">Quality</span>
+                    <span className="text-gray-300">Quality</span>
                     <span className="font-medium text-white">
                       {supplier.quality}%
                     </span>
@@ -513,7 +513,7 @@ const Procurement: React.FC = () => {
               </h2>
               <button
                 onClick={() => setShowExportModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all"
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-gray-400 hover:text-slate-100 transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -521,7 +521,7 @@ const Procurement: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                <label className="block text-sm font-medium mb-1.5 text-gray-300">
                   Export Format
                 </label>
                 <select className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all">
@@ -532,7 +532,7 @@ const Procurement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                <label className="block text-sm font-medium mb-1.5 text-gray-300">
                   Date Range
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -551,7 +551,7 @@ const Procurement: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowExportModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-all"
+                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-gray-400 hover:text-slate-100 hover:bg-slate-800 transition-all"
                 >
                   Cancel
                 </button>

@@ -1,4 +1,4 @@
-// src/pages/admin/Reports.tsx
+// src/page/plant-manager/Reports.tsx
 import React, { useState } from 'react';
 import {
   FileText,
@@ -133,8 +133,8 @@ const Reports: React.FC = () => {
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-400">
-        <span>Admin</span>
+      <div className="flex items-center gap-2 text-sm text-slate-400">
+        <span>Plant Manager</span>
         <ChevronRight className="w-4 h-4" />
         <span className="text-slate-100">Reports</span>
       </div>
@@ -143,11 +143,11 @@ const Reports: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Reports</h1>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-slate-400">
             Operational reporting for inventory, purchasing and logistics
           </p>
         </div>
-        <button className="p-2.5 rounded-xl border border-slate-700 text-gray-400 hover:text-white hover:bg-slate-800 transition-all">
+        <button className="p-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
@@ -166,37 +166,37 @@ const Reports: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">{report.title}</h3>
-                <p className="text-xs text-gray-400">{report.recordCount}</p>
+                <p className="text-xs text-slate-400">{report.recordCount}</p>
               </div>
             </div>
 
             {/* Description & Timestamp */}
-            <p className="text-sm text-gray-400 flex-1">{report.description}</p>
-            <p className="text-xs text-gray-400">{report.updated}</p>
+            <p className="text-sm text-slate-400 flex-1">{report.description}</p>
+            <p className="text-xs text-slate-500">{report.updated}</p>
 
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-2.5 pt-2">
               <button
                 onClick={() => handlePreview(report)}
-                className="bg-[#0d1322] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
               >
                 <Eye className="w-4 h-4" /> Preview
               </button>
               <button
                 onClick={() => handlePrint(report)}
-                className="bg-[#0d1322] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
               >
                 <Printer className="w-4 h-4" /> Print
               </button>
               <button
                 onClick={() => handlePDF(report)}
-                className="bg-[#0d1322] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
               >
                 <Download className="w-4 h-4" /> PDF
               </button>
               <button
                 onClick={() => handleExcel(report)}
-                className="bg-[#0d1322] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
+                className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all"
               >
                 <FileSpreadsheet className="w-4 h-4" /> Excel
               </button>
@@ -210,7 +210,7 @@ const Reports: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">Scheduled Reports</h3>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-slate-400">
               Automatically delivered to operations leads
             </p>
           </div>
@@ -223,11 +223,11 @@ const Reports: React.FC = () => {
           {scheduledReports.map((item) => (
             <div
               key={item.id}
-              className="bg-[#0d1322]/70 border border-slate-800/60 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-slate-700/80 transition-all"
+              className="bg-[#101929]/70 border border-slate-800/60 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-slate-700/80 transition-all"
             >
               <div>
                 <p className="text-sm font-medium text-white">{item.name}</p>
-                <p className="text-xs text-gray-400">{item.schedule}</p>
+                <p className="text-xs text-slate-400">{item.schedule}</p>
               </div>
               <div className="mt-2 sm:mt-0">
                 <span className="px-3 py-1 rounded-lg text-xs font-medium bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
@@ -254,20 +254,20 @@ const Reports: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-xl font-bold text-white">{selectedReport.title}</h2>
-                <p className="text-sm text-gray-400">Preview</p>
+                <p className="text-sm text-slate-400">Preview</p>
               </div>
               <button
                 onClick={() => setShowPreviewModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-gray-400 hover:text-white transition-all"
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-[#0d1322] rounded-xl p-4 border border-slate-800">
-                <p className="text-sm text-gray-400">{selectedReport.description}</p>
-                <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+              <div className="bg-[#101929] rounded-xl p-4 border border-slate-800">
+                <p className="text-sm text-slate-400">{selectedReport.description}</p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
                   <Clock className="w-3 h-3" />
                   <span>{selectedReport.updated}</span>
                 </div>
@@ -276,15 +276,15 @@ const Reports: React.FC = () => {
               {/* Mock table preview */}
               <div className="border border-slate-800 rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-[#0d1322] border-b border-slate-800">
+                  <thead className="bg-[#101929] border-b border-slate-800">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                         Column 1
                       </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                         Column 2
                       </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                         Column 3
                       </th>
                     </tr>
@@ -295,9 +295,9 @@ const Reports: React.FC = () => {
                         key={i}
                         className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors"
                       >
-                        <td className="px-4 py-2.5 text-gray-300">Sample Data {i}</td>
-                        <td className="px-4 py-2.5 text-gray-300">Value {i}</td>
-                        <td className="px-4 py-2.5 text-gray-300">{i * 100}</td>
+                        <td className="px-4 py-2.5 text-slate-300">Sample Data {i}</td>
+                        <td className="px-4 py-2.5 text-slate-300">Value {i}</td>
+                        <td className="px-4 py-2.5 text-slate-300">{i * 100}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -307,7 +307,7 @@ const Reports: React.FC = () => {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                 <button
                   onClick={() => setShowPreviewModal(false)}
-                  className="px-5 py-2.5 border border-slate-700 rounded-xl text-gray-400 hover:text-white hover:bg-slate-800 transition-all"
+                  className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
                 >
                   Close
                 </button>
@@ -333,7 +333,7 @@ const Reports: React.FC = () => {
           <span className="text-sm">{toastMessage}</span>
           <button
             onClick={() => setShowToast(false)}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-slate-400 hover:text-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>

@@ -1,4 +1,4 @@
-// src/pages/admin/Suppliers.tsx
+// src/page/plant-manager/Suppliers.tsx
 import React, { useState, useMemo } from 'react';
 import {
   Search,
@@ -201,8 +201,8 @@ const Suppliers: React.FC = () => {
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#0b0f19] text-slate-100">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-400">
-        <span>Admin</span>
+      <div className="flex items-center gap-2 text-sm text-slate-400">
+        <span>Plant Manager</span>
         <ChevronRight className="w-4 h-4" />
         <span className="text-slate-100">Suppliers</span>
       </div>
@@ -211,23 +211,23 @@ const Suppliers: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Suppliers</h1>
-          <p className="text-sm text-gray-400">Manage vendor relationships, contacts, and performance metrics</p>
+          <p className="text-sm text-slate-400">Manage vendor relationships, contacts, and performance metrics</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
             title="Export"
           >
             <Download className="w-4 h-4" />
           </button>
           <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
             title="Print"
           >
             <Printer className="w-4 h-4" />
@@ -238,7 +238,7 @@ const Suppliers: React.FC = () => {
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'cards'
                   ? 'bg-cyan-500 text-slate-950'
-                  : 'text-gray-400 hover:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-100'
               }`}
               title="Card View"
             >
@@ -249,7 +249,7 @@ const Suppliers: React.FC = () => {
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'table'
                   ? 'bg-cyan-500 text-slate-950'
-                  : 'text-gray-400 hover:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-100'
               }`}
               title="Table View"
             >
@@ -268,19 +268,19 @@ const Suppliers: React.FC = () => {
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Total Suppliers</p>
+          <p className="text-xs text-slate-400 uppercase tracking-wider">Total Suppliers</p>
           <p className="text-2xl font-bold text-white mt-1">{totalSuppliers}</p>
         </div>
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Active Vendors</p>
+          <p className="text-xs text-slate-400 uppercase tracking-wider">Active Vendors</p>
           <p className="text-2xl font-bold text-white mt-1">{activeSuppliers}</p>
         </div>
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">On Hold</p>
+          <p className="text-xs text-slate-400 uppercase tracking-wider">On Hold</p>
           <p className="text-2xl font-bold text-white mt-1">{onHoldSuppliers}</p>
         </div>
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Open POs</p>
+          <p className="text-xs text-slate-400 uppercase tracking-wider">Open POs</p>
           <p className="text-2xl font-bold text-white mt-1">{totalOpenPOs}</p>
         </div>
       </div>
@@ -296,7 +296,7 @@ const Suppliers: React.FC = () => {
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   statusFilter === status
                     ? 'bg-cyan-500 text-slate-950'
-                    : 'text-gray-400 hover:text-slate-100'
+                    : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {status}
@@ -305,13 +305,13 @@ const Suppliers: React.FC = () => {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search by supplier name, contact, or ID"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-[#0f172a] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 w-full sm:w-64"
+                className="bg-[#0f172a] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 w-full sm:w-64"
               />
             </div>
           </div>
@@ -333,27 +333,27 @@ const Suppliers: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-white">{supplier.name}</p>
-                    <p className="text-xs text-gray-400">{supplier.code}</p>
+                    <p className="text-xs text-slate-400">{supplier.code}</p>
                   </div>
                 </div>
                 <StatusBadge status={supplier.status} />
               </div>
 
               <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-gray-300">
-                  <User className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-slate-300">
+                  <User className="w-4 h-4 text-slate-400" />
                   <span>{supplier.contactPerson}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Mail className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-slate-300">
+                  <Mail className="w-4 h-4 text-slate-400" />
                   <span className="truncate">{supplier.email}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Phone className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-slate-300">
+                  <Phone className="w-4 h-4 text-slate-400" />
                   <span>{supplier.phone}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <MapPin className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-slate-300">
+                  <MapPin className="w-4 h-4 text-slate-400" />
                   <span>{supplier.location}</span>
                 </div>
               </div>
@@ -361,17 +361,17 @@ const Suppliers: React.FC = () => {
               <div className="mt-4 flex items-center justify-between pt-3 border-t border-slate-800/60">
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-xs text-gray-400">Open POs</p>
+                    <p className="text-xs text-slate-400">Open POs</p>
                     <p className="text-sm font-semibold text-white">{supplier.openPOs}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">Terms</p>
-                    <p className="text-sm font-medium text-gray-300">{supplier.paymentTerms}</p>
+                    <p className="text-xs text-slate-400">Terms</p>
+                    <p className="text-sm font-medium text-slate-300">{supplier.paymentTerms}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => handleEdit(supplier)}
-                  className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-slate-100 transition-colors"
                   title="Edit Supplier"
                 >
                   <Edit className="w-4 h-4" />
@@ -389,25 +389,25 @@ const Suppliers: React.FC = () => {
             <table className="w-full min-w-[900px]">
               <thead className="bg-slate-800/30 border-b border-slate-800/60">
                 <tr>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     Supplier
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     Contact Person
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     Phone / Location
                   </th>
-                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                     Open POs
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     Payment Terms
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     Status
                   </th>
-                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                     Actions
                   </th>
                 </tr>
@@ -421,25 +421,25 @@ const Suppliers: React.FC = () => {
                     <td className="px-4 py-3.5">
                       <div>
                         <p className="text-sm font-medium text-white">{supplier.name}</p>
-                        <p className="text-xs text-gray-400">{supplier.code}</p>
+                        <p className="text-xs text-slate-400">{supplier.code}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <div>
-                        <p className="text-sm text-gray-300">{supplier.contactPerson}</p>
-                        <p className="text-xs text-gray-400">{supplier.email}</p>
+                        <p className="text-sm text-slate-300">{supplier.contactPerson}</p>
+                        <p className="text-xs text-slate-400">{supplier.email}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <div>
-                        <p className="text-sm text-gray-300">{supplier.phone}</p>
-                        <p className="text-xs text-gray-400">{supplier.location}</p>
+                        <p className="text-sm text-slate-300">{supplier.phone}</p>
+                        <p className="text-xs text-slate-400">{supplier.location}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-center text-sm font-medium text-white">
                       {supplier.openPOs}
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-gray-300">
+                    <td className="px-4 py-3.5 text-sm text-slate-300">
                       {supplier.paymentTerms}
                     </td>
                     <td className="px-4 py-3.5">
@@ -449,13 +449,13 @@ const Suppliers: React.FC = () => {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleEdit(supplier)}
-                          className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-slate-100 transition-colors"
                           title="Edit Supplier"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-slate-100 transition-colors"
                           title="View Details"
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -466,7 +466,7 @@ const Suppliers: React.FC = () => {
                 ))}
                 {filteredSuppliers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                       No suppliers found matching your criteria.
                     </td>
                   </tr>
@@ -477,19 +477,19 @@ const Suppliers: React.FC = () => {
 
           {/* Pagination */}
           <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800/60 bg-slate-800/10">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-slate-400">
               Showing <span className="text-white font-medium">1</span> to{' '}
               <span className="text-white font-medium">{filteredSuppliers.length}</span> of{' '}
               <span className="text-white font-medium">{mockSuppliers.length}</span> suppliers
             </div>
             <div className="flex items-center gap-1">
-              <button className="p-1.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-white hover:bg-slate-800/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              <button className="p-1.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
                 1
               </button>
-              <button className="p-1.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-white hover:bg-slate-800/50 transition-colors">
+              <button className="p-1.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">
                 <ChevronRightIcon className="w-4 h-4" />
               </button>
             </div>
@@ -513,7 +513,7 @@ const Suppliers: React.FC = () => {
               <h2 className="text-xl font-bold text-white">Add New Supplier</h2>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-all"
+                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-slate-100 transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -521,59 +521,59 @@ const Suppliers: React.FC = () => {
 
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Supplier Name *
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="Enter supplier name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Contact Person *
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="Full name"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-slate-300">
                     Email *
                   </label>
                   <input
                     type="email"
-                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     placeholder="contact@company.com"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-slate-300">
                     Phone *
                   </label>
                   <input
                     type="text"
-                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     placeholder="+1 234 567 8900"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Location
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="City, Country"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Payment Terms
                 </label>
                 <select className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
@@ -584,7 +584,7 @@ const Suppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Status
                 </label>
                 <select className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
@@ -597,7 +597,7 @@ const Suppliers: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
+                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
                 >
                   Cancel
                 </button>
@@ -629,7 +629,7 @@ const Suppliers: React.FC = () => {
               <h2 className="text-xl font-bold text-white">Edit Supplier</h2>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-all"
+                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-slate-100 transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -637,7 +637,7 @@ const Suppliers: React.FC = () => {
 
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Supplier Name *
                 </label>
                 <input
@@ -647,7 +647,7 @@ const Suppliers: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Contact Person *
                 </label>
                 <input
@@ -658,7 +658,7 @@ const Suppliers: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-slate-300">
                     Email *
                   </label>
                   <input
@@ -668,7 +668,7 @@ const Suppliers: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-slate-300">
                     Phone *
                   </label>
                   <input
@@ -679,7 +679,7 @@ const Suppliers: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Location
                 </label>
                 <input
@@ -689,7 +689,7 @@ const Suppliers: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Payment Terms
                 </label>
                 <select
@@ -703,7 +703,7 @@ const Suppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
                   Status
                 </label>
                 <select
@@ -719,7 +719,7 @@ const Suppliers: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
+                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
                 >
                   Cancel
                 </button>

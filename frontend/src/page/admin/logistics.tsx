@@ -1,0 +1,875 @@
+// src/page/admin/Logistics.tsx
+import React, { useState, useMemo } from 'react';
+import {
+ Truck,
+ Search,
+ Plus,
+ ChevronLeft,
+ ChevronRight,
+ Package,
+ Clock,
+ CheckCircle,
+ AlertTriangle,
+ MapPin,
+ Eye,
+ Send,
+ X,
+ Calendar,
+ User,
+ Building2,
+ Clipboard,
+ Check,
+ AlertCircle,
+ ChevronDown,
+ Filter,
+ RefreshCw,
+} from 'lucide-react';
+
+// ============================================
+// TYPES
+// ============================================
+
+type ShipmentStatus =
+ | 'Pending Approval'
+ | 'Approved'
+ | 'Assigned'
+ | 'Picked Up'
+ | 'In Transit'
+ | 'Delivered'
+ | 'Cancelled';
+
+interface Shipment {
+ id: string;
+ shipmentNo: string;
+ poNumber: string;
+ customer: string;
+ warehouse: string;
+ preparedBy: string;
+ destination: string;
+ preparedDate: string;
+ assignedLogistics: string | null;
+ status: ShipmentStatus;
+ items: { name: string; sku: string; qty: number; unit: string }[];
+ totalItems: number;
+ totalWeight: number;
+ weightUnit: string;
+ timeline: {
+  step: string;
+  completed: boolean;
+  timestamp?: string;
+ }[];
+ barcodeVerified: boolean;
+ expectedDelivery?: string;
+}
+
+// ============================================
+// MOCK DATA
+// ============================================
+
+const mockShipments: Shipment[] = [
+ {
+  id: '1',
+  shipmentNo: 'SHP-3301',
+  poNumber: 'PO-2857',
+  customer: 'Northwind Traders',
+  warehouse: 'Central Depot',
+  preparedBy: 'M. Santos (Plant Manager)',
+  destination: 'QC Central Hub, PH',
+  preparedDate: '2026-08-01',
+  assignedLogistics: null,
+  status: 'Pending Approval',
+  items: [
+   { name: 'Industrial LED Panel 40W', sku: 'ELC-LED-040', qty: 12, unit: 'pcs' },
+   { name: 'Aluminium Profile 6m', sku: 'RAW-ALU-006', qty: 8, unit: 'bar' },
+  ],
+  totalItems: 20,
+  totalWeight: 450,
+  weightUnit: 'kg',
+  timeline: [
+   { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-01 10:30' },
+   { step: 'Admin Approved', completed: false },
+   { step: 'Assigned to Logistics', completed: false },
+   { step: 'Picked Up', completed: false },
+   { step: 'In Transit', completed: false },
+   { step: 'Delivered', completed: false },
+  ],
+  barcodeVerified: true,
+ },
+ {
+  id: '2',
+  shipmentNo: 'SHP-3302',
+  poNumber: 'PO-2851',
+  customer: 'Cebu Logistics Co.',
+  warehouse: 'Northgate',
+  preparedBy: 'L. Cruz (Plant Manager)',
+  destination: 'Davao DC, PH',
+  preparedDate: '2026-07-30',
+  assignedLogistics: 'Integrated Logistics System',
+  status: 'Assigned',
+  items: [
+   { name: 'Corrugated Box 60x40x40', sku: 'PKG-BOX-604', qty: 8, unit: 'pcs' },
+  ],
+  totalItems: 8,
+  totalWeight: 620,
+  weightUnit: 'kg',
+  timeline: [
+   { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-30 09:00' },
+   { step: 'Admin Approved', completed: true, timestamp: '2026-07-30 14:20' },
+   { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-30 15:00' },
+   { step: 'Picked Up', completed: false },
+   { step: 'In Transit', completed: false },
+   { step: 'Delivered', completed: false },
+  ],
+  barcodeVerified: true,
+ },
+ {
+  id: '3',
+  shipmentNo: 'SHP-3303',
+  poNumber: 'PO-2855',
+  customer: 'Kraft Industrial',
+  warehouse: 'Southpark',
+  preparedBy: 'R. Diaz (Plant Manager)',
+  destination: 'Cebu Port, PH',
+  preparedDate: '2026-07-28',
+  assignedLogistics: 'External Delivery Group',
+  status: 'In Transit',
+  items: [
+   { name: 'Steel Sheet 2mm', sku: 'RAW-SST-002', qty: 20, unit: 'sheet' },
+  ],
+  totalItems: 20,
+  totalWeight: 1200,
+  weightUnit: 'kg',
+  timeline: [
+   { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-28 11:00' },
+   { step: 'Admin Approved', completed: true, timestamp: '2026-07-28 15:30' },
+   { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-28 16:45' },
+   { step: 'Picked Up', completed: true, timestamp: '2026-07-29 08:00' },
+   { step: 'In Transit', completed: true, timestamp: '2026-07-29 10:00' },
+   { step: 'Delivered', completed: false },
+  ],
+  barcodeVerified: true,
+ },
+ {
+  id: '4',
+  shipmentNo: 'SHP-3304',
+  poNumber: 'PO-2843',
+  customer: 'Apex Components',
+  warehouse: 'Eastside',
+  preparedBy: 'J. Santos (Plant Manager)',
+  destination: 'Makati Branch, PH',
+  preparedDate: '2026-08-02',
+  assignedLogistics: 'Internal Fleet',
+  status: 'Delivered',
+  items: [
+   { name: 'Wireless Earbuds Pro', sku: 'SKU-1001', qty: 3, unit: 'pcs' },
+  ],
+  totalItems: 3,
+  totalWeight: 120,
+  weightUnit: 'kg',
+  timeline: [
+   { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 08:00' },
+   { step: 'Admin Approved', completed: true, timestamp: '2026-08-02 09:15' },
+   { step: 'Assigned to Logistics', completed: true, timestamp: '2026-08-02 09:45' },
+   { step: 'Picked Up', completed: true, timestamp: '2026-08-02 10:00' },
+   { step: 'In Transit', completed: true, timestamp: '2026-08-02 11:30' },
+   { step: 'Delivered', completed: true, timestamp: '2026-08-02 14:00' },
+  ],
+  barcodeVerified: true,
+ },
+ {
+  id: '5',
+  shipmentNo: 'SHP-3305',
+  poNumber: 'PO-2859',
+  customer: 'Meridian Supply',
+  warehouse: 'Central Depot',
+  preparedBy: 'L. Reyes (Plant Manager)',
+  destination: 'Bohol Warehouse',
+  preparedDate: '2026-07-31',
+  assignedLogistics: null,
+  status: 'Approved',
+  items: [
+   { name: 'Safety Helmet Class E', sku: 'SAF-HLM-001', qty: 5, unit: 'pcs' },
+  ],
+  totalItems: 5,
+  totalWeight: 240,
+  weightUnit: 'kg',
+  timeline: [
+   { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-31 14:00' },
+   { step: 'Admin Approved', completed: true, timestamp: '2026-08-01 10:00' },
+   { step: 'Assigned to Logistics', completed: false },
+   { step: 'Picked Up', completed: false },
+   { step: 'In Transit', completed: false },
+   { step: 'Delivered', completed: false },
+  ],
+  barcodeVerified: false,
+ },
+ {
+  id: '6',
+  shipmentNo: 'SHP-3306',
+  poNumber: 'PO-2860',
+  customer: 'Bayview Home Goods',
+  warehouse: 'Northgate',
+  preparedBy: 'M. Santos (Plant Manager)',
+  destination: 'Clark Freeport Zone',
+  preparedDate: '2026-08-02',
+  assignedLogistics: null,
+  status: 'Cancelled',
+  items: [
+   { name: 'Pallet Wrap Film 500mm', sku: 'PKG-WRP-500', qty: 15, unit: 'roll' },
+  ],
+  totalItems: 15,
+  totalWeight: 760,
+  weightUnit: 'kg',
+  timeline: [
+   { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 13:00' },
+   { step: 'Admin Approved', completed: false },
+   { step: 'Assigned to Logistics', completed: false },
+   { step: 'Picked Up', completed: false },
+   { step: 'In Transit', completed: false },
+   { step: 'Delivered', completed: false },
+  ],
+  barcodeVerified: false,
+ },
+];
+
+// ============================================
+// CONSTANTS
+// ============================================
+
+const statusOptions = [
+ 'All Status',
+ 'Pending Approval',
+ 'Approved',
+ 'Assigned',
+ 'Picked Up',
+ 'In Transit',
+ 'Delivered',
+ 'Cancelled',
+];
+
+const warehouseOptions = ['All Warehouses', 'Central Depot', 'Northgate', 'Southpark', 'Eastside'];
+const logisticsOptions = ['All Logistics', 'Integrated Logistics System', 'External Delivery Group', 'Internal Fleet', 'Courier Partner'];
+
+// ============================================
+// HELPER COMPONENTS
+// ============================================
+
+const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
+ const config: Record<ShipmentStatus, { color: string; bg: string; dotColor: string }> = {
+  'Pending Approval': {
+   color: 'text-amber-400',
+   bg: 'bg-amber-500/10 border-amber-500/20',
+   dotColor: 'bg-amber-400',
+  },
+  Approved: {
+   color: 'text-blue-400',
+   bg: 'bg-blue-500/10 border-blue-500/20',
+   dotColor: 'bg-blue-400',
+  },
+  Assigned: {
+   color: 'text-purple-400',
+   bg: 'bg-purple-500/10 border-purple-500/20',
+   dotColor: 'bg-purple-400',
+  },
+  'Picked Up': {
+   color: 'text-cyan-400',
+   bg: 'bg-cyan-500/10 border-cyan-500/20',
+   dotColor: 'bg-cyan-400',
+  },
+  'In Transit': {
+   color: 'text-sky-400',
+   bg: 'bg-sky-500/10 border-sky-500/20',
+   dotColor: 'bg-sky-400',
+  },
+  Delivered: {
+   color: 'text-emerald-400',
+   bg: 'bg-emerald-500/10 border-emerald-500/20',
+   dotColor: 'bg-emerald-400',
+  },
+  Cancelled: {
+   color: 'text-gray-400',
+   bg: 'bg-slate-500/10 border-slate-500/20',
+   dotColor: 'bg-slate-400',
+  },
+ };
+ const { color, bg, dotColor } = config[status];
+ return (
+  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}>
+   <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+   {status}
+  </span>
+ );
+};
+
+ const KPICard: React.FC<{
+  label: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactNode;
+ }> = ({ label, value, subtitle, icon }) => (
+  <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-5 hover:border-slate-700 transition-all duration-200 h-full flex flex-col">
+  <div className="flex items-start justify-between flex-1">
+   <div>
+    <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">{label}</p>
+    <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
+    {subtitle && <p className="text-gray-400 text-xs mt-1">{subtitle}</p>}
+   </div>
+   <div className="p-2.5 bg-gray-800/50 bg-gray-800/50 rounded-lg shrink-0">{icon}</div>
+  </div>
+ </div>
+);
+
+const SearchInput: React.FC<{
+ value: string;
+ onChange: (value: string) => void;
+ placeholder?: string;
+}> = ({ value, onChange, placeholder = 'Search...' }) => (
+ <div className="relative flex-1 min-w-[180px]">
+  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+  <input
+   type="text"
+   value={value}
+   onChange={(e) => onChange(e.target.value)}
+   placeholder={placeholder}
+   className="w-full bg-gray-800/50 border-gray-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-gray-400 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
+  />
+ </div>
+);
+
+const FilterSelect: React.FC<{
+ value: string;
+ onChange: (value: string) => void;
+ options: string[];
+}> = ({ value, onChange, options }) => (
+ <div className="min-w-[130px]">
+  <select
+   value={value}
+   onChange={(e) => onChange(e.target.value)}
+   className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer"
+  >
+   {options.map((opt) => (
+    <option key={opt} value={opt}>{opt}</option>
+   ))}
+  </select>
+ </div>
+);
+
+const Pagination: React.FC<{
+ currentPage: number;
+ totalPages: number;
+ onPageChange: (page: number) => void;
+ totalItems: number;
+ itemsPerPage: number;
+}> = ({ currentPage, totalPages, onPageChange, totalItems, itemsPerPage }) => {
+ const start = (currentPage - 1) * itemsPerPage + 1;
+ const end = Math.min(currentPage * itemsPerPage, totalItems);
+
+ const getPages = () => {
+  const pages: number[] = [];
+  if (totalPages <= 5) {
+   for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else if (currentPage <= 3) {
+   for (let i = 1; i <= 5; i++) pages.push(i);
+  } else if (currentPage >= totalPages - 2) {
+   for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+  } else {
+   for (let i = currentPage - 2; i <= currentPage + 2; i++) pages.push(i);
+  }
+  return pages;
+ };
+
+ if (totalItems === 0) return null;
+
+ return (
+  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-800 border-gray-800/50 bg-slate-50 bg-gray-800/30">
+   <div className="text-sm text-gray-400">
+    Showing <span className="text-white font-medium">{start}</span> to{' '}
+    <span className="text-white font-medium">{end}</span> of{' '}
+    <span className="text-white font-medium">{totalItems}</span> shipments
+   </div>
+   <div className="flex items-center gap-1">
+    <button
+     onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+     disabled={currentPage === 1}
+     className="p-1.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+     <ChevronLeft className="w-4 h-4" />
+    </button>
+    {getPages().map((page) => (
+     <button
+      key={page}
+      onClick={() => onPageChange(page)}
+      className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
+       currentPage === page
+        ? 'bg-cyan-500 text-slate-950'
+        : 'text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800'
+      }`}
+     >
+      {page}
+     </button>
+    ))}
+    <button
+     onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+     disabled={currentPage === totalPages}
+     className="p-1.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+     <ChevronRight className="w-4 h-4" />
+    </button>
+   </div>
+  </div>
+ );
+};
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
+const Logistics: React.FC = () => {
+ const [search, setSearch] = useState('');
+ const [statusFilter, setStatusFilter] = useState('All Status');
+ const [warehouseFilter, setWarehouseFilter] = useState('All Warehouses');
+ const [logisticsFilter, setLogisticsFilter] = useState('All Logistics');
+ const [currentPage, setCurrentPage] = useState(1);
+ const itemsPerPage = 6;
+
+ // Modal states
+ const [showViewModal, setShowViewModal] = useState(false);
+ const [showAssignModal, setShowAssignModal] = useState(false);
+ const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+ const [assignForm, setAssignForm] = useState({
+  logisticsPartner: '',
+  pickupDate: '',
+  pickupTime: '',
+  notes: '',
+ });
+ const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+ // Filtered shipments
+ const filteredShipments = useMemo(() => {
+  return mockShipments.filter((shipment) => {
+   const matchSearch =
+    shipment.shipmentNo.toLowerCase().includes(search.toLowerCase()) ||
+    shipment.poNumber.toLowerCase().includes(search.toLowerCase()) ||
+    shipment.customer.toLowerCase().includes(search.toLowerCase()) ||
+    shipment.destination.toLowerCase().includes(search.toLowerCase()) ||
+    shipment.warehouse.toLowerCase().includes(search.toLowerCase());
+   const matchStatus = statusFilter === 'All Status' || shipment.status === statusFilter;
+   const matchWarehouse = warehouseFilter === 'All Warehouses' || shipment.warehouse === warehouseFilter;
+   const matchLogistics =
+    logisticsFilter === 'All Logistics' ||
+    (shipment.assignedLogistics && shipment.assignedLogistics === logisticsFilter) ||
+    (logisticsFilter === 'Not Assigned' && !shipment.assignedLogistics);
+   return matchSearch && matchStatus && matchWarehouse && matchLogistics;
+  });
+ }, [search, statusFilter, warehouseFilter, logisticsFilter]);
+
+ const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
+ const paginatedShipments = filteredShipments.slice(
+  (currentPage - 1) * itemsPerPage,
+  currentPage * itemsPerPage
+ );
+
+ // KPI counts
+ const pendingApproval = mockShipments.filter((s) => s.status === 'Pending Approval').length;
+ const approved = mockShipments.filter((s) => s.status === 'Approved').length;
+ const assigned = mockShipments.filter((s) => s.status === 'Assigned').length;
+ const inTransit = mockShipments.filter((s) => s.status === 'In Transit' || s.status === 'Picked Up').length;
+ const delivered = mockShipments.filter((s) => s.status === 'Delivered').length;
+ const cancelled = mockShipments.filter((s) => s.status === 'Cancelled').length;
+
+ // Handlers
+ const handleView = (shipment: Shipment) => {
+  setSelectedShipment(shipment);
+  setShowViewModal(true);
+ };
+
+ const handleAssign = (shipment: Shipment) => {
+  setSelectedShipment(shipment);
+  setAssignForm({
+   logisticsPartner: '',
+   pickupDate: '',
+   pickupTime: '',
+   notes: '',
+  });
+  setShowAssignModal(true);
+ };
+
+ const handleAssignSubmit = () => {
+  if (!selectedShipment) return;
+  // In real app, we would update the shipment status to 'Assigned' and save logistics partner.
+  // For mock, we show toast and close modal.
+  setToast({
+   message: `Shipment ${selectedShipment.shipmentNo} assigned to ${assignForm.logisticsPartner} and notified.`,
+   type: 'success',
+  });
+  setShowAssignModal(false);
+  setTimeout(() => setToast(null), 5000);
+ };
+
+ const handleApprove = (shipment: Shipment) => {
+  // Mock approve: show toast and update status in mock
+  setToast({
+   message: `Shipment ${shipment.shipmentNo} approved successfully.`,
+   type: 'success',
+  });
+  setTimeout(() => setToast(null), 5000);
+ };
+
+ return (
+  <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-transparent text-white min-h-screen">
+   {/* Breadcrumb */}
+   <div className="flex items-center gap-2 text-sm text-gray-400">
+    <span>Admin</span>
+    <ChevronRight className="w-4 h-4" />
+    <span className="text-white">Logistics (DTRS)</span>
+   </div>
+
+   {/* Header */}
+   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+     <h1 className="text-2xl font-bold text-white">Logistics & Tracking (DTRS)</h1>
+     <p className="text-sm text-gray-400">
+      Manage delivery routes, fleet status, and shipment tracking across warehouses and branches.
+     </p>
+    </div>
+    <button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
+     <Plus className="w-4 h-4" /> Create Shipment
+    </button>
+   </div>
+
+   {/* KPI Cards */}
+   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+    <KPICard label="Waiting Approval" value={pendingApproval} icon={<Clock className="w-5 h-5 text-amber-400" />} />
+    <KPICard label="Approved" value={approved} icon={<CheckCircle className="w-5 h-5 text-blue-400" />} />
+    <KPICard label="Assigned" value={assigned} icon={<Truck className="w-5 h-5 text-purple-400" />} />
+    <KPICard label="In Transit" value={inTransit} icon={<Package className="w-5 h-5 text-sky-400" />} />
+    <KPICard label="Delivered" value={delivered} icon={<CheckCircle className="w-5 h-5 text-emerald-400" />} />
+    <KPICard label="Cancelled" value={cancelled} icon={<AlertCircle className="w-5 h-5 text-gray-400" />} />
+   </div>
+
+   {/* Filter Bar */}
+   <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-4 flex flex-wrap items-center gap-3">
+    <SearchInput value={search} onChange={setSearch} placeholder="Search shipment #, PO #, customer..." />
+    <FilterSelect value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
+    <FilterSelect value={warehouseFilter} onChange={setWarehouseFilter} options={warehouseOptions} />
+    <FilterSelect value={logisticsFilter} onChange={setLogisticsFilter} options={[...logisticsOptions, 'Not Assigned']} />
+    <button className="px-3.5 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all flex items-center gap-1.5 text-sm">
+     <Filter className="w-4 h-4" /> More Filters
+    </button>
+    <button className="p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all">
+     <RefreshCw className="w-4 h-4" />
+    </button>
+   </div>
+
+   {/* Table */}
+   <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl overflow-hidden">
+    <div className="overflow-x-auto">
+     <table className="w-full min-w-[1000px]">
+      <thead className="bg-gray-800/50 border-b border-gray-800 border-gray-800/50">
+       <tr>
+        <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Shipment No.</th>
+        <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Order No.</th>
+        <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Customer</th>
+        <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Warehouse</th>
+        <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Prepared By</th>
+        <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Assigned Logistics</th>
+        <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Status</th>
+        <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-gray-400">Actions</th>
+       </tr>
+      </thead>
+      <tbody>
+       {paginatedShipments.map((shipment) => (
+        <tr key={shipment.id} className="border-b border-gray-800 border-gray-800/50 hover:bg-gray-800/50 hover:bg-gray-800/30 transition-all">
+         <td className="px-4 py-3.5 text-sm font-medium text-white">{shipment.shipmentNo}</td>
+         <td className="px-4 py-3.5 text-sm text-gray-300">{shipment.poNumber}</td>
+         <td className="px-4 py-3.5 text-sm text-gray-300">{shipment.customer}</td>
+         <td className="px-4 py-3.5 text-sm text-gray-300">{shipment.warehouse}</td>
+         <td className="px-4 py-3.5 text-sm text-gray-300">{shipment.preparedBy}</td>
+         <td className="px-4 py-3.5 text-sm text-gray-300">
+          {shipment.assignedLogistics || '—'}
+         </td>
+         <td className="px-4 py-3.5"><StatusBadge status={shipment.status} /></td>
+         <td className="px-4 py-3.5">
+          <div className="flex items-center justify-center gap-1">
+           <button
+            onClick={() => handleView(shipment)}
+            className="p-1.5 rounded-lg hover:bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-all"
+            title="View Details"
+           >
+            <Eye className="w-4 h-4" />
+           </button>
+           {shipment.status === 'Pending Approval' && (
+            <>
+             <button
+              onClick={() => handleApprove(shipment)}
+              className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-all"
+              title="Approve"
+             >
+              <Check className="w-4 h-4" />
+             </button>
+             <button
+              onClick={() => handleAssign(shipment)}
+              className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 transition-all"
+              title="Assign Logistics"
+             >
+              <Send className="w-4 h-4" />
+             </button>
+            </>
+           )}
+           {shipment.status === 'Approved' && (
+            <button
+             onClick={() => handleAssign(shipment)}
+             className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 transition-all"
+             title="Assign Logistics"
+            >
+             <Send className="w-4 h-4" />
+            </button>
+           )}
+          </div>
+         </td>
+        </tr>
+       ))}
+       {paginatedShipments.length === 0 && (
+        <tr>
+         <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+          No shipments found matching your criteria.
+         </td>
+        </tr>
+       )}
+      </tbody>
+     </table>
+    </div>
+    <Pagination
+     currentPage={currentPage}
+     totalPages={totalPages}
+     onPageChange={setCurrentPage}
+     totalItems={filteredShipments.length}
+     itemsPerPage={itemsPerPage}
+    />
+   </div>
+
+   {/* ============================================ */}
+   {/* VIEW SHIPMENT MODAL */}
+   {/* ============================================ */}
+   {showViewModal && selectedShipment && (
+    <div
+     className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+     onClick={() => setShowViewModal(false)}
+    >
+     <div
+      className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6"
+      onClick={(e) => e.stopPropagation()}
+     >
+      <div className="flex items-center justify-between mb-6">
+       <div>
+        <h2 className="text-xl font-bold text-white">Shipment Details</h2>
+        <p className="text-sm text-gray-400">{selectedShipment.shipmentNo} · {selectedShipment.poNumber}</p>
+       </div>
+       <button
+        onClick={() => setShowViewModal(false)}
+        className="p-1.5 rounded-lg hover:bg-gray-800/50 hover:bg-gray-800/50 text-gray-400 hover:text-white transition-all"
+       >
+        <X className="w-5 h-5" />
+       </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+       <div>
+        <p className="text-xs text-gray-400">Customer</p>
+        <p className="text-sm text-white">{selectedShipment.customer}</p>
+       </div>
+       <div>
+        <p className="text-xs text-gray-400">Warehouse</p>
+        <p className="text-sm text-white">{selectedShipment.warehouse}</p>
+       </div>
+       <div>
+        <p className="text-xs text-gray-400">Destination</p>
+        <p className="text-sm text-white">{selectedShipment.destination}</p>
+       </div>
+       <div>
+        <p className="text-xs text-gray-400">Prepared By</p>
+        <p className="text-sm text-white">{selectedShipment.preparedBy}</p>
+       </div>
+       <div>
+        <p className="text-xs text-gray-400">Total Items</p>
+        <p className="text-sm text-white">{selectedShipment.totalItems}</p>
+       </div>
+       <div>
+        <p className="text-xs text-gray-400">Total Weight</p>
+        <p className="text-sm text-white">{selectedShipment.totalWeight} {selectedShipment.weightUnit}</p>
+       </div>
+       <div>
+        <p className="text-xs text-gray-400">Barcode Verified</p>
+        <p className="text-sm text-white">{selectedShipment.barcodeVerified ? 'Yes' : 'No'}</p>
+       </div>
+       <div>
+        <p className="text-xs text-gray-400">Status</p>
+        <StatusBadge status={selectedShipment.status} />
+       </div>
+      </div>
+
+       <div className="mb-4">
+        <h4 className="text-sm font-medium text-gray-300 mb-2">Items</h4>
+        <div className="bg-gray-800/50 rounded-xl border border-gray-800 border-gray-800/50 overflow-hidden">
+         <table className="w-full text-sm">
+          <thead className="bg-gray-800/50 bg-gray-800/50 border-b border-gray-800 border-gray-800/50">
+           <tr>
+            <th className="px-4 py-2 text-left text-xs text-gray-400">Product</th>
+            <th className="px-4 py-2 text-left text-xs text-gray-400">SKU</th>
+            <th className="px-4 py-2 text-right text-xs text-gray-400">Qty</th>
+            <th className="px-4 py-2 text-left text-xs text-gray-400">Unit</th>
+           </tr>
+          </thead>
+          <tbody>
+           {selectedShipment.items.map((item, idx) => (
+            <tr key={idx} className="border-b border-gray-800 border-gray-800/50">
+             <td className="px-4 py-2 text-white text-gray-200">{item.name}</td>
+             <td className="px-4 py-2 text-gray-400 font-mono">{item.sku}</td>
+             <td className="px-4 py-2 text-right text-white">{item.qty}</td>
+             <td className="px-4 py-2 text-gray-400">{item.unit}</td>
+            </tr>
+           ))}
+          </tbody>
+         </table>
+        </div>
+       </div>
+
+       <div>
+        <h4 className="text-sm font-medium text-gray-300 mb-2">Progress Timeline</h4>
+       <div className="space-y-2">
+        {selectedShipment.timeline.map((step, idx) => (
+         <div key={idx} className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${step.completed ? 'bg-cyan-500' : 'bg-slate-700'}`} />
+          <div className="flex-1 flex justify-between">
+           <span className="text-sm text-white">{step.step}</span>
+           {step.timestamp && <span className="text-xs text-gray-400">{step.timestamp}</span>}
+          </div>
+         </div>
+        ))}
+       </div>
+      </div>
+
+      <div className="flex justify-end mt-6 pt-4 border-t border-gray-800 border-gray-800/50">
+       <button
+        onClick={() => setShowViewModal(false)}
+        className="px-5 py-2 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all"
+       >
+        Close
+       </button>
+      </div>
+     </div>
+    </div>
+   )}
+
+   {/* ============================================ */}
+   {/* ASSIGN LOGISTICS MODAL */}
+   {/* ============================================ */}
+   {showAssignModal && selectedShipment && (
+    <div
+     className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+     onClick={() => setShowAssignModal(false)}
+    >
+     <div
+      className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl w-full max-w-lg p-6"
+      onClick={(e) => e.stopPropagation()}
+     >
+      <div className="flex items-center justify-between mb-6">
+       <h2 className="text-xl font-bold text-white">Assign Logistics</h2>
+       <button
+        onClick={() => setShowAssignModal(false)}
+        className="p-1.5 rounded-lg hover:bg-gray-800/50 hover:bg-gray-800/50 text-gray-400 hover:text-white transition-all"
+       >
+        <X className="w-5 h-5" />
+       </button>
+      </div>
+
+      <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+       <div>
+        <label className="block text-sm font-medium mb-1.5 text-gray-300">Shipment</label>
+        <p className="text-white">{selectedShipment.shipmentNo} - {selectedShipment.customer}</p>
+       </div>
+
+       <div>
+        <label className="block text-sm font-medium mb-1.5 text-gray-300">Logistics Partner *</label>
+        <select
+         value={assignForm.logisticsPartner}
+         onChange={(e) => setAssignForm({ ...assignForm, logisticsPartner: e.target.value })}
+         className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+         required
+        >
+         <option value="">Select Logistics Partner</option>
+         {logisticsOptions.filter(o => o !== 'All Logistics').map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+         ))}
+        </select>
+       </div>
+
+       <div className="grid grid-cols-2 gap-4">
+        <div>
+         <label className="block text-sm font-medium mb-1.5 text-gray-300">Pickup Date</label>
+         <input
+          type="date"
+          value={assignForm.pickupDate}
+          onChange={(e) => setAssignForm({ ...assignForm, pickupDate: e.target.value })}
+          className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+         />
+        </div>
+        <div>
+         <label className="block text-sm font-medium mb-1.5 text-gray-300">Pickup Time</label>
+         <input
+          type="time"
+          value={assignForm.pickupTime}
+          onChange={(e) => setAssignForm({ ...assignForm, pickupTime: e.target.value })}
+          className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+         />
+        </div>
+       </div>
+
+       <div>
+        <label className="block text-sm font-medium mb-1.5 text-gray-300">Notes</label>
+         <textarea
+          rows={3}
+          value={assignForm.notes}
+          onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value })}
+          className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          placeholder="Any special instructions..."
+         />
+       </div>
+
+       <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800 border-gray-800/50">
+        <button
+         type="button"
+         onClick={() => setShowAssignModal(false)}
+         className="px-5 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all"
+        >
+         Cancel
+        </button>
+        <button
+         type="submit"
+         onClick={handleAssignSubmit}
+         className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+        >
+         <Send className="w-4 h-4" /> Assign & Notify
+        </button>
+       </div>
+      </form>
+     </div>
+    </div>
+   )}
+
+   {/* Toast */}
+   {toast && (
+    <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm text-white flex items-center gap-2 ${
+     toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+    }`}>
+     {toast.type === 'success' && <CheckCircle className="w-5 h-5" />}
+     {toast.type === 'error' && <AlertCircle className="w-5 h-5" />}
+     {toast.type === 'info' && <Clock className="w-5 h-5" />}
+     {toast.message}
+    </div>
+   )}
+  </div>
+ );
+};
+
+export default Logistics;
