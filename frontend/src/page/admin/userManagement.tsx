@@ -556,80 +556,6 @@ const UserModal: React.FC<{
  );
 };
 
-const UserProfileDrawer: React.FC<{
- user: User | null;
- isOpen: boolean;
- onClose: () => void;
-}> = ({ user, isOpen, onClose }) => {
- if (!isOpen || !user) return null;
-
- return (
-  <div className="fixed inset-0 z-50 flex justify-end">
-   <div className="bg-black/50 backdrop-blur-sm w-full" onClick={onClose} />
-   <div className="bg-[#0d1322] border-l border-gray-800 border-gray-800 shadow-sm w-full max-w-[420px] h-full overflow-y-auto p-6 animate-in slide-in-from-right duration-200">
-    <div className="flex items-center justify-between mb-8">
-     <h2 className="text-xl font-bold text-white tracking-tight">User Profile</h2>
-     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-800/50 hover:bg-gray-800/50 text-gray-400 hover:text-white transition-colors duration-150">
-      <X className="w-5 h-5" />
-     </button>
-    </div>
-
-    <div className="flex flex-col items-center mb-8">
-     <div className="w-24 h-24 rounded-full bg-[#5B8CFF]/20 border-2 border-[#5B8CFF]/30 flex items-center justify-center text-3xl font-bold text-[#5B8CFF]">
-      {user.firstName.charAt(0)}{user.lastName.charAt(0) || ''}
-     </div>
-     <h3 className="text-white font-semibold text-lg mt-4 tracking-tight">{user.firstName} {user.lastName}</h3>
-     <p className="text-gray-400 text-sm mt-1">{user.email}</p>
-     <div className="mt-3"><StatusBadge status={user.status} /></div>
-    </div>
-
-    <div className="space-y-6">
-     <div>
-      <h4 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-3">Employee Information</h4>
-      <div className="space-y-3 text-sm bg-gray-800/50 rounded-2xl p-4 border border-gray-800 border-gray-800/50">
-       <div className="flex justify-between"><span className="text-gray-400">Employee ID</span><span className="text-white">{user.employeeId}</span></div>
-       <div className="flex justify-between"><span className="text-gray-400">Department</span><span className="text-white">{user.department}</span></div>
-       <div className="flex justify-between"><span className="text-gray-400">Role</span><span className="text-white">{user.role}</span></div>
-       <div className="flex justify-between"><span className="text-gray-400">Phone</span><span className="text-white">{user.phone}</span></div>
-      </div>
-     </div>
-
-     <div>
-      <h4 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-3">Assigned Warehouse</h4>
-      <div className="bg-gray-800/50 rounded-2xl p-4 border border-gray-800 border-gray-800/50">
-       <div className="flex items-center gap-2">
-        <Warehouse className="w-4 h-4 text-gray-400" />
-        <span className="text-white text-sm">{user.warehouse}</span>
-        <span className="text-gray-400 text-xs ml-auto">{user.branch}</span>
-       </div>
-      </div>
-     </div>
-
-     <div>
-      <h4 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-3">Permissions</h4>
-      <div className="flex flex-wrap gap-2">
-       {user.permissions.map((p) => (
-        <span key={p} className="px-2.5 py-1 bg-[#5B8CFF]/10 border border-[#5B8CFF]/20 rounded-lg text-xs text-[#5B8CFF]">
-         {p}
-        </span>
-       ))}
-      </div>
-     </div>
-
-     <div>
-      <h4 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-3">Account Activity</h4>
-      <div className="space-y-3 text-sm bg-gray-800/50 rounded-2xl p-4 border border-gray-800 border-gray-800/50">
-       <div className="flex justify-between"><span className="text-gray-400">Last Login</span><span className="text-white">{user.lastLogin}</span></div>
-       <div className="flex justify-between"><span className="text-gray-400">Created</span><span className="text-white">{user.createdAt}</span></div>
-       <div className="flex justify-between"><span className="text-gray-400">Last Updated</span><span className="text-white">{user.updatedAt}</span></div>
-      </div>
-     </div>
-    </div>
-   </div>
-  </div>
- );
-};
-
 const UserManagement: React.FC = () => {
  const [users, setUsers] = useState<User[]>(mockUsers);
  const [filters, setFilters] = useState<UserFilters>({
@@ -644,11 +570,13 @@ const UserManagement: React.FC = () => {
  const [currentPage, setCurrentPage] = useState(1);
  const [itemsPerPage] = useState(10);
  const [isLoading] = useState(false);
- const [showCreateModal, setShowCreateModal] = useState(false);
- const [editUser, setEditUser] = useState<User | null>(null);
- const [viewUser, setViewUser] = useState<User | null>(null);
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [viewUser, setViewUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
- const filteredUsers = useMemo(() => {
+  const filteredUsers = useMemo(() => {
   let result = users.filter((u) => {
    const search = filters.search.toLowerCase();
    const matchSearch =
@@ -725,8 +653,8 @@ const UserManagement: React.FC = () => {
  const pendingUsers = users.filter((u) => u.status === 'Pending').length;
  const suspendedUsers = users.filter((u) => u.status === 'Suspended').length;
 
- return (
-  <div className="w-full space-y-6 text-white">
+  return (
+   <div className="w-full px-6 py-8 space-y-6 text-white">
    {/* 1. PAGE HEADER */}
    <div>
     <h1 className="text-2xl font-bold text-white tracking-tight">User Management</h1>
@@ -819,17 +747,17 @@ const UserManagement: React.FC = () => {
       <Download className="w-3.5 h-3.5"/> Export
      </button>
 
-     <button className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white rounded-lg transition shadow-lg shadow-blue-600/20">
-      <UserPlus className="w-3.5 h-3.5"/> + New User
-     </button>
+      <button onClick={() => setIsAddUserModalOpen(true)} className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white rounded-lg transition shadow-lg shadow-blue-600/20">
+       <UserPlus className="w-3.5 h-3.5"/> + New User
+      </button>
     </div>
    </div>
 
-   {/* 4. TABLE CONTAINER */}
-   <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-xl overflow-hidden">
-    <div className="overflow-x-auto">
+    {/* 4. TABLE CONTAINER */}
+    <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden shadow-xl mt-6">
+     <div className="overflow-x-auto w-full">
      <table className="w-full text-left text-xs text-gray-300 border-collapse">
-      <thead className="bg-slate-50 bg-gray-800/50 border-b border-gray-800 border-gray-800/50 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+        <thead className="bg-[#0b101d] border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
        <tr>
         <th className="px-6 py-4 whitespace-nowrap">USER</th>
         <th className="px-6 py-4 whitespace-nowrap">EMPLOYEE ID</th>
@@ -841,9 +769,9 @@ const UserManagement: React.FC = () => {
         <th className="px-6 py-4 whitespace-nowrap text-right">ACTIONS</th>
        </tr>
       </thead>
-      <tbody className="divide-y divide-slate-200 divide-gray-800/50">
-       {users.map((u) => (
-        <tr key={u.id} className="hover:bg-gray-800/50 hover:bg-gray-800/50 transition-colors">
+       <tbody>
+        {users.map((u) => (
+         <tr key={u.id} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
          <td className="px-6 py-4 whitespace-nowrap">
           <div className="flex items-center gap-3">
            <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/30">
@@ -873,20 +801,190 @@ const UserManagement: React.FC = () => {
            • {u.status}
           </span>
          </td>
-          <td className="px-6 py-4 whitespace-nowrap text-right">
-           <div className="flex items-center justify-end gap-2 text-gray-400">
-           <button className="p-1 hover:text-white transition"><Eye className="w-4 h-4"/></button>
-           <button className="p-1 hover:text-white transition"><Edit className="w-4 h-4"/></button>
-          </div>
-         </td>
+           <td className="px-6 py-4 whitespace-nowrap text-right">
+            <div className="flex items-center justify-end gap-2 text-gray-400">
+            <button onClick={() => setSelectedUser(u)} className="p-1 hover:text-white transition"><Eye className="w-4 h-4"/></button>
+            <button className="p-1 hover:text-white transition"><Edit className="w-4 h-4"/></button>
+           </div>
+          </td>
         </tr>
        ))}
       </tbody>
-     </table>
+       </table>
+      </div>
+     </div>
+
+      {isAddUserModalOpen && (
+       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6" onClick={() => setIsAddUserModalOpen(false)}>
+        <div className="max-w-xl w-full max-h-[90vh] flex flex-col rounded-xl bg-[#0d1527] border border-gray-800 shadow-2xl p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+         <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white tracking-tight">Create New User</h2>
+          <button onClick={() => setIsAddUserModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-800/50 text-gray-400 hover:text-white transition-colors duration-150">
+           <X className="w-5 h-5" />
+          </button>
+         </div>
+
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-400">Full Name</label>
+           <input
+            type="text"
+            className="w-full h-10 bg-gray-800/50 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors"
+            placeholder="Enter full name"
+           />
+          </div>
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-400">Email Address</label>
+           <input
+            type="email"
+            className="w-full h-10 bg-gray-800/50 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors"
+            placeholder="Enter email address"
+           />
+          </div>
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-400">Employee ID</label>
+           <input
+            type="text"
+            className="w-full h-10 bg-gray-800/50 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors"
+            placeholder="Enter employee ID"
+           />
+          </div>
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-400">Department</label>
+           <select className="w-full h-10 bg-gray-800/50 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors appearance-none">
+            <option>Purchasing</option>
+            <option>Warehouse</option>
+            <option>Procurement</option>
+            <option>Inventory</option>
+            <option>Logistics</option>
+           </select>
+          </div>
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-400">System Role</label>
+           <select className="w-full h-10 bg-gray-800/50 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors appearance-none">
+            <option>Administrator</option>
+            <option>Manager</option>
+            <option>Plant Manager</option>
+            <option>QA Supervisor</option>
+            <option>User</option>
+           </select>
+          </div>
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-400">Branch / Warehouse Assignment</label>
+           <select className="w-full h-10 bg-gray-800/50 border border-gray-700 rounded-lg px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors appearance-none">
+            <option>BR-PAMP / WH-PAMP</option>
+            <option>BR-MNL / WH-MNL</option>
+            <option>BR-CEB / WH-CEB</option>
+            <option>BR-DVO / WH-DVO</option>
+           </select>
+          </div>
+         </div>
+
+         <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800 mt-auto">
+          <button
+           onClick={() => setIsAddUserModalOpen(false)}
+           className="h-10 px-4 border border-gray-700 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors duration-200"
+          >
+           Cancel
+          </button>
+          <button
+           onClick={() => setIsAddUserModalOpen(false)}
+           className="h-10 px-5 rounded-lg text-sm font-medium transition-opacity duration-200 hover:opacity-90"
+           style={{ backgroundColor: '#5B8CFF', color: '#FFFFFF' }}
+          >
+           Create User
+          </button>
+         </div>
+        </div>
+       </div>
+      )}
+
+      {/* Slide-over User Details Drawer */}
+      {selectedUser && (
+       <div className="fixed inset-0 z-50 overflow-hidden">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setSelectedUser(null)} />
+        <div className="fixed inset-y-0 right-0 flex max-w-full">
+         <div className="w-screen max-w-md transform transition ease-in-out duration-500 sm:duration-700">
+          <div className="flex h-full flex-col overflow-y-auto bg-[#0d1322] border-l border-gray-800 shadow-xl">
+           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+            <h2 className="text-lg font-semibold text-white">User Details</h2>
+            <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-white transition-colors">
+             <X className="w-5 h-5" />
+            </button>
+           </div>
+           <div className="p-6 space-y-6">
+             <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-blue-500/20 border-2 border-blue-500/30 flex items-center justify-center text-2xl font-bold text-blue-400">
+               {selectedUser.firstName.charAt(0)}{selectedUser.lastName?.charAt(0) || ''}
+              </div>
+              <div>
+               <h3 className="text-white font-semibold text-lg">{selectedUser.firstName} {selectedUser.lastName}</h3>
+               <p className="text-gray-400 text-sm">{selectedUser.email}</p>
+               <span className={
+                'mt-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ' +
+                (selectedUser.status === 'Active' ? 'text-green-400 bg-green-400/10 border-green-400/20' :
+                 selectedUser.status === 'Inactive' ? 'text-gray-400 bg-gray-400/10 border-gray-400/20' :
+                 selectedUser.status === 'Pending' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' :
+                 selectedUser.status === 'Suspended' ? 'text-red-400 bg-red-400/10 border-red-400/20' :
+                 'text-gray-400 bg-gray-400/10 border-gray-400/20')
+               }>
+                {selectedUser.status}
+               </span>
+              </div>
+             </div>
+            <div className="grid grid-cols-2 gap-4">
+             <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+              <p className="text-gray-400 text-xs mb-1">Employee ID</p>
+              <p className="text-white text-sm font-medium">{selectedUser.employeeId}</p>
+             </div>
+             <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+              <p className="text-gray-400 text-xs mb-1">Department</p>
+              <p className="text-white text-sm font-medium">{selectedUser.department}</p>
+             </div>
+             <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+              <p className="text-gray-400 text-xs mb-1">Role</p>
+              <p className="text-white text-sm font-medium">{selectedUser.role}</p>
+             </div>
+             <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+              <p className="text-gray-400 text-xs mb-1">Branch</p>
+              <p className="text-white text-sm font-medium">{selectedUser.branch}</p>
+             </div>
+             <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+              <p className="text-gray-400 text-xs mb-1">Warehouse</p>
+              <p className="text-white text-sm font-medium">{selectedUser.warehouse}</p>
+             </div>
+             <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+              <p className="text-gray-400 text-xs mb-1">Status</p>
+              <p className="text-white text-sm font-medium">{selectedUser.status}</p>
+             </div>
+            </div>
+            <div className="bg-gray-800/20 border border-gray-800/50 rounded-xl p-4">
+             <h4 className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-3">Recent Activity</h4>
+             <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+               <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500/60" />
+                <span className="text-gray-300">Profile created</span>
+               </div>
+               <span className="text-gray-500 text-xs whitespace-nowrap">{selectedUser.createdAt}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+               <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500/60" />
+                <span className="text-gray-300">Last login</span>
+               </div>
+               <span className="text-gray-500 text-xs whitespace-nowrap">{selectedUser.lastLogin}</span>
+              </div>
+             </div>
+            </div>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+      )}
     </div>
-   </div>
-  </div>
- );
-};
+   );
+   };
 
 export default UserManagement;

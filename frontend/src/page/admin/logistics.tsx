@@ -63,174 +63,8 @@ interface Shipment {
 }
 
 // ============================================
-// MOCK DATA
+// MOCK DATA (initial state now lives inside the component body)
 // ============================================
-
-const mockShipments: Shipment[] = [
- {
-  id: '1',
-  shipmentNo: 'SHP-3301',
-  poNumber: 'PO-2857',
-  customer: 'Northwind Traders',
-  warehouse: 'Central Depot',
-  preparedBy: 'M. Santos (Plant Manager)',
-  destination: 'QC Central Hub, PH',
-  preparedDate: '2026-08-01',
-  assignedLogistics: null,
-  status: 'Pending Approval',
-  items: [
-   { name: 'Industrial LED Panel 40W', sku: 'ELC-LED-040', qty: 12, unit: 'pcs' },
-   { name: 'Aluminium Profile 6m', sku: 'RAW-ALU-006', qty: 8, unit: 'bar' },
-  ],
-  totalItems: 20,
-  totalWeight: 450,
-  weightUnit: 'kg',
-  timeline: [
-   { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-01 10:30' },
-   { step: 'Admin Approved', completed: false },
-   { step: 'Assigned to Logistics', completed: false },
-   { step: 'Picked Up', completed: false },
-   { step: 'In Transit', completed: false },
-   { step: 'Delivered', completed: false },
-  ],
-  barcodeVerified: true,
- },
- {
-  id: '2',
-  shipmentNo: 'SHP-3302',
-  poNumber: 'PO-2851',
-  customer: 'Cebu Logistics Co.',
-  warehouse: 'Northgate',
-  preparedBy: 'L. Cruz (Plant Manager)',
-  destination: 'Davao DC, PH',
-  preparedDate: '2026-07-30',
-  assignedLogistics: 'Integrated Logistics System',
-  status: 'Assigned',
-  items: [
-   { name: 'Corrugated Box 60x40x40', sku: 'PKG-BOX-604', qty: 8, unit: 'pcs' },
-  ],
-  totalItems: 8,
-  totalWeight: 620,
-  weightUnit: 'kg',
-  timeline: [
-   { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-30 09:00' },
-   { step: 'Admin Approved', completed: true, timestamp: '2026-07-30 14:20' },
-   { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-30 15:00' },
-   { step: 'Picked Up', completed: false },
-   { step: 'In Transit', completed: false },
-   { step: 'Delivered', completed: false },
-  ],
-  barcodeVerified: true,
- },
- {
-  id: '3',
-  shipmentNo: 'SHP-3303',
-  poNumber: 'PO-2855',
-  customer: 'Kraft Industrial',
-  warehouse: 'Southpark',
-  preparedBy: 'R. Diaz (Plant Manager)',
-  destination: 'Cebu Port, PH',
-  preparedDate: '2026-07-28',
-  assignedLogistics: 'External Delivery Group',
-  status: 'In Transit',
-  items: [
-   { name: 'Steel Sheet 2mm', sku: 'RAW-SST-002', qty: 20, unit: 'sheet' },
-  ],
-  totalItems: 20,
-  totalWeight: 1200,
-  weightUnit: 'kg',
-  timeline: [
-   { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-28 11:00' },
-   { step: 'Admin Approved', completed: true, timestamp: '2026-07-28 15:30' },
-   { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-28 16:45' },
-   { step: 'Picked Up', completed: true, timestamp: '2026-07-29 08:00' },
-   { step: 'In Transit', completed: true, timestamp: '2026-07-29 10:00' },
-   { step: 'Delivered', completed: false },
-  ],
-  barcodeVerified: true,
- },
- {
-  id: '4',
-  shipmentNo: 'SHP-3304',
-  poNumber: 'PO-2843',
-  customer: 'Apex Components',
-  warehouse: 'Eastside',
-  preparedBy: 'J. Santos (Plant Manager)',
-  destination: 'Makati Branch, PH',
-  preparedDate: '2026-08-02',
-  assignedLogistics: 'Internal Fleet',
-  status: 'Delivered',
-  items: [
-   { name: 'Wireless Earbuds Pro', sku: 'SKU-1001', qty: 3, unit: 'pcs' },
-  ],
-  totalItems: 3,
-  totalWeight: 120,
-  weightUnit: 'kg',
-  timeline: [
-   { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 08:00' },
-   { step: 'Admin Approved', completed: true, timestamp: '2026-08-02 09:15' },
-   { step: 'Assigned to Logistics', completed: true, timestamp: '2026-08-02 09:45' },
-   { step: 'Picked Up', completed: true, timestamp: '2026-08-02 10:00' },
-   { step: 'In Transit', completed: true, timestamp: '2026-08-02 11:30' },
-   { step: 'Delivered', completed: true, timestamp: '2026-08-02 14:00' },
-  ],
-  barcodeVerified: true,
- },
- {
-  id: '5',
-  shipmentNo: 'SHP-3305',
-  poNumber: 'PO-2859',
-  customer: 'Meridian Supply',
-  warehouse: 'Central Depot',
-  preparedBy: 'L. Reyes (Plant Manager)',
-  destination: 'Bohol Warehouse',
-  preparedDate: '2026-07-31',
-  assignedLogistics: null,
-  status: 'Approved',
-  items: [
-   { name: 'Safety Helmet Class E', sku: 'SAF-HLM-001', qty: 5, unit: 'pcs' },
-  ],
-  totalItems: 5,
-  totalWeight: 240,
-  weightUnit: 'kg',
-  timeline: [
-   { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-31 14:00' },
-   { step: 'Admin Approved', completed: true, timestamp: '2026-08-01 10:00' },
-   { step: 'Assigned to Logistics', completed: false },
-   { step: 'Picked Up', completed: false },
-   { step: 'In Transit', completed: false },
-   { step: 'Delivered', completed: false },
-  ],
-  barcodeVerified: false,
- },
- {
-  id: '6',
-  shipmentNo: 'SHP-3306',
-  poNumber: 'PO-2860',
-  customer: 'Bayview Home Goods',
-  warehouse: 'Northgate',
-  preparedBy: 'M. Santos (Plant Manager)',
-  destination: 'Clark Freeport Zone',
-  preparedDate: '2026-08-02',
-  assignedLogistics: null,
-  status: 'Cancelled',
-  items: [
-   { name: 'Pallet Wrap Film 500mm', sku: 'PKG-WRP-500', qty: 15, unit: 'roll' },
-  ],
-  totalItems: 15,
-  totalWeight: 760,
-  weightUnit: 'kg',
-  timeline: [
-   { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 13:00' },
-   { step: 'Admin Approved', completed: false },
-   { step: 'Assigned to Logistics', completed: false },
-   { step: 'Picked Up', completed: false },
-   { step: 'In Transit', completed: false },
-   { step: 'Delivered', completed: false },
-  ],
-  barcodeVerified: false,
- },
-];
 
 // ============================================
 // CONSTANTS
@@ -381,42 +215,42 @@ const Pagination: React.FC<{
  if (totalItems === 0) return null;
 
  return (
-  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-800 border-gray-800/50 bg-slate-50 bg-gray-800/30">
-   <div className="text-sm text-gray-400">
-    Showing <span className="text-white font-medium">{start}</span> to{' '}
-    <span className="text-white font-medium">{end}</span> of{' '}
-    <span className="text-white font-medium">{totalItems}</span> shipments
-   </div>
-   <div className="flex items-center gap-1">
-    <button
-     onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-     disabled={currentPage === 1}
-     className="p-1.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-    >
-     <ChevronLeft className="w-4 h-4" />
-    </button>
-    {getPages().map((page) => (
+   <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800/80 bg-[#0b101d] rounded-b-xl">
+    <div className="text-sm text-slate-400">
+     Showing <span className="text-slate-300 font-medium">{start}</span> to{' '}
+     <span className="text-slate-300 font-medium">{end}</span> of{' '}
+     <span className="text-slate-300 font-medium">{totalItems}</span> shipments
+    </div>
+    <div className="flex items-center gap-1">
      <button
-      key={page}
-      onClick={() => onPageChange(page)}
-      className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
-       currentPage === page
-        ? 'bg-cyan-500 text-slate-950'
-        : 'text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800'
-      }`}
+      onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+      disabled={currentPage === 1}
+      className="p-1.5 rounded-xl border border-slate-700/60 text-slate-400 hover:bg-slate-700/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
      >
-      {page}
+      <ChevronLeft className="w-4 h-4" />
      </button>
-    ))}
-    <button
-     onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-     disabled={currentPage === totalPages}
-     className="p-1.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-    >
-     <ChevronRight className="w-4 h-4" />
-    </button>
+     {getPages().map((page) => (
+      <button
+       key={page}
+       onClick={() => onPageChange(page)}
+       className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
+        currentPage === page
+         ? 'bg-blue-600 text-white'
+         : 'text-slate-400 hover:bg-slate-700/50'
+       }`}
+      >
+       {page}
+      </button>
+     ))}
+     <button
+      onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+      disabled={currentPage === totalPages}
+      className="p-1.5 rounded-xl border border-slate-700/60 text-slate-400 hover:bg-slate-700/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+     >
+      <ChevronRight className="w-4 h-4" />
+     </button>
+    </div>
    </div>
-  </div>
  );
 };
 
@@ -430,12 +264,189 @@ const Logistics: React.FC = () => {
  const [warehouseFilter, setWarehouseFilter] = useState('All Warehouses');
  const [logisticsFilter, setLogisticsFilter] = useState('All Logistics');
  const [currentPage, setCurrentPage] = useState(1);
- const itemsPerPage = 6;
+  const itemsPerPage = 6;
 
- // Modal states
- const [showViewModal, setShowViewModal] = useState(false);
- const [showAssignModal, setShowAssignModal] = useState(false);
- const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  // Shipment data (useState must be at the top level of the component body)
+  const [shipments, setShipments] = useState<Shipment[]>([
+   {
+    id: '1',
+    shipmentNo: 'SHP-3301',
+    poNumber: 'PO-2857',
+    customer: 'Northwind Traders',
+    warehouse: 'Central Depot',
+    preparedBy: 'M. Santos (Plant Manager)',
+    destination: 'QC Central Hub, PH',
+    preparedDate: '2026-08-01',
+    assignedLogistics: null,
+    status: 'Pending Approval',
+    items: [
+     { name: 'Industrial LED Panel 40W', sku: 'ELC-LED-040', qty: 12, unit: 'pcs' },
+     { name: 'Aluminium Profile 6m', sku: 'RAW-ALU-006', qty: 8, unit: 'bar' },
+    ],
+    totalItems: 20,
+    totalWeight: 450,
+    weightUnit: 'kg',
+    timeline: [
+     { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-01 10:30' },
+     { step: 'Admin Approved', completed: false },
+     { step: 'Assigned to Logistics', completed: false },
+     { step: 'Picked Up', completed: false },
+     { step: 'In Transit', completed: false },
+     { step: 'Delivered', completed: false },
+    ],
+    barcodeVerified: true,
+   },
+   {
+    id: '2',
+    shipmentNo: 'SHP-3302',
+    poNumber: 'PO-2851',
+    customer: 'Cebu Logistics Co.',
+    warehouse: 'Northgate',
+    preparedBy: 'L. Cruz (Plant Manager)',
+    destination: 'Davao DC, PH',
+    preparedDate: '2026-07-30',
+    assignedLogistics: 'Integrated Logistics System',
+    status: 'Assigned',
+    items: [
+     { name: 'Corrugated Box 60x40x40', sku: 'PKG-BOX-604', qty: 8, unit: 'pcs' },
+    ],
+    totalItems: 8,
+    totalWeight: 620,
+    weightUnit: 'kg',
+    timeline: [
+     { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-30 09:00' },
+     { step: 'Admin Approved', completed: true, timestamp: '2026-07-30 14:20' },
+     { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-30 15:00' },
+     { step: 'Picked Up', completed: false },
+     { step: 'In Transit', completed: false },
+     { step: 'Delivered', completed: false },
+    ],
+    barcodeVerified: true,
+   },
+   {
+    id: '3',
+    shipmentNo: 'SHP-3303',
+    poNumber: 'PO-2855',
+    customer: 'Kraft Industrial',
+    warehouse: 'Southpark',
+    preparedBy: 'R. Diaz (Plant Manager)',
+    destination: 'Cebu Port, PH',
+    preparedDate: '2026-07-28',
+    assignedLogistics: 'External Delivery Group',
+    status: 'In Transit',
+    items: [
+     { name: 'Steel Sheet 2mm', sku: 'RAW-SST-002', qty: 20, unit: 'sheet' },
+    ],
+    totalItems: 20,
+    totalWeight: 1200,
+    weightUnit: 'kg',
+    timeline: [
+     { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-28 11:00' },
+     { step: 'Admin Approved', completed: true, timestamp: '2026-07-28 15:30' },
+     { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-28 16:45' },
+     { step: 'Picked Up', completed: true, timestamp: '2026-07-29 08:00' },
+     { step: 'In Transit', completed: true, timestamp: '2026-07-29 10:00' },
+     { step: 'Delivered', completed: false },
+    ],
+    barcodeVerified: true,
+   },
+   {
+    id: '4',
+    shipmentNo: 'SHP-3304',
+    poNumber: 'PO-2843',
+    customer: 'Apex Components',
+    warehouse: 'Eastside',
+    preparedBy: 'J. Santos (Plant Manager)',
+    destination: 'Makati Branch, PH',
+    preparedDate: '2026-08-02',
+    assignedLogistics: 'Internal Fleet',
+    status: 'Delivered',
+    items: [
+     { name: 'Wireless Earbuds Pro', sku: 'SKU-1001', qty: 3, unit: 'pcs' },
+    ],
+    totalItems: 3,
+    totalWeight: 120,
+    weightUnit: 'kg',
+    timeline: [
+     { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 08:00' },
+     { step: 'Admin Approved', completed: true, timestamp: '2026-08-02 09:15' },
+     { step: 'Assigned to Logistics', completed: true, timestamp: '2026-08-02 09:45' },
+     { step: 'Picked Up', completed: true, timestamp: '2026-08-02 10:00' },
+     { step: 'In Transit', completed: true, timestamp: '2026-08-02 11:30' },
+     { step: 'Delivered', completed: true, timestamp: '2026-08-02 14:00' },
+    ],
+    barcodeVerified: true,
+   },
+   {
+    id: '5',
+    shipmentNo: 'SHP-3305',
+    poNumber: 'PO-2859',
+    customer: 'Meridian Supply',
+    warehouse: 'Central Depot',
+    preparedBy: 'L. Reyes (Plant Manager)',
+    destination: 'Bohol Warehouse',
+    preparedDate: '2026-07-31',
+    assignedLogistics: null,
+    status: 'Approved',
+    items: [
+     { name: 'Safety Helmet Class E', sku: 'SAF-HLM-001', qty: 5, unit: 'pcs' },
+    ],
+    totalItems: 5,
+    totalWeight: 240,
+    weightUnit: 'kg',
+    timeline: [
+     { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-31 14:00' },
+     { step: 'Admin Approved', completed: true, timestamp: '2026-08-01 10:00' },
+     { step: 'Assigned to Logistics', completed: false },
+     { step: 'Picked Up', completed: false },
+     { step: 'In Transit', completed: false },
+     { step: 'Delivered', completed: false },
+    ],
+    barcodeVerified: false,
+   },
+   {
+    id: '6',
+    shipmentNo: 'SHP-3306',
+    poNumber: 'PO-2860',
+    customer: 'Bayview Home Goods',
+    warehouse: 'Northgate',
+    preparedBy: 'M. Santos (Plant Manager)',
+    destination: 'Clark Freeport Zone',
+    preparedDate: '2026-08-02',
+    assignedLogistics: null,
+    status: 'Cancelled',
+    items: [
+     { name: 'Pallet Wrap Film 500mm', sku: 'PKG-WRP-500', qty: 15, unit: 'roll' },
+    ],
+    totalItems: 15,
+    totalWeight: 760,
+    weightUnit: 'kg',
+    timeline: [
+     { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 13:00' },
+     { step: 'Admin Approved', completed: false },
+     { step: 'Assigned to Logistics', completed: false },
+     { step: 'Picked Up', completed: false },
+     { step: 'In Transit', completed: false },
+     { step: 'Delivered', completed: false },
+    ],
+    barcodeVerified: false,
+   },
+  ]);
+
+  // Modal states
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [createForm, setCreateForm] = useState({
+   poNumber: '',
+   customer: '',
+   warehouse: '',
+   destination: '',
+   assignedLogistics: '',
+   estimatedDeliveryDate: '',
+   estimatedDeliveryTime: '',
+  });
  const [assignForm, setAssignForm] = useState({
   logisticsPartner: '',
   pickupDate: '',
@@ -446,7 +457,7 @@ const Logistics: React.FC = () => {
 
  // Filtered shipments
  const filteredShipments = useMemo(() => {
-  return mockShipments.filter((shipment) => {
+  return shipments.filter((shipment) => {
    const matchSearch =
     shipment.shipmentNo.toLowerCase().includes(search.toLowerCase()) ||
     shipment.poNumber.toLowerCase().includes(search.toLowerCase()) ||
@@ -470,12 +481,12 @@ const Logistics: React.FC = () => {
  );
 
  // KPI counts
- const pendingApproval = mockShipments.filter((s) => s.status === 'Pending Approval').length;
- const approved = mockShipments.filter((s) => s.status === 'Approved').length;
- const assigned = mockShipments.filter((s) => s.status === 'Assigned').length;
- const inTransit = mockShipments.filter((s) => s.status === 'In Transit' || s.status === 'Picked Up').length;
- const delivered = mockShipments.filter((s) => s.status === 'Delivered').length;
- const cancelled = mockShipments.filter((s) => s.status === 'Cancelled').length;
+ const pendingApproval = shipments.filter((s) => s.status === 'Pending Approval').length;
+ const approved = shipments.filter((s) => s.status === 'Approved').length;
+ const assigned = shipments.filter((s) => s.status === 'Assigned').length;
+ const inTransit = shipments.filter((s) => s.status === 'In Transit' || s.status === 'Picked Up').length;
+ const delivered = shipments.filter((s) => s.status === 'Delivered').length;
+ const cancelled = shipments.filter((s) => s.status === 'Cancelled').length;
 
  // Handlers
  const handleView = (shipment: Shipment) => {
@@ -506,14 +517,57 @@ const Logistics: React.FC = () => {
   setTimeout(() => setToast(null), 5000);
  };
 
- const handleApprove = (shipment: Shipment) => {
-  // Mock approve: show toast and update status in mock
-  setToast({
-   message: `Shipment ${shipment.shipmentNo} approved successfully.`,
-   type: 'success',
-  });
-  setTimeout(() => setToast(null), 5000);
- };
+  const handleApprove = (shipment: Shipment) => {
+   // Mock approve: show toast and update status in mock
+   setToast({
+    message: `Shipment ${shipment.shipmentNo} approved successfully.`,
+    type: 'success',
+   });
+   setTimeout(() => setToast(null), 5000);
+  };
+
+  const handleCreateSubmit = () => {
+   if (!createForm.poNumber || !createForm.customer || !createForm.warehouse || !createForm.destination || !createForm.assignedLogistics) {
+    setToast({ message: 'Please fill in all required fields.', type: 'error' });
+    return;
+   }
+
+   const newShipment: Shipment = {
+    id: String(Date.now()),
+    shipmentNo: `SHP-${3307 + shipments.length}`,
+    poNumber: createForm.poNumber,
+    customer: createForm.customer,
+    warehouse: createForm.warehouse,
+    preparedBy: 'Current Admin',
+    destination: createForm.destination,
+    preparedDate: new Date().toISOString().split('T')[0],
+    assignedLogistics: createForm.assignedLogistics,
+    status: 'Pending Approval',
+    items: [],
+    totalItems: 0,
+    totalWeight: 0,
+    weightUnit: 'kg',
+    timeline: [{ step: 'Shipment Prepared', completed: true, timestamp: new Date().toLocaleString() }],
+    barcodeVerified: false,
+    expectedDelivery: createForm.estimatedDeliveryDate && createForm.estimatedDeliveryTime
+     ? `${createForm.estimatedDeliveryDate} ${createForm.estimatedDeliveryTime}`
+     : createForm.estimatedDeliveryDate,
+   };
+
+   setShipments([...shipments, newShipment]);
+   setCreateForm({
+    poNumber: '',
+    customer: '',
+    warehouse: '',
+    destination: '',
+    assignedLogistics: '',
+    estimatedDeliveryDate: '',
+    estimatedDeliveryTime: '',
+   });
+   setIsCreateModalOpen(false);
+   setToast({ message: 'Shipment created successfully with status Pending Approval.', type: 'success' });
+   setTimeout(() => setToast(null), 5000);
+  };
 
  return (
   <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-transparent text-white min-h-screen">
@@ -532,9 +586,9 @@ const Logistics: React.FC = () => {
       Manage delivery routes, fleet status, and shipment tracking across warehouses and branches.
      </p>
     </div>
-    <button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
-     <Plus className="w-4 h-4" /> Create Shipment
-    </button>
+     <button onClick={() => setIsCreateModalOpen(true)} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
+      <Plus className="w-4 h-4" /> Create Shipment
+     </button>
    </div>
 
    {/* KPI Cards */}
@@ -857,7 +911,140 @@ const Logistics: React.FC = () => {
     </div>
    )}
 
-   {/* Toast */}
+     {/* ============================================ */}
+     {/* CREATE SHIPMENT MODAL */}
+     {/* ============================================ */}
+     {isCreateModalOpen && (
+      <div
+       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+       onClick={() => setIsCreateModalOpen(false)}
+      >
+       <div
+        className="max-w-2xl w-full max-h-[90vh] flex flex-col rounded-xl bg-[#0d1527] border border-gray-800 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+       >
+        <div className="flex items-center justify-between p-6 pb-4 shrink-0">
+         <div>
+          <h2 className="text-xl font-bold text-white">Create New Shipment</h2>
+          <p className="text-sm text-gray-400">Fill in the details to create a new shipment record.</p>
+         </div>
+         <button
+          onClick={() => setIsCreateModalOpen(false)}
+          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-all"
+         >
+          <X className="w-5 h-5" />
+         </button>
+        </div>
+
+        <form onSubmit={(e) => e.preventDefault()} className="overflow-y-auto p-6 pt-0 space-y-4 custom-scrollbar">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-300">Order Number / Reference *</label>
+           <input
+            type="text"
+            value={createForm.poNumber}
+            onChange={(e) => setCreateForm({ ...createForm, poNumber: e.target.value })}
+            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            placeholder="e.g. PO-2861"
+            required
+           />
+          </div>
+
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-300">Customer Name *</label>
+           <input
+            type="text"
+            value={createForm.customer}
+            onChange={(e) => setCreateForm({ ...createForm, customer: e.target.value })}
+            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            placeholder="Enter customer name"
+            required
+           />
+          </div>
+
+           <div>
+            <label className="block text-sm font-medium mb-1.5 text-gray-300">Origin Warehouse *</label>
+            <select
+             value={createForm.warehouse}
+             onChange={(e) => setCreateForm({ ...createForm, warehouse: e.target.value })}
+             className="w-full bg-[#111827] text-slate-100 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+             required
+            >
+             <option value="" className="bg-[#0f172a] text-slate-100 py-2">Select Warehouse</option>
+             {warehouseOptions.filter(o => o !== 'All Warehouses').map((opt) => (
+              <option key={opt} value={opt} className="bg-[#0f172a] text-slate-100 py-2">{opt}</option>
+             ))}
+            </select>
+           </div>
+
+           <div>
+            <label className="block text-sm font-medium mb-1.5 text-gray-300">Assigned Logistics Provider / Fleet *</label>
+            <select
+             value={createForm.assignedLogistics}
+             onChange={(e) => setCreateForm({ ...createForm, assignedLogistics: e.target.value })}
+             className="w-full bg-[#111827] text-slate-100 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+             required
+            >
+             <option value="" className="bg-[#0f172a] text-slate-100 py-2">Select Logistics Provider</option>
+             <option value="Integrated Logistics System" className="bg-[#0f172a] text-slate-100 py-2">Integrated Logistics System</option>
+             <option value="External Delivery Group" className="bg-[#0f172a] text-slate-100 py-2">External Delivery Group</option>
+             <option value="Internal Fleet" className="bg-[#0f172a] text-slate-100 py-2">Internal Fleet</option>
+            </select>
+           </div>
+
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-300">Estimated Delivery Date</label>
+           <input
+            type="date"
+            value={createForm.estimatedDeliveryDate}
+            onChange={(e) => setCreateForm({ ...createForm, estimatedDeliveryDate: e.target.value })}
+            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+           />
+          </div>
+
+          <div>
+           <label className="block text-sm font-medium mb-1.5 text-gray-300">Estimated Delivery Time</label>
+           <input
+            type="time"
+            value={createForm.estimatedDeliveryTime}
+            onChange={(e) => setCreateForm({ ...createForm, estimatedDeliveryTime: e.target.value })}
+            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+           />
+          </div>
+         </div>
+
+         <div className="col-span-1 md:col-span-2">
+          <label className="block text-sm font-medium mb-1.5 text-gray-300">Destination / Delivery Address *</label>
+          <textarea
+           rows={2}
+           value={createForm.destination}
+           onChange={(e) => setCreateForm({ ...createForm, destination: e.target.value })}
+           className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+           placeholder="Enter delivery address"
+           required
+          />
+         </div>
+        </form>
+
+        <div className="flex items-center justify-end gap-3 p-6 pt-4 border-t border-gray-800 shrink-0">
+         <button
+          type="button"
+          onClick={() => setIsCreateModalOpen(false)}
+          className="px-5 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
+         >
+          Cancel
+         </button>
+         <button
+          type="button"
+          onClick={handleCreateSubmit}
+          className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+         >
+          <Check className="w-4 h-4" /> Create Shipment
+         </button>
+        </div>
+       </div>
+      </div>
+     )}
    {toast && (
     <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm text-white flex items-center gap-2 ${
      toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'

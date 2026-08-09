@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -10,16 +10,12 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import QASidebar from '../components/layout/QASidebar';
+import { useTheme } from '../context/ThemeContext';
 
 const QALayout: React.FC = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const navigate = useNavigate();
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle('dark');
-  };
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -28,7 +24,7 @@ const QALayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0f1d]">
+    <div className="flex h-screen overflow-hidden bg-[#090d16]">
       {/* Mobile Hamburger */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -51,7 +47,7 @@ const QALayout: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#0a0f1d]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#090d16]">
         {/* Top Bar */}
         <header className="flex items-center h-16 px-4 md:px-6 border-b border-slate-800/80 bg-[#090d16] sticky top-0 z-40 flex-shrink-0">
           <div className="flex items-center flex-1 min-w-0">
@@ -65,11 +61,11 @@ const QALayout: React.FC = () => {
           <div className="flex items-center gap-3 h-full flex-shrink-0">
             {/* Theme Toggle */}
             <button
-              onClick={toggleDarkMode}
+              onClick={toggleTheme}
               className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all"
               aria-label="Toggle theme"
             >
-              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
 
             {/* Notifications */}
@@ -101,7 +97,7 @@ const QALayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-[#0a0f1d]">
+        <main className="flex-1 overflow-y-auto bg-[#090d16]">
           <Outlet />
         </main>
       </div>

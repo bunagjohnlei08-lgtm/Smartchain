@@ -30,6 +30,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!isMounted) return;
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
+    root.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('smartchain-theme', theme);
   }, [theme, isMounted]);
 

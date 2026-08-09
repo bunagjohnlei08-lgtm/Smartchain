@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import {
   Bell,
   ChevronDown,
@@ -9,18 +9,13 @@ import {
   X,
   LogOut,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import PlantManagerSidebar from '../components/layout/PlantManagerSidebar';
+import { useTheme } from '../context/ThemeContext';
 
 const PlantManagerLayout: React.FC = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const navigate = useNavigate();
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle('dark');
-  };
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -29,7 +24,7 @@ const PlantManagerLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0f1d]">
+    <div className="flex h-screen overflow-hidden bg-[#090d16]">
       {/* Mobile Hamburger */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -52,7 +47,7 @@ const PlantManagerLayout: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#0a0f1d]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#090d16]">
         {/* Top Bar */}
         <header className="flex items-center h-16 px-4 md:px-6 border-b border-slate-800/80 bg-[#090d16] sticky top-0 z-40 flex-shrink-0">
           <div className="flex items-center flex-1 min-w-0">
@@ -62,11 +57,11 @@ const PlantManagerLayout: React.FC = () => {
           <div className="flex items-center gap-3 h-full flex-shrink-0">
             {/* Theme Toggle */}
             <button
-              onClick={toggleDarkMode}
+              onClick={toggleTheme}
               className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all"
               aria-label="Toggle theme"
             >
-              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
 
             {/* Notifications */}
@@ -78,9 +73,9 @@ const PlantManagerLayout: React.FC = () => {
             {/* User Profile Dropdown */}
             <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-slate-800 rounded-xl px-2 py-1 transition-all h-full">
               <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-sm font-semibold">
-                JD
+                L
               </div>
-              <span className="hidden sm:inline text-sm text-slate-300">John Doe</span>
+              <span className="hidden sm:inline text-sm text-slate-300">Laysa</span>
               <ChevronDown size={16} className="text-slate-400" />
             </div>
             <button
@@ -95,7 +90,7 @@ const PlantManagerLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-[#0a0f1d]">
+        <main className="flex-1 overflow-y-auto bg-[#090d16]">
           <Outlet />
         </main>
       </div>

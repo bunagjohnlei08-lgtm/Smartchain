@@ -41,6 +41,7 @@ import {
   Minus as MinusIcon,
   AlertTriangle,
   Clock as ClockIcon,
+  CheckCircle,
   CheckCircle as CheckCircleIcon,
   XCircle,
   Calendar as CalendarIcon,
@@ -58,172 +59,177 @@ import {
   Truck as TruckIcon,
   Warehouse as WarehouseIcon,
   ExternalLink,
+  QrCode,
 } from 'lucide-react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
 // ============================================
 // TYPES
 // ============================================
 
-interface PendingDelivery {
+type QaStatus = 'Pending QA' | 'QA Passed' | 'Rejected';
+type ReceivingStatus = 'Pending QA' | 'Ready for Stock In' | 'Completed' | 'Rejected';
+
+interface ReceivingItem {
   id: string;
-  poNumber: string;
+  receivingNo: string;
   supplier: string;
-  dock: string;
-  lineItems: number;
-  expectedTime: string;
+  receivingDate: string;
+  refNo: string;
+  qaStatus: QaStatus;
+  status: ReceivingStatus;
+  delivered: number;
+  total: number;
+  receivedValue: number;
 }
 
-interface ReceivingHistory {
-  id: string;
-  grn: string;
-  po: string;
+interface ReceivingDetail {
   supplier: string;
-  items: number;
-  received: string;
-}
-
-interface RecentStockIn {
-  id: string;
-  product: string;
-  po: string;
-  receiver: string;
-  time: string;
-  quantity: number;
+  warehouse: string;
+  totalItems: number;
+  referenceNo: string;
+  receivingArea: string;
+  totalProducts: number;
+  deliveryDate: string;
+  receivedBy: string;
+  receivedValue: number;
+  preparedBy: string;
+  qaInspector: string;
+  remarks: string;
 }
 
 // ============================================
 // MOCK DATA
 // ============================================
 
-const pendingDeliveries: PendingDelivery[] = [
+const mockReceivings: ReceivingItem[] = [
   {
     id: '1',
-    poNumber: 'PO-2058',
+    receivingNo: 'RCV-2025-0058',
     supplier: 'Northwind Traders',
-    dock: 'Dock 2',
-    lineItems: 14,
-    expectedTime: 'Today, 13:00',
+    receivingDate: '2025-05-21 09:15',
+    refNo: 'PO-2058',
+    qaStatus: 'Pending QA',
+    status: 'Pending QA',
+    delivered: 16,
+    total: 16,
+    receivedValue: 245000,
   },
   {
     id: '2',
-    poNumber: 'PO-2055',
+    receivingNo: 'RCV-2025-0057',
     supplier: 'Cebu Logistics Co.',
-    dock: 'Dock 3',
-    lineItems: 11,
-    expectedTime: 'Today, 10:15',
+    receivingDate: '2025-05-20 14:30',
+    refNo: 'PO-2055',
+    qaStatus: 'QA Passed',
+    status: 'Ready for Stock In',
+    delivered: 11,
+    total: 11,
+    receivedValue: 89750,
   },
   {
     id: '3',
-    poNumber: 'PO-2051',
+    receivingNo: 'RCV-2025-0056',
     supplier: 'Kraft Industrial',
-    dock: 'Dock 1',
-    lineItems: 8,
-    expectedTime: 'Tomorrow, 09:00',
-  },
-];
-
-const receivingHistory: ReceivingHistory[] = [
-  {
-    id: '1',
-    grn: 'GRN-7712',
-    po: 'PO-2057',
-    supplier: 'Kraft Industrial',
-    items: 9,
-    received: '2026-07-31 08:42',
-  },
-  {
-    id: '2',
-    grn: 'GRN-7711',
-    po: 'PO-2052',
-    supplier: 'Apex Components',
-    items: 18,
-    received: '2026-07-30 15:10',
-  },
-  {
-    id: '3',
-    grn: 'GRN-7710',
-    po: 'PO-2054',
-    supplier: 'Meridian Supply',
-    items: 4,
-    received: '2026-07-29 11:20',
+    receivingDate: '2025-05-19 10:00',
+    refNo: 'PO-2051',
+    qaStatus: 'Rejected',
+    status: 'Rejected',
+    delivered: 0,
+    total: 8,
+    receivedValue: 0,
   },
   {
     id: '4',
-    grn: 'GRN-7709',
-    po: 'PO-2041',
-    supplier: 'Northwind Traders',
-    items: 12,
-    received: '2026-07-28 09:05',
+    receivingNo: 'RCV-2025-0055',
+    supplier: 'Apex Components',
+    receivingDate: '2025-05-18 08:45',
+    refNo: 'PO-2050',
+    qaStatus: 'QA Passed',
+    status: 'Completed',
+    delivered: 18,
+    total: 18,
+    receivedValue: 132500,
+  },
+  {
+    id: '5',
+    receivingNo: 'RCV-2025-0054',
+    supplier: 'Meridian Supply',
+    receivingDate: '2025-05-17 11:20',
+    refNo: 'PO-2048',
+    qaStatus: 'Pending QA',
+    status: 'Pending QA',
+    delivered: 4,
+    total: 4,
+    receivedValue: 28600,
   },
 ];
 
-const recentStockIn: RecentStockIn[] = [
-  {
-    id: '1',
-    product: 'Industrial LED Panel 40W',
-    po: 'PO-2057',
-    receiver: 'A. Reyes',
-    time: '12 min ago',
-    quantity: 240,
-  },
-  {
-    id: '2',
-    product: 'Aluminium Profile 6m',
-    po: 'PO-2055',
-    receiver: 'A. Reyes',
-    time: '1 hr ago',
-    quantity: 120,
-  },
-  {
-    id: '3',
-    product: 'Servo Motor 400W',
-    po: 'PO-2051',
-    receiver: 'A. Reyes',
-    time: '5 hr ago',
-    quantity: 24,
-  },
+const mockDetail: ReceivingDetail = {
+  supplier: 'Northwind Traders',
+  warehouse: 'Central Depot',
+  totalItems: 16,
+  referenceNo: 'PO-2058',
+  receivingArea: 'Dock 2',
+  totalProducts: 8,
+  deliveryDate: 'May 21, 2025 09:15 AM',
+  receivedBy: 'Juan Dela Cruz',
+  receivedValue: 245000,
+  preparedBy: 'Maria Santos',
+  qaInspector: 'Rosa Ramirez',
+  remarks: 'All items accounted for, pending QA inspection.',
+};
+
+// Timeline steps for selected receiving
+const timelineSteps = [
+  { label: 'Receiving Created', time: 'May 21, 2025 09:00 AM' },
+  { label: 'Truck Arrived', time: 'May 21, 2025 09:15 AM' },
+  { label: 'Receiving Started', time: 'May 21, 2025 09:30 AM' },
+  { label: 'QA Inspection', time: 'In Progress' },
+  { label: 'QA Passed', time: 'Pending' },
+  { label: 'Stock In Completed', time: 'Pending' },
+  { label: 'Inventory Updated', time: 'Pending' },
 ];
 
 // ============================================
 // HELPER COMPONENTS
 // ============================================
 
-const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const config: Record<string, { color: string; bg: string; dotColor: string }> = {
-    Approved: {
-      color: 'text-emerald-700 dark:text-emerald-400',
-      bg: 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800',
-      dotColor: 'bg-emerald-500 dark:bg-emerald-400',
-    },
+const QaStatusBadge: React.FC<{ status: QaStatus }> = ({ status }) => {
+  const config = {
+    'Pending QA': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    'QA Passed': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    'Rejected': 'bg-rose-500/20 text-rose-400 border-rose-500/30',
   };
-  const { color, bg, dotColor } = config[status] || config['Approved'];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
+      {status === 'QA Passed' && <Check className="w-3 h-3 mr-1" />}
+      {status === 'Pending QA' && <Clock className="w-3 h-3 mr-1" />}
+      {status === 'Rejected' && <X className="w-3 h-3 mr-1" />}
       {status}
     </span>
   );
 };
 
-const SearchInput: React.FC<{
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  className?: string;
-}> = ({ value, onChange, placeholder = 'Search...', className = '' }) => (
-  <div className={`relative flex-1 min-w-[200px] ${className}`}>
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-[#0f172a] border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-    />
-  </div>
-);
+const ReceivingStatusBadge: React.FC<{ status: ReceivingStatus }> = ({ status }) => {
+  const config = {
+    'Pending QA': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    'Ready for Stock In': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+    'Completed': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    'Rejected': 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
+      {status}
+    </span>
+  );
+};
 
 // ============================================
 // MAIN COMPONENT
@@ -232,22 +238,47 @@ const SearchInput: React.FC<{
 const StockIn: React.FC = () => {
   // State
   const [search, setSearch] = useState('');
-  const [showChecklistModal, setShowChecklistModal] = useState(false);
-  const [selectedDelivery, setSelectedDelivery] = useState<PendingDelivery | null>(null);
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [selectedReceiving, setSelectedReceiving] = useState<ReceivingItem | null>(mockReceivings[0]);
+  const [qaStatus, setQaStatus] = useState<QaStatus>('Pending QA'); // simulate QA status
+  const [activeTab, setActiveTab] = useState<'info' | 'items' | 'attachments' | 'history'>('info');
 
-  // Calculate total deliveries
-  const totalDeliveries = pendingDeliveries.length;
-  const totalDocks = new Set(pendingDeliveries.map((d) => d.dock)).size;
+  // Filtered receivings
+  const filteredReceivings = mockReceivings.filter(r =>
+    r.receivingNo.toLowerCase().includes(search.toLowerCase()) ||
+    r.supplier.toLowerCase().includes(search.toLowerCase()) ||
+    r.refNo.toLowerCase().includes(search.toLowerCase())
+  );
 
-  // Handle open checklist
-  const handleOpenChecklist = (delivery: PendingDelivery) => {
-    setSelectedDelivery(delivery);
-    setShowChecklistModal(true);
-  };
+  // KPI calculations (using mockReceivings as today's data)
+  const totalDeliveries = mockReceivings.length;
+  const totalItemsReceived = mockReceivings.reduce((sum, r) => sum + r.delivered, 0);
+  const pendingQa = mockReceivings.filter(r => r.qaStatus === 'Pending QA').length;
+  const qaPassed = mockReceivings.filter(r => r.qaStatus === 'QA Passed').length;
+  const rejected = mockReceivings.filter(r => r.qaStatus === 'Rejected').length;
+  const totalValue = mockReceivings.reduce((sum, r) => sum + r.receivedValue, 0);
+
+  // KPI data
+  const kpiData = [
+    { label: "Today's Stock In", value: totalDeliveries, subtitle: 'Deliveries completed', change: '+18% vs yesterday', trend: 'up' },
+    { label: 'Received Today', value: totalItemsReceived, subtitle: 'Items received', change: '+22% vs yesterday', trend: 'up' },
+    { label: 'Pending QA', value: pendingQa, subtitle: 'Awaiting inspection', change: '-5% vs yesterday', trend: 'down' },
+    { label: 'QA Passed', value: qaPassed, subtitle: 'Ready for stock in', change: '+12% vs yesterday', trend: 'up' },
+    { label: 'Rejected', value: rejected, subtitle: 'Deliveries rejected', change: '-33% vs yesterday', trend: 'down' },
+    { label: 'Total Received Value', value: `₱${totalValue.toLocaleString()}`, subtitle: "Today's value", change: '+16% vs yesterday', trend: 'up' },
+  ];
+
+  // Determine if "Perform Stock In" should be enabled
+  const canPerformStockIn = selectedReceiving?.qaStatus === 'QA Passed';
+
+  // Pie chart data for Items Summary
+  const pieData = [
+    { name: 'Accepted', value: 85, color: '#10b981' },
+    { name: 'Rejected', value: 10, color: '#ef4444' },
+    { name: 'Pending', value: 5, color: '#f59e0b' },
+  ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+    <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Plant Manager</span>
@@ -255,75 +286,269 @@ const StockIn: React.FC = () => {
         <span className="text-slate-100">Stock In</span>
       </div>
 
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Stock In</h1>
-          <p className="text-sm text-slate-400">Inbound receiving against approved purchase orders</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="p-2.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <button className="p-2.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors">
-            <Download className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Top Callout Banner */}
-      <div className="bg-[#0f172a]/90 border border-slate-800 rounded-2xl p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Ready to receive a delivery?</h3>
-          <p className="text-sm text-slate-400">
-            {totalDeliveries} deliveries are scheduled across {totalDocks} docks today.
+          <h1 className="text-2xl font-bold text-white tracking-tight">Stock In</h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Inbound receiving against approved purchase and transfer deliveries.
           </p>
         </div>
-        <button
-          onClick={() => setShowReceiveModal(true)}
-          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 transition-colors whitespace-nowrap"
-        >
-          <ArrowDownToLine className="w-4 h-4" /> Receive Products
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
+            <QrCode className="w-4 h-4" />
+            Scan Barcode
+          </button>
+          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
+            <Printer className="w-4 h-4" />
+            Print
+          </button>
+          <button className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" />
+            New Receiving
+          </button>
+        </div>
       </div>
 
-      {/* Top Half Grid: Pending Deliveries + Receiving Timeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column - Pending Deliveries */}
-        <div className="lg:col-span-7">
-          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Pending Deliveries</h3>
-                <p className="text-sm text-slate-400">Expected at the dock</p>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {kpiData.map((kpi, idx) => {
+          const trendIcon = kpi.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />;
+          const trendColor = kpi.trend === 'up' ? 'text-emerald-400' : 'text-rose-400';
+          const accentClasses = [
+            'text-blue-400 bg-blue-500/10 border border-blue-500/20',
+            'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20',
+            'text-amber-400 bg-amber-500/10 border border-amber-500/20',
+            'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20',
+            'text-rose-400 bg-rose-500/10 border border-rose-500/20',
+            'text-teal-400 bg-teal-500/10 border border-teal-500/20',
+          ];
+          return (
+            <div key={idx} className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 hover:border-slate-700 transition-colors">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{kpi.label}</p>
+                  <p className="text-2xl font-bold text-white mt-1">{kpi.value}</p>
+                </div>
+                <div className={`p-2.5 rounded-lg flex items-center justify-center ${accentClasses[idx]}`}>
+                  {idx === 0 && <Box className="w-5 h-5" />}
+                  {idx === 1 && <PackageCheck className="w-5 h-5" />}
+                  {idx === 2 && <Clock className="w-5 h-5" />}
+                  {idx === 3 && <CheckCircle className="w-5 h-5" />}
+                  {idx === 4 && <XCircle className="w-5 h-5" />}
+                  {idx === 5 && <FileText className="w-5 h-5" />}
+                </div>
               </div>
-              <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
-                View all
-              </button>
+              <p className="text-xs text-slate-400 mt-1">{kpi.subtitle}</p>
+              <p className={`text-xs font-medium mt-1 flex items-center gap-1 ${trendColor}`}>
+                {trendIcon} {kpi.change}
+              </p>
             </div>
+          );
+        })}
+      </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {pendingDeliveries.map((delivery) => (
-                <div
-                  key={delivery.id}
-                  className="bg-[#141d30] border border-slate-800/80 rounded-xl p-4 hover:border-slate-600 transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-1.5">
-                    <span className="text-base font-semibold text-white">{delivery.poNumber}</span>
-                    <span className="px-2.5 py-0.5 rounded-lg text-xs font-medium bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                      {delivery.dock}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-300 mb-2">{delivery.supplier}</p>
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>{delivery.lineItems} line items</span>
-                    <span>{delivery.expectedTime}</span>
-                  </div>
+      {/* ============================================
+          FULL-WIDTH TABLE SECTION
+          ============================================ */}
+      <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4 w-full">
+        {/* Search & Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search receiving no., supplier, or reference..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-[#070a12] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            />
+          </div>
+          <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+            <option>All Status</option>
+            <option>Pending QA</option>
+            <option>Ready for Stock In</option>
+            <option>Completed</option>
+            <option>Rejected</option>
+          </select>
+          <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+            <option>All QA Status</option>
+            <option>Pending QA</option>
+            <option>QA Passed</option>
+            <option>Rejected</option>
+          </select>
+          <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+            <option>All Warehouses</option>
+            <option>Central Depot</option>
+            <option>Northgate</option>
+            <option>Southpark</option>
+            <option>Eastside</option>
+          </select>
+          <div className="flex items-center gap-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300">
+            <Calendar className="w-4 h-4 text-slate-500" />
+            <span>Date Range</span>
+            <ChevronDown className="w-4 h-4 text-slate-500" />
+          </div>
+          <button className="p-2 rounded-xl border border-slate-800 text-slate-400 hover:bg-slate-800/50 transition-colors">
+            <Filter className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[#070a12] border-b border-slate-800/80">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Ref. No.</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">QA Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Received Value</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {filteredReceivings.map((rec) => (
+                <tr key={rec.id} className="hover:bg-slate-800/20 transition-colors">
+                  <td className="px-4 py-3 font-mono text-blue-400 hover:underline font-medium">{rec.receivingNo}</td>
+                  <td className="px-4 py-3 text-slate-300">{rec.supplier}</td>
+                  <td className="px-4 py-3 text-slate-300">{rec.receivingDate}</td>
+                  <td className="px-4 py-3 text-slate-400">{rec.refNo}</td>
+                  <td className="px-4 py-3"><QaStatusBadge status={rec.qaStatus} /></td>
+                  <td className="px-4 py-3"><ReceivingStatusBadge status={rec.status} /></td>
+                  <td className="px-4 py-3 text-center text-white">{rec.delivered} / {rec.total}</td>
+                  <td className="px-4 py-3 text-right text-white">₱{rec.receivedValue.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                        onClick={() => setSelectedReceiving(rec)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredReceivings.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                    No receiving records found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ============================================
+          BOTTOM DASHBOARD SECTION
+          ============================================ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        {/* LEFT COLUMN (2/3 span): Receiving Details + Pending Deliveries */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Receiving Details Card */}
+          {selectedReceiving && (
+            <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-base font-semibold text-white">Receiving Details</h3>
+                <div className="flex items-center gap-2">
+                  <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex gap-4 border-b border-slate-800">
+                {['info', 'items', 'attachments', 'history'].map((tab) => (
                   <button
-                    onClick={() => handleOpenChecklist(delivery)}
-                    className="w-full mt-3 py-2 rounded-lg text-sm font-medium border border-slate-700 text-slate-300 hover:bg-slate-800/50 transition-colors"
+                    key={tab}
+                    onClick={() => setActiveTab(tab as any)}
+                    className={`pb-2 text-sm font-medium capitalize transition-colors border-b-2 ${
+                      activeTab === tab
+                        ? 'border-cyan-500 text-white'
+                        : 'border-transparent text-slate-400 hover:text-slate-300'
+                    }`}
                   >
-                    Open receiving checklist
+                    {tab} {tab === 'items' && <span className="ml-1 text-xs bg-slate-700 px-2 py-0.5 rounded-full">14</span>}
+                    {tab === 'attachments' && <span className="ml-1 text-xs bg-slate-700 px-2 py-0.5 rounded-full">2</span>}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                {activeTab === 'info' && (
+                  <>
+                    <div><span className="text-slate-400">Supplier</span> <p className="text-white">{mockDetail.supplier}</p></div>
+                    <div><span className="text-slate-400">Warehouse</span> <p className="text-white">{mockDetail.warehouse}</p></div>
+                    <div><span className="text-slate-400">Total Items</span> <p className="text-white">{mockDetail.totalItems}</p></div>
+                    <div><span className="text-slate-400">Reference No.</span> <p className="text-white">{mockDetail.referenceNo}</p></div>
+                    <div><span className="text-slate-400">Receiving Area</span> <p className="text-white">{mockDetail.receivingArea}</p></div>
+                    <div><span className="text-slate-400">Total Products</span> <p className="text-white">{mockDetail.totalProducts}</p></div>
+                    <div><span className="text-slate-400">Delivery Date</span> <p className="text-white">{mockDetail.deliveryDate}</p></div>
+                    <div><span className="text-slate-400">Received By</span> <p className="text-white">{mockDetail.receivedBy}</p></div>
+                    <div><span className="text-slate-400">Received Value</span> <p className="text-white">₱{mockDetail.receivedValue.toLocaleString()}</p></div>
+                    <div><span className="text-slate-400">Prepared By</span> <p className="text-white">{mockDetail.preparedBy}</p></div>
+                    <div><span className="text-slate-400">QA Inspector</span> <p className="text-white">{mockDetail.qaInspector}</p></div>
+                    <div className="col-span-2"><span className="text-slate-400">Remarks</span> <p className="text-white">{mockDetail.remarks}</p></div>
+                  </>
+                )}
+                {activeTab === 'items' && (
+                  <div className="col-span-2 text-center text-slate-400 py-4">Items list will appear here</div>
+                )}
+                {activeTab === 'attachments' && (
+                  <div className="col-span-2 text-center text-slate-400 py-4">Attachments list</div>
+                )}
+                {activeTab === 'history' && (
+                  <div className="col-span-2 text-center text-slate-400 py-4">History timeline</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Deliveries (Horizontal Cards) */}
+          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-cyan-400" />
+              Pending Deliveries
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {mockReceivings.slice(0, 4).map((rec) => (
+                <div
+                  key={rec.id}
+                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                    selectedReceiving?.id === rec.id
+                      ? 'border-cyan-500/50 bg-cyan-500/10'
+                      : 'border-slate-800/60 hover:border-slate-600'
+                  }`}
+                  onClick={() => setSelectedReceiving(rec)}
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="text-sm font-semibold text-white">{rec.receivingNo}</span>
+                    <QaStatusBadge status={rec.qaStatus} />
+                  </div>
+                  <p className="text-sm text-slate-300 mt-1">{rec.supplier}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Expected: {rec.receivingDate}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {rec.total} Products · {rec.delivered} Items
+                  </p>
+                  <button className="w-full mt-2 py-1.5 text-xs font-medium text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 rounded-lg transition-colors">
+                    View Receiving
                   </button>
                 </div>
               ))}
@@ -331,378 +556,97 @@ const StockIn: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column - Receiving Timeline */}
-        <div className="lg:col-span-5">
-          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 h-full">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Receiving Timeline</h3>
-                <p className="text-sm text-slate-400">Today's inbound activity</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {[
-                {
-                  id: '1',
-                  title: 'PO-2057 received',
-                  description: 'Kraft Industrial · 9 items · Dock 1',
-                  time: '08:42',
-                  completed: true,
-                },
-                {
-                  id: '2',
-                  title: 'Quality inspection passed',
-                  description: 'GRN-7712 · no discrepancies',
-                  time: '09:05',
-                  completed: true,
-                },
-                {
-                  id: '3',
-                  title: 'Putaway to Zone B',
-                  description: 'Racks B-02-07, B-04-05',
-                  time: '09:40',
-                  completed: true,
-                },
-                {
-                  id: '4',
-                  title: 'PO-2055 arriving',
-                  description: 'Cebu Logistics Co. · Dock 3',
-                  time: '10:15',
-                  completed: false,
-                },
-                {
-                  id: '5',
-                  title: 'PO-2058 arriving',
-                  description: 'Northwind Traders · Dock 2',
-                  time: '13:00',
-                  completed: false,
-                },
-              ].map((item, index) => (
-                <div key={item.id} className="relative pl-6">
-                  {index < 4 && (
-                    <div
-                      className={`absolute left-1.5 top-5 bottom-0 w-0.5 ${
-                        item.completed ? 'bg-cyan-500' : 'bg-slate-700'
-                      }`}
-                    />
-                  )}
-                  <div
-                    className={`absolute left-0 top-1.5 w-3 h-3 rounded-full border-2 ${
-                      item.completed
-                        ? 'bg-cyan-500 border-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
-                        : 'bg-slate-700 border-slate-600'
-                    }`}
-                  />
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-white">{item.title}</p>
-                      <p className="text-xs text-slate-400">{item.description}</p>
-                    </div>
-                    <span className="text-xs font-mono text-slate-500 whitespace-nowrap ml-4">
-                      {item.time}
-                    </span>
+        {/* RIGHT COLUMN (1/3 span): Timeline, Items Summary, Quick Actions */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* Receiving Timeline */}
+          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-cyan-400" />
+              Receiving Timeline
+            </h3>
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              {timelineSteps.map((step, idx) => (
+                <div key={idx} className="flex items-start gap-3">
+                  <div className="relative flex flex-col items-center">
+                    <div className={`w-3 h-3 rounded-full border-2 ${
+                      idx < 3 ? 'bg-cyan-500 border-cyan-500' : 'bg-slate-700 border-slate-600'
+                    }`} />
+                    {idx < timelineSteps.length - 1 && (
+                      <div className={`w-0.5 h-6 ${idx < 3 ? 'bg-cyan-500' : 'bg-slate-700'}`} />
+                    )}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${idx < 3 ? 'text-white' : 'text-slate-500'}`}>{step.label}</p>
+                    <p className="text-xs text-slate-400">{step.time}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Bottom Half Grid: Receiving History + Recent Stock In */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column - Receiving History Table */}
-        <div className="lg:col-span-7">
-          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Receiving History</h3>
-                <p className="text-sm text-slate-400">Goods receipt notes</p>
-              </div>
-              <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
-                View all
-              </button>
+          {/* Items Summary (Donut Chart) */}
+          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+              <Package className="w-4 h-4 text-cyan-400" />
+              Items Summary
+            </h3>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={30}
+                    outerRadius={50}
+                    dataKey="value"
+                    label={false}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[#141d30] border-b border-slate-800">
-                  <tr>
-                    <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                      GRN
-                    </th>
-                    <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                      PO
-                    </th>
-                    <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                      Supplier
-                    </th>
-                    <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
-                      Items
-                    </th>
-                    <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                      Received
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receivingHistory.map((record) => (
-                    <tr
-                      key={record.id}
-                      className="border-b border-slate-800/60 hover:bg-[#141d30]/50 transition-colors"
-                    >
-                      <td className="px-5 py-3.5 text-sm font-medium text-white">
-                        {record.grn}
-                      </td>
-                      <td className="px-5 py-3.5 text-sm font-mono text-slate-400">
-                        {record.po}
-                      </td>
-                      <td className="px-5 py-3.5 text-sm text-slate-300">
-                        {record.supplier}
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-sm text-white">
-                        {record.items}
-                      </td>
-                      <td className="px-5 py-3.5 text-sm text-slate-400">
-                        {record.received}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex justify-center gap-4 text-xs">
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Accepted 85%</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Rejected 10%</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Pending 5%</div>
             </div>
           </div>
-        </div>
 
-        {/* Right Column - Recent Stock In */}
-        <div className="lg:col-span-5">
-          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Recent Stock In</h3>
-                <p className="text-sm text-slate-400">Latest inbound movements</p>
-              </div>
-            </div>
-
-            <div className="flex-1 space-y-3.5">
-              {recentStockIn.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[#141d30] border border-slate-800 hover:border-slate-600 transition-colors"
-                >
-                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 flex-shrink-0">
-                    <PackageCheck className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">
-                      {item.product}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {item.po} · {item.receiver} · {item.time}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold text-emerald-400 whitespace-nowrap">
-                    +{item.quantity}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-slate-800">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
-                <p className="text-sm text-slate-300 flex-1">
-                  Inbound volume today: <span className="font-semibold text-white">1,860</span> units across 3 suppliers.
-                </p>
-                <StatusBadge status="Approved" />
-              </div>
-            </div>
+          {/* Quick Actions */}
+          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
+            <button className="w-full py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors">
+              View Receiving Checklist
+            </button>
+            <button className="w-full py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors">
+              Print Receiving Slip
+            </button>
+            <button className="w-full py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors">
+              Upload Attachments
+            </button>
+            <button
+              disabled={!canPerformStockIn}
+              className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                canPerformStockIn
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                  : 'bg-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
+              }`}
+            >
+              <ArrowDownToLine className="w-4 h-4" />
+              Perform Stock In
+              {!canPerformStockIn && <AlertCircle className="w-4 h-4 ml-1" />}
+            </button>
+            {!canPerformStockIn && (
+              <p className="text-xs text-amber-400 text-center">QA status must be "QA Passed" to enable stock in.</p>
+            )}
           </div>
         </div>
       </div>
-
-      {/* ============================================ */}
-      {/* RECEIVE PRODUCTS MODAL */}
-      {/* ============================================ */}
-      {showReceiveModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowReceiveModal(false)}
-        >
-          <div
-            className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Receive Products</h2>
-              <button
-                onClick={() => setShowReceiveModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-slate-100 transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">
-                  PO Number *
-                </label>
-                <select className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                  <option>PO-2058 - Northwind Traders</option>
-                  <option>PO-2055 - Cebu Logistics Co.</option>
-                  <option>PO-2051 - Kraft Industrial</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">
-                  Dock Assignment
-                </label>
-                <select className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                  <option>Dock 1</option>
-                  <option>Dock 2</option>
-                  <option>Dock 3</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">
-                  Delivered Quantity
-                </label>
-                <input
-                  type="number"
-                  className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  placeholder="Enter quantity received"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">
-                  Condition / Inspection Status
-                </label>
-                <select className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                  <option>Passed - No discrepancies</option>
-                  <option>Passed - Minor discrepancies noted</option>
-                  <option>Failed - Return to supplier</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">
-                  Receiving Notes
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  placeholder="Add any receiving notes..."
-                />
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowReceiveModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
-                >
-                  <ArrowDownToLine className="w-4 h-4" /> Receive
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================ */}
-      {/* RECEIVING CHECKLIST MODAL */}
-      {/* ============================================ */}
-      {showChecklistModal && selectedDelivery && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowChecklistModal(false)}
-        >
-          <div
-            className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-lg p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Receiving Checklist</h2>
-                <p className="text-sm text-slate-400">
-                  {selectedDelivery.poNumber} · {selectedDelivery.supplier}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowChecklistModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-slate-100 transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-[#141d30] rounded-xl p-4 border border-slate-800">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">Dock</span>
-                  <span className="font-medium text-white">
-                    {selectedDelivery.dock}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <span className="text-slate-400">Line Items</span>
-                  <span className="font-medium text-white">
-                    {selectedDelivery.lineItems}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <span className="text-slate-400">Expected</span>
-                  <span className="font-medium text-white">
-                    {selectedDelivery.expectedTime}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-slate-300 mb-2">Checklist Items</h4>
-                <div className="space-y-2">
-                  {[
-                    'Verify PO and supplier documents',
-                    'Count and inspect delivered items',
-                    'Check for damage or discrepancies',
-                    'Record batch/lot numbers if applicable',
-                    'Update inventory system',
-                    'Generate goods receipt note',
-                  ].map((item, idx) => (
-                    <label
-                      key={idx}
-                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#141d30] transition-colors cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 rounded border-slate-700 bg-[#090d16] text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0"
-                      />
-                      <span className="text-sm text-slate-300">{item}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowChecklistModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
-                >
-                  Close
-                </button>
-                <button className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950">
-                  <ClipboardList className="w-4 h-4" /> Complete Receiving
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

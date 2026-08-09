@@ -184,15 +184,20 @@ const KPICard: React.FC<{
 // Custom Tooltip for chart
 const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
+    const used = payload.find((p) => p.dataKey === 'used')?.value;
+    const capacity = payload.find((p) => p.dataKey === 'capacity')?.value;
     return (
       <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-3 shadow-lg">
         <p className="text-sm font-semibold text-white mb-1">{label}</p>
         <div className="space-y-1 text-sm">
           <p className="text-slate-300">
-            Used: <span className="font-medium text-white">{payload[0]?.value?.toLocaleString()}</span>
+            Used: <span className="font-medium text-white">{used?.toLocaleString()}</span>
           </p>
           <p className="text-slate-300">
-            Capacity: <span className="font-medium text-white">{payload[1]?.value?.toLocaleString()}</span>
+            Capacity: <span className="font-medium text-white">{capacity?.toLocaleString()}</span>
+          </p>
+          <p className="text-xs text-slate-400 border-t border-slate-700 pt-1 mt-1">
+            {used?.toLocaleString()} / {capacity?.toLocaleString()}
           </p>
         </div>
       </div>
@@ -265,10 +270,10 @@ const Warehouse: React.FC = () => {
               </div>
               <span
                 className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                  zone.utilization >= 80
+                  zone.utilization > 90
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    : zone.utilization >= 70
                     ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                    : zone.utilization >= 60
-                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                     : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                 }`}
               >
@@ -283,10 +288,10 @@ const Warehouse: React.FC = () => {
                 style={{
                   width: `${zone.utilization}%`,
                   backgroundColor:
-                    zone.utilization >= 80
+                    zone.utilization > 90
+                      ? '#EF4444'
+                      : zone.utilization >= 70
                       ? '#F59E0B'
-                      : zone.utilization >= 60
-                      ? '#3B82F6'
                       : '#10B981',
                 }}
               />
@@ -338,7 +343,7 @@ const Warehouse: React.FC = () => {
             data={chartData}
             margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
           >
-            <CartesianGrid strokeDasharray="3 3" className="stroke-slate-700" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
             <XAxis
               dataKey="name"
               className="text-slate-400 text-xs"
@@ -358,8 +363,26 @@ const Warehouse: React.FC = () => {
                 <span className="text-slate-300 text-sm">{value}</span>
               )}
             />
-            <Bar dataKey="used" fill="#06b6d4" name="Used" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="capacity" fill="#14b8a6" name="Total Capacity" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="used"
+              fill="#06b6d4"
+              name="Used"
+              radius={[6, 6, 0, 0]}
+              isAnimationActive={true}
+              animationDuration={1200}
+              animationEasing="ease-in-out"
+            />
+            <Bar
+              dataKey="capacity"
+              fill="#475569"
+              stroke="#64748b"
+              strokeWidth={1}
+              name="Total Capacity"
+              radius={[6, 6, 0, 0]}
+              isAnimationActive={true}
+              animationDuration={1200}
+              animationEasing="ease-in-out"
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

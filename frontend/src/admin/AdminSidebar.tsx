@@ -12,13 +12,24 @@ import {
   Truck,
   Brain,
   BarChart3,
-  Settings,
   QrCode,
   Building2,
-  UserCog,
 } from 'lucide-react';
 
-const navGroups = [
+interface NavItem {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  path: string;
+  hasDropdown?: boolean;
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
   {
     title: 'OPERATIONS',
     items: [
@@ -29,15 +40,21 @@ const navGroups = [
   {
     title: 'WAREHOUSE MANAGEMENT',
     items: [
-      { id: 'warehouse-parent', icon: Warehouse, label: 'Warehouse / Inventory', path: '/admin/warehouse', hasDropdown: true },
+      {
+        id: 'warehouse-parent',
+        icon: Warehouse,
+        label: 'Warehouse / Inventory',
+        path: '/admin/inventory',
+        hasDropdown: true,
+      },
     ],
   },
   {
     title: 'PROCUREMENT & LOGISTICS',
     items: [
       { id: 'procurement', icon: ShoppingCart, label: 'Procurement', path: '/admin/procurement' },
-      { id: 'purchase-orders', icon: FileText, label: 'Purchase Orders', path: '/admin/purchase-orders' },
       { id: 'barcode-center', icon: QrCode, label: 'Barcode Center', path: '/admin/barcode-center' },
+      { id: 'purchase-orders', icon: FileText, label: 'Purchase Orders', path: '/admin/purchase-orders' },
       { id: 'suppliers', icon: Users, label: 'Suppliers', path: '/admin/suppliers' },
       { id: 'logistics', icon: Truck, label: 'Logistics (DTRS)', path: '/admin/logistics' },
     ],
@@ -45,15 +62,9 @@ const navGroups = [
   {
     title: 'ANALYTICS & INSIGHTS',
     items: [
-      { id: 'ai-demand-forecast', icon: Brain, label: 'AI Demand Forecasting', path: '/admin/ai-demand-forecast' },
+      { id: 'ai-demand-forecast', icon: Brain, label: 'AI Demand Forecasting', path: '/admin/ai-demand-forecasting' },
       { id: 'reports', icon: BarChart3, label: 'Reports', path: '/admin/reports' },
-    ],
-  },
-  {
-    title: 'SYSTEM MANAGEMENT',
-    items: [
-      { id: 'users', icon: UserCog, label: 'Users', path: '/admin/users' },
-      { id: 'settings-parent', icon: Settings, label: 'Settings', path: '/admin/settings', hasDropdown: true },
+      { id: 'users', icon: Users, label: 'Users', path: '/admin/users' },
     ],
   },
 ];
@@ -61,12 +72,7 @@ const navGroups = [
 export default function AdminSidebar() {
   const location = useLocation();
 
-  const [isWarehouseOpen, setIsWarehouseOpen] = useState(
-    location.pathname.startsWith('/admin/warehouse')
-  );
-  const [isSettingsOpen, setIsSettingsOpen] = useState(
-    location.pathname.startsWith('/admin/settings')
-  );
+  const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -114,8 +120,8 @@ export default function AdminSidebar() {
                 const active = item.hasDropdown ? isPathActive(item.path) : isActive(item.path);
 
                 if (item.hasDropdown) {
-                  const isOpen = item.id === 'warehouse-parent' ? isWarehouseOpen : isSettingsOpen;
-                  const setIsOpen = item.id === 'warehouse-parent' ? setIsWarehouseOpen : setIsSettingsOpen;
+                  const isOpen = isWarehouseOpen;
+                  const setIsOpen = setIsWarehouseOpen;
                   const isParentActive = isPathActive(item.path);
 
                   return (
@@ -123,35 +129,23 @@ export default function AdminSidebar() {
                        <button
                          type="button"
                          onClick={() => setIsOpen(!isOpen)}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all border ${
-                            isParentActive
-                              ? 'bg-[#0b2234] text-[#00a3c4] border-[#00a3c4]/40'
-                              : 'text-gray-400 hover:text-white border-transparent hover:bg-gray-800/40'
-                          }`}
-                       >
-                        <div className="flex items-center gap-3"><Icon className="w-5 h-5"/><span>{item.label}</span></div>
-                        {isOpen ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
-                      </button>
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all border ${
+                              isParentActive
+                                ? 'bg-[#0b2234] text-[#00a3c4] border-[#00a3c4]/40'
+                                : 'text-gray-400 hover:text-white border-transparent hover:bg-gray-800/40'
+                            }`}
+                         >
+                           <div className="flex items-center gap-3"><Icon className="w-5 h-5"/><span>{item.label}</span></div>
+                           {isOpen ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
+                         </button>
 
-                      {isOpen && (
-                        <div className="pl-9 pr-2 py-1 space-y-1 border-l border-gray-700 ml-5 my-1">
-                          {item.id === 'warehouse-parent' ? (
-                            <>
-                              <NavLink className={subLinkClass} to="/admin/warehouse/inventory">Inventory</NavLink>
-                              <NavLink className={subLinkClass} to="/admin/warehouse/stock-counting">Stock Counting</NavLink>
-                              <NavLink className={subLinkClass} to="/admin/warehouse/manage-locations">Manage Locations</NavLink>
-                            </>
-                          ) : (
-                            <>
-                              <NavLink className={subLinkClass} to="/admin/settings/api-keys">API Keys</NavLink>
-                              <NavLink className={subLinkClass} to="/admin/settings/brands">Brands</NavLink>
-                              <NavLink className={subLinkClass} to="/admin/settings/categories">Categories</NavLink>
-                              <NavLink className={subLinkClass} to="/admin/settings/company">Company Settings</NavLink>
-                              <NavLink className={subLinkClass} to="/admin/settings/uom">Units of Measure</NavLink>
-                            </>
-                          )}
-                        </div>
-                      )}
+                       {isOpen && (
+                         <div className="pl-9 pr-2 py-1 space-y-1 border-l border-gray-700 ml-5 my-1">
+                           <NavLink className={subLinkClass} to="/admin/inventory">Inventory</NavLink>
+                           <NavLink className={subLinkClass} to="/admin/stock-counting">Stock Counting</NavLink>
+                           <NavLink className={subLinkClass} to="/admin/manage-locations">Manage Locations</NavLink>
+                         </div>
+                       )}
                     </div>
                   );
                 }

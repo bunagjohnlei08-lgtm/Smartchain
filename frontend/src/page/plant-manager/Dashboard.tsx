@@ -220,7 +220,7 @@ const Dashboard: React.FC = () => {
     trend === 'up' ? ArrowUp : trend === 'down' ? ArrowDown : Minus;
 
   return (
-    <div className="w-full min-h-screen bg-[#0a0f1d] p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+    <div className="w-full min-h-screen bg-[#090d16] p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
       {/* ============================================================
           HEADER
       ============================================================ */}
@@ -237,7 +237,7 @@ const Dashboard: React.FC = () => {
                <input
                  type="text"
                  placeholder="Search products, PO, SKU..."
-                 className="pl-9 pr-4 py-2 rounded-xl bg-[#0f172a] border border-slate-800 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full sm:w-72"
+                 className="pl-9 pr-4 py-2 rounded-xl bg-[#0d1322] border border-slate-800 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full sm:w-72"
                />
             </div>
             <div>
@@ -247,7 +247,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-800 text-sm font-medium text-slate-300 bg-[#0f172a] hover:bg-slate-800 transition-colors">
+          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-800 text-sm font-medium text-slate-300 bg-[#0d1322] hover:bg-slate-800 transition-colors">
             <Download className="w-4 h-4" />
             Export snapshot
           </button>
@@ -264,7 +264,7 @@ const Dashboard: React.FC = () => {
         {kpiData.map((kpi, idx) => (
           <div
             key={idx}
-            className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-slate-600 transition-all group"
+            className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-slate-600 transition-all group"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
@@ -290,7 +290,7 @@ const Dashboard: React.FC = () => {
       ============================================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Inventory Trend */}
-        <div className="lg:col-span-8 bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5">
+        <div className="lg:col-span-8 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Inventory Trend</h3>
@@ -323,14 +323,18 @@ const Dashboard: React.FC = () => {
                 stroke="#3B82F6"
                 fill="url(#gradientStock)"
                 name="Stock Units"
+                isAnimationActive={true}
+                animationDuration={1500}
+                animationEasing="ease-in-out"
+                animationBegin={100}
               />
-              <Line type="monotone" yAxisId="right" dataKey="value" stroke="#22C55E" strokeWidth={2} name="Valuation ($M)" dot={{ fill: '#22C55E', r: 4 }} />
+              <Line type="monotone" yAxisId="right" dataKey="value" stroke="#22C55E" strokeWidth={2} name="Valuation ($M)" dot={{ fill: '#22C55E', r: 4 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={100} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         {/* PO Status Donut Chart */}
-        <div className="lg:col-span-4 bg-[#0f172a] border border-slate-800/80 rounded-2xl p-6 flex flex-col justify-between items-center h-full min-h-[340px]">
+        <div className="lg:col-span-4 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6 flex flex-col justify-between items-center h-full min-h-[340px]">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Purchase Order Status</h3>
@@ -352,6 +356,10 @@ const Dashboard: React.FC = () => {
                 dataKey="value"
                 label={false}
                 labelLine={false}
+                isAnimationActive={true}
+                animationDuration={1400}
+                animationEasing="ease-out"
+                animationBegin={200}
               >
                 {poStatusData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} stroke="#0f172a" strokeWidth={2} />
@@ -381,7 +389,7 @@ const Dashboard: React.FC = () => {
       ============================================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stock Movement */}
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5">
+        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Stock Movement</h3>
@@ -400,14 +408,14 @@ const Dashboard: React.FC = () => {
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff' }}
               />
               <Legend />
-              <Bar dataKey="in" fill="#3B82F6" name="Stock In" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="out" fill="#EF4444" name="Stock Out" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="in" fill="#3B82F6" name="Stock In" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" animationBegin={300} />
+              <Bar dataKey="out" fill="#EF4444" name="Stock Out" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" animationBegin={300} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {/* Monthly Inventory Activity */}
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5">
+        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Monthly Inventory Activity</h3>
@@ -426,9 +434,9 @@ const Dashboard: React.FC = () => {
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff' }}
               />
               <Legend />
-              <Bar dataKey="receiving" stackId="a" fill="#3B82F6" name="Receiving" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="release" stackId="a" fill="#22C55E" name="Release" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="transfers" stackId="a" fill="#F59E0B" name="Transfers" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="receiving" stackId="a" fill="#3B82F6" name="Receiving" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
+              <Bar dataKey="release" stackId="a" fill="#22C55E" name="Release" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
+              <Bar dataKey="transfers" stackId="a" fill="#F59E0B" name="Transfers" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -439,7 +447,7 @@ const Dashboard: React.FC = () => {
       ============================================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Low Stock Summary */}
-        <div className="lg:col-span-4 bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5">
+        <div className="lg:col-span-4 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Low Stock Summary</h3>
@@ -477,7 +485,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Recent Transactions */}
-        <div className="lg:col-span-8 bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5">
+        <div className="lg:col-span-8 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-lg font-semibold text-white">Recent Transactions</h3>
@@ -534,7 +542,7 @@ const Dashboard: React.FC = () => {
       ============================================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Supplier Performance */}
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-6">
+        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Supplier Performance</h3>
@@ -586,7 +594,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* AI Forecast Summary */}
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-6">
+        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-1">
             <div>
               <h3 className="text-white font-semibold">AI Forecast Summary</h3>

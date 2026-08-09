@@ -40,7 +40,7 @@ const QASidebar = () => {
           </div>
           <div className="flex flex-col justify-center">
             <span className="font-bold text-white text-base tracking-tight leading-none">SmartChain</span>
-            <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase mt-1">QA/QC Supervisor</span>
+             <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase mt-1">QA/QC SUPERVISOR</span>
           </div>
         </div>
       </div>

@@ -34,19 +34,19 @@ const sectionGroups: { title: string; items: NavItem[] }[] = [
         id: 'dashboard',
         icon: <LayoutDashboard className="w-5 h-5" />,
         label: 'Dashboard',
-        path: '/super-admin/dashboard',
+        path: '/admin/dashboard',
       },
       {
         id: 'products',
         icon: <Package className="w-5 h-5" />,
         label: 'Products',
-        path: '/super-admin/products',
+        path: '/admin/products',
       },
       {
         id: 'categories',
         icon: <Tag className="w-5 h-5" />,
         label: 'Categories',
-        path: '/super-admin/categories',
+        path: '/admin/categories',
       },
     ],
   },
@@ -57,19 +57,19 @@ const sectionGroups: { title: string; items: NavItem[] }[] = [
         id: 'suppliers',
         icon: <Users className="w-5 h-5" />,
         label: 'Suppliers',
-        path: '/super-admin/suppliers',
+        path: '/admin/suppliers',
       },
       {
         id: 'purchase-orders',
         icon: <FileText className="w-5 h-5" />,
         label: 'Purchase Orders',
-        path: '/super-admin/purchase-orders',
+        path: '/admin/purchase-orders',
       },
       {
         id: 'procurement',
         icon: <ShoppingCart className="w-5 h-5" />,
         label: 'Procurement',
-        path: '/super-admin/procurement',
+        path: '/admin/procurement',
       },
     ],
   },
@@ -81,16 +81,16 @@ const sectionGroups: { title: string; items: NavItem[] }[] = [
         icon: <Warehouse className="w-5 h-5" />,
         label: 'Warehouse',
         subItems: [
-          { label: 'Inventory', path: '/super-admin/inventory-list' },
-          { label: 'Stock In', path: '/super-admin/stock-in' },
-          { label: 'Stock Out', path: '/super-admin/stock-out' },
+          { label: 'Inventory', path: '/admin/inventory' },
+          { label: 'Stock In', path: '/admin/stock-in' },
+          { label: 'Stock Out', path: '/admin/stock-out' },
         ],
       },
       {
         id: 'shipment',
         icon: <Truck className="w-5 h-5" />,
         label: 'Shipment',
-        path: '/super-admin/logistics',
+        path: '/admin/shipment',
       },
     ],
   },
@@ -101,13 +101,13 @@ const sectionGroups: { title: string; items: NavItem[] }[] = [
         id: 'reports',
         icon: <FileBarChart className="w-5 h-5" />,
         label: 'Reports',
-        path: '/super-admin/reports',
+        path: '/admin/reports',
       },
       {
         id: 'forecast',
         icon: <Brain className="w-5 h-5" />,
         label: 'AI Forecast',
-        path: '/super-admin/forecast',
+        path: '/admin/forecast',
       },
     ],
   },
@@ -118,13 +118,13 @@ const sectionGroups: { title: string; items: NavItem[] }[] = [
         id: 'notifications',
         icon: <Bell className="w-5 h-5" />,
         label: 'Notifications',
-        path: '/super-admin/notifications',
+        path: '/admin/notifications',
       },
       {
         id: 'profile',
         icon: <User className="w-5 h-5" />,
         label: 'Profile',
-        path: '/super-admin/profile',
+        path: '/admin/profile',
       },
     ],
   },
@@ -135,7 +135,7 @@ const Sidebar = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const warehousePaths = ['/super-admin/inventory-list', '/super-admin/stock-in', '/super-admin/stock-out'];
+    const warehousePaths = ['/admin/inventory', '/admin/stock-in', '/admin/stock-out'];
     setWarehouseOpen(warehousePaths.includes(location.pathname));
   }, [location.pathname]);
 
@@ -149,7 +149,7 @@ const Sidebar = () => {
   return (
     <div className="w-64 h-screen sticky top-0 bg-[#090d16] border-r border-slate-800/80 text-slate-300 flex flex-col overflow-hidden z-30">
       <div className="p-4 border-b border-slate-800/80 flex-shrink-0">
-        <Link to="/super-admin/dashboard" className="flex items-center gap-2">
+        <Link to="/admin/dashboard" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
             <span className="text-white font-bold text-sm">SC</span>
           </div>

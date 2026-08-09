@@ -1,5 +1,5 @@
 // src/page/qa/QualityReports.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   FileSpreadsheet,
@@ -112,6 +112,9 @@ const KpiCard: React.FC<{
 // ============================================
 
 const QualityReports: React.FC = () => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       {/* Header */}
@@ -205,6 +208,10 @@ const QualityReports: React.FC = () => {
                 dot={{ r: 4, fill: '#22C55E' }}
                 activeDot={{ r: 6 }}
                 name="Passed"
+                isAnimationActive={true}
+                animationDuration={1500}
+                animationEasing="ease-in-out"
+                animationBegin={100}
               />
               <Line
                 type="monotone"
@@ -214,6 +221,10 @@ const QualityReports: React.FC = () => {
                 dot={{ r: 4, fill: '#EF4444' }}
                 activeDot={{ r: 6 }}
                 name="Rejected"
+                isAnimationActive={true}
+                animationDuration={1500}
+                animationEasing="ease-in-out"
+                animationBegin={100}
               />
               <Line
                 type="monotone"
@@ -223,6 +234,10 @@ const QualityReports: React.FC = () => {
                 dot={{ r: 4, fill: '#F59E0B' }}
                 activeDot={{ r: 6 }}
                 name="Damaged"
+                isAnimationActive={true}
+                animationDuration={1500}
+                animationEasing="ease-in-out"
+                animationBegin={100}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -245,6 +260,10 @@ const QualityReports: React.FC = () => {
                 paddingAngle={4}
                 dataKey="value"
                 label={false}
+                isAnimationActive={true}
+                animationDuration={1300}
+                animationEasing="ease-out"
+                animationBegin={200}
               >
                 {donutData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} stroke="#0d1322" strokeWidth={2} />
@@ -293,7 +312,7 @@ const QualityReports: React.FC = () => {
                   color: '#f1f5f9',
                 }}
               />
-              <Bar dataKey="quantity" fill="#06b6d4" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="quantity" fill="#06b6d4" radius={[0, 4, 4, 0]} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" animationBegin={300}>
                 <LabelList
                   dataKey="quantity"
                   position="right"
@@ -320,10 +339,10 @@ const QualityReports: React.FC = () => {
                   </span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-800 rounded-full mt-1 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-cyan-500 transition-all"
-                    style={{ width: `${item.passRate}%` }}
-                  />
+                 <div
+                   className="h-full rounded-full bg-cyan-500"
+                   style={{ width: mounted ? `${item.passRate}%` : '0%', transition: 'width 1s ease-out 0.4s' }}
+                 />
                 </div>
               </div>
             ))}

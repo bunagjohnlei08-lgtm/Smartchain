@@ -488,26 +488,34 @@ const AIDemandForecast: React.FC = () => {
         labelStyle={{ color: '#94A3B8', fontSize: '12px' }}
        />
        <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '16px', color: '#94A3B8', fontSize: '12px' }} />
-       <Area
-        type="monotone"
-        dataKey="actual"
-        stroke="#22C55E"
-        strokeWidth={3}
-        fill="url(#actualGradient)"
-        name="Actual"
-        dot={{ fill: '#22C55E', r: 3, strokeWidth: 0 }}
-        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-       />
-       <Line
-        type="monotone"
-        dataKey="forecastFromLastActual"
-        stroke="#3B82F6"
-        strokeWidth={3}
-        strokeDasharray="6 6"
-        name="Forecast"
-        dot={{ fill: '#3B82F6', r: 3 }}
-        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-       />
+        <Area
+         type="monotone"
+         dataKey="actual"
+         stroke="#22C55E"
+         strokeWidth={3}
+         fill="url(#actualGradient)"
+         name="Actual"
+         dot={{ fill: '#22C55E', r: 3, strokeWidth: 0 }}
+         activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+         isAnimationActive={true}
+         animationDuration={1500}
+         animationEasing="ease-in-out"
+         animationBegin={200}
+        />
+        <Line
+         type="monotone"
+         dataKey="forecastFromLastActual"
+         stroke="#3B82F6"
+         strokeWidth={3}
+         strokeDasharray="6 6"
+         name="Forecast"
+         dot={{ fill: '#3B82F6', r: 3 }}
+         activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+         isAnimationActive={true}
+         animationDuration={1500}
+         animationEasing="ease-in-out"
+         animationBegin={200}
+        />
       </AreaChart>
      </ResponsiveContainer>
     </div>
@@ -518,7 +526,7 @@ const AIDemandForecast: React.FC = () => {
     <div className="w-full">
      <div className="w-full bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-6">
       {/* Top Toolbar Card */}
-      <div className="bg-slate-50 bg-gray-800/30 border border-gray-800/50 p-4 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+      <div className="bg-[#0d1322] border border-slate-800/80 p-4 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
        <div className="relative flex-1 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
@@ -549,31 +557,31 @@ const AIDemandForecast: React.FC = () => {
        </div>
       </div>
 
-      <div className="w-full overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
-        <thead className="bg-gray-800/50 bg-gray-800/30 text-gray-400 uppercase tracking-wider text-[11px] font-semibold border-b border-gray-800 border-gray-800">
+      <div className="w-full overflow-x-auto rounded-lg">
+        <table className="w-full table-auto text-left border-collapse">
+        <thead className="bg-gray-800/50 bg-gray-800/30 text-slate-400 uppercase tracking-wider text-xs font-semibold border-b border-slate-800">
          <tr>
-          <th className="py-4 px-6 whitespace-nowrap text-left">Product</th>
-          <th className="py-4 px-6 whitespace-nowrap text-left">SKU</th>
-          <th className="py-4 px-6 whitespace-nowrap text-left">Warehouse</th>
-          <th className="py-4 px-6 whitespace-nowrap text-right">Hist. Demand</th>
-          <th className="py-4 px-6 whitespace-nowrap text-right">Predicted</th>
-          <th className="py-4 px-6 whitespace-nowrap text-right">Current Stock</th>
-          <th className="py-4 px-6 whitespace-nowrap text-right">Suggested Reorder</th>
-          <th className="py-4 px-6 whitespace-nowrap text-center">Actions</th>
+           <th className="px-3 py-3 whitespace-nowrap text-left">Product</th>
+           <th className="px-3 py-3 whitespace-nowrap text-left">SKU</th>
+           <th className="px-3 py-3 whitespace-nowrap text-left">Warehouse</th>
+           <th className="px-3 py-3 whitespace-nowrap text-right">Hist. Demand</th>
+           <th className="px-3 py-3 whitespace-nowrap text-right">Predicted</th>
+           <th className="px-3 py-3 whitespace-nowrap text-right">Current Stock</th>
+           <th className="px-3 py-3 whitespace-nowrap text-right">Suggested Reorder</th>
+           <th className="px-3 py-3 whitespace-nowrap text-right pr-4 min-w-[70px]">Actions</th>
          </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 divide-gray-800">
+        <tbody className="border-collapse">
          {paginatedProducts.map((product) => (
-          <tr key={product.id} className="hover:bg-gray-800/50 hover:bg-gray-800/30 transition">
-           <td className="py-4 px-6 whitespace-nowrap text-white font-medium">{product.name}</td>
-           <td className="py-4 px-6 whitespace-nowrap text-gray-400">{product.sku}</td>
-           <td className="py-4 px-6 whitespace-nowrap text-gray-300">{product.warehouse}</td>
-           <td className="py-4 px-6 whitespace-nowrap text-right text-gray-300">{product.historicalDemand}</td>
-           <td className="py-4 px-6 whitespace-nowrap text-right text-blue-400 font-semibold">{product.predictedDemand}</td>
-           <td className="py-4 px-6 whitespace-nowrap text-right text-gray-300">{product.currentStock}</td>
-           <td className="py-4 px-6 whitespace-nowrap text-right text-amber-400 font-medium">{product.suggestedReorder}</td>
-           <td className="py-4 px-6 whitespace-nowrap">
+          <tr key={product.id} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
+            <td className="px-3 py-3 whitespace-nowrap text-white font-medium">{product.name}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-gray-400">{product.sku}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-gray-300">{product.warehouse}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-right text-gray-300">{product.historicalDemand}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-right text-blue-400 font-semibold">{product.predictedDemand}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-right text-gray-300">{product.currentStock}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-right text-amber-400 font-medium">{product.suggestedReorder}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-right pr-4 min-w-[70px]">
             <div className="flex items-center justify-end gap-1">
              <button
               onClick={() => handleViewProduct(product)}
@@ -648,15 +656,15 @@ const AIDemandForecast: React.FC = () => {
         {mockAIInsights.map((insight) => (
          <div
           key={insight.id}
-          className="bg-slate-50 bg-gray-800/30 rounded-xl p-4 border border-gray-800/50 hover:border-slate-300 hover:border-gray-700 transition-all duration-200"
+           className="bg-[#0d1322] border border-slate-800/80 rounded-xl p-4 transition-all duration-200"
          >
           <div className="flex items-start justify-between gap-4">
            <div>
             <p className="text-white font-medium text-sm">{insight.title}</p>
-            <p className="text-gray-400 text-sm mt-0.5">{insight.description}</p>
+             <p className="text-slate-400 text-sm mt-0.5">{insight.description}</p>
            </div>
             {insight.action && (
-            <button className="bg-gray-800/30 border border-gray-700 text-gray-300 hover:text-white hover:border-blue-500 px-3 py-1.5 rounded-lg text-xs transition-all duration-200 whitespace-nowrap shrink-0">
+             <button className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs transition-all duration-200 whitespace-nowrap shrink-0">
              {insight.action}
             </button>
            )}
@@ -671,10 +679,10 @@ const AIDemandForecast: React.FC = () => {
      <div className="lg:col-span-1">
       <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-6">
        <h3 className="text-white font-semibold text-sm">Top Predicted Products</h3>
-       <p className="text-gray-400 text-xs mt-1 mb-4">Next 30-day demand ranking</p>
+        <p className="text-slate-400 text-xs mt-1 mb-4">Next 30-day demand ranking</p>
        <div className="space-y-3">
         {topProducts.map((product, idx) => (
-         <div key={product.id} className="bg-slate-50 bg-gray-800/30 rounded-xl p-3 border border-gray-800/50 hover:border-slate-300 hover:border-gray-700 transition-all duration-200">
+          <div key={product.id} className="bg-[#0d1322] border border-slate-800/80 rounded-xl p-3 transition-all duration-200">
           <div className="flex items-center justify-between">
            <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold flex items-center justify-center shrink-0">
@@ -682,7 +690,7 @@ const AIDemandForecast: React.FC = () => {
             </div>
             <div>
              <p className="text-white text-sm font-medium">{product.name}</p>
-             <p className="text-gray-400 text-xs">{product.sku}</p>
+              <p className="text-slate-400 text-xs">{product.sku}</p>
             </div>
            </div>
            <div className="flex items-center gap-2">
@@ -710,8 +718,8 @@ const AIDemandForecast: React.FC = () => {
     <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-6">
      <h3 className="text-white font-semibold text-sm mb-4">Forecast History</h3>
      <div className="overflow-x-auto">
-      <table className="w-full">
-       <thead className="bg-gray-800/50 bg-gray-800/30 border-b border-gray-800 border-gray-800">
+       <table className="w-full border-collapse">
+        <thead className="bg-gray-800/50 bg-gray-800/30 border-b border-slate-800">
         <tr>
          <th className="px-4 py-2 text-left text-gray-400 text-xs font-medium uppercase tracking-wider">Generated Date</th>
          <th className="px-4 py-2 text-left text-gray-400 text-xs font-medium uppercase tracking-wider">Generated By</th>
@@ -721,8 +729,8 @@ const AIDemandForecast: React.FC = () => {
         </tr>
        </thead>
        <tbody>
-        {mockForecastHistory.map((history) => (
-         <tr key={history.id} className="border-b border-gray-800 border-gray-800 hover:bg-gray-800/50 hover:bg-gray-800/30 transition-all duration-150">
+         {mockForecastHistory.map((history) => (
+          <tr key={history.id} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
           <td className="px-4 py-2.5 text-white text-sm">{history.generatedDate}</td>
           <td className="px-4 py-2.5 text-gray-400 text-sm">{history.generatedBy}</td>
           <td className="px-4 py-2.5 text-gray-400 text-sm">{history.model}</td>
@@ -762,26 +770,26 @@ const AIDemandForecast: React.FC = () => {
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 gap-3">
-         <div className="bg-slate-50 bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+         <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
           <p className="text-gray-400 text-xs">Historical Demand</p>
           <p className="text-white text-lg font-bold">{selectedProduct.historicalDemand}</p>
          </div>
-         <div className="bg-slate-50 bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+         <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
           <p className="text-gray-400 text-xs">Predicted Demand</p>
           <p className="text-white text-lg font-bold">{selectedProduct.predictedDemand}</p>
          </div>
-         <div className="bg-slate-50 bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+         <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
           <p className="text-gray-400 text-xs">Current Stock</p>
           <p className="text-white text-lg font-bold">{selectedProduct.currentStock}</p>
          </div>
-         <div className="bg-slate-50 bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
+         <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
           <p className="text-gray-400 text-xs">Suggested Reorder</p>
           <p className="text-white text-lg font-bold">{selectedProduct.suggestedReorder}</p>
          </div>
         </div>
 
         {/* Confidence & Safety */}
-        <div className="bg-slate-50 bg-gray-800/30 rounded-xl p-4 border border-gray-800/50">
+        <div className="bg-[#0d1322] rounded-xl p-4 border border-gray-800/50">
          <div className="flex items-center justify-between">
           <span className="text-gray-400 text-sm">Forecast Confidence</span>
           <span className="text-white font-semibold">{selectedProduct.confidence}%</span>

@@ -1,64 +1,72 @@
-import { useLocation } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
-  Layers,
-  Handshake,
-  FileText,
-  Boxes,
   Warehouse,
-  Box,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  QrCode,
+  ChevronDown,
+  ChevronUp,
+  ShoppingCart,
+  FileText,
+  Users,
   Truck,
+  Brain,
   BarChart3,
-  Sparkles,
-  Bell,
-  User,
+  QrCode,
+  Link2,
+  ClipboardList,
 } from 'lucide-react';
 
-const navGroups = [
+interface NavItem {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  path: string;
+  hasDropdown?: boolean;
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
   {
     title: 'OPERATIONS',
     items: [
       { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
-      { id: 'products', icon: Package, label: 'Products', path: '/admin/products' },
-      { id: 'categories', icon: Layers, label: 'Categories', path: '/admin/categories' },
+      { id: 'product-catalog', icon: Package, label: 'Product Catalog', path: '/admin/product-catalog' },
     ],
   },
   {
-    title: 'PROCUREMENT',
+    title: 'WAREHOUSE MANAGEMENT',
     items: [
-      { id: 'suppliers', icon: Handshake, label: 'Suppliers', path: '/admin/suppliers' },
+      {
+        id: 'warehouse-parent',
+        icon: Warehouse,
+        label: 'Warehouse / Inventory',
+        path: '/admin/inventory',
+        hasDropdown: true,
+      },
+    ],
+  },
+  {
+    title: 'PROCUREMENT & LOGISTICS',
+    items: [
+      { id: 'procurement', icon: ShoppingCart, label: 'Procurement', path: '/admin/procurement' },
       { id: 'purchase-orders', icon: FileText, label: 'Purchase Orders', path: '/admin/purchase-orders' },
-      { id: 'procurement', icon: Boxes, label: 'Procurement', path: '/admin/procurement' },
-    ],
-  },
-  {
-    title: 'WAREHOUSE',
-    items: [
-      { id: 'warehouse', icon: Warehouse, label: 'Warehouse', path: '/admin/warehouse' },
-      { id: 'inventory', icon: Box, label: 'Inventory', path: '/admin/inventory' },
-      { id: 'stock-in', icon: ArrowDownToLine, label: 'Stock In', path: '/admin/stock-in' },
-      { id: 'stock-out', icon: ArrowUpFromLine, label: 'Stock Out', path: '/admin/stock-out' },
       { id: 'barcode-center', icon: QrCode, label: 'Barcode Center', path: '/admin/barcode-center' },
-      { id: 'shipment', icon: Truck, label: 'Shipment', path: '/admin/shipment' },
+      { id: 'suppliers', icon: Users, label: 'Suppliers', path: '/admin/suppliers' },
+      { id: 'logistics', icon: Truck, label: 'Logistics (DTRS)', path: '/admin/logistics' },
+      { id: 'order-management', icon: ClipboardList, label: 'Order Management', path: '/admin/order-management' },
     ],
   },
   {
-    title: 'INSIGHTS',
+    title: 'ANALYTICS & INSIGHTS',
     items: [
+      { id: 'ai-demand-forecast', icon: Brain, label: 'AI Demand Forecasting', path: '/admin/ai-demand-forecasting' },
       { id: 'reports', icon: BarChart3, label: 'Reports', path: '/admin/reports' },
-      { id: 'forecast', icon: Sparkles, label: 'AI Forecast', path: '/admin/forecast' },
-    ],
-  },
-  {
-    title: 'ACCOUNT',
-    items: [
-      { id: 'notifications', icon: Bell, label: 'Notifications', path: '/admin/notifications' },
-      { id: 'profile', icon: User, label: 'Profile', path: '/admin/profile' },
+      { id: 'users', icon: Users, label: 'Users', path: '/admin/users' },
     ],
   },
 ];
@@ -66,43 +74,92 @@ const navGroups = [
 const AdminSidebar = () => {
   const location = useLocation();
 
+  const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
+
   const isActive = (path: string) => location.pathname === path;
+
+  const isPathActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
+
+  const linkClass = (active: boolean) =>
+    `flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all text-sm border ${
+      active
+        ? 'bg-[#0b2234] text-[#00a3c4] border-[#00a3c4]/40 font-medium'
+        : 'text-gray-400 hover:text-white hover:bg-gray-800/40 border-transparent'
+    }`;
+
+  const subLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `block px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+      isActive
+        ? 'text-[#00a3c4] font-semibold bg-[#00a3c4]/10'
+        : 'text-gray-400 hover:text-white hover:bg-gray-800/30'
+    }`;
 
   return (
     <div className="w-64 h-screen sticky top-0 flex flex-col justify-between overflow-hidden bg-[#090d16] border-r border-slate-800/80 text-slate-300">
-      <div className="flex-shrink-0 p-4 border-b border-slate-800/80 flex items-center gap-3">
-        <div className="bg-[#00a3c4]/10 border border-[#00a3c4]/30 text-[#00a3c4] p-2.5 rounded-2xl flex items-center justify-center">
-          <Warehouse className="w-5 h-5" />
-        </div>
-        <div className="flex flex-col">
-          <span className="font-bold text-white text-base tracking-tight leading-none">SmartChain</span>
-          <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase mt-1">Admin Panel</span>
+      {/* BRAND HEADER */}
+      <div className="h-16 flex-shrink-0 px-4 border-b border-slate-800/60 flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          <div className="bg-cyan-950/40 border border-cyan-500/30 p-2 rounded-xl text-cyan-400">
+            <Link2 className="w-5 h-5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-bold text-white text-base leading-none">SmartChain</span>
+            <span className="text-[10px] tracking-wider text-gray-400 font-medium uppercase mt-0.5">ADMINISTRATOR</span>
+          </div>
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto space-y-4 p-4 [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* NAVIGATION */}
+      <nav className="flex-1 overflow-y-auto p-4 space-y-4 [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {navGroups.map((group) => (
           <div key={group.title}>
-            <h3 className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase px-3 mt-5 mb-2">
+            <h3 className="text-[10px] font-bold tracking-wider text-gray-400 uppercase px-3 mt-5 mb-2">
               {group.title}
             </h3>
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = isActive(item.path);
+                const active = item.hasDropdown ? isPathActive(item.path) : isActive(item.path);
+
+                if (item.hasDropdown) {
+                  const isOpen = isWarehouseOpen;
+                  const setIsOpen = setIsWarehouseOpen;
+                  const isParentActive = isPathActive(item.path);
+
+                  return (
+                    <div key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => setIsOpen(!isOpen)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all border ${
+                          isParentActive
+                            ? 'bg-[#0b2234] text-[#00a3c4] border-[#00a3c4]/40'
+                            : 'text-gray-400 hover:text-white border-transparent hover:bg-gray-800/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className="w-5 h-5" />
+                          <span>{item.label}</span>
+                        </div>
+                        {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+
+                      {isOpen && (
+                        <div className="pl-9 pr-2 py-1 space-y-1 border-l border-gray-700 ml-5 my-1">
+                          <NavLink className={subLinkClass} to="/admin/inventory">Inventory</NavLink>
+                          <NavLink className={subLinkClass} to="/admin/stock-counting">Stock Counting</NavLink>
+                          <NavLink className={subLinkClass} to="/admin/manage-locations">Manage Locations</NavLink>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
-                  <Link
-                    key={item.id}
-                    to={item.path}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all text-sm ${
-                      active
-                        ? 'bg-[#0b2234] text-[#00a3c4] border border-[#00a3c4]/40 font-medium'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <Icon className={`w-5 h-5 ${active && item.id === 'forecast' ? 'drop-shadow-[0_0_6px_rgba(0,163,196,0.6)]' : ''}`} />
+                  <NavLink key={item.id} to={item.path} className={linkClass(active)}>
+                    <Icon className="w-5 h-5" />
                     <span>{item.label}</span>
-                  </Link>
+                  </NavLink>
                 );
               })}
             </div>

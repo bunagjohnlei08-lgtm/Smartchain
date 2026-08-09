@@ -21,10 +21,10 @@ export default function AdminHeader() {
 
         {/* User Profile */}
         <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-gray-800 rounded-xl px-2 py-1 transition-all">
-          <div className="w-9 h-9 bg-blue-900/60 text-blue-400 font-semibold rounded-full flex items-center justify-center text-sm border border-blue-700/40">
-            JD
-          </div>
-          <span className="hidden sm:inline text-sm text-gray-300">John Doe</span>
+           <div className="w-9 h-9 bg-blue-900/60 text-blue-400 font-semibold rounded-full flex items-center justify-center text-sm border border-blue-700/40">
+              JL
+           </div>
+           <span className="hidden sm:inline text-sm text-gray-300">John Lei</span>
           <ChevronDown className="w-4 h-4 text-gray-400" />
         </div>
 

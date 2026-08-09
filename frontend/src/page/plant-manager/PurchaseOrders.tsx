@@ -2,7 +2,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   Search,
-  Plus,
   ChevronRight,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
@@ -189,9 +188,6 @@ const PurchaseOrders: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">Purchase Orders</h1>
           <p className="text-sm text-slate-400">Replenishment orders from draft through completion</p>
         </div>
-        <button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
-          <Plus className="w-4 h-4" /> Create PO
-        </button>
       </div>
 
       {/* KPI Cards */}

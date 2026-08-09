@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Plus,
   MoreVertical,
-  TrendingUp,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -22,69 +21,65 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// ============================================
-// MOCK DATA
-// ============================================
-
-// Top Stat Cards
+// Top Stat Cards Data
 const topStats = [
   {
-    title: 'WAREHOUSE UTILIZATION',
+    title: 'Warehouse Utilization',
     value: '68%',
     subtitle: '+4.2% vs last week',
     subtitleColor: 'text-emerald-400',
-    icon: <Warehouse className="w-5 h-5 text-blue-400" />,
-    iconBg: 'bg-blue-500/10 border-blue-500/20',
+    icon: <Warehouse className="w-5 h-5 text-blue-400"/>,
+    iconBg: 'bg-blue-500/10',
   },
   {
-    title: 'OPEN PURCHASE ORDERS',
+    title: 'Open Purchase Orders',
     value: '23',
     subtitle: '6 awaiting approval',
     subtitleColor: 'text-slate-400',
-    icon: <FileText className="w-5 h-5 text-amber-400" />,
-    iconBg: 'bg-amber-500/10 border-amber-500/20',
+    icon: <FileText className="w-5 h-5 text-amber-400"/>,
+    iconBg: 'bg-amber-500/10',
   },
   {
-    title: 'SHIPMENTS IN TRANSIT',
+    title: 'Shipments In Transit',
     value: '14',
     subtitle: '2 delayed',
     subtitleColor: 'text-rose-400',
-    icon: <Truck className="w-5 h-5 text-emerald-400" />,
-    iconBg: 'bg-emerald-500/10 border-emerald-500/20',
+    icon: <Truck className="w-5 h-5 text-emerald-400"/>,
+    iconBg: 'bg-emerald-500/10',
   },
   {
-    title: 'LOW STOCK ITEMS',
+    title: 'Low Stock Items',
     value: '18',
     subtitle: 'Reorder recommended',
     subtitleColor: 'text-rose-400',
-    icon: <AlertTriangle className="w-5 h-5 text-rose-400" />,
-    iconBg: 'bg-rose-500/10 border-rose-500/20',
+    icon: <AlertTriangle className="w-5 h-5 text-rose-400"/>,
+    iconBg: 'bg-rose-500/10',
   },
 ];
 
-// Inventory Movement – data matched to 0–6000 y-axis scale
+// Inventory Movement Data (Values calibrated to fit 0-6000 Y-Axis scale)
 const movementData = [
-  { day: 'Mon', inbound: 3600, outbound: 2100 },
-  { day: 'Tue', inbound: 2800, outbound: 1100 },
-  { day: 'Wed', inbound: 1800, outbound: 3600 },
-  { day: 'Thu', inbound: 2400, outbound: 3900 },
-  { day: 'Fri', inbound: 1800, outbound: 5300 },
-  { day: 'Sat', inbound: 2600, outbound: 4800 },
-  { day: 'Sun', inbound: 3500, outbound: 5200 },
+  { day: 'Mon', inbound: 3400, outbound: 2100 },
+  { day: 'Tue', inbound: 2800, outbound: 1200 },
+  { day: 'Wed', inbound: 1900, outbound: 3800 },
+  { day: 'Thu', inbound: 2600, outbound: 4200 },
+  { day: 'Fri', inbound: 1800, outbound: 5200 },
+  { day: 'Sat', inbound: 2400, outbound: 4600 },
+  { day: 'Sun', inbound: 3600, outbound: 5100 },
 ];
 
-// AI Demand Forecast – projected (solid yellow) vs actual (dashed blue)
+// AI Demand Forecast Data
 const forecastData = [
   { day: 'Mon', projected: 3900, actual: 3600 },
   { day: 'Tue', projected: 3600, actual: 3000 },
-  { day: 'Wed', projected: 3300, actual: 2300 },
-  { day: 'Thu', projected: 3800, actual: 2700 },
-  { day: 'Fri', projected: 3600, actual: 2200 },
-  { day: 'Sat', projected: 3400, actual: 2600 },
+  { day: 'Wed', projected: 3300, actual: 2200 },
+  { day: 'Thu', projected: 3800, actual: 2800 },
+  { day: 'Fri', projected: 3600, actual: 2100 },
+  { day: 'Sat', projected: 3400, actual: 2500 },
   { day: 'Sun', projected: 4100, actual: 3600 },
 ];
 
-// Recent Purchase Orders
+// Recent Purchase Orders Data
 const purchaseOrders = [
   { id: 'PO-9021', supplier: 'Northgate Trading Co.', amount: '₱184,500', status: 'Approved' },
   { id: 'PO-9022', supplier: 'GreenLeaf Organics', amount: '₱62,400', status: 'Pending' },
@@ -93,7 +88,7 @@ const purchaseOrders = [
   { id: 'PO-9025', supplier: 'Bayview Home Goods', amount: '₱18,900', status: 'Cancelled' },
 ];
 
-// Inventory Status
+// Inventory Status Data
 const inventoryStatus = [
   { sku: 'SKU-001', product: 'Organic Green Tea', stock: 450, status: 'Healthy' },
   { sku: 'SKU-002', product: 'Stainless Steel Bottle', stock: 120, status: 'Low Stock' },
@@ -109,10 +104,7 @@ const quickActions = [
   'Generate Reports',
 ];
 
-// ============================================
-// HELPER BADGE COMPONENTS
-// ============================================
-
+// Helper Badge Components
 const POStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const styles: Record<string, string> = {
     Approved: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
@@ -121,7 +113,7 @@ const POStatusBadge: React.FC<{ status: string }> = ({ status }) => {
     Cancelled: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
   };
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.Pending}`}>
+    <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Pending}`}>
       {status}
     </span>
   );
@@ -135,29 +127,25 @@ const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
     'Out of Stock': 'text-rose-400 bg-rose-500/10 border-rose-500/20',
   };
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.Healthy}`}>
+    <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Healthy}`}>
       {status}
     </span>
   );
 };
 
-// ============================================
-// MAIN DASHBOARD COMPONENT
-// ============================================
-
-const Dashboard: React.FC = () => {
+export default function AdminDashboard() {
   return (
-    <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6">
-
+    <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-6 space-y-6">
+      
       {/* HEADER */}
-      <div className="mb-6">
+      <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">Operations Overview</h1>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-slate-400 text-sm mt-0.5">
           Real-time supply chain insights and warehouse analytics.
         </p>
       </div>
 
-      {/* 1. TOP STAT CARDS (4 columns) */}
+      {/* 1. TOP STAT CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {topStats.map((stat, idx) => (
           <div
@@ -165,21 +153,20 @@ const Dashboard: React.FC = () => {
             className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors"
           >
             <div className="flex items-start justify-between">
-              <div className={`p-2.5 rounded-lg border flex items-center justify-center shrink-0 ${stat.iconBg}`}>
+              <div className={`p-2.5 rounded-lg flex items-center justify-center shrink-0 ${stat.iconBg}`}>
                 {stat.icon}
               </div>
               <button className="text-slate-500 hover:text-slate-300">
-                <MoreVertical className="w-4 h-4" />
+                <MoreVertical className="w-4 h-4"/>
               </button>
             </div>
 
             <div className="mt-4">
-              <span className="text-[11px] font-semibold text-slate-400 tracking-wider uppercase">
+              <span className="text-xs text-slate-400 font-medium">
                 {stat.title}
               </span>
               <div className="text-3xl font-bold text-white mt-1">{stat.value}</div>
-              <div className={`text-xs mt-1.5 flex items-center gap-1 font-medium ${stat.subtitleColor}`}>
-                {stat.subtitle.includes('+') && <TrendingUp className="w-3.5 h-3.5" />}
+              <div className={`text-xs mt-1.5 font-medium ${stat.subtitleColor}`}>
                 {stat.subtitle}
               </div>
             </div>
@@ -187,7 +174,7 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* 2. CHARTS SECTION (2 columns) */}
+      {/* 2. CHARTS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Inventory Movement */}
         <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between">
@@ -196,35 +183,35 @@ const Dashboard: React.FC = () => {
               <h2 className="text-base font-semibold text-white">Inventory Movement</h2>
               <p className="text-xs text-slate-400">Inbound vs Outbound</p>
             </div>
-            <button className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">
-              <Download className="w-4 h-4" />
+            <button className="p-1 text-slate-400 hover:text-white">
+              <Download className="w-4 h-4"/>
             </button>
           </div>
 
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={movementData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <ResponsiveContainer height="100%" width="100%">
+              <AreaChart margin={{ left: -20, right: 10, bottom: 0, top: 10 }} data={movementData}>
                 <defs>
                   <linearGradient id="inboundGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="outboundGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25} />
+                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="day" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 6000]} ticks={[0, 1500, 3000, 4500, 6000]} />
                 <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff', borderRadius: '8px' }} />
-                <Area type="monotone" dataKey="inbound" stroke="#3b82f6" strokeWidth={2.5} fill="url(#inboundGrad)" />
-                <Area type="monotone" dataKey="outbound" stroke="#22c55e" strokeWidth={2.5} fill="url(#outboundGrad)" />
+                <Area dataKey="inbound" fill="url(#inboundGrad)" stroke="#3b82f6" strokeWidth={2.5} type="monotone" isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
+                <Area dataKey="outbound" fill="url(#outboundGrad)" stroke="#22c55e" strokeWidth={2.5} type="monotone" isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
               </AreaChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="flex items-center justify-center gap-6 mt-2 pt-2 border-t border-slate-800/40 text-xs">
+          <div className="flex items-center justify-center gap-6 mt-3 text-xs">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
               <span className="text-slate-300">inbound</span>
@@ -243,27 +230,25 @@ const Dashboard: React.FC = () => {
               <h2 className="text-base font-semibold text-white">AI Demand Forecast</h2>
               <p className="text-xs text-slate-400">7-day projection</p>
             </div>
-            <button className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">
-              <RefreshCw className="w-4 h-4" />
+            <button className="p-1 text-slate-400 hover:text-white">
+              <RefreshCw className="w-4 h-4"/>
             </button>
           </div>
 
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={forecastData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+            <ResponsiveContainer height="100%" width="100%">
+              <LineChart margin={{ left: -20, right: 10, bottom: 0, top: 10 }} data={forecastData}>
+                <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="day" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 6000]} ticks={[0, 1500, 3000, 4500, 6000]} />
                 <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff', borderRadius: '8px' }} />
-                {/* Solid yellow line for Projected */}
-                <Line type="monotone" dataKey="projected" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 4, fill: '#f59e0b' }} />
-                {/* Dashed blue line with circular dots for Actual */}
-                <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 4, fill: '#3b82f6' }} />
+                <Line type="monotone" dataKey="projected" stroke="#f59e0b" strokeWidth={2.5} dot={{ fill: '#f59e0b', r: 4 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
+                <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: '#3b82f6', r: 4 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="flex items-center justify-center gap-6 mt-2 pt-2 border-t border-slate-800/40 text-xs">
+          <div className="flex items-center justify-center gap-6 mt-3 text-xs">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
               <span className="text-slate-300">Actual</span>
@@ -276,7 +261,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. MIDDLE TABLES (2 columns) */}
+      {/* 3. MIDDLE TABLES SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Purchase Orders */}
         <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
@@ -285,10 +270,11 @@ const Dashboard: React.FC = () => {
               <h2 className="text-base font-semibold text-white">Recent Purchase Orders</h2>
               <p className="text-xs text-slate-400">Latest activity across suppliers</p>
             </div>
-            <button className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors">
+            <button className="text-xs text-blue-400 hover:text-blue-300 font-medium">
               View all &gt;
             </button>
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -302,11 +288,11 @@ const Dashboard: React.FC = () => {
               <tbody className="divide-y divide-slate-800/50 text-slate-200">
                 {purchaseOrders.map((po) => (
                   <tr key={po.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3.5 pl-1 font-mono font-medium text-slate-100">{po.id}</td>
-                    <td className="py-3.5 text-slate-300">{po.supplier}</td>
-                    <td className="py-3.5 font-medium">{po.amount}</td>
-                    <td className="py-3.5 pr-1 text-right">
-                      <POStatusBadge status={po.status} />
+                    <td className="py-3 pl-1 font-mono font-medium text-slate-100">{po.id}</td>
+                    <td className="py-3 text-slate-300">{po.supplier}</td>
+                    <td className="py-3 font-medium">{po.amount}</td>
+                    <td className="py-3 pr-1 text-right">
+                      <POStatusBadge status={po.status}/>
                     </td>
                   </tr>
                 ))}
@@ -322,10 +308,11 @@ const Dashboard: React.FC = () => {
               <h2 className="text-base font-semibold text-white">Inventory Status</h2>
               <p className="text-xs text-slate-400">Current stock levels</p>
             </div>
-            <button className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors">
+            <button className="text-xs text-blue-400 hover:text-blue-300 font-medium">
               Manage &gt;
             </button>
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -334,17 +321,16 @@ const Dashboard: React.FC = () => {
                   <th className="pb-3">PRODUCT</th>
                   <th className="pb-3">STOCK</th>
                   <th className="pb-3 pr-1 text-right">STATUS</th>
-
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50 text-slate-200">
                 {inventoryStatus.map((item) => (
                   <tr key={item.sku} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3.5 pl-1 font-mono font-medium text-slate-100">{item.sku}</td>
-                    <td className="py-3.5 text-slate-300">{item.product}</td>
-                    <td className="py-3.5 font-medium">{item.stock}</td>
-                    <td className="py-3.5 pr-1 text-right">
-                      <InventoryStatusBadge status={item.status} />
+                    <td className="py-3 pl-1 font-mono font-medium text-slate-100">{item.sku}</td>
+                    <td className="py-3 text-slate-300">{item.product}</td>
+                    <td className="py-3 font-medium">{item.stock}</td>
+                    <td className="py-3 pr-1 text-right">
+                      <InventoryStatusBadge status={item.status}/>
                     </td>
                   </tr>
                 ))}
@@ -356,17 +342,17 @@ const Dashboard: React.FC = () => {
 
       {/* 4. QUICK ACTIONS */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-300 tracking-wide">Quick Actions</h3>
+        <h3 className="text-sm font-semibold text-slate-300">Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((label, idx) => (
             <button
               key={idx}
               className="bg-[#0b101d] border border-slate-800/80 hover:border-slate-700 rounded-xl p-5 flex flex-col items-center justify-center gap-3 group transition-all"
             >
-              <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 group-hover:scale-105 transition-all">
-                <Plus className="w-5 h-5" />
+              <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400 group-hover:scale-105 transition-all">
+                <Plus className="w-5 h-5"/>
               </div>
-              <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors">
+              <span className="text-xs font-medium text-slate-300 group-hover:text-white">
                 {label}
               </span>
             </button>
@@ -375,11 +361,9 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* FOOTER */}
-      <div className="pt-8 text-center text-xs text-slate-500 border-t border-slate-800/60">
+      <div className="pt-6 text-center text-xs text-slate-500 border-t border-slate-800/60">
         © 2026 SmartChain. All rights reserved. Powered by AI.
       </div>
     </div>
   );
-};
-
-export default Dashboard;
+}

@@ -2,7 +2,6 @@ import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Package,
   FileText,
   Boxes,
   Warehouse,
@@ -15,6 +14,7 @@ import {
   Sparkles,
   Bell,
   User,
+  ShoppingCart,
 } from 'lucide-react';
 
 const navGroups = [
@@ -22,7 +22,7 @@ const navGroups = [
     title: 'OPERATIONS',
     items: [
       { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: '/plant-manager/dashboard' },
-      { id: 'products', icon: Package, label: 'Products', path: '/plant-manager/products' },
+      { id: 'order-management', icon: ShoppingCart, label: 'Order Management', path: '/plant-manager/order-management' },
     ],
   },
   {
@@ -73,7 +73,7 @@ const PlantManagerSidebar = () => {
           </div>
           <div className="flex flex-col justify-center">
             <span className="font-bold text-white text-base tracking-tight leading-none">SmartChain</span>
-            <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase mt-1">Plant Manager</span>
+             <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase mt-1">PLANT MANAGER</span>
           </div>
         </div>
       </div>

@@ -82,9 +82,9 @@ const PlantManagerLayout: React.FC = () => {
             {/* User Profile Dropdown */}
             <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-slate-800 rounded-xl px-2 py-1 transition-all">
               <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-sm font-semibold">
-                JD
+                L
               </div>
-              <span className="hidden sm:inline text-sm text-slate-300">John Doe</span>
+              <span className="hidden sm:inline text-sm text-slate-300">Laysa</span>
               <ChevronDown size={16} className="text-slate-400" />
             </div>
           </div>

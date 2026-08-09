@@ -288,6 +288,10 @@ const Forecast: React.FC = () => {
               fill="url(#upperBandGradient)"
               name="Confidence Band"
               stackId="1"
+              isAnimationActive={true}
+              animationDuration={1500}
+              animationEasing="ease-in-out"
+              animationBegin={100}
             />
             <Area
               type="monotone"
@@ -296,6 +300,10 @@ const Forecast: React.FC = () => {
               fill="url(#lowerBandGradient)"
               name="Confidence Band"
               stackId="1"
+              isAnimationActive={true}
+              animationDuration={1500}
+              animationEasing="ease-in-out"
+              animationBegin={100}
             />
             <Area
               type="monotone"
@@ -305,6 +313,10 @@ const Forecast: React.FC = () => {
               fill="none"
               name="Predicted Demand"
               dot={{ fill: '#00a3c4', r: 4 }}
+              isAnimationActive={true}
+              animationDuration={1600}
+              animationEasing="ease-in-out"
+              animationBegin={200}
             />
           </AreaChart>
         </ResponsiveContainer>

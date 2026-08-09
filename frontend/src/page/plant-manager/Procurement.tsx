@@ -5,6 +5,7 @@ import {
   Eye,
   Plus,
   X,
+  Trash2,
   Clock,
   CheckCircle,
   XCircle,
@@ -532,6 +533,12 @@ const ReplenishmentPlanning: React.FC = () => {
     showToast('Request rejected.', 'error');
   };
 
+  const handleCancelRequest = (id: string) => {
+    const updatedHistory = history.filter((r) => r.id !== id);
+    setHistory(updatedHistory);
+    showToast('Request withdrawn successfully.', 'info');
+  };
+
   // AI Recommendations mock
   const recommendations = products.filter((p) => p.currentStock < p.minStock).slice(0, 3);
 
@@ -651,22 +658,13 @@ const ReplenishmentPlanning: React.FC = () => {
                         <Eye className="w-4 h-4" />
                       </button>
                       {req.status === 'Pending Approval' && (
-                        <>
-                          <button
-                            onClick={() => handleApproveRequest(req.id)}
-                            className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-all"
-                            title="Approve"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRejectRequest(req.id)}
-                            className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all"
-                            title="Reject"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        </>
+                        <button
+                          onClick={() => handleCancelRequest(req.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all"
+                          title="Cancel Request"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                   </td>
