@@ -1,28 +1,26 @@
 import React, { useState } from 'react';
 import {
- Brain,
- TrendingUp,
- TrendingDown,
- Search,
- Download,
- Printer,
- RefreshCw,
- AlertCircle,
- CheckCircle,
- XCircle,
- Eye,
- ChevronLeft,
- ChevronRight as ChevronRightIcon,
- Filter,
- Sparkles,
- Shield,
- Target,
- Award,
- Minus,
- Maximize2,
- Minimize2,
- ShoppingCart,
- X,
+  Brain,
+  TrendingUp,
+  TrendingDown,
+  Search,
+  Download,
+  Printer,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Eye,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon,
+  Filter,
+  Sparkles,
+  Target,
+  Minus,
+  Maximize2,
+  Minimize2,
+  ShoppingCart,
+  X,
 } from 'lucide-react';
 import {
  AreaChart,
@@ -467,7 +465,7 @@ const AIDemandForecast: React.FC = () => {
       </button>
      </div>
      <ResponsiveContainer width="100%" height={expandedChart ? 500 : 320}>
-      <AreaChart data={_forecastChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }} animationDuration={1500}>
+      <AreaChart data={_forecastChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
        <defs>
         <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1">
          <stop offset="5%" stopColor="#22C55E" stopOpacity={0.25}/>

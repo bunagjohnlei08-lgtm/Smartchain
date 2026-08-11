@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   Plus,
   Search,
-  ChevronDown,
   Printer,
   Edit,
   Edit3,
@@ -13,47 +12,20 @@ import {
   ArrowLeft,
   QrCode,
   Package,
-  MoreHorizontal,
   Eye,
   X,
   Save,
   AlertCircle,
   CheckCircle,
-  TrendingUp,
-  TrendingDown,
+  XCircle,
   Filter,
-  RefreshCw,
   Download,
-  FileText,
   Table,
   Grid,
-  List,
   Layers,
-  Tag,
-  Truck,
-  Warehouse,
-  DollarSign,
-  ShoppingCart,
-  Calendar,
-  Clock,
-  User,
-  FileCheck,
-  FileBarChart,
-  Settings,
-  Bell,
-  Moon,
-  Sun,
-  LogOut,
-  MessageSquare,
-  Home,
-  LayoutDashboard,
-  Clipboard,
-  PackageCheck,
   PackageX,
-  PackageOpen,
-  ArrowUp,
-  ArrowDown,
-  Minus,
+  Clock,
+  DollarSign,
 } from 'lucide-react';
 
 // ============================================
@@ -272,8 +244,6 @@ const getStatusIcon = (status: Product['status']) => {
   }
 };
 
-// XCircle is from lucide-react; we'll import it
-import { XCircle } from 'lucide-react';
 
 // ============================================
 // COMPONENTS

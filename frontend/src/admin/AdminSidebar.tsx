@@ -1,3 +1,5 @@
+import logo from '../../assets/logo.png';
+
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -95,14 +97,14 @@ export default function AdminSidebar() {
   return (
     <aside className="bg-[#0f172a] text-gray-300 border-r border-slate-800/80 w-64 min-h-screen flex flex-col justify-between overflow-hidden z-30 select-none">
       {/* BRAND HEADER */}
-      <div className="h-16 flex-shrink-0 px-4 border-b border-slate-800/60 flex items-center gap-3">
+      <div className="flex-shrink-0 p-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="bg-cyan-950/40 border border-cyan-500/30 p-2 rounded-xl text-cyan-400">
-            <Building2 className="w-5 h-5"/>
+          <div className="w-10 h-10 min-w-[40px] bg-white rounded-lg flex items-center justify-center p-1 shadow-sm">
+            <img src={logo} alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-white text-base leading-none">SmartChain</span>
-            <span className="text-[10px] tracking-wider text-gray-400 font-medium uppercase mt-0.5">ADMINISTRATOR</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold text-white truncate">Archon Nell</span>
+            <span className="text-[10px] font-medium tracking-wider text-slate-400 uppercase">ADMINISTRATOR</span>
           </div>
         </div>
       </div>

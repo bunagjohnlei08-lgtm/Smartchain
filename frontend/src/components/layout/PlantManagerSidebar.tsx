@@ -16,6 +16,7 @@ import {
   User,
   ShoppingCart,
 } from 'lucide-react';
+import logo from '../../assets/logo.png';
 
 const navGroups = [
   {
@@ -66,15 +67,13 @@ const PlantManagerSidebar = () => {
 
   return (
     <div className="w-64 h-screen sticky top-0 flex flex-col justify-between overflow-hidden bg-[#090d16] border-r border-slate-800/80 text-slate-300">
-      <div className="flex-shrink-0 h-16 px-6 flex items-center border-b border-slate-800/80">
-        <div className="flex items-center gap-3.5">
-          <div className="bg-[#00a3c4]/10 border border-[#00a3c4]/30 text-[#00a3c4] p-2.5 rounded-2xl flex items-center justify-center">
-            <Warehouse className="w-5 h-5" />
-          </div>
-          <div className="flex flex-col justify-center">
-            <span className="font-bold text-white text-base tracking-tight leading-none">SmartChain</span>
-             <span className="text-[10px] font-semibold text-slate-500 tracking-wider uppercase mt-1">PLANT MANAGER</span>
-          </div>
+      <div className="flex-shrink-0 h-16 px-4 flex items-center border-b border-slate-800">
+        <div className="w-10 h-10 min-w-[40px] bg-white rounded-lg flex items-center justify-center p-1 shadow-sm">
+          <img src={logo} alt="Archon Nell Incorporated" className="w-full h-full object-contain" />
+        </div>
+        <div className="flex flex-col min-w-0 ml-3">
+          <span className="text-sm font-bold text-white truncate">Archon Nell</span>
+          <span className="text-[10px] font-medium tracking-wider text-slate-400 uppercase">PLANT MANAGER</span>
         </div>
       </div>
 

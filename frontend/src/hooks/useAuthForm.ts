@@ -37,14 +37,12 @@ const validate = (state: FormState): FieldErrors => {
   } else if (state.password.length < 6) {
     errors.password = 'Password must be at least 6 characters';
   }
-  if (state.mode === 'login') {
-    if (!state.role) {
-      errors.role = 'Please select a role';
-    }
-  }
   if (state.mode === 'signup') {
     if (!state.name.trim()) {
       errors.name = 'Name is required';
+    }
+    if (!state.role) {
+      errors.role = 'Please select a role';
     }
     if (state.password !== state.confirmPassword) {
       errors.confirmPassword = 'Passwords do not match';
@@ -130,7 +128,6 @@ export const useAuthForm = ({
             email: state.email,
             password: state.password,
             rememberMe: state.rememberMe,
-            role: state.role,
           });
         } else if (state.mode === 'signup' && onSignup) {
           onSignup({
@@ -139,7 +136,7 @@ export const useAuthForm = ({
             email: state.email,
             password: state.password,
             confirmPassword: state.confirmPassword,
-            role: state.role,
+            role: state.role as SignupFormData['role'],
           });
         }
       }, 1000);

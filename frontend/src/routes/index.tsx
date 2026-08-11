@@ -36,8 +36,6 @@ import PlantManagerForecast from '../page/plant-manager/Forecast';
 import PlantManagerNotifications from '../page/plant-manager/Notifications';
 import PlantManagerProfile from '../page/plant-manager/Profile';
 import PlantManagerSuppliers from '../page/plant-manager/Suppliers';
-import PlantManagerCategories from '../page/plant-manager/Categories';
-import PlantManagerBarcodeCenter from '../page/plant-manager/BarcodeCenter';
 import PlantManagerOrderManagement from '../page/plant-manager/OrderManagement';
 
 import QADashboard from '../page/QA/Dashboard';
@@ -53,11 +51,11 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
     path: '/dashboard',
-    element: <ProtectedRoute allowedRoles={['admin']}><Navigate to="/admin/dashboard" replace /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['ADMIN']}><Navigate to="/admin/dashboard" replace /></ProtectedRoute>,
   },
   {
     path: '/admin',
-    element: <ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <Navigate to="/admin/dashboard" replace /> },
       { path: 'dashboard', element: <AdminDashboard /> },
@@ -78,7 +76,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/plant-manager',
-    element: <ProtectedRoute allowedRoles={['plant_manager']}><PlantManagerLayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['PLANT_MANAGER']}><PlantManagerLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <Navigate to="/plant-manager/dashboard" replace /> },
       { path: 'products', element: <Navigate to="/plant-manager/dashboard" replace /> },
@@ -96,14 +94,12 @@ const router = createBrowserRouter([
       { path: 'notifications', element: <PlantManagerNotifications /> },
       { path: 'profile', element: <PlantManagerProfile /> },
       { path: 'suppliers', element: <PlantManagerSuppliers /> },
-      { path: 'categories', element: <PlantManagerCategories /> },
-      { path: 'barcode-center', element: <PlantManagerBarcodeCenter /> },
       { path: 'order-management', element: <PlantManagerOrderManagement /> },
     ],
   },
   {
     path: '/qa',
-    element: <ProtectedRoute allowedRoles={['qa_supervisor']}><QALayout /></ProtectedRoute>,
+    element: <ProtectedRoute allowedRoles={['QA_SUPERVISOR']}><QALayout /></ProtectedRoute>,
     children: [
       { index: true, element: <Navigate to="/qa/dashboard" replace /> },
       { path: 'dashboard', element: <QADashboard /> },

@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { AuthLayout } from '../components/auth';
 import FormButton from '../components/auth/FormButton';
 import FormInput from '../components/auth/FormInput';
+import api from '../lib/api';
+import type { AxiosError } from 'axios';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,18 +18,52 @@ const LoginPage: React.FC = () => {
     handleCancel,
   } = useAuthForm({
     initialMode: 'login',
-    onLogin: (data) => {
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userRole', data.role);
-      if (data.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else if (data.role === 'qa_supervisor') {
-        navigate('/qa/dashboard');
-      } else {
-        navigate('/plant-manager/dashboard');
+    onLogin: async (data) => {
+      try {
+        await api.get('/sanctum/csrf-cookie', { withCredentials: true });
+
+        const response = await api.post('/api/login', {
+          email: data.email,
+          password: data.password,
+        });
+
+        const { token, user } = response.data;
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('userRole', user.role?.slug || '');
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+
+        const role = user.role?.slug;
+        if (role === 'ADMIN') {
+          navigate('/admin/dashboard');
+        } else if (role === 'QA_SUPERVISOR') {
+          navigate('/qa/dashboard');
+        } else if (role === 'PLANT_MANAGER') {
+          navigate('/plant-manager/dashboard');
+        } else {
+          navigate('/login');
+        }
+      } catch (error) {
+        const apiErrors: Record<string, string> = {};
+        const axiosError = error as AxiosError;
+        if (axiosError.response?.data && typeof axiosError.response.data === 'object') {
+          const data = axiosError.response.data as Record<string, unknown>;
+          if (data.errors && typeof data.errors === 'object') {
+            Object.entries(data.errors as Record<string, unknown>).forEach(([key, messages]) => {
+              apiErrors[key] = Array.isArray(messages) ? String(messages[0]) : String(messages);
+            });
+          } else if (data.message) {
+            apiErrors.email = String(data.message);
+          }
+        }
+        updateField('email', data.email);
+        updateField('password', data.password);
+        setLoginErrors(apiErrors);
       }
     },
   });
+
+  const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
 
   return (
     <AuthLayout>
@@ -38,15 +74,21 @@ const LoginPage: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {loginErrors.email && (
+          <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#FCA5A5', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+            {loginErrors.email}
+          </div>
+        )}
+
         <FormInput
-          label="User Name"
-          type="text"
+          label="Email"
+          type="email"
           name="email"
           autoComplete="username"
-          placeholder="Enter your username"
+          placeholder="Enter your email"
           value={formData.email}
           onChange={(value) => updateField('email', value)}
-          error={errors.email}
+          error={errors.email || loginErrors.email}
           required
         />
 
@@ -58,30 +100,10 @@ const LoginPage: React.FC = () => {
           placeholder="Enter your password"
           value={formData.password}
           onChange={(value) => updateField('password', value)}
-          error={errors.password}
+          error={errors.password || loginErrors.password}
           required
           showPasswordToggle
         />
-
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium" style={{ color: '#A2AAB8' }}>
-            Role
-          </label>
-          <select
-            value={formData.role}
-            onChange={(e) => updateField('role', e.target.value)}
-            className="w-full bg-[#091018] border border-[#2A3447] rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-            style={{ color: '#F5F7FA' }}
-          >
-            <option value="" disabled>
-              Select a role
-            </option>
-            <option value="admin">Admin</option>
-            <option value="plant_manager">Plant Manager</option>
-            <option value="qa_supervisor">QA/QC Supervisor</option>
-          </select>
-          {errors.role && <p className="text-xs text-red-400">{errors.role}</p>}
-        </div>
 
         <div className="flex items-center justify-between pt-2">
           <label className="flex items-center cursor-pointer">

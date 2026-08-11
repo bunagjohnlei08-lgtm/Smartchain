@@ -14,8 +14,29 @@ import { useTheme } from '../context/ThemeContext';
 
 const QALayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [userName, setUserName] = React.useState('User');
+  const [userInitials, setUserInitials] = React.useState('U');
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        const user: { name?: string } = JSON.parse(raw);
+        const fullName = user.name?.trim() || '';
+        if (fullName) {
+          setUserName(fullName);
+          const parts = fullName.split(/\s+/);
+          const first = parts[0]?.[0] ?? '';
+          const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+          setUserInitials((first + last).toUpperCase() || 'U');
+        }
+      }
+    } catch {
+      // ignore parse errors; fallback initials remain
+    }
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -77,10 +98,10 @@ const QALayout: React.FC = () => {
             {/* User Profile Badge */}
             <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-slate-800 rounded-xl px-2 py-1 transition-all h-full">
               <div className="w-8 h-8 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-sm font-semibold">
-                RV
+                {userInitials}
               </div>
               <div className="hidden sm:flex flex-col">
-                <span className="text-sm text-slate-300 leading-none">R. Villanueva</span>
+                <span className="text-sm text-slate-300 leading-none">{userName}</span>
                 <span className="text-[10px] text-slate-500 leading-none mt-0.5">QA/QC Supervisor</span>
               </div>
               <ChevronDown size={16} className="text-slate-400 hidden sm:block" />

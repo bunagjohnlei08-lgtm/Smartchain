@@ -14,22 +14,13 @@ import {
   Eye,
   MoreVertical,
   X,
-  FileText,
   Send,
   Clock,
   CheckCircle,
-  AlertCircle,
   Truck,
   Package,
-  DollarSign,
-  User,
-  Phone,
-  Mail,
-  MapPin,
   Calendar,
   Building,
-  Edit,
-  Link,
 } from 'lucide-react';
 
 // ============================================
@@ -37,7 +28,7 @@ import {
 // ============================================
 
 type POStatus = 'Draft' | 'Pending' | 'Approved' | 'Sent to Supplier' | 'In Transit' | 'Completed' | 'Cancelled';
-type PaymentStatus = 'Unpaid' | 'Partial' | 'Paid';
+type PaymentStatus = 'Unpaid' | 'Partial' | 'Paid' | 'Pending';
 
 interface PurchaseOrderItem {
   sku: string;
@@ -252,8 +243,11 @@ const StatusBadge: React.FC<{ status: POStatus }> = ({ status }) => {
     Completed: { color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
     Cancelled: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
   };
-  const normalizedStatus = status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : 'Draft';
-  const { color, bg, border } = config[normalizedStatus] || config[status] || config['Draft'];
+  const normalizedStatus = (status
+    ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
+    : 'Draft') as POStatus;
+  const resolvedStatus = normalizedStatus in config ? normalizedStatus : status;
+  const { color, bg, border } = config[resolvedStatus] || config['Draft'];
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg} ${border}`}>
       {status}

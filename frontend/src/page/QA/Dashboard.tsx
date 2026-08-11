@@ -220,12 +220,26 @@ const QADashboard: React.FC = () => {
   const completedToday = 12;
   const progressPercentage = (completedToday / dailyTarget) * 100;
 
+  const firstName = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        const user: { name?: string } = JSON.parse(raw);
+        const fullName = user.name?.trim() || '';
+        if (fullName) return fullName.split(/\s+/)[0];
+      }
+    } catch {
+      // ignore
+    }
+    return 'User';
+  }, []);
+
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Good afternoon, Ramon</h1>
+          <h1 className="text-2xl font-bold text-white">Good afternoon, {firstName}</h1>
           <p className="text-sm text-slate-400">
             Wednesday, August 5, 2026 — receiving inspection summary for Plant 02.
           </p>

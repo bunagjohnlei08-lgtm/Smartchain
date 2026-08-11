@@ -5,17 +5,13 @@ import {
   Eye,
   Printer,
   Download,
-  FileSpreadsheet,
   BarChart3,
   Clock,
   Calendar,
   ChevronRight,
-  X,
   CheckCircle,
-  RefreshCw,
   Plus,
   Search,
-  Filter,
   ChevronDown,
   MoreVertical,
   AlertCircle,
@@ -25,6 +21,8 @@ import {
   TrendingUp,
   LayoutGrid,
   Zap,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import {
   PieChart,
@@ -52,6 +50,8 @@ interface ReportItem {
   lastGenerated: string;
   format: 'PDF' | 'Excel' | 'CSV';
   status: 'Generated' | 'Pending';
+  fileSize: string;
+  parameters: string;
 }
 
 interface Category {
@@ -77,7 +77,7 @@ const reportCategories: Category[] = [
   { id: 'system', name: 'System Reports', icon: <AlertCircle className="w-4 h-4" /> },
 ];
 
-const mockReports: ReportItem[] = [
+const mockReportsData: ReportItem[] = [
   {
     id: '1',
     name: 'Stock Movement Report',
@@ -86,6 +86,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 09:15 AM',
     format: 'PDF',
     status: 'Generated',
+    fileSize: '2.4 MB',
+    parameters: 'Date Range: May 1 - May 31, 2025',
   },
   {
     id: '2',
@@ -95,6 +97,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 08:45 AM',
     format: 'Excel',
     status: 'Generated',
+    fileSize: '1.1 MB',
+    parameters: 'Date Range: May 1 - May 31, 2025',
   },
   {
     id: '3',
@@ -104,6 +108,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 08:30 AM',
     format: 'PDF',
     status: 'Generated',
+    fileSize: '3.7 MB',
+    parameters: 'Cost Method: FIFO, Warehouse: All',
   },
   {
     id: '4',
@@ -113,6 +119,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 07:55 AM',
     format: 'CSV',
     status: 'Generated',
+    fileSize: '1.8 MB',
+    parameters: 'Date Range: May 1 - May 31, 2025',
   },
   {
     id: '5',
@@ -122,6 +130,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 07:30 AM',
     format: 'Excel',
     status: 'Pending',
+    fileSize: '0.9 MB',
+    parameters: 'Date Range: May 1 - May 31, 2025',
   },
   {
     id: '6',
@@ -131,6 +141,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 06:40 AM',
     format: 'PDF',
     status: 'Generated',
+    fileSize: '2.1 MB',
+    parameters: 'Date Range: May 1 - May 31, 2025',
   },
   {
     id: '7',
@@ -140,6 +152,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 06:20 AM',
     format: 'Excel',
     status: 'Generated',
+    fileSize: '1.5 MB',
+    parameters: 'Period: Q2 2025',
   },
   {
     id: '8',
@@ -149,6 +163,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 05:50 AM',
     format: 'PDF',
     status: 'Generated',
+    fileSize: '0.6 MB',
+    parameters: 'Threshold: Min Stock Level',
   },
   {
     id: '9',
@@ -158,6 +174,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 05:10 AM',
     format: 'CSV',
     status: 'Generated',
+    fileSize: '4.2 MB',
+    parameters: 'Model: Prophet, Horizon: 30 days',
   },
   {
     id: '10',
@@ -167,6 +185,8 @@ const mockReports: ReportItem[] = [
     lastGenerated: 'May 31, 2025 04:30 AM',
     format: 'Excel',
     status: 'Generated',
+    fileSize: '1.3 MB',
+    parameters: 'Warehouse: All, Capacity: 100%',
   },
 ];
 
@@ -252,10 +272,79 @@ const Reports: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('inventory');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [reports, setReports] = useState<ReportItem[]>(mockReportsData);
   const itemsPerPage = 10;
 
+  const [isCustomReportOpen, setIsCustomReportOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportCategory, setReportCategory] = useState('inventory');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [exportFormat, setExportFormat] = useState<'PDF' | 'Excel' | 'CSV'>('PDF');
+  const [reportNotes, setReportNotes] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
+  const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
+
+  const openDrawer = (report: ReportItem) => {
+    setSelectedReport(report);
+    setIsViewDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setIsViewDrawerOpen(false);
+    setSelectedReport(null);
+  };
+
+  const categoryLabelMap: Record<string, string> = {
+    inventory: 'Inventory Reports',
+    'stock-movement': 'Stock Movement Reports',
+    receiving: 'Receiving Reports',
+    shipment: 'Shipment Reports',
+    order: 'Order Reports',
+    procurement: 'Procurement Reports',
+  };
+
+  const generateReport = () => {
+    if (!reportTitle.trim() || !startDate || !endDate) return;
+    setIsGenerating(true);
+    setTimeout(() => {
+      const newReport: ReportItem = {
+        id: Date.now().toString(),
+        name: reportTitle,
+        description: reportNotes || `Custom ${categoryLabelMap[reportCategory] || 'Report'}`,
+        category: categoryLabelMap[reportCategory] || 'System Reports',
+        lastGenerated: new Date().toLocaleString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        }),
+        format: exportFormat,
+        status: 'Generated',
+      };
+      setReports(prev => [newReport, ...prev]);
+      setReportTitle('');
+      setReportCategory('inventory');
+      setStartDate('');
+      setEndDate('');
+      setExportFormat('PDF');
+      setReportNotes('');
+      setIsGenerating(false);
+      setIsCustomReportOpen(false);
+    }, 1200);
+  };
+
+  const resetForm = () => {
+    setReportTitle('');
+    setReportCategory('inventory');
+    setStartDate('');
+    setEndDate('');
+    setExportFormat('PDF');
+    setReportNotes('');
+  };
+
   // Filter reports based on category and search
-  const filteredReports = mockReports.filter(report => {
+  const filteredReports = reports.filter(report => {
     const categoryMatch = selectedCategory === 'all' || report.category === reportCategories.find(c => c.id === selectedCategory)?.name;
     const searchMatch = report.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         report.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -294,12 +383,138 @@ const Reports: React.FC = () => {
             <Calendar className="w-4 h-4 shrink-0" />
             Schedule Report
           </button>
-          <button className="inline-flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-medium rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors whitespace-nowrap h-9">
+          <button
+            onClick={() => setIsCustomReportOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-medium rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors whitespace-nowrap h-9"
+          >
             <Plus className="w-4 h-4 shrink-0" />
             Create Custom Report
           </button>
         </div>
       </div>
+
+      {/* CUSTOM REPORT MODAL */}
+      {isCustomReportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#0b101d] border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800/60">
+              <h2 className="text-lg font-semibold text-white">Create Custom Report</h2>
+              <button
+                onClick={() => { setIsCustomReportOpen(false); resetForm(); }}
+                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Report Title */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Report Title</label>
+                <input
+                  type="text"
+                  value={reportTitle}
+                  onChange={(e) => setReportTitle(e.target.value)}
+                  placeholder="e.g. Monthly Inventory Summary"
+                  className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </div>
+
+              {/* Category Dropdown */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Category</label>
+                <select
+                  value={reportCategory}
+                  onChange={(e) => setReportCategory(e.target.value)}
+                  className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                >
+                  <option value="inventory">Inventory</option>
+                  <option value="stock-movement">Stock Movement</option>
+                  <option value="receiving">Receiving</option>
+                  <option value="shipment">Shipment</option>
+                  <option value="order">Order</option>
+                  <option value="procurement">Procurement</option>
+                </select>
+              </div>
+
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  />
+                </div>
+              </div>
+
+              {/* Export Format */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Export Format</label>
+                <div className="flex items-center gap-4">
+                  {['PDF', 'Excel', 'CSV'].map((fmt) => (
+                    <label key={fmt} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="exportFormat"
+                        value={fmt}
+                        checked={exportFormat === fmt}
+                        onChange={() => setExportFormat(fmt as 'PDF' | 'Excel' | 'CSV')}
+                        className="accent-cyan-500"
+                      />
+                      <span className="text-sm text-slate-300">{fmt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Notes / File Description</label>
+                <textarea
+                  value={reportNotes}
+                  onChange={(e) => setReportNotes(e.target.value)}
+                  placeholder="Optional description or notes for this report..."
+                  rows={3}
+                  className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-800/60">
+              <button
+                onClick={() => { setIsCustomReportOpen(false); resetForm(); }}
+                disabled={isGenerating}
+                className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={generateReport}
+                disabled={isGenerating}
+                className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isGenerating ? (
+                  <svg className="animate-spin h-4 w-4 text-slate-950" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : null}
+                {isGenerating ? 'Generating...' : 'Generate Report'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -430,7 +645,7 @@ const Reports: React.FC = () => {
                       <td className="px-3 py-3"><StatusBadge status={report.status} /></td>
                       <td className="px-3 py-3 text-right pr-4 min-w-[90px]">
                         <div className="flex items-center justify-end gap-1">
-                          <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                          <button onClick={() => openDrawer(report)} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
                             <Eye className="w-4 h-4" />
                           </button>
                           <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
@@ -625,6 +840,107 @@ const Reports: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* VIEW REPORT DRAWER */}
+      {isViewDrawerOpen && selectedReport && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDrawer} />
+          <div className="relative ml-auto h-full w-full max-w-lg bg-[#0b101d] border-l border-slate-700/80 shadow-2xl flex flex-col">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-800/60 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <h2 className="text-lg font-semibold text-white truncate">{selectedReport.name}</h2>
+                <StatusBadge status={selectedReport.status} />
+              </div>
+              <button
+                onClick={closeDrawer}
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Drawer Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* Key Information Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Category</p>
+                  <p className="text-sm text-slate-200 truncate">{selectedReport.category}</p>
+                </div>
+                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Format</p>
+                  <div className="mt-1">
+                    <FormatBadge format={selectedReport.format} />
+                  </div>
+                </div>
+                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Last Generated</p>
+                  <p className="text-sm text-slate-200">{selectedReport.lastGenerated}</p>
+                </div>
+                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">File Size</p>
+                  <p className="text-sm text-slate-200">{selectedReport.fileSize}</p>
+                </div>
+                <div className="col-span-2 bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Description</p>
+                  <p className="text-sm text-slate-300">{selectedReport.description}</p>
+                </div>
+                <div className="col-span-2 bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Parameters</p>
+                  <p className="text-sm text-slate-300">{selectedReport.parameters}</p>
+                </div>
+              </div>
+
+              {/* Report History / Summary */}
+              <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-4">
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Report History</h3>
+                <div className="space-y-2">
+                  {[
+                    { time: selectedReport.lastGenerated, action: 'Generated', user: 'System', status: 'Success' },
+                    { time: 'May 30, 2025 08:15 AM', action: 'Downloaded', user: 'Admin', status: 'Success' },
+                    { time: 'May 29, 2025 07:45 AM', action: 'Generated', user: 'System', status: 'Success' },
+                    { time: 'May 28, 2025 06:20 AM', action: 'Printed', user: 'Manager', status: 'Success' },
+                    { time: 'May 27, 2025 09:00 AM', action: 'Regenerated', user: 'Admin', status: 'Success' },
+                  ].map((log, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-b-0">
+                      <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded-lg bg-slate-800/60 text-slate-400">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-slate-200">{log.action}</p>
+                          <p className="text-[10px] text-slate-500">by {log.user}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-400">{log.time}</p>
+                        <p className="text-[10px] text-emerald-400">{log.status}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Footer Actions */}
+            <div className="p-5 border-t border-slate-800/60 flex items-center gap-3 shrink-0">
+              <button className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-medium transition-colors">
+                <Download className="w-4 h-4" />
+                Download File
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-colors">
+                <Printer className="w-4 h-4" />
+                Print Report
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-colors">
+                <RefreshCw className="w-4 h-4" />
+                Regenerate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer (optional) */}
       <div className="text-center text-xs text-slate-500 pt-4 border-t border-slate-800/60">

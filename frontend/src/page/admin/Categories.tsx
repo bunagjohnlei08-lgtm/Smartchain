@@ -8,28 +8,12 @@ import {
   Edit,
   Archive,
   X,
-  Check,
   FolderOpen,
-  Package,
-  Grid,
-  Filter,
-  Download,
-  Printer,
-  RefreshCw,
   Eye,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Save,
-  FolderPlus,
   Folder,
-  Calendar,
-  Columns,
-  SortAsc,
-  SortDesc,
-  AlertCircle,
-  MoreVertical,
-  Trash2,
-  FileText,
 } from 'lucide-react';
 
 // ============================================
@@ -113,16 +97,6 @@ const mockCategories: Category[] = [
     lastUpdated: '2026-07-25 13:30',
   },
 ];
-
-// ============================================
-// CONSTANTS
-// ============================================
-
-const statuses = ['All Status', 'Active', 'Archived'];
-
-// ============================================
-// HELPER COMPONENTS
-// ============================================
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const config: Record<

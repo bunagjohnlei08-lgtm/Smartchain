@@ -3,35 +3,22 @@ import React, { useState } from 'react';
 import {
   ChevronRight,
   Search,
-  Download,
-  RefreshCw,
   Package,
   Clock,
-  User,
   X,
-  Scan,
   QrCode,
   ClipboardList,
   PackageMinus,
-  ArrowRight,
   Eye,
-  Edit,
-  Trash2,
   Filter,
   Printer,
   FileText,
-  ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Plus,
-  Minus,
   AlertCircle,
   CheckCircle,
   Truck,
   Calendar,
-  MapPin,
-  Check,
-  AlertTriangle,
-  Layers,
 } from 'lucide-react';
 import {
   PieChart,
@@ -227,7 +214,7 @@ const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
 };
 
 const QaStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const config = {
+  const config: { [key: string]: string } = {
     'QA Cleared': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     'QA Pending': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
     'QA Failed': 'text-rose-400 bg-rose-500/10 border-rose-500/20',

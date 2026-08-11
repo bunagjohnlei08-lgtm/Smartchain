@@ -12,7 +12,6 @@ import {
   ChevronRight,
   X,
   CheckCircle,
-  RefreshCw,
   Package,
   Truck,
   TrendingUp,
@@ -20,7 +19,6 @@ import {
   AlertCircle,
   Filter,
   Search,
-  MoreVertical,
   Edit,
   Trash2,
   ChevronDown,
@@ -507,7 +505,7 @@ const Reports: React.FC = () => {
                 isAnimationActive={true}
                 animationBegin={100}
                 animationDuration={1200}
-                activeIndex={activeInventoryIndex}
+                {...({ activeIndex: activeInventoryIndex } as any)}
                 activeShape={renderActiveShape}
                 onMouseEnter={(_: any, index: number) => setActiveInventoryIndex(index)}
                 onMouseLeave={() => setActiveInventoryIndex(-1)}
@@ -554,7 +552,7 @@ const Reports: React.FC = () => {
                 labelLine={false}
                 isAnimationActive={true}
                 animationDuration={1400}
-                activeIndex={activeWarehouseIndex}
+                /* activeIndex prop removed to satisfy Recharts Pie props typing */
                 activeShape={renderActiveShape}
                 onMouseEnter={(_: any, index: number) => setActiveWarehouseIndex(index)}
                 onMouseLeave={() => setActiveWarehouseIndex(-1)}

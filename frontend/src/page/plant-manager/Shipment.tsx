@@ -3,24 +3,18 @@ import React, { useState, useMemo } from 'react';
 import {
   Search,
   ChevronRight,
-  Package,
   CheckCircle,
   Clock,
   AlertCircle,
   X,
   Eye,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight as ChevronRightIcon,
-  User,
-  Box,
   Clipboard,
+  ChevronLeft,
   Check,
-  Scan,
-  Truck,
-  Calendar,
-  ArrowRight,
   Plus,
+  Play,
+  FileText,
+  AlertTriangle,
 } from 'lucide-react';
 
 // ============================================
@@ -83,7 +77,7 @@ interface Shipment {
 // MOCK DATA
 // ============================================
 
-const mockShipments: Shipment[] = [
+const initialMockShipments: Shipment[] = [
   {
     id: '1',
     shipmentNo: 'SHP-3301',
@@ -776,6 +770,149 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
 };
 
 // ============================================
+// CREATE SHIPMENT MODAL COMPONENT
+// ============================================
+
+interface CreateShipmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: {
+    orderNo: string;
+    customer: string;
+    warehouse: string;
+    preparedBy: string;
+    productSummary: string;
+    shipmentNo: string;
+  }) => void;
+  nextShipmentNo: string;
+}
+
+const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClose, onSave, nextShipmentNo }) => {
+  const [orderNo, setOrderNo] = useState('');
+  const [customer, setCustomer] = useState('');
+  const [warehouse, setWarehouse] = useState('');
+  const [productSummary, setProductSummary] = useState('');
+  const [preparedBy, setPreparedBy] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    if (!orderNo.trim() || !customer.trim() || !warehouse.trim() || !preparedBy.trim()) {
+      alert('Please fill in Order No, Customer, Warehouse, and Prepared By.');
+      return;
+    }
+    onSave({ orderNo, customer, warehouse, preparedBy, productSummary, shipmentNo: nextShipmentNo });
+    setOrderNo('');
+    setCustomer('');
+    setWarehouse('');
+    setProductSummary('');
+    setPreparedBy('');
+  };
+
+  const handleCancel = () => {
+    setOrderNo('');
+    setCustomer('');
+    setWarehouse('');
+    setProductSummary('');
+    setPreparedBy('');
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-white">Create Shipment</h2>
+            <p className="text-sm text-slate-400">Fill in the details to create a new shipment.</p>
+          </div>
+          <button onClick={handleCancel} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Shipment No.</label>
+            <input
+              type="text"
+              value={nextShipmentNo}
+              disabled
+              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-400 cursor-not-allowed"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Order No.</label>
+            <input
+              type="text"
+              value={orderNo}
+              onChange={(e) => setOrderNo(e.target.value)}
+              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              placeholder="e.g., PO-2860"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Customer Name</label>
+            <input
+              type="text"
+              value={customer}
+              onChange={(e) => setCustomer(e.target.value)}
+              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              placeholder="e.g., Northwind Traders"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Warehouse</label>
+            <input
+              type="text"
+              value={warehouse}
+              onChange={(e) => setWarehouse(e.target.value)}
+              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              placeholder="e.g., Central Depot"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Product Summary</label>
+            <input
+              type="text"
+              value={productSummary}
+              onChange={(e) => setProductSummary(e.target.value)}
+              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              placeholder="e.g., Industrial LED Panel 40W x 12"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Prepared By</label>
+            <input
+              type="text"
+              value={preparedBy}
+              onChange={(e) => setPreparedBy(e.target.value)}
+              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              placeholder="e.g., M. Santos"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-4 mt-4 border-t border-slate-800">
+          <button
+            onClick={handleCancel}
+            className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all"
+          >
+            Create Shipment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -786,11 +923,14 @@ const Shipments: React.FC = () => {
   const itemsPerPage = 6;
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [showPrepareModal, setShowPrepareModal] = useState(false);
+  const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
+  const [shipments, setShipments] = useState<Shipment[]>(initialMockShipments);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Filtered shipments
   const filteredShipments = useMemo(() => {
-    return mockShipments.filter((s) => {
+    return shipments.filter((s) => {
       const matchSearch =
         s.shipmentNo.toLowerCase().includes(search.toLowerCase()) ||
         s.orderNo.toLowerCase().includes(search.toLowerCase()) ||
@@ -808,12 +948,12 @@ const Shipments: React.FC = () => {
   );
 
   // KPI counts
-  const readyForPicking = mockShipments.filter((s) => s.status === 'Preparing').length;
-  const beingPacked = mockShipments.filter((s) => s.status === 'Packing').length;
-  const readyForShipment = mockShipments.filter((s) => s.status === 'Ready for Shipment').length;
-  const pickedToday = mockShipments.filter((s) => s.status === 'Picked Up' && s.timeline.some(t => t.step === 'Picked Up' && t.timestamp?.startsWith('2026-08-02'))).length;
-  const packedToday = mockShipments.filter((s) => s.status === 'Ready for Shipment' && s.timeline.some(t => t.step === 'Ready for Shipment' && t.timestamp?.startsWith('2026-08-02'))).length;
-  const pendingPickup = mockShipments.filter((s) => s.status === 'Ready for Shipment').length;
+  const readyForPicking = shipments.filter((s) => s.status === 'Preparing').length;
+  const beingPacked = shipments.filter((s) => s.status === 'Packing').length;
+  const readyForShipment = shipments.filter((s) => s.status === 'Ready for Shipment').length;
+  const pickedToday = shipments.filter((s) => s.status === 'Picked Up' && s.timeline.some(t => t.step === 'Picked Up' && t.timestamp?.startsWith('2026-08-02'))).length;
+  const packedToday = shipments.filter((s) => s.status === 'Ready for Shipment' && s.timeline.some(t => t.step === 'Ready for Shipment' && t.timestamp?.startsWith('2026-08-02'))).length;
+  const pendingPickup = shipments.filter((s) => s.status === 'Ready for Shipment').length;
 
   // Handlers
   const handlePrepare = (shipment: Shipment) => {
@@ -830,6 +970,71 @@ const Shipments: React.FC = () => {
     });
     setTimeout(() => setToast(null), 5000);
   };
+
+  const handleCreateShipment = (data: {
+    orderNo: string;
+    customer: string;
+    warehouse: string;
+    preparedBy: string;
+    productSummary: string;
+    shipmentNo: string;
+  }) => {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const newShipment: Shipment = {
+      id: Date.now().toString(),
+      shipmentNo: data.shipmentNo,
+      orderNo: data.orderNo,
+      customer: data.customer,
+      warehouse: data.warehouse,
+      preparedBy: data.preparedBy,
+      preparedDate: today,
+      status: 'Preparing',
+      items: data.productSummary
+        ? [
+            {
+              id: `i-${Date.now()}`,
+              name: data.productSummary,
+              sku: '',
+              requestedQty: 0,
+              availableQty: 0,
+              barcode: '',
+              verified: false,
+            },
+          ]
+        : [],
+      totalItems: 0,
+      totalWeight: 0,
+      weightUnit: 'kg',
+      packing: {
+        packageId: '',
+        boxes: 0,
+        weight: 0,
+        fragile: false,
+        notes: '',
+      },
+      checklist: {
+        correctProduct: false,
+        correctQty: false,
+        barcodeVerified: false,
+        packageCondition: false,
+        itemsComplete: false,
+      },
+      barcodeVerifiedAll: false,
+      timeline: [
+        { step: 'Shipment Created', completed: true, timestamp },
+        { step: 'Preparing', completed: false },
+      ],
+    };
+    setShipments(prev => [newShipment, ...prev]);
+    showToast('Shipment created successfully.', 'success');
+  };
+
+  const nextShipmentNo = `SHP-${shipments.reduce((max, s) => {
+    const num = parseInt(s.shipmentNo.replace('SHP-', ''), 10);
+    return num > max ? num : max;
+  }, 3305) + 1}`;
 
   const showToast = (message: string, type: 'success' | 'info' | 'error') => {
     setToast({ message, type });
@@ -851,7 +1056,7 @@ const Shipments: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">Shipments</h1>
           <p className="text-sm text-slate-400">Prepare and pack orders for shipment to customers.</p>
         </div>
-        <button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
+        <button onClick={() => setIsCreateModalOpen(true)} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
           <Plus className="w-4 h-4" /> Create Shipment
         </button>
       </div>
@@ -943,7 +1148,7 @@ const Shipments: React.FC = () => {
                       <button
                         onClick={() => {
                           setSelectedShipment(shipment);
-                          // Could open a view-only modal
+                          setIsViewDrawerOpen(true);
                         }}
                         className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
                         title="View Details"
@@ -1005,6 +1210,14 @@ const Shipments: React.FC = () => {
         </div>
       </div>
 
+      {/* Create Shipment Modal */}
+      <CreateShipmentModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSave={handleCreateShipment}
+        nextShipmentNo={nextShipmentNo}
+      />
+
       {/* Prepare Modal */}
       {selectedShipment && (
         <PrepareModal
@@ -1013,6 +1226,114 @@ const Shipments: React.FC = () => {
           onClose={() => setShowPrepareModal(false)}
           onMarkReady={handleMarkReady}
         />
+      )}
+
+      {/* View Shipment Drawer */}
+      {isViewDrawerOpen && selectedShipment && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsViewDrawerOpen(false)}
+          />
+          {/* Drawer Panel */}
+          <div className="relative w-full max-w-md bg-[#0d1322] border-l border-slate-800 shadow-2xl h-full overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-[#0d1322] border-b border-slate-800 p-4 flex items-center justify-between z-10">
+              <div>
+                <h2 className="text-lg font-bold text-white">{selectedShipment.shipmentNo}</h2>
+                <p className="text-xs text-slate-400">Order No. {selectedShipment.orderNo}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={selectedShipment.status} />
+                <button
+                  onClick={() => setIsViewDrawerOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-5">
+              {/* Customer & Warehouse Details Card */}
+              <div className="bg-[#0b0f19] border border-slate-800 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Customer Name</p>
+                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.customer}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Order No.</p>
+                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.orderNo}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Warehouse</p>
+                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.warehouse}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Prepared By</p>
+                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.preparedBy}</p>
+                </div>
+              </div>
+
+              {/* Stock Allocation Checklist */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-300 mb-3">Stock Allocation</h3>
+                <div className="space-y-3">
+                  {selectedShipment.items.map((item) => {
+                    const progress = item.requestedQty > 0
+                      ? Math.min((item.availableQty / item.requestedQty) * 100, 100)
+                      : 0;
+                    const isAllocated = item.availableQty >= item.requestedQty;
+                    return (
+                      <div key={item.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm text-white font-medium">{item.name}</p>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              isAllocated
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                            }`}
+                          >
+                            {isAllocated ? 'Allocated' : 'Insufficient'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mb-2">SKU: {item.sku}</p>
+                        <div className="w-full bg-slate-700 rounded-full h-2 mb-1">
+                          <div
+                            className="bg-cyan-500 h-2 rounded-full transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>Requested: {item.requestedQty}</span>
+                          <span>Available: {item.availableQty}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Plant Manager Actions */}
+              <div className="space-y-2 pt-4 border-t border-slate-800">
+                <button className="w-full px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2">
+                  <Play className="w-4 h-4" />
+                  {selectedShipment.status === 'Packing' ? 'Mark as Packed' : 'Start Preparation'}
+                </button>
+                <button className="w-full px-4 py-2.5 border border-slate-700 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-all text-sm flex items-center justify-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Generate Pick List
+                </button>
+                <button className="w-full px-4 py-2.5 border border-red-700/50 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all text-sm flex items-center justify-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Flag Stock Issue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast */}

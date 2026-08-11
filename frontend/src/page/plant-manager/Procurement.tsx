@@ -13,15 +13,10 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Calendar,
-  Package,
   Truck,
-  FileText,
-  Download,
   RefreshCw,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
-  Filter,
 } from 'lucide-react';
 
 // ============================================
@@ -29,7 +24,7 @@ import {
 // ============================================
 
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
-type RequestStatus = 'Ready for Request' | 'Pending Approval' | 'Approved' | 'Rejected';
+type RequestStatus = 'Ready for Request' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Awaiting Delivery';
 
 interface Product {
   id: string;
@@ -443,7 +438,21 @@ const ReplenishmentPlanning: React.FC = () => {
     setShowCreateModal(true);
   };
 
-  const handleViewDetails = (product: Product) => {
+  const handleViewDetails = (request: RequestHistory) => {
+    // Convert RequestHistory to Product for viewing
+    const product: Product = {
+      id: request.id,
+      name: request.product,
+      sku: '',
+      warehouse: request.warehouse,
+      currentStock: 0,
+      minStock: 0,
+      forecastedDemand: 0,
+      recommendedReorderQty: request.quantity,
+      supplier: request.supplier,
+      priority: request.priority || 'Medium',
+      status: request.status,
+    };
     setSelectedProduct(product);
     setShowViewModal(true);
   };

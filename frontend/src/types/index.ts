@@ -40,12 +40,14 @@ export interface Product {
 
 export type AuthMode = 'login' | 'signup';
 
+export type RoleSlug = 'ADMIN' | 'PLANT_MANAGER' | 'QA_SUPERVISOR';
+
 export interface LoginFormData {
   mode: 'login';
   email: string;
   password: string;
   rememberMe: boolean;
-  role: string;
+  role?: RoleSlug;
 }
 
 export interface SignupFormData {
@@ -54,7 +56,51 @@ export interface SignupFormData {
   email: string;
   password: string;
   confirmPassword: string;
-  role: string;
+  role: RoleSlug;
 }
 
 export type AuthFormData = LoginFormData | SignupFormData;
+
+export interface ApiRole {
+  id: number;
+  name: string;
+  slug: RoleSlug;
+  description?: string;
+}
+
+export interface ApiDepartment {
+  id: number;
+  name: string;
+  code: string;
+}
+
+export interface ApiBranch {
+  id: number;
+  name: string;
+  code: string;
+}
+
+export interface ApiWarehouse {
+  id: number;
+  name: string;
+  code: string;
+  branch_id: number;
+}
+
+export interface ApiUser {
+  id: number;
+  employee_id: string;
+  name: string;
+  email: string;
+  status: 'ACTIVE' | 'PENDING' | 'SUSPENDED';
+  role: ApiRole | null;
+  department: ApiDepartment | null;
+  branch: ApiBranch | null;
+  warehouse: ApiWarehouse | null;
+  role_id?: number;
+  department_id?: number | null;
+  branch_id?: number | null;
+  warehouse_id?: number | null;
+  created_at: string;
+  updated_at: string;
+}

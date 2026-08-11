@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import logo from '../../assets/logo.jpg';
 import {
   LayoutDashboard,
   Package,
@@ -148,13 +149,10 @@ const Sidebar = () => {
 
   return (
     <div className="w-64 h-screen sticky top-0 bg-[#090d16] border-r border-slate-800/80 text-slate-300 flex flex-col overflow-hidden z-30">
-      <div className="p-4 border-b border-slate-800/80 flex-shrink-0">
-        <Link to="/admin/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">SC</span>
-          </div>
-          <span className="text-white font-semibold text-lg tracking-tight">SmartChain</span>
-        </Link>
+      <div className="p-3 mb-2">
+        <div className="w-full bg-white rounded-lg p-2 flex items-center justify-center shadow-sm">
+          <img src={logo} alt="Archon Nell Incorporated" className="w-full h-auto max-h-12 object-contain" />
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-800 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-700 [scrollbar-width:thin]">
