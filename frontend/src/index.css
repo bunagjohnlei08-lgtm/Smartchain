@@ -1,3 +1,4 @@
+@layer sidebar-lock;
 @import "tailwindcss";
 
 @layer base {
@@ -45,5 +46,361 @@
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #64748b;
+  }
+}
+
+:root {
+  color-scheme: light;
+
+  --bg-app: #f4f7fb;
+  --bg-surface: #ffffff;
+  --bg-surface-alt: #f8fafc;
+  --bg-sidebar: #090d16;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #f1f5f9;
+  --bg-active: #eaf4ff;
+
+  --border-color: #d9e2ef;
+  --border-color-strong: #cbd5e1;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+
+  --shadow-color: rgba(74, 80, 95, 0.618);
+  --shadow-color-light: rgba(47, 41, 60, 0.473);
+}
+
+/* =========================================================
+   DARK MODE
+   ========================================================= */
+
+html.dark {
+  color-scheme: dark;
+
+  --bg-app: #090d16;
+  --bg-surface: #0f172a;
+  --bg-surface-alt: #0b101d;
+  --bg-sidebar: #090d16;
+  --bg-card: #0f172a;
+  --bg-input: #0b101d;
+  --bg-hover: rgba(30, 41, 59, 0.7);
+  --bg-active: rgba(0, 163, 196, 0.16);
+
+  --border-color: rgba(71, 85, 105, 0.7);
+  --border-color-strong: rgba(71, 85, 105, 0.9);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #0f172a;
+
+  --shadow-color: rgba(2, 6, 23, 0.5);
+  --shadow-color-light: rgba(2, 6, 23, 0.35);
+}
+
+/* =========================================================
+   BODY
+   ========================================================= */
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #475569 #0f172a;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    height: 8px;
+    display: block;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--bg-surface);
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+}
+
+/* =========================================================
+   LIGHT MODE ONLY (EXCLUDING SIDEBAR)
+   ========================================================= */
+
+@layer utilities {
+
+  /* MAIN DARK BACKGROUNDS → LIGHT (Excluding Sidebar) */
+  html:not(.dark) body *:not(aside):not(.sidebar):not(aside *):not(.sidebar *) {
+
+    &[class~="bg-[#090d16]"] {
+      background-color: var(--bg-app) !important;
+    }
+
+    &[class~="bg-[#0B0F19]"],
+    &[class~="bg-[#0F172A]"],
+    &[class~="bg-[#0a0e17]"],
+    &[class~="bg-[#0a0f1d]"],
+    &[class~="bg-[#0b101d]"],
+    &[class~="bg-[#0b1220]"],
+    &[class~="bg-[#0b1b2b]"],
+    &[class~="bg-[#0b132b]"],
+    &[class~="bg-[#0d1322]"],
+    &[class~="bg-[#0d1527]"],
+    &[class~="bg-[#0f172a]"],
+    &[class~="bg-[#101929]"],
+    &[class~="bg-[#111827]"],
+    &[class~="bg-[#111927]"],
+    &[class~="bg-[#131C2E]"],
+    &[class~="bg-[#161f33]"],
+    &[class~="bg-[#162033]"],
+    &[class~="bg-[#18253d]"],
+    &[class~="bg-[#1e293b]"],
+    &[class~="bg-[#1f2937]"],
+    &[class~="bg-[#090d16]"],
+    &[class~="bg-[#091018]"],
+    &[class~="bg-[#070a12]"] {
+      background-color: var(--bg-surface) !important;
+    }
+
+    /* DARK BACKGROUNDS WITH OPACITY */
+    &[class~="bg-[#090d16]/50"],
+    &[class~="bg-[#090d16]/80"],
+    &[class~="bg-[#0B0F19]/80"],
+    &[class~="bg-[#0F172A]/80"],
+    &[class~="bg-[#0f172a]/80"],
+    &[class~="bg-[#0f172a]/70"],
+    &[class~="bg-[#0f172a]/60"],
+    &[class~="bg-[#0f172a]/50"],
+    &[class~="bg-[#0f172a]/40"],
+    &[class~="bg-[#0d1322]/50"],
+    &[class~="bg-[#0d1322]/60"],
+    &[class~="bg-[#0b101d]/60"],
+    &[class~="bg-[#0b101d]/80"],
+    &[class~="bg-[#0b1220]/50"],
+    &[class~="bg-[#0b132b]/60"],
+    &[class~="bg-[#0b2234]/80"],
+    &[class~="bg-[#1e293b]/30"],
+    &[class~="bg-[#1e293b]/50"],
+    &[class~="bg-[#1e293b]/60"] {
+      background-color: var(--bg-surface-alt) !important;
+    }
+
+    /* ACTIVE ELEMENT */
+    &[class~="bg-[#0b2234]"],
+    &[class~="bg-[#0b2234]/80"] {
+      background-color: var(--bg-active) !important;
+    }
+
+    /* SLATE / GRAY BACKGROUNDS */
+    &[class~="bg-slate-900"],
+    &[class~="bg-slate-900/80"],
+    &[class~="bg-slate-900/60"],
+    &[class~="bg-slate-900/40"],
+    &[class~="bg-slate-900/30"],
+    &[class~="bg-slate-800"],
+    &[class~="bg-slate-800/10"],
+    &[class~="bg-slate-800/20"],
+    &[class~="bg-slate-800/30"],
+    &[class~="bg-slate-800/40"],
+    &[class~="bg-slate-800/50"],
+    &[class~="bg-slate-800/60"],
+    &[class~="bg-slate-700"],
+    &[class~="bg-slate-700/50"],
+    &[class~="bg-gray-900"],
+    &[class~="bg-gray-800"],
+    &[class~="bg-gray-800/20"],
+    &[class~="bg-gray-800/30"],
+    &[class~="bg-gray-800/50"],
+    &[class~="bg-gray-800/60"],
+    &[class~="bg-gray-800/70"],
+    &[class~="bg-gray-700"],
+    &[class~="bg-gray-700/50"] {
+      background-color: var(--bg-surface-alt) !important;
+    }
+
+    /* TEXT COLORS */
+    &[class~="text-slate-100"],
+    &[class~="text-slate-200"],
+    &[class~="text-slate-300"],
+    &[class~="text-white"],
+    &[class~="text-gray-100"],
+    &[class~="text-gray-200"],
+    &[class~="text-gray-300"] {
+      color: var(--text-primary) !important;
+    }
+
+    &[class~="text-slate-400"],
+    &[class~="text-slate-500"],
+    &[class~="text-slate-600"],
+    &[class~="text-gray-400"],
+    &[class~="text-gray-500"],
+    &[class~="text-gray-600"] {
+      color: var(--text-secondary) !important;
+    }
+
+    /* BORDERS */
+    &[class~="border-slate-800"],
+    &[class~="border-slate-800/90"],
+    &[class~="border-slate-800/80"],
+    &[class~="border-slate-800/60"],
+    &[class~="border-slate-800/50"],
+    &[class~="border-slate-800/40"],
+    &[class~="border-slate-800/30"],
+    &[class~="border-slate-700"],
+    &[class~="border-slate-700/60"],
+    &[class~="border-slate-700/50"],
+    &[class~="border-gray-800"],
+    &[class~="border-gray-800/50"],
+    &[class~="border-gray-800/30"],
+    &[class~="border-gray-800/60"],
+    &[class~="border-gray-800/80"],
+    &[class~="border-gray-800/70"],
+    &[class~="border-[#090d16]"],
+    &[class~="border-[#1e293b]"],
+    &[class~="border-[#1f2937]"],
+    &[class~="border-[#2A3447]"],
+    &[class~="border-[#263244]"],
+    &[class~="border-[#00a3c4]"],
+    &[class~="border-[#3b82f6]"],
+    &[class~="border-[#5B8CFF]"],
+    &[class~="border-gray-700/50"],
+    &[class~="border-slate-700/50"] {
+      border-color: var(--border-color) !important;
+    }
+
+    /* HOVER BACKGROUNDS */
+    &[class~="hover:bg-slate-800"]:hover,
+    &[class~="hover:bg-slate-800/20"]:hover,
+    &[class~="hover:bg-slate-800/30"]:hover,
+    &[class~="hover:bg-slate-800/40"]:hover,
+    &[class~="hover:bg-slate-800/50"]:hover,
+    &[class~="hover:bg-slate-800/60"]:hover,
+    &[class~="hover:bg-gray-800"]:hover,
+    &[class~="hover:bg-gray-800/20"]:hover,
+    &[class~="hover:bg-gray-800/30"]:hover,
+    &[class~="hover:bg-gray-800/40"]:hover,
+    &[class~="hover:bg-gray-800/50"]:hover,
+    &[class~="hover:bg-slate-800/60"]:hover {
+      background-color: var(--bg-hover) !important;
+    }
+
+    /* HOVER TEXT */
+    &[class~="hover:text-slate-100"]:hover,
+    &[class~="hover:text-slate-200"]:hover,
+    &[class~="hover:text-white"]:hover {
+      color: var(--text-primary) !important;
+    }
+  }
+
+  /* LIGHT MODE CUSTOM SCROLLBAR */
+  html:not(.dark) .custom-scrollbar {
+    scrollbar-color: #cbd5e1 #f8fafc;
+  }
+
+  html:not(.dark) .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f8fafc;
+  }
+
+  html:not(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+  }
+
+  html:not(.dark) .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
+
+/* =========================================================
+   HARD OVERRIDE: ALWAYS KEEP SIDEBAR DARK
+   ---------------------------------------------------------
+   Registered as the FIRST layer in the file (see the
+   `@layer sidebar-lock;` statement above `@import "tailwindcss"`).
+   Cascade layers reverse priority for `!important` rules: the
+   *earliest*-declared layer wins. Because this layer is declared
+   before Tailwind's own `theme, base, components, utilities`
+   layers, every `!important` rule below is guaranteed to outrank
+   any `!important` utility Tailwind (or the block above) ever
+   compiles for elements inside the sidebar - regardless of source
+   order or specificity. Leaving these rules unlayered was the bug:
+   unlayered `!important` is the LOWEST-priority `!important` there
+   is, so any layered `!important` utility silently won instead.
+   ========================================================= */
+
+@layer sidebar-lock {
+  html:not(.dark) aside,
+  html:not(.dark) .sidebar {
+    background-color: var(--bg-sidebar) !important;
+    border-right-color: rgba(71, 85, 105, 0.3) !important;
+  }
+
+  /* Hover state ng links / buttons sa loob ng sidebar */
+  html:not(.dark) aside a:hover,
+  html:not(.dark) .sidebar a:hover,
+  html:not(.dark) aside button:hover,
+  html:not(.dark) .sidebar button:hover,
+  html:not(.dark) aside a:hover *,
+  html:not(.dark) .sidebar a:hover * {
+    background-color: rgba(30, 41, 59, 0.7) !important;
+    color: #ffffff !important;
+  }
+
+  /* Active tab style (halimbawa: Dashboard) */
+  html:not(.dark) aside .active,
+  html:not(.dark) .sidebar .active,
+  html:not(.dark) aside [class*="bg-[#0b2234]"],
+  html:not(.dark) .sidebar [class*="bg-[#0b2234]"],
+  html:not(.dark) aside [class*="bg-[#0b2234]"] *,
+  html:not(.dark) .sidebar [class*="bg-[#0b2234]"] * {
+    background-color: rgba(0, 163, 196, 0.16) !important;
+    color: #38bdf8 !important;
   }
 }

@@ -95,7 +95,7 @@ export default function AdminSidebar() {
     }`;
 
   return (
-    <aside className="bg-[#0f172a] text-gray-300 border-r border-slate-800/80 w-64 min-h-screen flex flex-col justify-between overflow-hidden z-30 select-none">
+    <aside className="sidebar bg-[#0f172a] text-gray-300 border-r border-slate-800/80 w-64 min-h-screen flex flex-col justify-between overflow-hidden z-30 select-none">
       {/* BRAND HEADER */}
       <div className="flex-shrink-0 p-4 border-b border-slate-800">
         <div className="flex items-center gap-3">

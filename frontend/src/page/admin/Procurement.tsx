@@ -249,14 +249,15 @@ const Procurement: React.FC = () => {
   const activeSuppliers = supplierSummary.length;
 
   return (
-    <div className="w-full min-h-screen bg-[#0b0f19] text-slate-100 p-4 lg:p-6 space-y-6">
+{/* Theme fix: page background and text contrast now respond correctly to Light/Dark mode. */}
+    <div className="w-full min-h-screen bg-[#f4f7fb] dark:bg-[#090d16] text-slate-900 dark:text-slate-100 p-4 lg:p-6 space-y-6">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
             Procurement
           </h1>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Requests, approvals and inbound scheduling
           </p>
         </div>

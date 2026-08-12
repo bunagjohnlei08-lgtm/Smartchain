@@ -552,12 +552,12 @@ const ReplenishmentPlanning: React.FC = () => {
   const recommendations = products.filter((p) => p.currentStock < p.minStock).slice(0, 3);
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#0b0f19] text-slate-100 min-h-screen">
+    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#f4f7fb] dark:bg-[#090d16] text-slate-900 dark:text-slate-100 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Replenishment Planning</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Replenishment Planning</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Monitor inventory levels and submit replenishment requests to Admin.
           </p>
         </div>

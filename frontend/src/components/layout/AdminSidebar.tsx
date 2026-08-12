@@ -95,7 +95,7 @@ const AdminSidebar = () => {
     }`;
 
   return (
-    <div className="w-64 h-screen sticky top-0 flex flex-col justify-between overflow-hidden bg-[#090d16] border-r border-slate-800/80 text-slate-300">
+    <aside className="sidebar w-64 h-screen sticky top-0 flex flex-col justify-between overflow-hidden bg-[#090d16] border-r border-slate-800/80 text-slate-300">
       {/* HEADER */}
       <div className="flex items-center px-4 h-16 border-b border-slate-800 flex-shrink-0">
         <div className="w-9 h-9 min-w-[36px] bg-white rounded-lg flex items-center justify-center p-1 shadow-sm">
@@ -164,7 +164,7 @@ const AdminSidebar = () => {
           </div>
         ))}
       </nav>
-    </div>
+    </aside>
   );
 };
 

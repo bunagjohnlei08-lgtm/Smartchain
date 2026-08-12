@@ -148,7 +148,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 h-screen sticky top-0 bg-[#090d16] border-r border-slate-800/80 text-slate-300 flex flex-col overflow-hidden z-30">
+    <aside className="sidebar w-64 h-screen sticky top-0 bg-[#090d16] border-r border-slate-800/80 text-slate-300 flex flex-col overflow-hidden z-30">
       <div className="p-3 mb-2">
         <div className="w-full bg-white rounded-lg p-2 flex items-center justify-center shadow-sm">
           <img src={logo} alt="Archon Nell Incorporated" className="w-full h-auto max-h-12 object-contain" />
@@ -223,7 +223,7 @@ const Sidebar = () => {
           </div>
         ))}
       </nav>
-    </div>
+    </aside>
   );
 };
 

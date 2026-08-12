@@ -66,7 +66,7 @@ const PlantManagerSidebar = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="w-64 h-screen sticky top-0 flex flex-col justify-between overflow-hidden bg-[#090d16] border-r border-slate-800/80 text-slate-300">
+    <aside className="sidebar w-64 h-screen sticky top-0 flex flex-col justify-between overflow-hidden bg-[#090d16] border-r border-slate-800/80 text-slate-300">
       <div className="flex-shrink-0 h-16 px-4 flex items-center border-b border-slate-800">
         <div className="w-10 h-10 min-w-[40px] bg-white rounded-lg flex items-center justify-center p-1 shadow-sm">
           <img src={logo} alt="Archon Nell Incorporated" className="w-full h-full object-contain" />
@@ -106,7 +106,7 @@ const PlantManagerSidebar = () => {
           </div>
         ))}
       </nav>
-    </div>
+    </aside>
   );
 };
 

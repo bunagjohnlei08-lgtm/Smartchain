@@ -194,7 +194,8 @@ const Suppliers: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#0b0f19] text-slate-100">
+{/* Theme fix: page background and text contrast now respond correctly to Light/Dark mode. */}
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#f4f7fb] dark:bg-[#090d16] text-slate-900 dark:text-slate-100">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-400">
         <span>Admin</span>
@@ -205,8 +206,8 @@ const Suppliers: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Suppliers</h1>
-          <p className="text-sm text-gray-400">Manage vendor relationships, contacts, and performance metrics</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Suppliers</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Manage vendor relationships, contacts, and performance metrics</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
