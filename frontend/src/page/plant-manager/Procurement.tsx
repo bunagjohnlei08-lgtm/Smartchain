@@ -238,17 +238,17 @@ const KPICard: React.FC<{ label: string; value: string | number; icon: React.Rea
       ? 'text-emerald-400'
       : trendType === 'down'
       ? 'text-red-400'
-      : 'text-slate-400';
+      : 'text-[var(--text-muted)]';
 
   const TrendIcon =
     trendType === 'up' ? TrendingUp : trendType === 'down' ? TrendingDown : Minus;
 
   return (
-    <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-700 transition-all">
+    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm hover:border-[var(--border-color)] transition-all">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
-          <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1.5">{value}</p>
           {trend && (
             <p className={`text-xs mt-1 flex items-center gap-1 ${trendColor}`}>
               <TrendIcon className="w-3 h-3" />
@@ -256,7 +256,7 @@ const KPICard: React.FC<{ label: string; value: string | number; icon: React.Rea
             </p>
           )}
         </div>
-        <div className="p-2.5 bg-slate-800/60 rounded-lg">{icon}</div>
+        <div className="p-2.5 bg-[var(--bg-surface-alt)] rounded-lg">{icon}</div>
       </div>
     </div>
   );
@@ -268,13 +268,13 @@ const SearchInput: React.FC<{
   placeholder?: string;
 }> = ({ value, onChange, placeholder }) => (
   <div className="relative flex-1 min-w-[180px]">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-[#101929] border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
+      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
     />
   </div>
 );
@@ -288,7 +288,7 @@ const FilterSelect: React.FC<{
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#101929] border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer"
+      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3 py-2.5 text-sm text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer"
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>
@@ -326,17 +326,17 @@ const Pagination: React.FC<{
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-[#0b0f19]/30">
-      <div className="text-sm text-slate-400">
-        Showing <span className="text-white font-medium">{start}</span> to{' '}
-        <span className="text-white font-medium">{end}</span> of{' '}
-        <span className="text-white font-medium">{totalItems}</span> items
+    <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-alt)]">
+      <div className="text-sm text-[var(--text-secondary)]">
+        Showing <span className="text-[var(--text-primary)] font-medium">{start}</span> to{' '}
+        <span className="text-[var(--text-primary)] font-medium">{end}</span> of{' '}
+        <span className="text-[var(--text-primary)] font-medium">{totalItems}</span> items
       </div>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="p-1.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -347,7 +347,7 @@ const Pagination: React.FC<{
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
                 ? 'bg-cyan-500 text-slate-950'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]'
             }`}
           >
             {page}
@@ -356,7 +356,7 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="p-1.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRightIcon className="w-4 h-4" />
         </button>
@@ -551,18 +551,19 @@ const ReplenishmentPlanning: React.FC = () => {
   // AI Recommendations mock
   const recommendations = products.filter((p) => p.currentStock < p.minStock).slice(0, 3);
 
+  {/* FIX: Prevent UI horizontal overflow and align container spacing */}
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#f4f7fb] dark:bg-[#090d16] text-slate-900 dark:text-slate-100 min-h-screen">
+    <div className="w-full max-w-[100vw] overflow-x-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] min-h-screen transition-colors duration-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Replenishment Planning</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Replenishment Planning</h1>
+          <p className="text-sm text-[var(--text-secondary)]">
             Monitor inventory levels and submit replenishment requests to Admin.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-slate-700 text-slate-300 hover:bg-slate-800">
+          <button className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)]">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
           <button
@@ -574,8 +575,8 @@ const ReplenishmentPlanning: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* FIX: Responsive metric cards grid to prevent overflow on narrow screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
         <KPICard
           label="Needing Replenishment"
           value={needingReplenishment}
@@ -613,7 +614,7 @@ const ReplenishmentPlanning: React.FC = () => {
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-4 flex flex-wrap items-center gap-3">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-4 flex flex-wrap items-center gap-3">
         <SearchInput value={search} onChange={setSearch} placeholder="Search products, SKU, warehouse..." />
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'Pending Approval', 'Approved', 'Rejected', 'Awaiting Delivery']} />
         <FilterSelect value={priorityFilter} onChange={setPriorityFilter} options={['All Priorities', 'Low', 'Medium', 'High', 'Critical']} />
@@ -623,45 +624,45 @@ const ReplenishmentPlanning: React.FC = () => {
             setStatusFilter('All Status');
             setPriorityFilter('All Priorities');
           }}
-          className="px-4 py-2.5 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-800 transition-all text-sm"
+          className="px-4 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)] transition-all text-sm"
         >
           Reset
         </button>
       </div>
 
       {/* Main Table */}
-      <div className="w-full max-w-full bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl overflow-hidden">
+      <div className="w-full max-w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
         <div className="w-full overflow-x-auto">
           <table className="w-full min-w-[900px]">
-            <thead className="bg-[#0b0f19]/50 border-b border-slate-800">
+            <thead className="bg-[var(--bg-surface-alt)] border-b border-[var(--border-color)]">
               <tr>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Request No.</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Requested By</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Warehouse</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Priority</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Date</th>
-                <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Supplier</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
+                <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedRequests.map((req) => (
-                <tr key={req.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all">
-                  <td className="px-4 py-3.5 text-sm font-medium text-white">{req.requestNo}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{req.submittedBy || '—'}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{req.warehouse}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{req.product}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{req.supplier}</td>
+                <tr key={req.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
+                  <td className="px-4 py-3.5 text-sm font-medium text-[var(--text-primary)]">{req.requestNo}</td>
+                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.submittedBy || '—'}</td>
+                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.warehouse}</td>
+                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.product}</td>
+                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.supplier}</td>
                   <td className="px-4 py-3.5"><PriorityBadge priority={req.priority || 'Medium'} /></td>
                   <td className="px-4 py-3.5"><StatusBadge status={req.status} /></td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{req.submittedDate}</td>
+                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.submittedDate}</td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => handleViewDetails(req)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                        className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
                         title="View"
                       >
                         <Eye className="w-4 h-4" />
@@ -681,7 +682,7 @@ const ReplenishmentPlanning: React.FC = () => {
               ))}
               {paginatedRequests.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-[var(--text-muted)]">
                     No requests found matching your criteria.
                   </td>
                 </tr>
@@ -699,45 +700,45 @@ const ReplenishmentPlanning: React.FC = () => {
       </div>
 
       {/* Request History Section */}
-      <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-5 space-y-4">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-white">Request History</h3>
-            <p className="text-sm text-slate-400">Track your submitted replenishment requests</p>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Request History</h3>
+            <p className="text-sm text-[var(--text-muted)]">Track your submitted replenishment requests</p>
           </div>
           <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">View all</button>
         </div>
         <div className="w-full overflow-x-auto">
           <table className="w-full min-w-[900px]">
-            <thead className="border-b border-slate-800">
+            <thead className="border-b border-[var(--border-color)]">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Request No.</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Requested By</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Warehouse</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Priority</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Date</th>
-                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Supplier</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
+                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {history.map((item) => (
-                <tr key={item.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all">
-                  <td className="px-4 py-2.5 text-sm font-medium text-white">{item.requestNo}</td>
-                  <td className="px-4 py-2.5 text-sm text-slate-300">{item.submittedBy || '—'}</td>
-                  <td className="px-4 py-2.5 text-sm text-slate-300">{item.warehouse}</td>
-                  <td className="px-4 py-2.5 text-sm text-slate-300">{item.product}</td>
-                  <td className="px-4 py-2.5 text-sm text-slate-300">{item.supplier}</td>
+                <tr key={item.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
+                  <td className="px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]">{item.requestNo}</td>
+                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.submittedBy || '—'}</td>
+                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.warehouse}</td>
+                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.product}</td>
+                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.supplier}</td>
                   <td className="px-4 py-2.5"><PriorityBadge priority={item.priority || 'Medium'} /></td>
                   <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
-                  <td className="px-4 py-2.5 text-sm text-slate-300">{item.submittedDate}</td>
+                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.submittedDate}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => handleViewDetails(item)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                        className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
                         title="View"
                       >
                         <Eye className="w-4 h-4" />
@@ -748,7 +749,7 @@ const ReplenishmentPlanning: React.FC = () => {
               ))}
               {history.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-6 text-center text-slate-400">No request history found.</td>
+                  <td colSpan={9} className="px-4 py-6 text-center text-[var(--text-muted)]">No request history found.</td>
                 </tr>
               )}
             </tbody>
@@ -757,54 +758,54 @@ const ReplenishmentPlanning: React.FC = () => {
       </div>
 
       {/* Right Panel: Replenishment Insights */}
-      <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-5">
-        <h3 className="text-lg font-semibold text-white mb-4">Replenishment Insights</h3>
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-5">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Replenishment Insights</h3>
         <div className="space-y-3">
-          <div className="bg-slate-800/50 rounded-xl p-3 text-sm text-slate-300 flex items-start gap-2">
+          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5" />
             <span>AI recommends replenishment for <strong>{needingReplenishment}</strong> products.</span>
           </div>
-          <div className="bg-slate-800/50 rounded-xl p-3 text-sm text-slate-300 flex items-start gap-2">
+          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5" />
             <span><strong>{criticalStock}</strong> products are below minimum stock.</span>
           </div>
-          <div className="bg-slate-800/50 rounded-xl p-3 text-sm text-slate-300 flex items-start gap-2">
+          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <Clock className="w-4 h-4 text-amber-400 mt-0.5" />
             <span><strong>{pendingRequests}</strong> requests waiting for Admin approval.</span>
           </div>
-          <div className="bg-slate-800/50 rounded-xl p-3 text-sm text-slate-300 flex items-start gap-2">
+          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5" />
             <span>Forecast confidence: <strong>{forecastAccuracy}%</strong></span>
           </div>
         </div>
       </div>
 
-      {/* AI Recommendation Cards */}
+      {/* FIX: AI recommendation cards responsive grid */}
       {recommendations.length > 0 && (
-        <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-5">
+        <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-semibold text-white">AI Recommendations</h3>
-              <p className="text-sm text-slate-400">Products that need immediate attention</p>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI Recommendations</h3>
+              <p className="text-sm text-[var(--text-muted)]">Products that need immediate attention</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
             {recommendations.map((product) => (
-              <div key={product.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+              <div key={product.id} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-white font-medium">{product.name}</p>
-                    <p className="text-xs text-slate-400">{product.sku}</p>
+                    <p className="text-[var(--text-primary)] font-medium">{product.name}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{product.sku}</p>
                   </div>
                   <PriorityBadge priority={product.priority} />
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-1 text-sm">
-                  <span className="text-slate-400">Current Stock</span>
-                  <span className="text-white text-right">{product.currentStock}</span>
-                  <span className="text-slate-400">Forecast</span>
-                  <span className="text-white text-right">{product.forecastedDemand}</span>
-                  <span className="text-slate-400">Recommended</span>
-                  <span className="text-white text-right font-medium">{product.recommendedReorderQty}</span>
+                  <span className="text-[var(--text-muted)]">Current Stock</span>
+                  <span className="text-[var(--text-primary)] text-right">{product.currentStock}</span>
+                  <span className="text-[var(--text-muted)]">Forecast</span>
+                  <span className="text-[var(--text-primary)] text-right">{product.forecastedDemand}</span>
+                  <span className="text-[var(--text-muted)]">Recommended</span>
+                  <span className="text-[var(--text-primary)] text-right font-medium">{product.recommendedReorderQty}</span>
                 </div>
                 <button
                   onClick={() => handleCreateRequest(product)}
@@ -825,92 +826,92 @@ const ReplenishmentPlanning: React.FC = () => {
           onClick={() => setShowNewRequestModal(false)}
         >
           <div
-            className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">New Request</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">New Request</h2>
               <button
                 onClick={() => setShowNewRequestModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Request No.</label>
-                  <input
-                    type="text"
-                    value={newRequest.requestNo}
-                    onChange={(e) => setNewRequest({ ...newRequest, requestNo: e.target.value })}
-                    placeholder="Auto-generated if empty"
-                    className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Date Submitted</label>
-                  <input
-                    type="date"
-                    value={newRequest.submittedDate}
-                    onChange={(e) => setNewRequest({ ...newRequest, submittedDate: e.target.value })}
-                    className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Product <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    value={newRequest.product}
-                    onChange={(e) => setNewRequest({ ...newRequest, product: e.target.value })}
-                    placeholder="Product name"
-                    className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Warehouse <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    value={newRequest.warehouse}
-                    onChange={(e) => setNewRequest({ ...newRequest, warehouse: e.target.value })}
-                    placeholder="Warehouse name"
-                    className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Supplier <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    value={newRequest.supplier}
-                    onChange={(e) => setNewRequest({ ...newRequest, supplier: e.target.value })}
-                    placeholder="Supplier name"
-                    className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Quantity <span className="text-red-400">*</span></label>
-                  <input
-                    type="number"
-                    value={newRequest.quantity}
-                    onChange={(e) => setNewRequest({ ...newRequest, quantity: e.target.value })}
-                    placeholder="0"
-                    min="0"
-                    className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  />
-                </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Request No.</label>
+                    <input
+                      type="text"
+                      value={newRequest.requestNo}
+                      onChange={(e) => setNewRequest({ ...newRequest, requestNo: e.target.value })}
+                      placeholder="Auto-generated if empty"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Date Submitted</label>
+                    <input
+                      type="date"
+                      value={newRequest.submittedDate}
+                      onChange={(e) => setNewRequest({ ...newRequest, submittedDate: e.target.value })}
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={newRequest.product}
+                      onChange={(e) => setNewRequest({ ...newRequest, product: e.target.value })}
+                      placeholder="Product name"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Warehouse <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={newRequest.warehouse}
+                      onChange={(e) => setNewRequest({ ...newRequest, warehouse: e.target.value })}
+                      placeholder="Warehouse name"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Supplier <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={newRequest.supplier}
+                      onChange={(e) => setNewRequest({ ...newRequest, supplier: e.target.value })}
+                      placeholder="Supplier name"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Quantity <span className="text-red-400">*</span></label>
+                    <input
+                      type="number"
+                      value={newRequest.quantity}
+                      onChange={(e) => setNewRequest({ ...newRequest, quantity: e.target.value })}
+                      placeholder="0"
+                      min="0"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    />
+                  </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Status</label>
+                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Status</label>
                   <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium">
                     <Clock className="w-4 h-4" />
                     Pending Approval
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                 <button
                   onClick={() => setShowNewRequestModal(false)}
-                  className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                  className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all"
                 >
                   Cancel
                 </button>
@@ -933,73 +934,73 @@ const ReplenishmentPlanning: React.FC = () => {
           onClick={() => setShowCreateModal(false)}
         >
           <div
-            className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Create Replenishment Request</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Create Replenishment Request</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-slate-400">Product</p>
-                  <p className="text-white font-medium">{selectedProduct.name}</p>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Product</p>
+                    <p className="text-[var(--text-primary)] font-medium">{selectedProduct.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Warehouse</p>
+                    <p className="text-[var(--text-primary)]">{selectedProduct.warehouse}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Current Stock</p>
+                    <p className="text-[var(--text-primary)]">{selectedProduct.currentStock}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Minimum Stock</p>
+                    <p className="text-[var(--text-primary)]">{selectedProduct.minStock}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Forecasted Demand</p>
+                    <p className="text-[var(--text-primary)]">{selectedProduct.forecastedDemand}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">Recommended Quantity</p>
+                    <p className="text-[var(--text-primary)] font-semibold">{selectedProduct.recommendedReorderQty}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-[var(--text-muted)]">Supplier</p>
+                    <p className="text-[var(--text-primary)]">{selectedProduct.supplier}</p>
+                  </div>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Warehouse</p>
-                  <p className="text-white">{selectedProduct.warehouse}</p>
+                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Reason *</label>
+                  <input
+                    type="text"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    placeholder="e.g., Upcoming production surge"
+                  />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Current Stock</p>
-                  <p className="text-white">{selectedProduct.currentStock}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Minimum Stock</p>
-                  <p className="text-white">{selectedProduct.minStock}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Forecasted Demand</p>
-                  <p className="text-white">{selectedProduct.forecastedDemand}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Recommended Quantity</p>
-                  <p className="text-white font-semibold">{selectedProduct.recommendedReorderQty}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-slate-400">Supplier</p>
-                  <p className="text-white">{selectedProduct.supplier}</p>
-                </div>
+                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Additional Notes</label>
+                  <textarea
+                    rows={3}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    placeholder="Any additional information..."
+                  />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">Reason *</label>
-                <input
-                  type="text"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  placeholder="e.g., Upcoming production surge"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-slate-300">Additional Notes</label>
-                <textarea
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full bg-[#101929] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                  placeholder="Any additional information..."
-                />
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                  className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all"
                 >
                   Cancel
                 </button>
@@ -1022,64 +1023,64 @@ const ReplenishmentPlanning: React.FC = () => {
           onClick={() => setShowViewModal(false)}
         >
           <div
-            className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Product Details</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Product Details</h2>
               <button
                 onClick={() => setShowViewModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-slate-400">Product</p>
-                <p className="text-white font-medium">{selectedProduct.name}</p>
+                <p className="text-xs text-[var(--text-muted)]">Product</p>
+                <p className="text-[var(--text-primary)] font-medium">{selectedProduct.name}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">SKU</p>
-                <p className="text-white font-mono">{selectedProduct.sku}</p>
+                <p className="text-xs text-[var(--text-muted)]">SKU</p>
+                <p className="text-[var(--text-primary)] font-mono">{selectedProduct.sku}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Warehouse</p>
-                <p className="text-white">{selectedProduct.warehouse}</p>
+                <p className="text-xs text-[var(--text-muted)]">Warehouse</p>
+                <p className="text-[var(--text-primary)]">{selectedProduct.warehouse}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Supplier</p>
-                <p className="text-white">{selectedProduct.supplier}</p>
+                <p className="text-xs text-[var(--text-muted)]">Supplier</p>
+                <p className="text-[var(--text-primary)]">{selectedProduct.supplier}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Current Stock</p>
-                <p className="text-white">{selectedProduct.currentStock}</p>
+                <p className="text-xs text-[var(--text-muted)]">Current Stock</p>
+                <p className="text-[var(--text-primary)]">{selectedProduct.currentStock}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Minimum Stock</p>
-                <p className="text-white">{selectedProduct.minStock}</p>
+                <p className="text-xs text-[var(--text-muted)]">Minimum Stock</p>
+                <p className="text-[var(--text-primary)]">{selectedProduct.minStock}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Forecasted Demand</p>
-                <p className="text-white">{selectedProduct.forecastedDemand}</p>
+                <p className="text-xs text-[var(--text-muted)]">Forecasted Demand</p>
+                <p className="text-[var(--text-primary)]">{selectedProduct.forecastedDemand}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Recommended Qty</p>
-                <p className="text-white font-semibold">{selectedProduct.recommendedReorderQty}</p>
+                <p className="text-xs text-[var(--text-muted)]">Recommended Qty</p>
+                <p className="text-[var(--text-primary)] font-semibold">{selectedProduct.recommendedReorderQty}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Priority</p>
+                <p className="text-xs text-[var(--text-muted)]">Priority</p>
                 <PriorityBadge priority={selectedProduct.priority} />
               </div>
               <div>
-                <p className="text-xs text-slate-400">Status</p>
+                <p className="text-xs text-[var(--text-muted)]">Status</p>
                 <StatusBadge status={selectedProduct.status} />
               </div>
             </div>
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowViewModal(false)}
-                className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all"
               >
                 Close
               </button>
@@ -1090,12 +1091,12 @@ const ReplenishmentPlanning: React.FC = () => {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-300">
+        <div className="fixed bottom-6 right-6 z-50 bg-[var(--bg-surface)] text-[var(--text-primary)] px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-300">
           {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400" />}
           {toast.type === 'error' && <XCircle className="w-5 h-5 text-red-400" />}
           {toast.type === 'info' && <Clock className="w-5 h-5 text-cyan-400" />}
           <span className="text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={() => setToast(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>

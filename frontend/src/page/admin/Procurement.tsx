@@ -1,4 +1,3 @@
-// src/pages/admin/Procurement.tsx
 import React, { useState } from 'react';
 import {
   Download,
@@ -7,6 +6,7 @@ import {
   Clock as ClockIcon,
   CheckCircle as CheckCircleIcon,
   Calendar as CalendarIcon,
+  ChevronRight,
 } from 'lucide-react';
 
 // ============================================
@@ -160,28 +160,34 @@ const supplierSummary: SupplierSummary[] = [
 // HELPER COMPONENTS
 // ============================================
 
-  const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-   const config: Record<string, { color: string; bg: string; dotColor: string }> = {
-     Pending: {
-       color: 'text-amber-400',
-       bg: 'bg-amber-500/10 border-amber-500/20',
-       dotColor: 'bg-amber-500',
-     },
-     Approved: {
-       color: 'text-emerald-400',
-       bg: 'bg-emerald-500/10 border-emerald-500/20',
-       dotColor: 'bg-emerald-500',
-     },
-     'Partially Received': {
-       color: 'text-sky-400',
-       bg: 'bg-sky-500/10 border-sky-500/20',
-       dotColor: 'bg-sky-500',
-     },
-   };
-  const { color, bg, dotColor } = config[status] || config['Pending'];
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const config: Record<
+    string,
+    { color: string; bg: string; border: string; dotColor: string }
+  > = {
+    Pending: {
+      color: 'text-amber-800 dark:text-amber-400',
+      bg: 'bg-amber-100 dark:bg-amber-500/10',
+      border: 'border dark:border-amber-500/20 border-amber-200',
+      dotColor: 'bg-amber-500',
+    },
+    Approved: {
+      color: 'text-emerald-800 dark:text-emerald-400',
+      bg: 'bg-emerald-100 dark:bg-emerald-500/10',
+      border: 'border dark:border-emerald-500/20 border-emerald-200',
+      dotColor: 'bg-emerald-500',
+    },
+    'Partially Received': {
+      color: 'text-sky-800 dark:text-sky-400',
+      bg: 'bg-sky-100 dark:bg-sky-500/10',
+      border: 'border dark:border-sky-500/20 border-sky-200',
+      dotColor: 'bg-sky-500',
+    },
+  };
+  const { color, bg, border, dotColor } = config[status] || config['Pending'];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${color} ${bg} ${border}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {status}
@@ -189,36 +195,26 @@ const supplierSummary: SupplierSummary[] = [
   );
 };
 
-  const KPICard: React.FC<{
-   label: string;
-   value: string | number;
-   indicator: string;
-   icon: React.ReactNode;
-   trend?: 'up' | 'down' | 'stable';
- }> = ({ label, value, indicator, icon, trend }) => {
-   const trendColor =
-     trend === 'up'
-       ? 'text-emerald-400'
-       : trend === 'down'
-       ? 'text-red-400'
-       : 'text-gray-400';
-
-   return (
-     <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5 shadow-sm">
-       <div className="flex items-start justify-between">
-         <div>
-           <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
-             {label}
-           </p>
-           <p className="text-2xl font-bold text-white mt-1.5">
-             {value}
-           </p>
-           <p className={`text-xs mt-1 ${trendColor}`}>{indicator}</p>
-         </div>
-         <div className="p-2.5 bg-slate-800 rounded-lg">{icon}</div>
-       </div>
-     </div>
-   );
+const KPICard: React.FC<{
+  label: string;
+  value: string | number;
+  indicator: string;
+  icon: React.ReactNode;
+}> = ({ label, value, indicator, icon }) => {
+  return (
+    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-5 flex items-start justify-between">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+          {label}
+        </p>
+        <p className="text-2xl font-bold text-[var(--text-primary)] mt-2">
+          {value}
+        </p>
+        <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">{indicator}</p>
+      </div>
+      <div className="p-2.5 bg-[var(--bg-hover)] rounded-lg">{icon}</div>
+    </div>
+  );
 };
 
 // ============================================
@@ -229,7 +225,6 @@ const Procurement: React.FC = () => {
   const [requests, setRequests] = useState(pendingRequests);
   const [showExportModal, setShowExportModal] = useState(false);
 
-  // Handle Approve/Decline
   const handleRequestAction = (id: string, action: 'Approve' | 'Decline') => {
     setRequests((prev) =>
       prev.map((req) =>
@@ -243,30 +238,33 @@ const Procurement: React.FC = () => {
     );
   };
 
-  // KPI Data
   const pendingCount = requests.filter((r) => r.status === 'Pending').length;
   const approvedCount = requests.filter((r) => r.status === 'Approved').length;
   const activeSuppliers = supplierSummary.length;
 
   return (
-{/* Theme fix: page background and text contrast now respond correctly to Light/Dark mode. */}
-    <div className="w-full min-h-screen bg-[#f4f7fb] dark:bg-[#090d16] text-slate-900 dark:text-slate-100 p-4 lg:p-6 space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Procurement
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Requests, approvals and inbound scheduling
-          </p>
+    <div className="min-h-screen w-full bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200 p-6 space-y-6">
+      {/* Breadcrumb & Header Row */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <span>SmartChain</span>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-[var(--text-primary)] font-medium">Procurement</span>
         </div>
-        <button
-          onClick={() => setShowExportModal(true)}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-slate-700 text-gray-300 hover:bg-slate-800"
-        >
-          <Download className="w-4 h-4" /> Export summary
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Procurement</h1>
+            <p className="text-sm text-[var(--text-muted)]">
+              Requests, approvals and inbound scheduling
+            </p>
+          </div>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" /> Export summary
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards Row */}
@@ -275,47 +273,43 @@ const Procurement: React.FC = () => {
           label="Pending Requests"
           value={pendingCount}
           indicator="+2 vs last period"
-          icon={<ClockIcon className="w-5 h-5 text-amber-400" />}
-          trend="up"
+          icon={<ClockIcon className="w-5 h-5 text-amber-500" />}
         />
         <KPICard
           label="Approved Orders"
           value={approvedCount}
           indicator="+1 vs last period"
-          icon={<CheckCircleIcon className="w-5 h-5 text-emerald-400" />}
-          trend="up"
+          icon={<CheckCircleIcon className="w-5 h-5 text-emerald-500" />}
         />
         <KPICard
           label="Receiving Windows"
           value={receivingSchedule.length}
           indicator="today vs last period"
-          icon={<CalendarIcon className="w-5 h-5 text-blue-400" />}
-          trend="up"
+          icon={<CalendarIcon className="w-5 h-5 text-cyan-500" />}
         />
         <KPICard
           label="Active Suppliers"
           value={activeSuppliers}
           indicator="stable vs last period"
-          icon={<Truck className="w-5 h-5 text-gray-400" />}
-          trend="stable"
+          icon={<Truck className="w-5 h-5 text-[var(--text-muted)]" />}
         />
       </div>
 
-      {/* Middle Section: 2 Columns */}
+      {/* Main Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Side (2 spans) - Pending Requests Grid */}
+        {/* Left Side - Pending Requests */}
         <div className="lg:col-span-2">
-          <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-6">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
                   Pending Requests
                 </h3>
-                <p className="text-sm text-gray-400">
+                <p className="text-xs text-[var(--text-muted)]">
                   Awaiting purchasing decision
                 </p>
               </div>
-              <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
+              <button className="text-xs text-[#00a3c4] hover:underline dark:text-cyan-400">
                 View all
               </button>
             </div>
@@ -324,31 +318,34 @@ const Procurement: React.FC = () => {
               {requests.map((req) => (
                 <div
                   key={req.id}
-                  className="bg-[#161f33] border border-slate-800 rounded-xl p-4 hover:shadow-sm transition-shadow duration-200"
+                  className="bg-[var(--bg-surface-alt)] border border-[var(--border-color)] rounded-lg p-4 flex flex-col justify-between"
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-white">
-                      {req.title}
-                    </h4>
-                    <StatusBadge status={req.status} />
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-tight">
+                        {req.title}
+                      </h4>
+                      <StatusBadge status={req.status} />
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mb-3">
+                      {req.reference} · {req.location}
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)] mb-4">
+                      <span>Qty {req.qty}</span>
+                      <span>Needed {req.needed}</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-400 mb-2">
-                    {req.reference} · {req.location}
-                  </p>
-                  <div className="flex items-center gap-4 text-sm text-gray-300 mb-3">
-                    <span>Qty {req.qty}</span>
-                    <span>Needed {req.needed}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="flex items-center gap-2 pt-2">
                     <button
                       onClick={() => handleRequestAction(req.id, 'Decline')}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-700 text-gray-300 hover:bg-slate-800 transition-all"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)] transition-all"
                     >
                       Decline
                     </button>
                     <button
                       onClick={() => handleRequestAction(req.id, 'Approve')}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition-all"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none transition-all"
                     >
                       Approve
                     </button>
@@ -359,50 +356,46 @@ const Procurement: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side (1 span) - Receiving Schedule Timeline */}
+        {/* Right Side - Receiving Schedule */}
         <div className="lg:col-span-1">
-          <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-6 h-full">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-6 h-full">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
                   Receiving Schedule
                 </h3>
-                <p className="text-sm text-gray-400">
+                <p className="text-xs text-[var(--text-muted)]">
                   Today's dock assignments
                 </p>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               {receivingSchedule.map((item, index) => (
-                <div key={item.id} className="relative pl-6">
-                  {/* Timeline Line */}
+                <div key={item.id} className="relative pl-5">
                   {index < receivingSchedule.length - 1 && (
-                    <div className="absolute left-1.5 top-6 bottom-0 w-0.5 bg-slate-800" />
+                    <div className="absolute left-1.5 top-5 bottom-0 w-px bg-[var(--border-color)]" />
                   )}
-                  {/* Timeline Dot */}
                   <div
-                    className={`absolute left-0 top-1.5 w-3 h-3 rounded-full border-2 ${
+                    className={`absolute left-0 top-1.5 w-3 h-3 rounded-full ${
                       item.status === 'Approved'
-                        ? 'bg-emerald-500 border-emerald-500'
+                        ? 'bg-emerald-500'
                         : item.status === 'Partially Received'
-                        ? 'bg-blue-500 border-blue-500'
-                        : 'bg-amber-500 border-amber-500'
+                        ? 'bg-sky-500'
+                        : 'bg-amber-500'
                     }`}
                   />
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
                         {item.poNumber} · {item.dock}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-[var(--text-muted)] mb-1.5">
                         {item.supplier}
                       </p>
-                      <div className="mt-1">
-                        <StatusBadge status={item.status} />
-                      </div>
+                      <StatusBadge status={item.status} />
                     </div>
-                    <span className="text-sm font-medium text-gray-300 whitespace-nowrap ml-4">
+                    <span className="text-xs font-medium text-[var(--text-muted)]">
                       {item.time}
                     </span>
                   </div>
@@ -413,18 +406,18 @@ const Procurement: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Section: Supplier Summary */}
-      <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
+      {/* Bottom Section - Supplier Summary */}
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-6">
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <h3 className="text-lg font-semibold text-white">
-              Supplier Summary
-            </h3>
-            <p className="text-sm text-gray-400">
-              Fill rate and quality across active vendors
-            </p>
+                <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                  Supplier Summary
+                </h3>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Fill rate and quality across active vendors
+                </p>
           </div>
-          <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
+          <button className="text-xs text-[#00a3c4] hover:underline dark:text-cyan-400">
             View all
           </button>
         </div>
@@ -433,13 +426,13 @@ const Procurement: React.FC = () => {
           {supplierSummary.map((supplier) => (
             <div
               key={supplier.id}
-              className="bg-[#161f33] border border-slate-800 rounded-xl p-4 hover:shadow-sm transition-shadow duration-200"
+              className="bg-[var(--bg-surface-alt)] border border-[var(--border-color)] rounded-lg p-4 space-y-3"
             >
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-semibold text-white">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-[var(--text-primary)]">
                   {supplier.name}
                 </h4>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-[var(--text-muted)]">
                   {supplier.orders} orders
                 </span>
               </div>
@@ -447,22 +440,22 @@ const Procurement: React.FC = () => {
               <div className="space-y-2">
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-300">On-time</span>
-                    <span className="font-medium text-white">
+                    <span className="text-[var(--text-muted)]">On-time</span>
+                    <span className="font-medium text-[var(--text-primary)]">
                       {supplier.onTime}%
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-[var(--bg-hover)] rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all"
+                      className="h-full rounded-full"
                       style={{
                         width: `${supplier.onTime}%`,
                         backgroundColor:
                           supplier.onTime >= 90
-                            ? '#34D399'
+                            ? '#34d399'
                             : supplier.onTime >= 80
-                            ? '#FBBF24'
-                            : '#F87171',
+                            ? '#fbbf24'
+                            : '#f87171',
                       }}
                     />
                   </div>
@@ -470,22 +463,22 @@ const Procurement: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-300">Quality</span>
-                    <span className="font-medium text-white">
+                    <span className="text-[var(--text-muted)]">Quality</span>
+                    <span className="font-medium text-[var(--text-primary)]">
                       {supplier.quality}%
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-[var(--bg-hover)] rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all"
+                      className="h-full rounded-full"
                       style={{
                         width: `${supplier.quality}%`,
                         backgroundColor:
                           supplier.quality >= 90
-                            ? '#34D399'
+                            ? '#34d399'
                             : supplier.quality >= 80
-                            ? '#FBBF24'
-                            : '#F87171',
+                            ? '#fbbf24'
+                            : '#f87171',
                       }}
                     />
                   </div>
@@ -496,25 +489,23 @@ const Procurement: React.FC = () => {
         </div>
       </div>
 
-      {/* ============================================ */}
-      {/* EXPORT SUMMARY MODAL */}
-      {/* ============================================ */}
+      {/* Export Modal */}
       {showExportModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={() => setShowExportModal(false)}
         >
           <div
-            className="bg-[#0f172a] border border-slate-800/80 rounded-2xl w-full max-w-md p-6"
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl w-full max-w-md p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">
                 Export Summary
               </h2>
               <button
                 onClick={() => setShowExportModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-gray-400 hover:text-slate-100 transition-all"
+                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -522,43 +513,43 @@ const Procurement: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-xs font-medium mb-1 text-[var(--text-muted)]">
                   Export Format
                 </label>
-                <select className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all">
-                  <option>PDF Document</option>
-                  <option>Excel Spreadsheet</option>
-                  <option>CSV File</option>
-                </select>
+                  <select className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-600/50">
+                    <option>PDF Document</option>
+                    <option>Excel Spreadsheet</option>
+                    <option>CSV File</option>
+                  </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-xs font-medium mb-1 text-[var(--text-muted)]">
                   Date Range
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="date"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-600/50"
                   />
                   <input
                     type="date"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-600/50"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                 <button
                   type="button"
                   onClick={() => setShowExportModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-gray-400 hover:text-slate-100 hover:bg-slate-800 transition-all"
+                  className="px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950"
+                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" /> Export
                 </button>

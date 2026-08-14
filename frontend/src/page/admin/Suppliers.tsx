@@ -193,48 +193,48 @@ const Suppliers: React.FC = () => {
     setShowEditModal(true);
   };
 
+  {/* FIX: Dark mode canvas adaptation */}
   return (
-{/* Theme fix: page background and text contrast now respond correctly to Light/Dark mode. */}
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#f4f7fb] dark:bg-[#090d16] text-slate-900 dark:text-slate-100">
+    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-400">
+      <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
         <span>Admin</span>
         <ChevronRight className="w-4 h-4" />
-        <span className="text-slate-100">Suppliers</span>
+        <span className="text-[var(--text-inverse)]">Suppliers</span>
       </div>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Suppliers</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Manage vendor relationships, contacts, and performance metrics</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Suppliers</h1>
+          <p className="text-sm text-[var(--text-secondary)]">Manage vendor relationships, contacts, and performance metrics</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+            className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+            className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             title="Export"
           >
             <Download className="w-4 h-4" />
           </button>
           <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
+            className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             title="Print"
           >
             <Printer className="w-4 h-4" />
           </button>
-          <div className="flex items-center gap-1 bg-slate-800/50 rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-[var(--bg-hover)] rounded-xl p-1">
             <button
               onClick={() => setViewMode('cards')}
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'cards'
                   ? 'bg-cyan-500 text-slate-950'
-                  : 'text-gray-400 hover:text-slate-100'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
               title="Card View"
             >
@@ -245,7 +245,7 @@ const Suppliers: React.FC = () => {
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'table'
                   ? 'bg-cyan-500 text-slate-950'
-                  : 'text-gray-400 hover:text-slate-100'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
               title="Table View"
             >
@@ -263,28 +263,28 @@ const Suppliers: React.FC = () => {
 
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Total Suppliers</p>
-          <p className="text-2xl font-bold text-white mt-1">{totalSuppliers}</p>
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
+          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Total Suppliers</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{totalSuppliers}</p>
         </div>
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Active Vendors</p>
-          <p className="text-2xl font-bold text-white mt-1">{activeSuppliers}</p>
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
+          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Active Vendors</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{activeSuppliers}</p>
         </div>
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">On Hold</p>
-          <p className="text-2xl font-bold text-white mt-1">{onHoldSuppliers}</p>
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
+          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">On Hold</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{onHoldSuppliers}</p>
         </div>
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Open POs</p>
-          <p className="text-2xl font-bold text-white mt-1">{totalOpenPOs}</p>
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
+          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Open POs</p>
+          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{totalOpenPOs}</p>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-4">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-wrap items-center gap-1 bg-slate-800/50 rounded-full p-1">
+          <div className="flex flex-wrap items-center gap-1 bg-[var(--bg-hover)] rounded-full p-1">
             {statusOptions.map((status) => (
               <button
                 key={status}
@@ -292,7 +292,7 @@ const Suppliers: React.FC = () => {
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   statusFilter === status
                     ? 'bg-cyan-500 text-slate-950'
-                    : 'text-gray-400 hover:text-slate-100'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {status}
@@ -301,13 +301,13 @@ const Suppliers: React.FC = () => {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
               <input
                 type="text"
                 placeholder="Search by supplier name, contact, or ID"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-[#0f172a] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 w-full sm:w-64"
+                className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl pl-9 pr-4 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               />
             </div>
           </div>
@@ -320,7 +320,7 @@ const Suppliers: React.FC = () => {
           {filteredSuppliers.map((supplier) => (
             <div
               key={supplier.id}
-              className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-5 hover:border-slate-600 transition-all"
+              className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 hover:border-[var(--border-color-strong)] transition-all"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -328,46 +328,46 @@ const Suppliers: React.FC = () => {
                     <Building2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-white">{supplier.name}</p>
-                    <p className="text-xs text-gray-400">{supplier.code}</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{supplier.name}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{supplier.code}</p>
                   </div>
                 </div>
                 <StatusBadge status={supplier.status} />
               </div>
 
               <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-gray-300">
-                  <User className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <User className="w-4 h-4 text-[var(--text-muted)]" />
                   <span>{supplier.contactPerson}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Mail className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Mail className="w-4 h-4 text-[var(--text-muted)]" />
                   <span className="truncate">{supplier.email}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Phone className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Phone className="w-4 h-4 text-[var(--text-muted)]" />
                   <span>{supplier.phone}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <MapPin className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <MapPin className="w-4 h-4 text-[var(--text-muted)]" />
                   <span>{supplier.location}</span>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center justify-between pt-3 border-t border-slate-800/60">
+              <div className="mt-4 flex items-center justify-between pt-3 border-t border-[var(--border-color)]">
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-xs text-gray-400">Open POs</p>
-                    <p className="text-sm font-semibold text-white">{supplier.openPOs}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Open POs</p>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{supplier.openPOs}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">Terms</p>
-                    <p className="text-sm font-medium text-gray-300">{supplier.paymentTerms}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Terms</p>
+                    <p className="text-sm font-medium text-[var(--text-secondary)]">{supplier.paymentTerms}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => handleEdit(supplier)}
-                  className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                   title="Edit Supplier"
                 >
                   <Edit className="w-4 h-4" />
@@ -380,30 +380,30 @@ const Suppliers: React.FC = () => {
 
       {/* Supplier Table View */}
       {viewMode === 'table' && (
-        <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl overflow-hidden">
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px]">
-              <thead className="bg-slate-800/30 border-b border-slate-800/60">
+              <thead className="bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
                 <tr>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Supplier
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Contact Person
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Phone / Location
                   </th>
-                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Open POs
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Payment Terms
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Status
                   </th>
-                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-gray-400">
+                  <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                     Actions
                   </th>
                 </tr>
@@ -412,30 +412,30 @@ const Suppliers: React.FC = () => {
                 {filteredSuppliers.map((supplier) => (
                   <tr
                     key={supplier.id}
-                    className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors"
+                    className="border-b border-[var(--border-color)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <td className="px-4 py-3.5">
                       <div>
-                        <p className="text-sm font-medium text-white">{supplier.name}</p>
-                        <p className="text-xs text-gray-400">{supplier.code}</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{supplier.name}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{supplier.code}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <div>
-                        <p className="text-sm text-gray-300">{supplier.contactPerson}</p>
-                        <p className="text-xs text-gray-400">{supplier.email}</p>
+                        <p className="text-sm text-[var(--text-secondary)]">{supplier.contactPerson}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{supplier.email}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <div>
-                        <p className="text-sm text-gray-300">{supplier.phone}</p>
-                        <p className="text-xs text-gray-400">{supplier.location}</p>
+                        <p className="text-sm text-[var(--text-secondary)]">{supplier.phone}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{supplier.location}</p>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-center text-sm font-medium text-white">
+                    <td className="px-4 py-3.5 text-center text-sm font-medium text-[var(--text-primary)]">
                       {supplier.openPOs}
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-gray-300">
+                    <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">
                       {supplier.paymentTerms}
                     </td>
                     <td className="px-4 py-3.5">
@@ -445,13 +445,13 @@ const Suppliers: React.FC = () => {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleEdit(supplier)}
-                          className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                           title="Edit Supplier"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                           title="View Details"
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -462,7 +462,7 @@ const Suppliers: React.FC = () => {
                 ))}
                 {filteredSuppliers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={7} className="px-4 py-8 text-center text-[var(--text-muted)]">
                       No suppliers found matching your criteria.
                     </td>
                   </tr>
@@ -472,20 +472,20 @@ const Suppliers: React.FC = () => {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800/60 bg-slate-800/10">
-            <div className="text-sm text-gray-400">
-              Showing <span className="text-white font-medium">1</span> to{' '}
-              <span className="text-white font-medium">{filteredSuppliers.length}</span> of{' '}
-              <span className="text-white font-medium">{mockSuppliers.length}</span> suppliers
+          <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-hover)]">
+            <div className="text-sm text-[var(--text-muted)]">
+              Showing <span className="text-[var(--text-primary)] font-medium">1</span> to{' '}
+              <span className="text-[var(--text-primary)] font-medium">{filteredSuppliers.length}</span> of{' '}
+              <span className="text-[var(--text-primary)] font-medium">{mockSuppliers.length}</span> suppliers
             </div>
             <div className="flex items-center gap-1">
-              <button className="p-1.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-white hover:bg-slate-800/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              <button className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
                 1
               </button>
-              <button className="p-1.5 rounded-xl border border-slate-800/80 text-gray-400 hover:text-white hover:bg-slate-800/50 transition-colors">
+              <button className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                 <ChevronRightIcon className="w-4 h-4" />
               </button>
             </div>
@@ -502,14 +502,14 @@ const Suppliers: React.FC = () => {
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="bg-[#0f172a] border border-slate-800/80 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Add New Supplier</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add New Supplier</h2>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -517,62 +517,62 @@ const Suppliers: React.FC = () => {
 
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Supplier Name *
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="Enter supplier name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Contact Person *
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="Full name"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                     Email *
                   </label>
                   <input
                     type="email"
-                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     placeholder="contact@company.com"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                     Phone *
                   </label>
                   <input
                     type="text"
-                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     placeholder="+1 234 567 8900"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Location
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="City, Country"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Payment Terms
                 </label>
-                <select className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                <select className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                   <option>Net 15</option>
                   <option>Net 30</option>
                   <option>Net 45</option>
@@ -580,20 +580,20 @@ const Suppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Status
                 </label>
-                <select className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                <select className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                   <option>Active</option>
                   <option>On Hold</option>
                   <option>Inactive</option>
                 </select>
               </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
+                  className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
                 >
                   Cancel
                 </button>
@@ -618,14 +618,14 @@ const Suppliers: React.FC = () => {
           onClick={() => setShowEditModal(false)}
         >
           <div
-            className="bg-[#0f172a] border border-slate-800/80 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Edit Supplier</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Edit Supplier</h2>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-slate-100 transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -633,64 +633,64 @@ const Suppliers: React.FC = () => {
 
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Supplier Name *
                 </label>
                 <input
                   type="text"
                   defaultValue={selectedSupplier.name}
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Contact Person *
                 </label>
                 <input
                   type="text"
                   defaultValue={selectedSupplier.contactPerson}
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                     Email *
                   </label>
                   <input
                     type="email"
                     defaultValue={selectedSupplier.email}
-                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                     Phone *
                   </label>
                   <input
                     type="text"
                     defaultValue={selectedSupplier.phone}
-                    className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Location
                 </label>
                 <input
                   type="text"
                   defaultValue={selectedSupplier.location}
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Payment Terms
                 </label>
                 <select
                   defaultValue={selectedSupplier.paymentTerms}
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 >
                   <option>Net 15</option>
                   <option>Net 30</option>
@@ -699,23 +699,23 @@ const Suppliers: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-gray-300">
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Status
                 </label>
                 <select
                   defaultValue={selectedSupplier.status}
-                  className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 >
                   <option>Active</option>
                   <option>On Hold</option>
                   <option>Inactive</option>
                 </select>
               </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-5 py-2.5 border border-slate-800 rounded-xl text-gray-400 hover:text-slate-100 hover:bg-slate-800/50 transition-all"
+                  className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
                 >
                   Cancel
                 </button>
@@ -735,3 +735,4 @@ const Suppliers: React.FC = () => {
 };
 
 export default Suppliers;
+

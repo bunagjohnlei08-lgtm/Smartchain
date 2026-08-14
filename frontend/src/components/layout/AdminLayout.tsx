@@ -42,7 +42,7 @@ const AdminLayout: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#090d16]">
+      <div className="flex-1 flex flex-col min-w-0 bg-transparent">
         {/* Top Bar */}
         <header className="bg-[#090d16]/80 backdrop-blur-xl border-b border-slate-800/60 px-4 py-3 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
           <div className="lg:hidden w-10" />
@@ -86,7 +86,7 @@ const AdminLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-[#090d16]">
+        <main className="flex-1 overflow-y-auto bg-transparent">
           <Outlet />
         </main>
       </div>
