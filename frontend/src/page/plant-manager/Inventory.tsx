@@ -6,12 +6,7 @@ import {
   Printer,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  Package,
-  Clock,
-  AlertTriangle,
   RefreshCw,
-  X,
 } from 'lucide-react';
 
 // ============================================

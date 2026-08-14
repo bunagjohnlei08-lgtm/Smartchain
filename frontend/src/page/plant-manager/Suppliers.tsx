@@ -9,11 +9,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  CheckCircle,
-  MoreVertical,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
-  Eye,
   Edit,
   Download,
   Printer,
@@ -23,8 +20,6 @@ import {
   X,
   Save,
   ExternalLink,
-  AlertCircle,
-  Clock,
 } from 'lucide-react';
 
 // ============================================

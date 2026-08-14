@@ -23,10 +23,7 @@ import {
   ArrowDown,
   Minus,
   Sparkles,
-  TrendingUp,
   ExternalLink,
-  Shield,
-  Check,
 } from 'lucide-react';
 import {
   AreaChart,

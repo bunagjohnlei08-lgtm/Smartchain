@@ -18,9 +18,6 @@ import {
   ChevronRight,
   Paperclip,
   FileImage,
-  Calendar,
-  User,
-  Link,
 } from 'lucide-react';
 
 // ============================================
@@ -363,7 +360,6 @@ const KPICard: React.FC<{
 // ============================================
 
 const ReceivingManagement: React.FC = () => {
-  const [receivings, setReceivings] = useState<ReceivingItem[]>(mockReceivings);
   const [search, setSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('All Suppliers');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -371,27 +367,20 @@ const ReceivingManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [formPoNumber, setFormPoNumber] = useState('');
-  const [formSupplier, setFormSupplier] = useState('');
-  const [formExpectedDate, setFormExpectedDate] = useState('');
-  const [formTotalItems, setFormTotalItems] = useState('');
-
   const [selectedReceivingId, setSelectedReceivingId] = useState<string | null>(
-    receivings[0]?.id || null
+    mockReceivings[0]?.id || null
   );
-  const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'products' | 'inspection' | 'notes' | 'attachments'
   >('products');
 
   const selectedReceiving = useMemo(() => {
-    return receivings.find((r) => r.id === selectedReceivingId) || null;
-  }, [selectedReceivingId, receivings]);
+    return mockReceivings.find((r) => r.id === selectedReceivingId) || null;
+  }, [selectedReceivingId]);
 
   // Filter data
   const filteredReceivings = useMemo(() => {
-    return receivings.filter((r) => {
+    return mockReceivings.filter((r) => {
       const matchSearch =
         r.receivingNo.toLowerCase().includes(search.toLowerCase()) ||
         r.poNumber.toLowerCase().includes(search.toLowerCase()) ||
@@ -402,7 +391,7 @@ const ReceivingManagement: React.FC = () => {
         statusFilter === 'All Status' || r.status === statusFilter;
       return matchSearch && matchSupplier && matchStatus;
     });
-  }, [search, supplierFilter, statusFilter, receivings]);
+  }, [search, supplierFilter, statusFilter]);
 
   // Pagination
   const totalItems = filteredReceivings.length;
@@ -412,66 +401,15 @@ const ReceivingManagement: React.FC = () => {
   const paginatedReceivings = filteredReceivings.slice(start - 1, end);
 
   // KPI data
-  const totalDeliveries = receivings.length;
-  const pendingQA = receivings.filter((r) => r.status === 'Pending QA').length;
-  const passed = receivings.filter((r) => r.status === 'Passed').length;
-  const rejected = receivings.filter((r) => r.status === 'Rejected').length;
-  const partial = receivings.filter((r) => r.status === 'Partial').length;
+  const totalDeliveries = mockReceivings.length;
+  const pendingQA = mockReceivings.filter((r) => r.status === 'Pending QA').length;
+  const passed = mockReceivings.filter((r) => r.status === 'Passed').length;
+  const rejected = mockReceivings.filter((r) => r.status === 'Rejected').length;
+  const partial = mockReceivings.filter((r) => r.status === 'Partial').length;
 
   // Handle row click
   const handleRowClick = (id: string) => {
     setSelectedReceivingId(id);
-  };
-
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const highestNo = receivings.reduce((max, r) => {
-      const num = parseInt(r.receivingNo.replace('RCV-', ''), 10);
-      return num > max ? num : max;
-    }, 0);
-    const nextNo = String(highestNo + 1).padStart(5, '0');
-    const today = new Date();
-    const dateStr = today.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    const timeStr = today.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const newReceiving: ReceivingItem = {
-      id: String(Date.now()),
-      receivingNo: `RCV-${nextNo}`,
-      poNumber: formPoNumber,
-      supplier: formSupplier,
-      expectedDate: formExpectedDate,
-      items: Number(formTotalItems) || 0,
-      preparedBy: 'Plant Manager',
-      status: 'Pending QA',
-      createdAt: `${dateStr} ${timeStr}`,
-      timeline: [
-        {
-          status: 'Receiving Created',
-          date: dateStr,
-          time: timeStr,
-          performedBy: 'Plant Manager',
-        },
-        {
-          status: 'Pending QA Inspection',
-          date: dateStr,
-          time: timeStr,
-          performedBy: 'System',
-        },
-      ],
-    };
-    setReceivings((prev) => [newReceiving, ...prev]);
-    setSelectedReceivingId(newReceiving.id);
-    setIsCreateModalOpen(false);
-    setFormPoNumber('');
-    setFormSupplier('');
-    setFormExpectedDate('');
-    setFormTotalItems('');
   };
 
   return (
@@ -484,10 +422,7 @@ const ReceivingManagement: React.FC = () => {
             Manage all incoming deliveries from suppliers.
           </p>
         </div>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
-        >
+        <button className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
           <Plus className="w-4 h-4" /> Create Receiving
         </button>
       </div>
@@ -646,11 +581,7 @@ const ReceivingManagement: React.FC = () => {
                   <td className="px-4 py-3.5">
                     <div className="flex items-center justify-center gap-1">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRowClick(record.id);
-                          setIsViewDrawerOpen(true);
-                        }}
+                        onClick={() => handleRowClick(record.id)}
                         className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
                       >
                         <Eye className="w-4 h-4" />
@@ -999,215 +930,6 @@ const ReceivingManagement: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Create Receiving Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0f172a] border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-              <h2 className="text-lg font-semibold text-white">Create Receiving</h2>
-              <button
-                onClick={() => {
-                  setIsCreateModalOpen(false);
-                  setFormPoNumber('');
-                  setFormSupplier('');
-                  setFormExpectedDate('');
-                  setFormTotalItems('');
-                }}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  PO Number
-                </label>
-                <input
-                  type="text"
-                  value={formPoNumber}
-                  onChange={(e) => setFormPoNumber(e.target.value)}
-                  required
-                  placeholder="e.g. PO-2026-006"
-                  className="w-full bg-[#0b1220] border border-[#1f2937] rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Supplier
-                </label>
-                <input
-                  type="text"
-                  value={formSupplier}
-                  onChange={(e) => setFormSupplier(e.target.value)}
-                  required
-                  placeholder="e.g. ABC Industrial"
-                  className="w-full bg-[#0b1220] border border-[#1f2937] rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Expected Date
-                </label>
-                <input
-                  type="text"
-                  value={formExpectedDate}
-                  onChange={(e) => setFormExpectedDate(e.target.value)}
-                  required
-                  placeholder="e.g. Aug 15, 2026"
-                  className="w-full bg-[#0b1220] border border-[#1f2937] rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Total Items
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formTotalItems}
-                  onChange={(e) => setFormTotalItems(e.target.value)}
-                  required
-                  placeholder="e.g. 12"
-                  className="w-full bg-[#0b1220] border border-[#1f2937] rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreateModalOpen(false);
-                    setFormPoNumber('');
-                    setFormSupplier('');
-                    setFormExpectedDate('');
-                    setFormTotalItems('');
-                  }}
-                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 border border-[#1f2937] hover:bg-slate-800 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-950 bg-cyan-500 hover:bg-cyan-400 transition-colors"
-                >
-                  Create Receiving
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* View Receiving Drawer */}
-      {isViewDrawerOpen && selectedReceiving && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setIsViewDrawerOpen(false)}
-          />
-
-          {/* Drawer Panel */}
-          <div className="relative w-full max-w-md bg-[#111827] border-l border-[#1f2937] shadow-2xl h-full overflow-y-auto transform transition-transform duration-300 translate-x-0">
-            {/* Header */}
-            <div className="sticky top-0 bg-[#111827] border-b border-[#1f2937] p-4 flex items-center justify-between z-10">
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-white">
-                  {selectedReceiving.receivingNo}
-                </h3>
-                <StatusBadge status={selectedReceiving.status} />
-              </div>
-              <button
-                onClick={() => setIsViewDrawerOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-6">
-              {/* Supplier Card */}
-              <div className="bg-[#0b1220] border border-[#1f2937] rounded-xl p-4 space-y-3">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Supplier Information</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-slate-500">Supplier Name</p>
-                    <p className="text-white font-medium">{selectedReceiving.supplier}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">PO Number</p>
-                    <p className="text-white font-medium">{selectedReceiving.poNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Expected Date</p>
-                    <p className="text-white font-medium">{selectedReceiving.expectedDate}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Prepared By</p>
-                    <p className="text-white font-medium">{selectedReceiving.preparedBy}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Items Checklist */}
-              <div>
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                  Items Checklist ({selectedReceiving.items})
-                </h4>
-                <div className="space-y-3">
-                  {selectedReceiving.products?.map((product, idx) => {
-                    const progress = product.deliveredQty > 0
-                      ? Math.round((product.acceptedQty / product.deliveredQty) * 100)
-                      : 0;
-
-                    return (
-                      <div key={idx} className="bg-[#0b1220] border border-[#1f2937] rounded-xl p-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="text-white text-sm font-medium">{product.product}</p>
-                            <p className="text-slate-500 text-xs font-mono">{product.sku}</p>
-                          </div>
-                          <StatusBadge
-                            status={
-                              product.inspectionStatus === 'Pending'
-                                ? 'Pending QA'
-                                : (product.inspectionStatus as ReceivingStatus)
-                            }
-                          />
-                        </div>
-                        <div className="w-full bg-slate-800 rounded-full h-2 mt-2">
-                          <div
-                            className="bg-cyan-500 h-2 rounded-full transition-all"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                          <span>Accepted: {product.acceptedQty} / {product.deliveredQty}</span>
-                          <span>{progress}%</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Plant Manager Actions */}
-              <div className="space-y-2 pt-4 border-t border-[#1f2937]">
-                <button className="w-full px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-semibold transition-all">
-                  {selectedReceiving.status === 'Pending QA' ? 'Start Inspection' : 'Acknowledge'}
-                </button>
-                <button className="w-full px-4 py-2.5 border border-[#1f2937] hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all">
-                  Generate Receiving Slip
-                </button>
-                <button className="w-full px-4 py-2.5 border border-red-500/30 hover:bg-red-500/10 text-red-400 rounded-xl text-sm font-medium transition-all">
-                  Flag Delivery Issue
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

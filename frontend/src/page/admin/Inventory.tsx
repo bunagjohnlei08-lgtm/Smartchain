@@ -1,5 +1,5 @@
 // src/page/admin/Inventory.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search,
   ChevronLeft,
@@ -32,356 +32,112 @@ import {
   Check,
   LayoutList,
   LayoutGrid,
+  Loader2,
 } from 'lucide-react';
+import type { ApiInventoryItem, ApiWarehouse } from '../../types';
+import type { AxiosError } from 'axios';
+import { apiClient } from '../../lib/api';
 
 // ============================================
 // TYPES
 // ============================================
 
-interface InventoryItem {
-  id: string;
-  sku: string;
+type InventoryItem = ApiInventoryItem;
+
+type InventoryStatus = 'Available' | 'Low Stock' | 'Out of Stock';
+
+interface InventoryFormData {
   barcode: string;
-  productName: string;
-  warehouse: string;
-  rack: string;
-  shelf: string;
-  bin: string;
-  batchLot: string | null;
-  availableQty: number;
-  reservedQty: number;
-  damagedQty: number;
-  totalQty: number;
-  unit: string;
-  reorderLevel: number;
-  image?: string;
+  product: string;
   category: string;
   brand: string;
-  serialTracked: boolean;
-  costPrice: number;
-  lastUpdated: string;
-  supplierRef?: string;
-  supplierName?: string;
-  receivingReference?: string;
-  receivedDate?: string;
-  movements?: MovementLog[];
-  pendingReceiving?: boolean;
-}
-
-interface MovementLog {
-  id: string;
-  date: string;
-  type: 'Stock In' | 'Stock Out' | 'Transfer' | 'Adjustment' | 'Reserved' | 'QA Passed' | 'Receiving';
-  qty: number;
-  user: string;
-  reason?: string;
-  reference?: string;
-}
-
-interface DamagedRecord {
-  id: string;
-  productId: string;
-  productName: string;
-  barcode: string;
-  quantity: number;
-  reason: string;
-  reportedBy: string;
-  date: string;
-  inspectionReference: string;
+  unit: string;
+  cost_price: number;
+  warehouse_id: number | '';
+  available_stock: number;
+  reserved_stock: number;
+  backload: number;
+  status: InventoryStatus;
+  pending_receiving: boolean;
 }
 
 // ============================================
-// MOCK DATA
+// HELPERS
 // ============================================
 
-const mockDamagedRecords: DamagedRecord[] = [
-  {
-    id: 'd1',
-    productId: '4',
-    productName: 'Stainless Steel Bottle',
-    barcode: 'SKU-BOTTLE-002',
-    quantity: 2,
-    reason: 'Damaged during shipping',
-    reportedBy: 'A. Reyes',
-    date: '2026-08-05',
-    inspectionReference: 'INSP-2026-008',
-  },
-  {
-    id: 'd2',
-    productId: '3',
-    productName: 'Organic Green Tea',
-    barcode: 'SKU-ORG-TEA-001',
-    quantity: 1,
-    reason: 'Expired',
-    reportedBy: 'L. Cruz',
-    date: '2026-08-03',
-    inspectionReference: 'INSP-2026-012',
-  },
-];
+function getApiErrorMessage(error: unknown): string {
+  const axiosError = error as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
+  const status = axiosError.response?.status;
+  if (status === 401) return 'Session expired. Please log in again.';
+  if (status === 403) return 'You do not have permission to perform this action.';
+  if (status === 422 && axiosError.response?.data?.errors) {
+    const firstError = Object.values(axiosError.response.data.errors)[0];
+    return Array.isArray(firstError) ? firstError[0] : String(firstError);
+  }
+  const msg = axiosError.response?.data?.message;
+  if (typeof msg === 'string') return msg;
+  return 'An unexpected error occurred. Please try again.';
+}
 
-const mockInventory: InventoryItem[] = [
-  {
-    id: '1',
-    sku: 'SKU-IPAD-AIRRR',
-    barcode: '8806091234567',
-    productName: 'IPAD AIR',
-    warehouse: 'Central Depot',
-    rack: 'A-02',
-    shelf: '2',
-    bin: 'B',
-    batchLot: null,
-    availableQty: 2,
-    reservedQty: 0,
-    damagedQty: 0,
-    totalQty: 2,
-    unit: 'pcs',
-    reorderLevel: 3,
-    category: 'Electronics',
-    brand: 'Apple',
-    serialTracked: true,
-    costPrice: 10000,
-    lastUpdated: '2 mins ago',
-    supplierRef: 'SUP-001',
-    supplierName: 'Apple Inc.',
-    receivingReference: 'PO-2026-001',
-    receivedDate: '2026-08-01',
-    movements: [
-      { id: 'm1', date: '2026-08-01 10:30', type: 'Receiving', qty: 10, user: 'A. Reyes', reference: 'PO-2026-001' },
-      { id: 'm2', date: '2026-08-01 11:00', type: 'QA Passed', qty: 10, user: 'Q. Inspector' },
-      { id: 'm3', date: '2026-08-02 09:15', type: 'Stock In', qty: 10, user: 'A. Reyes' },
-      { id: 'm4', date: '2026-08-05 14:20', type: 'Stock Out', qty: -8, user: 'M. Lim' },
-    ],
-    pendingReceiving: false,
-  },
-  {
-    id: '2',
-    sku: 'SKU-SONY-XM5',
-    barcode: '8806092345678',
-    productName: 'Sony WH-1000XM5',
-    warehouse: 'Central Depot',
-    rack: 'B-04',
-    shelf: '1',
-    bin: 'C',
-    batchLot: null,
-    availableQty: 95,
-    reservedQty: 4,
-    damagedQty: 0,
-    totalQty: 99,
-    unit: 'pcs',
-    reorderLevel: 10,
-    category: 'Electronics',
-    brand: 'Sony',
-    serialTracked: false,
-    costPrice: 15000,
-    lastUpdated: '1 hr ago',
-    supplierRef: 'SUP-002',
-    supplierName: 'Sony Corp.',
-    receivingReference: 'PO-2026-005',
-    receivedDate: '2026-07-20',
-    movements: [
-      { id: 'm5', date: '2026-07-20 08:00', type: 'Receiving', qty: 50, user: 'A. Reyes', reference: 'PO-2026-005' },
-      { id: 'm6', date: '2026-07-20 09:00', type: 'QA Passed', qty: 50, user: 'Q. Inspector' },
-      { id: 'm7', date: '2026-07-21 10:00', type: 'Stock In', qty: 50, user: 'A. Reyes' },
-      { id: 'm8', date: '2026-08-01 16:30', type: 'Stock Out', qty: -5, user: 'R. Diaz' },
-      { id: 'm9', date: '2026-08-05 11:00', type: 'Reserved', qty: 4, user: 'Sales Team', reason: 'Customer order #1234' },
-    ],
-    pendingReceiving: false,
-  },
-  {
-    id: '3',
-    sku: 'SKU-ORG-TEA-001',
-    barcode: '8806093456789',
-    productName: 'Organic Green Tea',
-    warehouse: 'Northgate',
-    rack: 'C-12',
-    shelf: '3',
-    bin: 'A',
-    batchLot: 'BATCH-2024-01',
-    availableQty: 39,
-    reservedQty: 5,
-    damagedQty: 1,
-    totalQty: 45,
-    unit: 'box',
-    reorderLevel: 20,
-    category: 'Beverages',
-    brand: "Nature's Best",
-    serialTracked: false,
-    costPrice: 250,
-    lastUpdated: 'Aug 10, 2026',
-    supplierRef: 'SUP-003',
-    supplierName: 'Nature’s Best Co.',
-    receivingReference: 'PO-2026-012',
-    receivedDate: '2026-08-02',
-    movements: [
-      { id: 'm10', date: '2026-08-02 09:00', type: 'Receiving', qty: 30, user: 'A. Reyes', reference: 'PO-2026-012' },
-      { id: 'm11', date: '2026-08-02 09:30', type: 'QA Passed', qty: 30, user: 'Q. Inspector' },
-      { id: 'm12', date: '2026-08-03 10:00', type: 'Stock In', qty: 30, user: 'A. Reyes' },
-      { id: 'm13', date: '2026-08-05 13:00', type: 'Stock Out', qty: -5, user: 'J. Santos' },
-      { id: 'm14', date: '2026-08-06 08:00', type: 'Reserved', qty: 5, user: 'Sales Team', reason: 'Customer order #5678' },
-      { id: 'm15', date: '2026-08-07 09:00', type: 'Adjustment', qty: -1, user: 'L. Cruz', reason: 'Damaged' },
-    ],
-    pendingReceiving: false,
-  },
-  {
-    id: '4',
-    sku: 'SKU-BOTTLE-002',
-    barcode: '8806094567890',
-    productName: 'Stainless Steel Bottle',
-    warehouse: 'Eastside',
-    rack: 'D-08',
-    shelf: '2',
-    bin: 'F',
-    batchLot: null,
-    availableQty: 0,
-    reservedQty: 0,
-    damagedQty: 2,
-    totalQty: 2,
-    unit: 'pcs',
-    reorderLevel: 5,
-    category: 'Kitchenware',
-    brand: 'EcoLife',
-    serialTracked: false,
-    costPrice: 450,
-    lastUpdated: 'Aug 9, 2026',
-    supplierRef: 'SUP-004',
-    supplierName: 'EcoLife Inc.',
-    receivingReference: 'PO-2026-020',
-    receivedDate: '2026-07-15',
-    movements: [
-      { id: 'm16', date: '2026-07-15 08:00', type: 'Receiving', qty: 10, user: 'A. Reyes', reference: 'PO-2026-020' },
-      { id: 'm17', date: '2026-07-15 09:00', type: 'QA Passed', qty: 10, user: 'Q. Inspector' },
-      { id: 'm18', date: '2026-07-16 10:00', type: 'Stock In', qty: 10, user: 'A. Reyes' },
-      { id: 'm19', date: '2026-08-01 13:00', type: 'Stock Out', qty: -8, user: 'J. Santos' },
-      { id: 'm20', date: '2026-08-05 11:00', type: 'Adjustment', qty: -2, user: 'L. Cruz', reason: 'Damaged' },
-    ],
-    pendingReceiving: false,
-  },
-  {
-    id: '5',
-    sku: 'SKU-MBP-M3',
-    barcode: '8806095678901',
-    productName: 'Macbook Pro M3',
-    warehouse: 'Southpark',
-    rack: 'E-01',
-    shelf: '1',
-    bin: 'A',
-    batchLot: null,
-    availableQty: 3,
-    reservedQty: 2,
-    damagedQty: 0,
-    totalQty: 5,
-    unit: 'pcs',
-    reorderLevel: 4,
-    category: 'Electronics',
-    brand: 'Apple',
-    serialTracked: true,
-    costPrice: 150000,
-    lastUpdated: 'Aug 8, 2026',
-    supplierRef: 'SUP-001',
-    supplierName: 'Apple Inc.',
-    receivingReference: 'PO-2026-025',
-    receivedDate: '2026-07-28',
-    movements: [
-      { id: 'm21', date: '2026-07-28 09:00', type: 'Receiving', qty: 20, user: 'A. Reyes', reference: 'PO-2026-025' },
-      { id: 'm22', date: '2026-07-28 10:00', type: 'QA Passed', qty: 20, user: 'Q. Inspector' },
-      { id: 'm23', date: '2026-07-29 10:00', type: 'Stock In', qty: 20, user: 'A. Reyes' },
-      { id: 'm24', date: '2026-08-03 12:00', type: 'Stock Out', qty: -15, user: 'M. Santos' },
-      { id: 'm25', date: '2026-08-05 14:00', type: 'Reserved', qty: 2, user: 'Sales Team', reason: 'Customer order #9012' },
-    ],
-    pendingReceiving: false,
-  },
-  {
-    id: '6',
-    sku: 'SKU-CHAIR-001',
-    barcode: '8806096789012',
-    productName: 'Ergonomic Chair',
-    warehouse: 'Central Depot',
-    rack: 'F-03',
-    shelf: '2',
-    bin: 'D',
-    batchLot: null,
-    availableQty: 12,
-    reservedQty: 3,
-    damagedQty: 0,
-    totalQty: 15,
-    unit: 'pcs',
-    reorderLevel: 6,
-    category: 'Furniture',
-    brand: 'FlexiSeat',
-    serialTracked: false,
-    costPrice: 12000,
-    lastUpdated: '5 mins ago',
-    supplierRef: 'SUP-006',
-    supplierName: 'FlexiSeat Ltd.',
-    receivingReference: 'PO-2026-030',
-    receivedDate: '2026-07-25',
-    movements: [
-      { id: 'm26', date: '2026-07-25 08:00', type: 'Receiving', qty: 8, user: 'A. Reyes', reference: 'PO-2026-030' },
-      { id: 'm27', date: '2026-07-25 09:00', type: 'QA Passed', qty: 8, user: 'Q. Inspector' },
-      { id: 'm28', date: '2026-07-26 10:00', type: 'Stock In', qty: 8, user: 'A. Reyes' },
-      { id: 'm29', date: '2026-08-02 11:00', type: 'Reserved', qty: 3, user: 'Sales Team', reason: 'Customer order #3456' },
-    ],
-    pendingReceiving: false,
-  },
-  {
-    id: '7',
-    sku: 'SKU-NEW-001',
-    barcode: '8806097890123',
-    productName: 'Wireless Keyboard',
-    warehouse: 'Central Depot',
-    rack: 'G-01',
-    shelf: '1',
-    bin: 'A',
-    batchLot: null,
-    availableQty: 0,
-    reservedQty: 0,
-    damagedQty: 0,
-    totalQty: 0,
-    unit: 'pcs',
-    reorderLevel: 10,
-    category: 'Electronics',
-    brand: 'Logitech',
-    serialTracked: false,
-    costPrice: 2500,
-    lastUpdated: '1 day ago',
-    supplierRef: 'SUP-007',
-    supplierName: 'Logitech',
-    receivingReference: 'PO-2026-035',
-    receivedDate: '2026-08-06',
-    movements: [
-      { id: 'm30', date: '2026-08-06 08:00', type: 'Receiving', qty: 20, user: 'A. Reyes', reference: 'PO-2026-035' },
-      { id: 'm31', date: '2026-08-06 09:00', type: 'QA Passed', qty: 20, user: 'Q. Inspector' },
-    ],
-    pendingReceiving: true,
-  },
-];
+function formatLastUpdated(dateString: string): string {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '—';
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? '' : 's'} ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hr${diffHr === 1 ? '' : 's'} ago`;
+  const diffDay = Math.round(diffHr / 24);
+  if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const emptyFormData = (defaultWarehouseId: number | ''): InventoryFormData => ({
+  barcode: '',
+  product: '',
+  category: '',
+  brand: '',
+  unit: 'pcs',
+  cost_price: 0,
+  warehouse_id: defaultWarehouseId,
+  available_stock: 0,
+  reserved_stock: 0,
+  backload: 0,
+  status: 'Available',
+  pending_receiving: false,
+});
+
+const toFormData = (item: InventoryItem): InventoryFormData => ({
+  barcode: item.barcode,
+  product: item.product,
+  category: item.category ?? '',
+  brand: item.brand ?? '',
+  unit: item.unit,
+  cost_price: item.cost_price,
+  warehouse_id: item.warehouse_id,
+  available_stock: item.available_stock,
+  reserved_stock: item.reserved_stock,
+  backload: item.backload,
+  status: item.status,
+  pending_receiving: item.pending_receiving,
+});
 
 // ============================================
 // CONSTANTS
 // ============================================
 
-const warehouses = ['All Warehouses', 'Central Depot', 'Northgate', 'Eastside', 'Southpark'];
-const statuses = ['All Status', 'Healthy', 'Low Stock', 'Critical', 'Out of Stock'];
-const categories = ['All Categories', 'Electronics', 'Beverages', 'Kitchenware', 'Furniture'];
-const brands = ['All Brands', 'Apple', 'Sony', "Nature's Best", 'EcoLife', 'FlexiSeat', 'Logitech'];
+const statusOptions: InventoryStatus[] = ['Available', 'Low Stock', 'Out of Stock'];
 const sortOptions = ['Name A-Z', 'Name Z-A', 'Stock Low-High', 'Stock High-Low', 'Last Updated'];
 
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
 
-const getStatus = (availableQty: number, reorderLevel: number): 'Healthy' | 'Low Stock' | 'Critical' | 'Out of Stock' => {
-  if (availableQty <= 0) return 'Out of Stock';
-  if (availableQty < reorderLevel * 0.5) return 'Critical';
-  if (availableQty < reorderLevel) return 'Low Stock';
-  return 'Healthy';
-};
-
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'Healthy': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+    case 'Available': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
     case 'Low Stock': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-    case 'Critical': return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
     case 'Out of Stock': return 'text-red-400 bg-red-500/10 border-red-500/20';
     default: return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
   }
@@ -389,9 +145,8 @@ const getStatusColor = (status: string) => {
 
 const getStatusIcon = (status: string) => {
   switch (status) {
-    case 'Healthy': return CheckCircle;
+    case 'Available': return CheckCircle;
     case 'Low Stock': return AlertCircle;
-    case 'Critical': return AlertTriangle;
     case 'Out of Stock': return XCircle;
     default: return Info;
   }
@@ -419,11 +174,10 @@ const KPICard: React.FC<{
   value: string | number;
   subtitle: string;
   icon: React.ReactNode;
-  trend?: { value: string; positive: boolean };
   onClick?: () => void;
   clickable?: boolean;
   iconContainerClassName?: string;
-}> = ({ label, value, subtitle, icon, trend, onClick, clickable, iconContainerClassName }) => {
+}> = ({ label, value, subtitle, icon, onClick, clickable, iconContainerClassName }) => {
   return (
     <div
       className={`relative overflow-hidden bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-gray-700 transition-all duration-200 ${clickable ? 'cursor-pointer hover:bg-[#111927]' : ''}`}
@@ -437,14 +191,6 @@ const KPICard: React.FC<{
         </div>
         <div className={iconContainerClassName || 'p-2.5 bg-slate-800/60 rounded-lg'}>{icon}</div>
       </div>
-      {trend && (
-        <div className="mt-2 flex items-center gap-1 text-xs">
-          <span className={trend.positive ? 'text-emerald-400' : 'text-red-400'}>
-            {trend.positive ? '↑' : '↓'} {trend.value}
-          </span>
-          <span className="text-slate-500">vs last month</span>
-        </div>
-      )}
     </div>
   );
 };
@@ -575,113 +321,192 @@ const Pagination: React.FC<{
 // MODALS & DRAWERS
 // ============================================
 
-// ----- Stock Adjustment Modal -----
-const StockAdjustmentModal: React.FC<{
+// ----- Inventory Form Modal (Create / Edit) -----
+const InventoryFormModal: React.FC<{
   isOpen: boolean;
+  mode: 'create' | 'edit';
   onClose: () => void;
   product: InventoryItem | null;
-  onAdjust: (id: string, adjustment: { type: 'increase' | 'decrease'; qty: number; reason: string; notes: string }) => void;
-}> = ({ isOpen, onClose, product, onAdjust }) => {
-  const [adjustmentType, setAdjustmentType] = useState<'increase' | 'decrease'>('increase');
-  const [qty, setQty] = useState<number>(0);
-  const [reason, setReason] = useState('');
-  const [notes, setNotes] = useState('');
+  warehouses: ApiWarehouse[];
+  onSubmit: (data: InventoryFormData) => Promise<void>;
+}> = ({ isOpen, mode, onClose, product, warehouses, onSubmit }) => {
+  const [formData, setFormData] = useState<InventoryFormData>(
+    emptyFormData(warehouses[0]?.id ?? '')
+  );
+  const [submitting, setSubmitting] = useState(false);
 
-  if (!isOpen || !product) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    if (mode === 'edit' && product) {
+      setFormData(toFormData(product));
+    } else {
+      setFormData(emptyFormData(warehouses[0]?.id ?? ''));
+    }
+  }, [isOpen, mode, product, warehouses]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (qty <= 0) return;
-    onAdjust(product.id, { type: adjustmentType, qty, reason, notes });
-    onClose();
+    if (!formData.barcode || !formData.product || !formData.warehouse_id) return;
+    setSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Stock Adjustment</h2>
+          <h2 className="text-xl font-bold text-white">{mode === 'create' ? 'New Inventory Record' : 'Edit Inventory Record'}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="mb-4 p-4 bg-slate-800/30 rounded-xl border border-slate-700">
-          <p className="text-sm text-slate-400">Product</p>
-          <p className="text-white font-medium">{product.productName}</p>
-          <p className="text-slate-400 text-xs">SKU: {product.sku} | Current Stock: {product.totalQty} {product.unit}</p>
-        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-300">Adjustment Type</label>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setAdjustmentType('increase')}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  adjustmentType === 'increase'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                <ArrowUp className="w-4 h-4 inline mr-1.5" /> Increase
-              </button>
-              <button
-                type="button"
-                onClick={() => setAdjustmentType('decrease')}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  adjustmentType === 'decrease'
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                <ArrowDown className="w-4 h-4 inline mr-1.5" /> Decrease
-              </button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Barcode *</label>
+              <input
+                type="text"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                required
+              />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-300">Quantity *</label>
-            <input
-              type="number"
-              min="1"
-              value={qty}
-              onChange={(e) => setQty(Number(e.target.value))}
-              className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-300">Reason *</label>
-            <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none"
-              required
-            >
-              <option value="">Select reason</option>
-              <option>Damaged</option>
-              <option>Expired</option>
-              <option>Lost</option>
-              <option>Found</option>
-              <option>Correction</option>
-              <option>Transferred</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-300">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              placeholder="Additional details..."
-            />
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Product *</label>
+              <input
+                type="text"
+                value={formData.product}
+                onChange={(e) => setFormData({ ...formData, product: e.target.value })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Category</label>
+              <input
+                type="text"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Brand</label>
+              <input
+                type="text"
+                value={formData.brand}
+                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Unit</label>
+              <input
+                type="text"
+                value={formData.unit}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Cost Price</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.cost_price}
+                onChange={(e) => setFormData({ ...formData, cost_price: Number(e.target.value) })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Warehouse *</label>
+              <select
+                value={formData.warehouse_id}
+                onChange={(e) => setFormData({ ...formData, warehouse_id: Number(e.target.value) })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none"
+                required
+              >
+                <option value="" disabled>Select warehouse</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Available Stock *</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.available_stock}
+                onChange={(e) => setFormData({ ...formData, available_stock: Number(e.target.value) })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Reserved Stock *</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.reserved_stock}
+                onChange={(e) => setFormData({ ...formData, reserved_stock: Number(e.target.value) })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Backload *</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.backload}
+                onChange={(e) => setFormData({ ...formData, backload: Number(e.target.value) })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-slate-300">Status *</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as InventoryStatus })}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none"
+                required
+              >
+                {statusOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2 flex items-center gap-2 pt-1">
+              <input
+                id="pending_receiving"
+                type="checkbox"
+                checked={formData.pending_receiving}
+                onChange={(e) => setFormData({ ...formData, pending_receiving: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-700 bg-[#0b0f19] text-cyan-500 focus:ring-cyan-500/40"
+              />
+              <label htmlFor="pending_receiving" className="text-sm text-slate-300">Pending Receiving</label>
+            </div>
           </div>
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
             <button type="button" onClick={onClose} className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
               Cancel
             </button>
-            <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950">
-              <Save className="w-4 h-4" /> Apply Adjustment
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950 disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {mode === 'create' ? 'Create Record' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -695,7 +520,7 @@ const ReserveStockModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   product: InventoryItem | null;
-  onReserve: (id: string, qty: number, reason: string) => void;
+  onReserve: (id: number, qty: number, reason: string) => void;
 }> = ({ isOpen, onClose, product, onReserve }) => {
   const [qty, setQty] = useState<number>(0);
   const [reason, setReason] = useState('');
@@ -704,8 +529,10 @@ const ReserveStockModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (qty <= 0 || qty > product.availableQty) return;
+    if (qty <= 0 || qty > product.available_stock) return;
     onReserve(product.id, qty, reason);
+    setQty(0);
+    setReason('');
     onClose();
   };
 
@@ -720,8 +547,8 @@ const ReserveStockModal: React.FC<{
         </div>
         <div className="mb-4 p-4 bg-slate-800/30 rounded-xl border border-slate-700">
           <p className="text-sm text-slate-400">Product</p>
-          <p className="text-white font-medium">{product.productName}</p>
-          <p className="text-slate-400 text-xs">Available: {product.availableQty} {product.unit}</p>
+          <p className="text-white font-medium">{product.product}</p>
+          <p className="text-slate-400 text-xs">Available: {product.available_stock} {product.unit}</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -729,13 +556,13 @@ const ReserveStockModal: React.FC<{
             <input
               type="number"
               min="1"
-              max={product.availableQty}
+              max={product.available_stock}
               value={qty}
               onChange={(e) => setQty(Number(e.target.value))}
               className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               required
             />
-            <p className="text-xs text-slate-500 mt-1">Max: {product.availableQty}</p>
+            <p className="text-xs text-slate-500 mt-1">Max: {product.available_stock}</p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5 text-slate-300">Reason (e.g., Order #)</label>
@@ -761,25 +588,27 @@ const ReserveStockModal: React.FC<{
   );
 };
 
-// ----- Damaged Stock Modal -----
-const DamagedStockModal: React.FC<{
+// ----- Backload Stock Modal -----
+const BackloadStockModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  records: DamagedRecord[];
-}> = ({ isOpen, onClose, records }) => {
+  items: InventoryItem[];
+}> = ({ isOpen, onClose, items }) => {
   if (!isOpen) return null;
+
+  const records = items.filter((item) => item.backload > 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Damaged Stock</h2>
+          <h2 className="text-xl font-bold text-white">Backload Stock</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
             <X className="w-5 h-5" />
           </button>
         </div>
         {records.length === 0 ? (
-          <p className="text-slate-400 text-center py-8">No damaged stock records.</p>
+          <p className="text-slate-400 text-center py-8">No backload stock records.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px]">
@@ -787,21 +616,19 @@ const DamagedStockModal: React.FC<{
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Barcode</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Qty</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Reason</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Reported By</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Warehouse</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Backload Qty</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {records.map((record) => (
                   <tr key={record.id} className="border-b border-slate-800 hover:bg-slate-800/30">
-                    <td className="px-4 py-3 text-sm text-white">{record.productName}</td>
+                    <td className="px-4 py-3 text-sm text-white">{record.product}</td>
                     <td className="px-4 py-3 text-sm font-mono text-slate-300">{record.barcode}</td>
-                    <td className="px-4 py-3 text-center text-sm text-white">{record.quantity}</td>
-                    <td className="px-4 py-3 text-sm text-slate-300">{record.reason}</td>
-                    <td className="px-4 py-3 text-sm text-slate-300">{record.reportedBy}</td>
-                    <td className="px-4 py-3 text-sm text-slate-400">{record.date}</td>
+                    <td className="px-4 py-3 text-sm text-slate-300">{record.warehouse}</td>
+                    <td className="px-4 py-3 text-center text-sm text-white">{record.backload}</td>
+                    <td className="px-4 py-3"><StatusBadge status={record.status} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -826,11 +653,8 @@ const DetailsDrawer: React.FC<{
 }> = ({ isOpen, onClose, product }) => {
   if (!isOpen || !product) return null;
 
-  const movements = product.movements || [];
-
-  const inventoryValue = product.totalQty * product.costPrice;
-
-  const status = getStatus(product.availableQty, product.reorderLevel);
+  const totalQty = product.available_stock + product.reserved_stock + product.backload;
+  const inventoryValue = totalQty * product.cost_price;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -849,10 +673,9 @@ const DetailsDrawer: React.FC<{
               <Package className="w-10 h-10" />
             </div>
             <div>
-              <h3 className="text-white font-semibold text-lg">{product.productName}</h3>
-              <p className="text-slate-400 text-sm">SKU: {product.sku}</p>
+              <h3 className="text-white font-semibold text-lg">{product.product}</h3>
               <p className="text-slate-400 text-sm">Barcode: {product.barcode}</p>
-              <p className="text-slate-400 text-sm">Category: {product.category} | Brand: {product.brand}</p>
+              <p className="text-slate-400 text-sm">Category: {product.category || '—'} | Brand: {product.brand || '—'}</p>
             </div>
           </div>
 
@@ -871,32 +694,16 @@ const DetailsDrawer: React.FC<{
               <p className="text-white">{product.warehouse}</p>
             </div>
             <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
-              <p className="text-slate-400">Rack / Shelf / Bin</p>
-              <p className="text-white">{product.rack} • {product.shelf} / {product.bin}</p>
-            </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
-              <p className="text-slate-400">Batch / Lot</p>
-              <p className="text-white">{product.batchLot || 'N/A'}</p>
-            </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
-              <p className="text-slate-400">Supplier</p>
-              <p className="text-white">{product.supplierName || 'N/A'}</p>
-            </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
-              <p className="text-slate-400">Receiving Reference</p>
-              <p className="text-white">{product.receivingReference || 'N/A'}</p>
-            </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
-              <p className="text-slate-400">Received Date</p>
-              <p className="text-white">{product.receivedDate || 'N/A'}</p>
-            </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
               <p className="text-slate-400">Unit</p>
               <p className="text-white">{product.unit}</p>
             </div>
             <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
-              <p className="text-slate-400">Reorder Level</p>
-              <p className="text-white">{product.reorderLevel}</p>
+              <p className="text-slate-400">Pending Receiving</p>
+              <p className="text-white">{product.pending_receiving ? 'Yes' : 'No'}</p>
+            </div>
+            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
+              <p className="text-slate-400">Last Updated</p>
+              <p className="text-white">{formatLastUpdated(product.updated_at)}</p>
             </div>
             <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700 col-span-2">
               <p className="text-slate-400">Inventory Value</p>
@@ -909,52 +716,28 @@ const DetailsDrawer: React.FC<{
             <div className="grid grid-cols-3 gap-2 text-sm">
               <div className="text-center">
                 <p className="text-emerald-400">Available</p>
-                <p className="text-white font-medium">{product.availableQty}</p>
+                <p className="text-white font-medium">{product.available_stock}</p>
               </div>
               <div className="text-center">
                 <p className="text-blue-400">Reserved</p>
-                <p className="text-white font-medium">{product.reservedQty}</p>
+                <p className="text-white font-medium">{product.reserved_stock}</p>
               </div>
               <div className="text-center">
-                <p className="text-red-400">Damaged</p>
-                <p className="text-white font-medium">{product.damagedQty}</p>
+                <p className="text-red-400">Backload</p>
+                <p className="text-white font-medium">{product.backload}</p>
               </div>
             </div>
             <div className="mt-2 text-center text-sm text-slate-400">
-              Total Physical: {product.totalQty} {product.unit}
+              Total Physical: {totalQty} {product.unit}
             </div>
             <div className="mt-2 flex justify-center">
-              <StatusBadge status={status} />
+              <StatusBadge status={product.status} />
             </div>
           </div>
 
           <div>
             <h4 className="text-sm font-medium text-slate-300 mb-2">Movement History</h4>
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-              {movements.length > 0 ? (
-                movements.map((mov) => (
-                  <div key={mov.id} className="flex items-start gap-3 text-sm">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                      mov.type === 'Stock In' || mov.type === 'Receiving' || mov.type === 'QA Passed' ? 'bg-emerald-500' :
-                      mov.type === 'Stock Out' ? 'bg-red-500' :
-                      mov.type === 'Transfer' ? 'bg-blue-500' :
-                      mov.type === 'Reserved' ? 'bg-yellow-500' :
-                      'bg-purple-500'
-                    }`} />
-                    <div className="flex-1">
-                      <p className="text-white">{mov.type}</p>
-                      <p className="text-slate-400 text-xs">
-                        {mov.qty > 0 ? `+${mov.qty}` : mov.qty} {mov.reason ? `(${mov.reason})` : ''}
-                        {mov.reference && ` • Ref: ${mov.reference}`}
-                      </p>
-                      <p className="text-slate-500 text-xs">{mov.date} • {mov.user}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-slate-400 text-sm">No movement history.</p>
-              )}
-            </div>
+            <p className="text-slate-400 text-sm">No movement history available.</p>
           </div>
 
           <div className="flex justify-end pt-4 border-t border-slate-800">
@@ -976,22 +759,22 @@ const InventoryGrid: React.FC<{
   items: InventoryItem[];
   onViewDetails: (item: InventoryItem) => void;
   onReserveStock: (item: InventoryItem) => void;
-  onAdjustStock: (item: InventoryItem) => void;
+  onEdit: (item: InventoryItem) => void;
   onMovementHistory: (item: InventoryItem) => void;
   onPrintBarcode: (item: InventoryItem) => void;
 }> = ({
   items,
   onViewDetails,
   onReserveStock,
-  onAdjustStock,
+  onEdit,
   onMovementHistory,
   onPrintBarcode,
 }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
       {items.map((item) => {
-        const status = getStatus(item.availableQty, item.reorderLevel);
-        const inventoryValue = item.totalQty * item.costPrice;
+        const totalQty = item.available_stock + item.reserved_stock + item.backload;
+        const inventoryValue = totalQty * item.cost_price;
         return (
           <div
             key={item.id}
@@ -1003,15 +786,14 @@ const InventoryGrid: React.FC<{
                 <Package className="w-7 h-7" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-white font-semibold text-base truncate">{item.productName}</h3>
-                <p className="text-slate-400 text-xs truncate">SKU: {item.sku}</p>
+                <h3 className="text-white font-semibold text-base truncate">{item.product}</h3>
                 <p className="text-slate-400 text-xs truncate">Barcode: {item.barcode}</p>
               </div>
             </div>
 
             {/* Category & Warehouse */}
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-3">
-              <span className="bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.category}</span>
+              <span className="bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.category || 'Uncategorized'}</span>
               <span className="bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.warehouse}</span>
             </div>
 
@@ -1019,21 +801,21 @@ const InventoryGrid: React.FC<{
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
               <div className="bg-slate-800/30 rounded-xl p-2">
                 <p className="text-emerald-400 text-xs font-medium">Available</p>
-                <p className="text-white text-lg font-bold">{item.availableQty}</p>
+                <p className="text-white text-lg font-bold">{item.available_stock}</p>
               </div>
               <div className="bg-slate-800/30 rounded-xl p-2">
                 <p className="text-blue-400 text-xs font-medium">Reserved</p>
-                <p className="text-white text-lg font-bold">{item.reservedQty}</p>
+                <p className="text-white text-lg font-bold">{item.reserved_stock}</p>
               </div>
               <div className="bg-slate-800/30 rounded-xl p-2">
-                <p className="text-red-400 text-xs font-medium">Damaged</p>
-                <p className="text-white text-lg font-bold">{item.damagedQty}</p>
+                <p className="text-red-400 text-xs font-medium">Backload</p>
+                <p className="text-white text-lg font-bold">{item.backload}</p>
               </div>
             </div>
 
             {/* Status & Inventory Value */}
             <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-800">
-              <StatusBadge status={status} />
+              <StatusBadge status={item.status} />
               <div className="text-right">
                 <p className="text-slate-400 text-xs">Inventory Value</p>
                 <p className="text-cyan-400 text-sm font-bold">₱{inventoryValue.toLocaleString()}</p>
@@ -1042,7 +824,7 @@ const InventoryGrid: React.FC<{
 
             {/* Last Updated */}
             <div className="text-xs text-slate-500 mt-2">
-              Updated: {item.lastUpdated}
+              Updated: {formatLastUpdated(item.updated_at)}
             </div>
 
             {/* Actions */}
@@ -1062,9 +844,9 @@ const InventoryGrid: React.FC<{
                 <Layers className="w-4 h-4" />
               </button>
               <button
-                onClick={() => onAdjustStock(item)}
+                onClick={() => onEdit(item)}
                 className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
-                title="Stock Adjustment"
+                title="Edit"
               >
                 <Edit className="w-4 h-4" />
               </button>
@@ -1095,7 +877,13 @@ const InventoryGrid: React.FC<{
 // ============================================
 
 export const InventoryList: React.FC = () => {
-  // State
+  // Data state
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [warehouses, setWarehouses] = useState<ApiWarehouse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filter/view state
   const [search, setSearch] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState('All Warehouses');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -1107,31 +895,82 @@ export const InventoryList: React.FC = () => {
   const itemsPerPage = 10;
 
   // Modal states
-  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [showReserveModal, setShowReserveModal] = useState(false);
-  const [showDamagedModal, setShowDamagedModal] = useState(false);
+  const [showBackloadModal, setShowBackloadModal] = useState(false);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
 
+  // Fetching
+  const fetchInventory = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.get('/inventory');
+      setItems(response.data.data ?? response.data);
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchWarehouses = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/warehouses');
+      setWarehouses(response.data);
+    } catch (e) {
+      // ignore — warehouse dropdown will just be empty
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInventory();
+    fetchWarehouses();
+  }, [fetchInventory, fetchWarehouses]);
+
   // Quick actions handlers
   const handleReceiveStock = () => {
-    alert('Navigate to Receiving module');
+    setSelectedProduct(null);
+    setFormMode('create');
+    setShowFormModal(true);
   };
 
   const handleStockIn = () => {
-    alert('Open Stock In modal (increase stock)');
+    alert('Stock In: select a record from the table and use its Edit action to adjust Available Stock.');
   };
 
   const handleStockOut = () => {
-    alert('Open Stock Out modal (decrease stock)');
+    alert('Stock Out: select a record from the table and use its Edit action to adjust Available Stock.');
   };
 
   const handleTransferStock = () => {
-    alert('Open Transfer Stock modal');
+    alert('Transfer Stock: select a record from the table and use its Edit action to change Warehouse.');
   };
 
   const handleExport = () => {
-    alert('Export inventory data');
+    const header = ['Barcode', 'Product', 'Warehouse', 'Available', 'Reserved', 'Backload', 'Status', 'Last Updated'];
+    const rows = filteredItems.map((item) => [
+      item.barcode,
+      item.product,
+      item.warehouse,
+      item.available_stock,
+      item.reserved_stock,
+      item.backload,
+      item.status,
+      item.updated_at,
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'inventory-export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Per-row actions
@@ -1145,9 +984,10 @@ export const InventoryList: React.FC = () => {
     setShowReserveModal(true);
   };
 
-  const handleAdjustStock = (product: InventoryItem) => {
+  const handleEdit = (product: InventoryItem) => {
     setSelectedProduct(product);
-    setShowAdjustModal(true);
+    setFormMode('edit');
+    setShowFormModal(true);
   };
 
   const handleMovementHistory = (product: InventoryItem) => {
@@ -1156,65 +996,112 @@ export const InventoryList: React.FC = () => {
   };
 
   const handlePrintBarcode = (product: InventoryItem) => {
-    alert(`Print barcode for ${product.productName}`);
+    const printWindow = window.open('', '_blank', 'width=400,height=300');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head><title>Print Barcode</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding: 24px;">
+          <h2 style="margin-bottom: 4px;">${product.product}</h2>
+          <p style="color: #555; margin-top: 0;">${product.warehouse}</p>
+          <div style="font-size: 28px; letter-spacing: 4px; font-family: monospace; margin: 24px 0; padding: 16px; border: 1px solid #ccc;">
+            *${product.barcode}*
+          </div>
+          <p>${product.barcode}</p>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
-  const handleDamagedKPIClick = () => {
-    setShowDamagedModal(true);
+  const handleBackloadKPIClick = () => {
+    setShowBackloadModal(true);
   };
 
-  const handleAdjustSubmit = (id: string, adjustment: { type: 'increase' | 'decrease'; qty: number; reason: string; notes: string }) => {
-    alert(`Stock adjusted: ${adjustment.type} ${adjustment.qty} units for ${id}. Reason: ${adjustment.reason}`);
+  const handleFormSubmit = async (data: InventoryFormData) => {
+    try {
+      if (formMode === 'create') {
+        await apiClient.post('/inventory', data);
+      } else if (selectedProduct) {
+        await apiClient.put(`/inventory/${selectedProduct.id}`, data);
+      }
+      await fetchInventory();
+      setShowFormModal(false);
+      setSelectedProduct(null);
+    } catch (e) {
+      alert(getApiErrorMessage(e));
+    }
   };
 
-  const handleReserveSubmit = (id: string, qty: number, reason: string) => {
-    alert(`Reserved ${qty} units for ${id}. Reason: ${reason}`);
+  const handleReserveSubmit = async (id: number, qty: number, _reason: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    try {
+      await apiClient.put(`/inventory/${id}`, {
+        available_stock: item.available_stock - qty,
+        reserved_stock: item.reserved_stock + qty,
+      });
+      await fetchInventory();
+    } catch (e) {
+      alert(getApiErrorMessage(e));
+    }
   };
+
+  // Filter option lists derived from live data
+  const warehouseOptions = useMemo(
+    () => ['All Warehouses', ...warehouses.map((w) => w.name)],
+    [warehouses]
+  );
+  const categoryOptions = useMemo(
+    () => ['All Categories', ...Array.from(new Set(items.map((i) => i.category).filter((c): c is string => !!c)))],
+    [items]
+  );
+  const brandOptions = useMemo(
+    () => ['All Brands', ...Array.from(new Set(items.map((i) => i.brand).filter((b): b is string => !!b)))],
+    [items]
+  );
+  const statusFilterOptions = ['All Status', ...statusOptions];
 
   // Filter and sort
   const filteredItems = useMemo(() => {
-    let items = mockInventory.filter(item => {
+    const list = items.filter(item => {
       const searchLower = search.toLowerCase();
-      const matchSearch = 
-        item.productName.toLowerCase().includes(searchLower) ||
-        item.sku.toLowerCase().includes(searchLower) ||
+      const matchSearch =
+        item.product.toLowerCase().includes(searchLower) ||
         item.barcode.toLowerCase().includes(searchLower) ||
-        (item.supplierName && item.supplierName.toLowerCase().includes(searchLower)) ||
-        (item.batchLot && item.batchLot.toLowerCase().includes(searchLower)) ||
-        (item.receivingReference && item.receivingReference.toLowerCase().includes(searchLower)) ||
-        `${item.rack}${item.shelf}${item.bin}`.toLowerCase().includes(searchLower);
+        item.warehouse.toLowerCase().includes(searchLower);
 
       const matchWarehouse = warehouseFilter === 'All Warehouses' || item.warehouse === warehouseFilter;
       const matchCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
       const matchBrand = brandFilter === 'All Brands' || item.brand === brandFilter;
-
-      const computedStatus = getStatus(item.availableQty, item.reorderLevel);
-      const matchStatus = statusFilter === 'All Status' || computedStatus === statusFilter;
+      const matchStatus = statusFilter === 'All Status' || item.status === statusFilter;
 
       return matchSearch && matchWarehouse && matchCategory && matchBrand && matchStatus;
     });
 
     switch (sortBy) {
       case 'Name A-Z':
-        items.sort((a, b) => a.productName.localeCompare(b.productName));
+        list.sort((a, b) => a.product.localeCompare(b.product));
         break;
       case 'Name Z-A':
-        items.sort((a, b) => b.productName.localeCompare(a.productName));
+        list.sort((a, b) => b.product.localeCompare(a.product));
         break;
       case 'Stock Low-High':
-        items.sort((a, b) => a.availableQty - b.availableQty);
+        list.sort((a, b) => a.available_stock - b.available_stock);
         break;
       case 'Stock High-Low':
-        items.sort((a, b) => b.availableQty - a.availableQty);
+        list.sort((a, b) => b.available_stock - a.available_stock);
         break;
       case 'Last Updated':
-        items.sort((a, b) => a.lastUpdated.localeCompare(b.lastUpdated));
+        list.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         break;
       default:
         break;
     }
-    return items;
-  }, [search, warehouseFilter, statusFilter, categoryFilter, brandFilter, sortBy]);
+    return list;
+  }, [items, search, warehouseFilter, statusFilter, categoryFilter, brandFilter, sortBy]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const paginatedItems = filteredItems.slice(
@@ -1222,22 +1109,37 @@ export const InventoryList: React.FC = () => {
     currentPage * itemsPerPage
   );
 
-  // KPI calculations
-  const totalAvailable = mockInventory.reduce((sum, item) => sum + item.availableQty, 0);
-  const totalReserved = mockInventory.reduce((sum, item) => sum + item.reservedQty, 0);
-  const totalDamaged = mockInventory.reduce((sum, item) => sum + item.damagedQty, 0);
-  const lowStockCount = mockInventory.filter(item => getStatus(item.availableQty, item.reorderLevel) === 'Low Stock').length;
-  const criticalCount = mockInventory.filter(item => getStatus(item.availableQty, item.reorderLevel) === 'Critical').length;
-  const outOfStockCount = mockInventory.filter(item => getStatus(item.availableQty, item.reorderLevel) === 'Out of Stock').length;
-  const pendingReceivingCount = mockInventory.filter(item => item.pendingReceiving).length;
-  const inventoryValue = mockInventory.reduce((sum, item) => sum + (item.totalQty * item.costPrice), 0);
+  // KPI calculations (from full backend dataset, not just the current page)
+  const totalAvailable = items.reduce((sum, item) => sum + item.available_stock, 0);
+  const totalReserved = items.reduce((sum, item) => sum + item.reserved_stock, 0);
+  const totalBackload = items.reduce((sum, item) => sum + item.backload, 0);
+  const lowStockCount = items.filter(item => item.status === 'Low Stock').length;
+  const outOfStockCount = items.filter(item => item.status === 'Out of Stock').length;
+  const pendingReceivingCount = items.filter(item => item.pending_receiving).length;
+  const inventoryValue = items.reduce((sum, item) => sum + (item.available_stock + item.reserved_stock + item.backload) * item.cost_price, 0);
 
-  const belowReorderCount = mockInventory.filter(item => item.availableQty < item.reorderLevel && item.availableQty > 0).length;
-  const reservedForShipmentCount = mockInventory.filter(item => item.reservedQty > 0).length;
-  const readyForStockInCount = mockInventory.filter(item => item.pendingReceiving && item.availableQty === 0).length;
+  const reservedForShipmentCount = items.filter(item => item.reserved_stock > 0).length;
+  const readyForStockInCount = items.filter(item => item.pending_receiving && item.available_stock === 0).length;
+
+  const resetFilters = () => {
+    setSearch('');
+    setWarehouseFilter('All Warehouses');
+    setStatusFilter('All Status');
+    setCategoryFilter('All Categories');
+    setBrandFilter('All Brands');
+    setSortBy('Name A-Z');
+    setCurrentPage(1);
+  };
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 text-sm flex items-center justify-between gap-4">
+          <span>{error}</span>
+          <button onClick={fetchInventory} className="text-red-300 hover:text-white underline whitespace-nowrap">Retry</button>
+        </div>
+      )}
+
       {/* Header with actions on the right */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -1285,7 +1187,6 @@ export const InventoryList: React.FC = () => {
           value={totalAvailable}
           subtitle="Across all warehouses"
           icon={<Package className="w-5 h-5 text-emerald-400" />}
-          trend={{ value: '8%', positive: true }}
         />
         <KPICard
           label="Reserved Stock"
@@ -1294,17 +1195,17 @@ export const InventoryList: React.FC = () => {
           icon={<Layers className="w-5 h-5 text-blue-400" />}
         />
         <KPICard
-          label="Damaged Stock"
-          value={totalDamaged}
-          subtitle="Pending disposal"
+          label="Backload Stock"
+          value={totalBackload}
+          subtitle="Pending resolution"
           icon={<AlertTriangle className="w-5 h-5 text-red-400" />}
           clickable
-          onClick={handleDamagedKPIClick}
+          onClick={handleBackloadKPIClick}
         />
         <KPICard
           label="Low Stock Items"
-          value={lowStockCount + criticalCount}
-          subtitle={`${criticalCount} critical`}
+          value={lowStockCount}
+          subtitle="Needs restock"
           icon={<AlertCircle className="w-5 h-5 text-yellow-400" />}
         />
         <KPICard
@@ -1319,16 +1220,15 @@ export const InventoryList: React.FC = () => {
           subtitle="Cost-based"
           icon={<Coins className="w-5 h-5" />}
           iconContainerClassName="p-2.5 bg-cyan-500/10 rounded-xl text-cyan-400"
-          trend={{ value: '5.2%', positive: true }}
         />
       </div>
 
       {/* Alert Pills */}
       <div className="flex flex-wrap gap-3">
-        {belowReorderCount > 0 && (
+        {lowStockCount > 0 && (
           <AlertPill
-            title="Below Reorder"
-            count={belowReorderCount}
+            title="Low Stock"
+            count={lowStockCount}
             color="yellow"
             icon={<AlertCircle className="w-4 h-4" />}
           />
@@ -1371,25 +1271,25 @@ export const InventoryList: React.FC = () => {
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Search by SKU, Barcode, Product, Supplier, Batch, Location..."
+            placeholder="Search by Barcode, Product, or Warehouse..."
             className="flex-[2] min-w-[160px] sm:min-w-[200px]"
           />
           <FilterSelect
             value={warehouseFilter}
             onChange={setWarehouseFilter}
-            options={warehouses}
+            options={warehouseOptions}
             className="flex-1 min-w-[100px] sm:min-w-[130px]"
           />
           <FilterSelect
             value={categoryFilter}
             onChange={setCategoryFilter}
-            options={categories}
+            options={categoryOptions}
             className="flex-1 min-w-[100px] sm:min-w-[130px]"
           />
           <FilterSelect
             value={brandFilter}
             onChange={setBrandFilter}
-            options={brands}
+            options={brandOptions}
             className="flex-1 min-w-[100px] sm:min-w-[130px]"
           />
         </div>
@@ -1398,7 +1298,7 @@ export const InventoryList: React.FC = () => {
           <FilterSelect
             value={statusFilter}
             onChange={setStatusFilter}
-            options={statuses}
+            options={statusFilterOptions}
             className="min-w-[100px] sm:min-w-[130px]"
           />
           <FilterSelect
@@ -1411,27 +1311,12 @@ export const InventoryList: React.FC = () => {
             <Filter className="w-4 h-4" />
           </button>
           <button
-            onClick={() => {
-              setSearch('');
-              setWarehouseFilter('All Warehouses');
-              setStatusFilter('All Status');
-              setCategoryFilter('All Categories');
-              setBrandFilter('All Brands');
-              setSortBy('Name A-Z');
-              setCurrentPage(1);
-            }}
+            onClick={resetFilters}
             className="px-3 py-2 sm:px-3.5 sm:py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all text-xs sm:text-sm"
           >
             Reset
           </button>
           <div className="flex-1 hidden md:block"></div>
-          <div className="flex items-center gap-2">
-            {criticalCount > 0 && (
-              <span className="px-2 py-1 sm:px-3 sm:py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> {criticalCount} Critical
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -1464,103 +1349,93 @@ export const InventoryList: React.FC = () => {
         </div>
       </div>
 
-      {/* Inventory Display - Table or Grid */}
-      {viewMode === 'table' ? (
+      {/* Loading state */}
+      {isLoading && items.length === 0 ? (
+        <div className="bg-[#0d1322] border border-slate-800 rounded-2xl p-16 flex flex-col items-center justify-center gap-3 text-slate-400">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="text-sm">Loading inventory...</span>
+        </div>
+      ) : viewMode === 'table' ? (
         // Table View
         <div className="bg-[#0d1322] border border-slate-800 rounded-2xl">
           <div className="overflow-x-auto w-full custom-scrollbar">
-            <table className="w-full min-w-[1000px]">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-[#0b0f19]/50 border-b border-slate-800 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Barcode</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden lg:table-cell">SKU</th>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Product</th>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Warehouse</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden 2xl:table-cell">Rack</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden 2xl:table-cell">Shelf</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden 2xl:table-cell">Bin</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden 2xl:table-cell">Batch / Lot</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Available</th>
-                  <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden lg:table-cell">Reserved</th>
-                  <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Damaged</th>
-                  <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden 2xl:table-cell">Reorder Level</th>
+                  <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Reserved</th>
+                  <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Backload</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Status</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5 hidden xl:table-cell">Last Updated</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Last Updated</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedItems.map((item) => {
-                  const status = getStatus(item.availableQty, item.reorderLevel);
-                  return (
-                    <tr key={item.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all">
-                      <td className="px-2 py-2 text-xs font-mono text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.barcode}</td>
-                      <td className="px-2 py-2 text-xs font-mono text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate hidden lg:table-cell">{item.sku}</td>
-                      <td className="px-2 py-2 sm:px-4 sm:py-3.5">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-md sm:rounded-lg bg-slate-800/50 border border-slate-700 flex items-center justify-center text-slate-400">
-                            <Package className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
-                          </div>
-                          <span className="text-white text-xs sm:text-sm font-medium truncate">{item.productName}</span>
+                {paginatedItems.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all">
+                    <td className="px-2 py-2 text-xs font-mono text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.barcode}</td>
+                    <td className="px-2 py-2 sm:px-4 sm:py-3.5">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-md sm:rounded-lg bg-slate-800/50 border border-slate-700 flex items-center justify-center text-slate-400">
+                          <Package className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                         </div>
-                      </td>
-                      <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.warehouse}</td>
-                      <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate hidden 2xl:table-cell">{item.rack}</td>
-                      <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate hidden 2xl:table-cell">{item.shelf}</td>
-                      <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate hidden 2xl:table-cell">{item.bin}</td>
-                      <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate hidden 2xl:table-cell">{item.batchLot || '—'}</td>
-                      <td className="px-2 py-2 text-center text-xs text-white font-medium sm:px-4 sm:py-3.5 sm:text-sm">{item.availableQty}</td>
-                      <td className="px-2 py-2 text-center text-xs text-blue-400 sm:px-4 sm:py-3.5 sm:text-sm hidden lg:table-cell">{item.reservedQty}</td>
-                      <td className="px-2 py-2 text-center text-xs text-red-400 sm:px-4 sm:py-3.5 sm:text-sm">{item.damagedQty}</td>
-                      <td className="px-2 py-2 text-center text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm hidden 2xl:table-cell">{item.reorderLevel}</td>
-                      <td className="px-2 py-2 sm:px-4 sm:py-3.5"><StatusBadge status={status} /></td>
-                      <td className="px-2 py-2 text-xs text-slate-400 sm:px-4 sm:py-3.5 sm:text-sm hidden xl:table-cell">{item.lastUpdated}</td>
-                      <td className="px-2 py-2 sm:px-4 sm:py-3.5">
-                        <div className="flex items-center justify-center gap-0.5 sm:gap-1">
-                          <button
-                            onClick={() => handleViewDetails(item)}
-                            className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
-                            title="View Details"
-                          >
-                            <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleReserveStock(item)}
-                            className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
-                            title="Reserve Stock"
-                          >
-                            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleAdjustStock(item)}
-                            className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
-                            title="Stock Adjustment"
-                          >
-                            <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleMovementHistory(item)}
-                            className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all hidden sm:flex"
-                            title="Movement History"
-                          >
-                            <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </button>
-                          <button
-                            onClick={() => handlePrintBarcode(item)}
-                            className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all hidden sm:flex"
-                            title="Print Barcode"
-                          >
-                            <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        <span className="text-white text-xs sm:text-sm font-medium truncate">{item.product}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.warehouse}</td>
+                    <td className="px-2 py-2 text-center text-xs text-white font-medium sm:px-4 sm:py-3.5 sm:text-sm">{item.available_stock}</td>
+                    <td className="px-2 py-2 text-center text-xs text-blue-400 sm:px-4 sm:py-3.5 sm:text-sm">{item.reserved_stock}</td>
+                    <td className={`px-2 py-2 text-center text-xs sm:px-4 sm:py-3.5 sm:text-sm ${item.backload > 0 ? 'text-red-400' : 'text-slate-500'}`}>{item.backload}</td>
+                    <td className="px-2 py-2 sm:px-4 sm:py-3.5"><StatusBadge status={item.status} /></td>
+                    <td className="px-2 py-2 text-xs text-slate-400 sm:px-4 sm:py-3.5 sm:text-sm">{formatLastUpdated(item.updated_at)}</td>
+                    <td className="px-2 py-2 sm:px-4 sm:py-3.5">
+                      <div className="flex items-center justify-center gap-0.5 sm:gap-1">
+                        <button
+                          onClick={() => handleViewDetails(item)}
+                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                          title="View Details"
+                        >
+                          <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleReserveStock(item)}
+                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                          title="Reserve Stock"
+                        >
+                          <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                          title="Edit"
+                        >
+                          <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleMovementHistory(item)}
+                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all hidden sm:flex"
+                          title="Movement History"
+                        >
+                          <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
+                        <button
+                          onClick={() => handlePrintBarcode(item)}
+                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all hidden sm:flex"
+                          title="Print Barcode"
+                        >
+                          <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
                 {paginatedItems.length === 0 && (
                   <tr>
-                    <td colSpan={15} className="px-4 py-8 text-center text-slate-400">
-                      No items found matching your criteria.
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                      No inventory records found matching your criteria.
                     </td>
                   </tr>
                 )}
@@ -1583,13 +1458,13 @@ export const InventoryList: React.FC = () => {
               items={paginatedItems}
               onViewDetails={handleViewDetails}
               onReserveStock={handleReserveStock}
-              onAdjustStock={handleAdjustStock}
+              onEdit={handleEdit}
               onMovementHistory={handleMovementHistory}
               onPrintBarcode={handlePrintBarcode}
             />
             {paginatedItems.length === 0 && (
               <div className="text-center text-slate-400 py-8">
-                No items found matching your criteria.
+                No inventory records found matching your criteria.
               </div>
             )}
           </div>
@@ -1604,11 +1479,13 @@ export const InventoryList: React.FC = () => {
       )}
 
       {/* Modals */}
-      <StockAdjustmentModal
-        isOpen={showAdjustModal}
-        onClose={() => setShowAdjustModal(false)}
+      <InventoryFormModal
+        isOpen={showFormModal}
+        mode={formMode}
+        onClose={() => { setShowFormModal(false); setSelectedProduct(null); }}
         product={selectedProduct}
-        onAdjust={handleAdjustSubmit}
+        warehouses={warehouses}
+        onSubmit={handleFormSubmit}
       />
       <ReserveStockModal
         isOpen={showReserveModal}
@@ -1616,10 +1493,10 @@ export const InventoryList: React.FC = () => {
         product={selectedProduct}
         onReserve={handleReserveSubmit}
       />
-      <DamagedStockModal
-        isOpen={showDamagedModal}
-        onClose={() => setShowDamagedModal(false)}
-        records={mockDamagedRecords}
+      <BackloadStockModal
+        isOpen={showBackloadModal}
+        onClose={() => setShowBackloadModal(false)}
+        items={items}
       />
       <DetailsDrawer
         isOpen={showDetailsDrawer}
@@ -1708,4 +1585,4 @@ const WarehouseModule: React.FC = () => {
   );
 };
 
-export default WarehouseModule; 
+export default WarehouseModule;

@@ -8,7 +8,6 @@ import {
   Download,
   Eye,
   X,
-  ChevronRight,
   CheckCircle,
   Clock,
   Package,
@@ -18,7 +17,6 @@ import {
   MapPin,
   Circle,
   Check,
-  AlertCircle,
 } from 'lucide-react';
 
 // ============================================

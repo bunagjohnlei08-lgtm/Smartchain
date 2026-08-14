@@ -87,6 +87,25 @@ export interface ApiWarehouse {
   branch_id: number;
 }
 
+export interface ApiInventoryItem {
+  id: number;
+  barcode: string;
+  product: string;
+  category: string | null;
+  brand: string | null;
+  unit: string;
+  cost_price: number;
+  warehouse: string;
+  warehouse_id: number;
+  available_stock: number;
+  reserved_stock: number;
+  backload: number;
+  status: 'Available' | 'Low Stock' | 'Out of Stock';
+  pending_receiving: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ApiUser {
   id: number;
   employee_id: string;

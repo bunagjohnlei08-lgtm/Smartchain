@@ -4,8 +4,6 @@ import {
   LayoutGrid,
   ArrowUp,
   ArrowDown,
-  Box,
-  Layers,
   Warehouse as WarehouseIcon,
   BarChart3,
   Package,
@@ -183,8 +181,8 @@ const KPICard: React.FC<{
 // Custom Tooltip for chart
 const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
-    const used = payload.find((p: any) => p.dataKey === 'used')?.value;
-    const capacity = payload.find((p: any) => p.dataKey === 'capacity')?.value;
+    const used = payload.find((p) => p.dataKey === 'used')?.value;
+    const capacity = payload.find((p) => p.dataKey === 'capacity')?.value;
     return (
       <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-3 shadow-lg">
         <p className="text-sm font-semibold text-white mb-1">{label}</p>

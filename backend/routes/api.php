@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\InventoryController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -22,4 +23,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/departments', [UserController::class, 'departments']);
     Route::get('/branches', [UserController::class, 'branches']);
     Route::get('/warehouses', [UserController::class, 'warehouses']);
+
+    Route::get('/inventory', [InventoryController::class, 'index']);
+    Route::post('/inventory', [InventoryController::class, 'store']);
+    Route::get('/inventory/{id}', [InventoryController::class, 'show']);
+    Route::put('/inventory/{id}', [InventoryController::class, 'update']);
+    Route::delete('/inventory/{id}', [InventoryController::class, 'destroy']);
 });
