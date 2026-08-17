@@ -222,7 +222,7 @@ const QADashboard: React.FC = () => {
 
   const firstName = React.useMemo(() => {
     try {
-      const raw = localStorage.getItem('user');
+      const raw = sessionStorage.getItem('user');
       if (raw) {
         const user: { name?: string } = JSON.parse(raw);
         const fullName = user.name?.trim() || '';

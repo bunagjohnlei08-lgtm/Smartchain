@@ -75,7 +75,13 @@ const AdminLayout: React.FC = () => {
 
             {/* Logout */}
             <button
-              onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
+              onClick={() => {
+                sessionStorage.removeItem('isAuthenticated');
+                sessionStorage.removeItem('userRole');
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('user');
+                window.location.href = '/login';
+              }}
               className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-all"
               aria-label="Logout"
               title="Logout"

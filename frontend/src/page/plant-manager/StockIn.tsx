@@ -1,5 +1,6 @@
-// src/page/plant-manager/StockIn.tsx
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import type { AxiosError } from 'axios';
+import { apiClient } from '../../lib/api';
 import {
   ChevronRight,
   Search,
@@ -7,8 +8,8 @@ import {
   Package,
   Clock,
   Calendar,
-  Check,
   X,
+  Check,
   AlertCircle,
   Plus,
   MoreVertical,
@@ -25,157 +26,247 @@ import {
   PackageCheck,
   ArrowDownToLine,
   Box,
+  Loader2,
+  PanelRightClose,
   QrCode,
 } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
-// ============================================
-// TYPES
-// ============================================
-
-type QaStatus = 'Pending QA' | 'QA Passed' | 'Rejected';
+type QaStatus = 'Pending QA' | 'Passed' | 'Rejected' | 'Partial';
 type ReceivingStatus = 'Pending QA' | 'Ready for Stock In' | 'Completed' | 'Rejected';
+type DrawerMode = 'receiving' | 'stocked' | null;
+
+interface ReceivingLineItem {
+  id: number;
+  productName: string;
+  deliveredQuantity: number;
+  acceptedQuantity: number;
+  stockableQuantity: number;
+  stockedQuantity: number;
+  unit: string;
+  inspectionStatus: QaStatus;
+  warehouse: string | null;
+  stockedInAt: string | null;
+  barcode: string | null;
+}
 
 interface ReceivingItem {
-  id: string;
+  id: number;
   receivingNo: string;
+  purchaseOrder: string;
   supplier: string;
   receivingDate: string;
   refNo: string;
+  preparedBy: string | null;
   qaStatus: QaStatus;
   status: ReceivingStatus;
-  delivered: number;
-  total: number;
+  productSummary: string;
+  itemsCount: number;
+  totalQuantity: number;
+  eligibleItemsCount: number;
+  eligibleQuantity: number;
+  eligibilityMessage: string;
   receivedValue: number;
+  items: ReceivingLineItem[];
+  timeline: { status: string; performed_by: string; occurred_at: string }[];
+  stockedInAt: string | null;
 }
 
-interface ReceivingDetail {
-  supplier: string;
+interface RecentlyStockedItem {
+  id: number;
+  receivingId: number;
+  receivingNo: string | null;
+  barcode: string | null;
+  product: string;
   warehouse: string;
-  totalItems: number;
-  referenceNo: string;
-  receivingArea: string;
-  totalProducts: number;
-  deliveryDate: string;
-  receivedBy: string;
-  receivedValue: number;
-  preparedBy: string;
-  qaInspector: string;
-  remarks: string;
+  quantity: number;
+  stockInDate: string | null;
+  status: 'Stocked In';
 }
 
-// ============================================
-// MOCK DATA
-// ============================================
+interface StockInHistoryItem {
+  id: number;
+  receivingId: number;
+  receivingNo: string | null;
+  product: string;
+  supplier: string | null;
+  receivingDate: string | null;
+  referenceNo: string | null;
+  stockedQuantity: number;
+  barcode: string | null;
+  stockInDate: string | null;
+  status: 'Completed';
+}
 
-const mockReceivings: ReceivingItem[] = [
-  {
-    id: '1',
-    receivingNo: 'RCV-2025-0058',
-    supplier: 'Northwind Traders',
-    receivingDate: '2025-05-21 09:15',
-    refNo: 'PO-2058',
-    qaStatus: 'Pending QA',
-    status: 'Pending QA',
-    delivered: 16,
-    total: 16,
-    receivedValue: 245000,
-  },
-  {
-    id: '2',
-    receivingNo: 'RCV-2025-0057',
-    supplier: 'Cebu Logistics Co.',
-    receivingDate: '2025-05-20 14:30',
-    refNo: 'PO-2055',
-    qaStatus: 'QA Passed',
-    status: 'Ready for Stock In',
-    delivered: 11,
-    total: 11,
-    receivedValue: 89750,
-  },
-  {
-    id: '3',
-    receivingNo: 'RCV-2025-0056',
-    supplier: 'Kraft Industrial',
-    receivingDate: '2025-05-19 10:00',
-    refNo: 'PO-2051',
-    qaStatus: 'Rejected',
-    status: 'Rejected',
-    delivered: 0,
-    total: 8,
-    receivedValue: 0,
-  },
-  {
-    id: '4',
-    receivingNo: 'RCV-2025-0055',
-    supplier: 'Apex Components',
-    receivingDate: '2025-05-18 08:45',
-    refNo: 'PO-2050',
-    qaStatus: 'QA Passed',
-    status: 'Completed',
-    delivered: 18,
-    total: 18,
-    receivedValue: 132500,
-  },
-  {
-    id: '5',
-    receivingNo: 'RCV-2025-0054',
-    supplier: 'Meridian Supply',
-    receivingDate: '2025-05-17 11:20',
-    refNo: 'PO-2048',
-    qaStatus: 'Pending QA',
-    status: 'Pending QA',
-    delivered: 4,
-    total: 4,
-    receivedValue: 28600,
-  },
-];
+interface ApiReceivingLineItem {
+  id: number;
+  product_id: number;
+  product_name: string;
+  delivered_quantity: number;
+  accepted_quantity: number;
+  stockable_quantity: number;
+  stocked_quantity: number;
+  unit: string;
+  inspection_status: QaStatus;
+  warehouse: string | null;
+  stocked_in_at: string | null;
+  barcode: string | null;
+}
 
-const mockDetail: ReceivingDetail = {
-  supplier: 'Northwind Traders',
-  warehouse: 'Central Depot',
-  totalItems: 16,
-  referenceNo: 'PO-2058',
-  receivingArea: 'Dock 2',
-  totalProducts: 8,
-  deliveryDate: 'May 21, 2025 09:15 AM',
-  receivedBy: 'Juan Dela Cruz',
-  receivedValue: 245000,
-  preparedBy: 'Maria Santos',
-  qaInspector: 'Rosa Ramirez',
-  remarks: 'All items accounted for, pending QA inspection.',
-};
+interface ApiReceiving {
+  id: number;
+  receiving_no: string;
+  purchase_order: string;
+  supplier: string;
+  ref_no: string | null;
+  delivery_date: string;
+  qa_status: QaStatus;
+  stock_in_status: ReceivingStatus;
+  prepared_by: string | null;
+  product_summary: string;
+  items_count: number;
+  total_quantity: number;
+  eligible_items_count: number;
+  eligible_quantity: number;
+  eligibility_message: string;
+  received_value: number;
+  items: ApiReceivingLineItem[];
+  timeline: { status: string; performed_by: string; occurred_at: string }[];
+  stocked_in_at: string | null;
+}
 
-// Timeline steps for selected receiving
-const timelineSteps = [
-  { label: 'Receiving Created', time: 'May 21, 2025 09:00 AM' },
-  { label: 'Truck Arrived', time: 'May 21, 2025 09:15 AM' },
-  { label: 'Receiving Started', time: 'May 21, 2025 09:30 AM' },
-  { label: 'QA Inspection', time: 'In Progress' },
-  { label: 'QA Passed', time: 'Pending' },
-  { label: 'Stock In Completed', time: 'Pending' },
-  { label: 'Inventory Updated', time: 'Pending' },
-];
+interface ApiRecentlyStockedItem {
+  id: number;
+  receiving_id: number;
+  receiving_no: string | null;
+  barcode: string | null;
+  product: string;
+  warehouse: string;
+  quantity: number;
+  stock_in_date: string | null;
+  status: 'Stocked In';
+}
 
-// ============================================
-// HELPER COMPONENTS
-// ============================================
+interface ApiStockInHistoryItem {
+  id: number;
+  receiving_id: number;
+  receiving_no: string | null;
+  product: string;
+  supplier: string | null;
+  receiving_date: string | null;
+  reference_no: string | null;
+  stocked_quantity: number;
+  barcode: string | null;
+  stock_in_date: string | null;
+  status: 'Completed';
+}
+
+const mapReceiving = (record: ApiReceiving): ReceivingItem => ({
+  id: record.id,
+  receivingNo: record.receiving_no,
+  purchaseOrder: record.purchase_order,
+  supplier: record.supplier,
+  receivingDate: formatDateOnly(record.delivery_date),
+  refNo: record.ref_no ?? '—',
+  preparedBy: record.prepared_by,
+  qaStatus: record.qa_status,
+  status: record.stock_in_status,
+  productSummary: record.product_summary,
+  itemsCount: record.items_count,
+  totalQuantity: record.total_quantity,
+  eligibleItemsCount: record.eligible_items_count,
+  eligibleQuantity: record.eligible_quantity,
+  eligibilityMessage: record.eligibility_message,
+  receivedValue: record.received_value,
+  items: record.items.map((item) => ({
+    id: item.id,
+    productName: item.product_name,
+    deliveredQuantity: item.delivered_quantity,
+    acceptedQuantity: item.accepted_quantity,
+    stockableQuantity: item.stockable_quantity,
+    stockedQuantity: item.stocked_quantity,
+    unit: item.unit,
+    inspectionStatus: item.inspection_status,
+    warehouse: item.warehouse,
+    stockedInAt: item.stocked_in_at,
+    barcode: item.barcode,
+  })),
+  timeline: record.timeline,
+  stockedInAt: record.stocked_in_at,
+});
+
+const mapRecentlyStocked = (item: ApiRecentlyStockedItem): RecentlyStockedItem => ({
+  id: item.id,
+  receivingId: item.receiving_id,
+  receivingNo: item.receiving_no,
+  barcode: item.barcode,
+  product: item.product,
+  warehouse: item.warehouse,
+  quantity: item.quantity,
+  stockInDate: item.stock_in_date,
+  status: item.status,
+});
+
+const mapStockInHistory = (item: ApiStockInHistoryItem): StockInHistoryItem => ({
+  id: item.id,
+  receivingId: item.receiving_id,
+  receivingNo: item.receiving_no,
+  product: item.product,
+  supplier: item.supplier,
+  receivingDate: item.receiving_date,
+  referenceNo: item.reference_no,
+  stockedQuantity: item.stocked_quantity,
+  barcode: item.barcode,
+  stockInDate: item.stock_in_date,
+  status: item.status,
+});
+
+function formatDateOnly(dateString: string | null): string {
+  if (!dateString) return '—';
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+  if (!match) return '—';
+  const [, y, m, d] = match;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[Number(m) - 1]} ${Number(d)}, ${y}`;
+}
+
+function formatDateTime(dateString: string | null): string {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function getApiErrorMessage(error: unknown): string {
+  const axiosError = error as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
+  const status = axiosError.response?.status;
+  if (status === 401) return 'Session expired. Please log in again.';
+  if (status === 403) return 'You do not have permission to perform this action.';
+  if (status === 422 && axiosError.response?.data?.errors) {
+    const firstError = Object.values(axiosError.response.data.errors)[0];
+    return Array.isArray(firstError) ? firstError[0] : String(firstError);
+  }
+  const msg = axiosError.response?.data?.message;
+  if (typeof msg === 'string') return msg;
+  return 'An unexpected error occurred. Please try again.';
+}
 
 const QaStatusBadge: React.FC<{ status: QaStatus }> = ({ status }) => {
   const config = {
     'Pending QA': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    'QA Passed': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    'Rejected': 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+    Passed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    Rejected: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+    Partial: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
-      {status === 'QA Passed' && <Check className="w-3 h-3 mr-1" />}
+      {status === 'Passed' && <Check className="w-3 h-3 mr-1" />}
       {status === 'Pending QA' && <Clock className="w-3 h-3 mr-1" />}
       {status === 'Rejected' && <X className="w-3 h-3 mr-1" />}
       {status}
@@ -183,12 +274,13 @@ const QaStatusBadge: React.FC<{ status: QaStatus }> = ({ status }) => {
   );
 };
 
-const ReceivingStatusBadge: React.FC<{ status: ReceivingStatus }> = ({ status }) => {
+const ReceivingStatusBadge: React.FC<{ status: ReceivingStatus | 'Stocked In' }> = ({ status }) => {
   const config = {
     'Pending QA': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
     'Ready for Stock In': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-    'Completed': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    'Rejected': 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+    Completed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    Rejected: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+    'Stocked In': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
@@ -197,73 +289,222 @@ const ReceivingStatusBadge: React.FC<{ status: ReceivingStatus }> = ({ status })
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+const BarcodeSVG: React.FC<{ value: string }> = ({ value }) => {
+  const digits = value.split('').map(Number);
+  const patterns = digits.map((digit) => {
+    const pattern = [];
+    for (let index = 0; index < 5; index += 1) {
+      pattern.push(digit % 3 === 0 ? 2 : 1);
+    }
+    return pattern;
+  }).flat();
+
+  const barWidth = 2;
+  const barSpacing = 1;
+  const height = 42;
+
+  return (
+    <svg
+      viewBox={`0 0 ${patterns.length * (barWidth + barSpacing)} ${height}`}
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-auto max-h-12"
+    >
+      {patterns.map((thickness, index) => (
+        <rect
+          key={`${value}-${index}`}
+          x={index * (barWidth + barSpacing)}
+          y={0}
+          width={thickness === 2 ? barWidth * 2 : barWidth}
+          height={height}
+          fill="currentColor"
+          className="text-slate-100"
+        />
+      ))}
+    </svg>
+  );
+};
 
 const StockIn: React.FC = () => {
-  // State
+  const [receivings, setReceivings] = useState<ReceivingItem[]>([]);
+  const [recentlyStocked, setRecentlyStocked] = useState<RecentlyStockedItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<StockInHistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [recentError, setRecentError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isStockingIn, setIsStockingIn] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [search, setSearch] = useState('');
-  const [selectedReceiving, setSelectedReceiving] = useState<ReceivingItem | null>(mockReceivings[0]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedStockedId, setSelectedStockedId] = useState<number | null>(null);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'items' | 'attachments' | 'history'>('info');
 
-  // Filtered receivings
-  const filteredReceivings = mockReceivings.filter(r =>
-    r.receivingNo.toLowerCase().includes(search.toLowerCase()) ||
-    r.supplier.toLowerCase().includes(search.toLowerCase()) ||
-    r.refNo.toLowerCase().includes(search.toLowerCase())
+  const fetchReceivings = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const response = await apiClient.get<{ data: ApiReceiving[] }>('/stock-in/receivings');
+      const mapped = (response.data.data ?? []).map(mapReceiving);
+      setReceivings(mapped);
+      setSelectedId((prev) => {
+        if (prev !== null && mapped.some((item) => item.id === prev)) return prev;
+        return mapped[0]?.id ?? null;
+      });
+    } catch (error) {
+      setLoadError(getApiErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchRecentStocked = useCallback(async () => {
+    setIsLoadingRecent(true);
+    setRecentError(null);
+    try {
+      const response = await apiClient.get<{ data: ApiRecentlyStockedItem[] }>('/stock-in/recently-stocked');
+      setRecentlyStocked((response.data.data ?? []).map(mapRecentlyStocked));
+    } catch (error) {
+      setRecentError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingRecent(false);
+    }
+  }, []);
+
+  const fetchHistory = useCallback(async () => {
+    setIsLoadingHistory(true);
+    setHistoryError(null);
+    try {
+      const response = await apiClient.get<{ data: ApiStockInHistoryItem[] }>('/stock-in/history');
+      setHistoryItems((response.data.data ?? []).map(mapStockInHistory));
+    } catch (error) {
+      setHistoryError(getApiErrorMessage(error));
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReceivings();
+    fetchRecentStocked();
+    fetchHistory();
+  }, [fetchReceivings, fetchRecentStocked, fetchHistory]);
+
+  const selectedReceiving = receivings.find((record) => record.id === selectedId) ?? null;
+  const selectedStocked = recentlyStocked.find((record) => record.id === selectedStockedId) ?? null;
+
+  const filteredReceivings = receivings.filter((record) =>
+    record.receivingNo.toLowerCase().includes(search.toLowerCase()) ||
+    record.supplier.toLowerCase().includes(search.toLowerCase()) ||
+    record.refNo.toLowerCase().includes(search.toLowerCase())
   );
 
-  // KPI calculations (using mockReceivings as today's data)
-  const totalDeliveries = mockReceivings.length;
-  const totalItemsReceived = mockReceivings.reduce((sum, r) => sum + r.delivered, 0);
-  const pendingQa = mockReceivings.filter(r => r.qaStatus === 'Pending QA').length;
-  const qaPassed = mockReceivings.filter(r => r.qaStatus === 'QA Passed').length;
-  const rejected = mockReceivings.filter(r => r.qaStatus === 'Rejected').length;
-  const totalValue = mockReceivings.reduce((sum, r) => sum + r.receivedValue, 0);
+  const totalDeliveries = receivings.length;
+  const totalItemsReceived = receivings.reduce((sum, receiving) => sum + receiving.items.reduce((itemSum, item) => itemSum + item.stockedQuantity, 0), 0);
+  const pendingQa = receivings.filter((receiving) => receiving.status === 'Pending QA').length;
+  const qaPassed = receivings.filter((receiving) => receiving.status === 'Ready for Stock In').length;
+  const rejected = receivings.filter((receiving) => receiving.status === 'Rejected').length;
+  const totalValue = receivings.reduce((sum, receiving) => sum + receiving.receivedValue, 0);
 
-  // KPI data
   const kpiData = [
-    { label: "Today's Stock In", value: totalDeliveries, subtitle: 'Deliveries completed', change: '+18% vs yesterday', trend: 'up' },
-    { label: 'Received Today', value: totalItemsReceived, subtitle: 'Items received', change: '+22% vs yesterday', trend: 'up' },
-    { label: 'Pending QA', value: pendingQa, subtitle: 'Awaiting inspection', change: '-5% vs yesterday', trend: 'down' },
-    { label: 'QA Passed', value: qaPassed, subtitle: 'Ready for stock in', change: '+12% vs yesterday', trend: 'up' },
-    { label: 'Rejected', value: rejected, subtitle: 'Deliveries rejected', change: '-33% vs yesterday', trend: 'down' },
-    { label: 'Total Received Value', value: `₱${totalValue.toLocaleString()}`, subtitle: "Today's value", change: '+16% vs yesterday', trend: 'up' },
+    { label: 'Total Receivings', value: totalDeliveries, subtitle: 'All records', trend: 'up' },
+    { label: 'Items Stocked In', value: totalItemsReceived, subtitle: 'QA-approved quantity', trend: 'up' },
+    { label: 'Pending QA', value: pendingQa, subtitle: 'Awaiting inspection', trend: 'down' },
+    { label: 'Ready for Stock In', value: qaPassed, subtitle: 'Eligible receivings', trend: 'up' },
+    { label: 'Rejected', value: rejected, subtitle: 'Deliveries rejected', trend: 'down' },
+    { label: 'Total Received Value', value: `₱${totalValue.toLocaleString()}`, subtitle: 'Stock In view', trend: 'up' },
   ];
 
-  // Determine if "Perform Stock In" should be enabled
-  const canPerformStockIn = selectedReceiving?.qaStatus === 'QA Passed';
+  const canPerformStockIn = selectedReceiving !== null && selectedReceiving.eligibleQuantity > 0 && selectedReceiving.status !== 'Completed';
 
-  // Pie chart data for Items Summary
+  const handleSelect = (id: number) => {
+    setSelectedId(id);
+    setDrawerMode('receiving');
+    setActionMessage(null);
+  };
+
+  const handleSelectStocked = (id: number) => {
+    setSelectedStockedId(id);
+    setDrawerMode('stocked');
+  };
+
+  const handlePerformStockIn = async () => {
+    if (!selectedReceiving || !canPerformStockIn) return;
+    setIsStockingIn(true);
+    setActionMessage(null);
+    try {
+      await apiClient.post(`/stock-in/receivings/${selectedReceiving.id}/stock-in`);
+      setActionMessage({ type: 'success', text: `${selectedReceiving.receivingNo} stocked in successfully. Inventory and barcode are now available.` });
+      await Promise.all([fetchReceivings(), fetchRecentStocked(), fetchHistory()]);
+      setSelectedId(selectedReceiving.id);
+      setDrawerMode('receiving');
+    } catch (error) {
+      setActionMessage({ type: 'error', text: getApiErrorMessage(error) });
+    } finally {
+      setIsStockingIn(false);
+    }
+  };
+
+  const handlePrimaryStockIn = () => {
+    const firstEligible = receivings.find((receiving) => receiving.eligibleQuantity > 0 && receiving.status !== 'Completed');
+    if (!firstEligible) {
+      setActionMessage({ type: 'error', text: 'No QA-approved receiving is ready for Stock In right now.' });
+      return;
+    }
+    setSelectedId(firstEligible.id);
+    setDrawerMode('receiving');
+    setActionMessage(null);
+  };
+
+  const timelineSteps = selectedReceiving ? [
+    { label: 'Receiving Created', done: true, time: selectedReceiving.receivingDate },
+    {
+      label: 'QA Inspection',
+      done: selectedReceiving.status !== 'Pending QA',
+      time: selectedReceiving.status === 'Pending QA' ? 'In Progress' : selectedReceiving.status,
+    },
+    {
+      label: 'Ready for Stock In',
+      done: selectedReceiving.status === 'Ready for Stock In' || selectedReceiving.status === 'Completed',
+      time: selectedReceiving.status === 'Ready for Stock In' || selectedReceiving.status === 'Completed' ? selectedReceiving.status : selectedReceiving.status,
+    },
+    {
+      label: 'Stock In Completed',
+      done: selectedReceiving.status === 'Completed',
+      time: selectedReceiving.status === 'Completed' ? formatDateTime(selectedReceiving.stockedInAt) : 'Pending',
+    },
+    {
+      label: 'Barcode Available',
+      done: selectedReceiving.items.some((item) => Boolean(item.barcode)),
+      time: selectedReceiving.items.find((item) => item.barcode)?.barcode ?? 'Pending',
+    },
+  ] : [];
+
   const pieData = [
-    { name: 'Accepted', value: 85, color: '#10b981' },
-    { name: 'Rejected', value: 10, color: '#ef4444' },
-    { name: 'Pending', value: 5, color: '#f59e0b' },
+    { name: 'Ready', value: qaPassed, color: '#10b981' },
+    { name: 'Rejected', value: rejected, color: '#ef4444' },
+    { name: 'Pending', value: pendingQa, color: '#f59e0b' },
   ];
+  const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0) || 1;
 
   return (
     <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Plant Manager</span>
         <ChevronRight className="w-4 h-4" />
         <span className="text-slate-100">Stock In</span>
       </div>
 
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Stock In</h1>
           <p className="text-slate-400 text-sm mt-1">
-            Inbound receiving against approved purchase and transfer deliveries.
+            Inbound receiving against QA-approved deliveries and accepted quantities.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
-            <QrCode className="w-4 h-4" />
-            Scan Barcode
-          </button>
           <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
             <Download className="w-4 h-4" />
             Export
@@ -272,14 +513,45 @@ const StockIn: React.FC = () => {
             <Printer className="w-4 h-4" />
             Print
           </button>
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors">
+          <button
+            onClick={() => {
+              fetchReceivings();
+              fetchRecentStocked();
+              fetchHistory();
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading || isLoadingRecent ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <button
+            onClick={handlePrimaryStockIn}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors"
+          >
             <Plus className="w-4 h-4" />
-            New Receiving
+            Stock In
           </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {loadError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {loadError}
+        </div>
+      )}
+
+      {actionMessage && (
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm ${
+          actionMessage.type === 'success'
+            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+            : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+        }`}>
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {actionMessage.text}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {kpiData.map((kpi, idx) => {
           const trendIcon = kpi.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />;
@@ -310,18 +582,14 @@ const StockIn: React.FC = () => {
               </div>
               <p className="text-xs text-slate-400 mt-1">{kpi.subtitle}</p>
               <p className={`text-xs font-medium mt-1 flex items-center gap-1 ${trendColor}`}>
-                {trendIcon} {kpi.change}
+                {trendIcon}
               </p>
             </div>
           );
         })}
       </div>
 
-      {/* ============================================
-          FULL-WIDTH TABLE SECTION
-          ============================================ */}
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4 w-full">
-        {/* Search & Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -337,21 +605,11 @@ const StockIn: React.FC = () => {
             <option>All Status</option>
             <option>Pending QA</option>
             <option>Ready for Stock In</option>
-            <option>Completed</option>
-            <option>Rejected</option>
-          </select>
-          <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-            <option>All QA Status</option>
-            <option>Pending QA</option>
-            <option>QA Passed</option>
             <option>Rejected</option>
           </select>
           <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
             <option>All Warehouses</option>
-            <option>Central Depot</option>
-            <option>Northgate</option>
-            <option>Southpark</option>
-            <option>Eastside</option>
+            <option>Main Warehouse</option>
           </select>
           <div className="flex items-center gap-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300">
             <Calendar className="w-4 h-4 text-slate-500" />
@@ -363,16 +621,15 @@ const StockIn: React.FC = () => {
           </button>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Ref. No.</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">QA Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
                 <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Received Value</th>
@@ -380,21 +637,32 @@ const StockIn: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
+              {isLoading && receivings.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                    Loading receivings...
+                  </td>
+                </tr>
+              )}
               {filteredReceivings.map((rec) => (
-                <tr key={rec.id} className="hover:bg-slate-800/20 transition-colors">
+                <tr key={rec.id} className={`hover:bg-slate-800/20 transition-colors ${selectedReceiving?.id === rec.id ? 'bg-slate-800/20' : ''}`}>
                   <td className="px-4 py-3 font-mono text-blue-400 hover:underline font-medium">{rec.receivingNo}</td>
+                  <td className="px-4 py-3 text-slate-300">{rec.productSummary}</td>
                   <td className="px-4 py-3 text-slate-300">{rec.supplier}</td>
                   <td className="px-4 py-3 text-slate-300">{rec.receivingDate}</td>
                   <td className="px-4 py-3 text-slate-400">{rec.refNo}</td>
-                  <td className="px-4 py-3"><QaStatusBadge status={rec.qaStatus} /></td>
                   <td className="px-4 py-3"><ReceivingStatusBadge status={rec.status} /></td>
-                  <td className="px-4 py-3 text-center text-white">{rec.delivered} / {rec.total}</td>
+                  <td className="px-4 py-3 text-center text-white">
+                    <div>{rec.itemsCount} item{rec.itemsCount === 1 ? '' : 's'}</div>
+                    <div className="text-xs text-slate-500">{rec.totalQuantity} units</div>
+                  </td>
                   <td className="px-4 py-3 text-right text-white">₱{rec.receivedValue.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-                        onClick={() => setSelectedReceiving(rec)}
+                        onClick={() => handleSelect(rec.id)}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -405,9 +673,9 @@ const StockIn: React.FC = () => {
                   </td>
                 </tr>
               ))}
-              {filteredReceivings.length === 0 && (
+              {!isLoading && filteredReceivings.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     No receiving records found.
                   </td>
                 </tr>
@@ -417,102 +685,177 @@ const StockIn: React.FC = () => {
         </div>
       </div>
 
-      {/* ============================================
-          BOTTOM DASHBOARD SECTION
-          ============================================ */}
+      <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4 w-full">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <QrCode className="w-4 h-4 text-cyan-400" />
+            Recently Stocked In
+          </h3>
+          <span className="text-xs text-slate-400">Latest 5 records</span>
+        </div>
+
+        {recentError && (
+          <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {recentError}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[#070a12] border-b border-slate-800/80">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Barcode</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Warehouse</th>
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Quantity</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Stock In Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {isLoadingRecent && recentlyStocked.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                    Loading recently stocked records...
+                  </td>
+                </tr>
+              )}
+              {recentlyStocked.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-800/20 transition-colors">
+                  <td className="px-4 py-3">
+                    {item.barcode ? (
+                      <div className="w-40">
+                        <BarcodeSVG value={item.barcode} />
+                        <p className="mt-1 text-[10px] tracking-[0.2em] text-cyan-300 font-mono text-center">{item.barcode}</p>
+                      </div>
+                    ) : (
+                      <span className="font-mono text-cyan-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-white">{item.product}</td>
+                  <td className="px-4 py-3 text-slate-300">{item.warehouse}</td>
+                  <td className="px-4 py-3 text-center text-white">{item.quantity}</td>
+                  <td className="px-4 py-3 text-slate-300">{formatDateTime(item.stockInDate)}</td>
+                  <td className="px-4 py-3"><ReceivingStatusBadge status={item.status} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                      onClick={() => handleSelectStocked(item.id)}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!isLoadingRecent && recentlyStocked.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    No stocked-in records yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4 w-full">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <FileText className="w-4 h-4 text-cyan-400" />
+            Stock In History
+          </h3>
+          <span className="text-xs text-slate-400">Completed records</span>
+        </div>
+
+        {historyError && (
+          <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {historyError}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[#070a12] border-b border-slate-800/80">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Reference No.</th>
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Stocked Qty</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Barcode</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Stock In Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {isLoadingHistory && historyItems.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                    Loading history...
+                  </td>
+                </tr>
+              )}
+              {historyItems.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-800/20 transition-colors">
+                  <td className="px-4 py-3 font-mono text-blue-400">{item.receivingNo ?? '—'}</td>
+                  <td className="px-4 py-3 text-white">{item.product}</td>
+                  <td className="px-4 py-3 text-slate-300">{item.supplier ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-300">{formatDateOnly(item.receivingDate)}</td>
+                  <td className="px-4 py-3 text-slate-300">{item.referenceNo ?? '—'}</td>
+                  <td className="px-4 py-3 text-center text-white">{item.stockedQuantity}</td>
+                  <td className="px-4 py-3 font-mono text-cyan-300">{item.barcode ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-300">{formatDateTime(item.stockInDate)}</td>
+                  <td className="px-4 py-3"><ReceivingStatusBadge status={item.status} /></td>
+                </tr>
+              ))}
+              {!isLoadingHistory && historyItems.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                    No stock in history found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* LEFT COLUMN (2/3 span): Receiving Details + Pending Deliveries */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Receiving Details Card */}
-          {selectedReceiving && (
-            <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-semibold text-white">Receiving Details</h3>
-                <div className="flex items-center gap-2">
-                  <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="flex gap-4 border-b border-slate-800">
-                {['info', 'items', 'attachments', 'history'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab as any)}
-                    className={`pb-2 text-sm font-medium capitalize transition-colors border-b-2 ${
-                      activeTab === tab
-                        ? 'border-cyan-500 text-white'
-                        : 'border-transparent text-slate-400 hover:text-slate-300'
-                    }`}
-                  >
-                    {tab} {tab === 'items' && <span className="ml-1 text-xs bg-slate-700 px-2 py-0.5 rounded-full">14</span>}
-                    {tab === 'attachments' && <span className="ml-1 text-xs bg-slate-700 px-2 py-0.5 rounded-full">2</span>}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab Content */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                {activeTab === 'info' && (
-                  <>
-                    <div><span className="text-slate-400">Supplier</span> <p className="text-white">{mockDetail.supplier}</p></div>
-                    <div><span className="text-slate-400">Warehouse</span> <p className="text-white">{mockDetail.warehouse}</p></div>
-                    <div><span className="text-slate-400">Total Items</span> <p className="text-white">{mockDetail.totalItems}</p></div>
-                    <div><span className="text-slate-400">Reference No.</span> <p className="text-white">{mockDetail.referenceNo}</p></div>
-                    <div><span className="text-slate-400">Receiving Area</span> <p className="text-white">{mockDetail.receivingArea}</p></div>
-                    <div><span className="text-slate-400">Total Products</span> <p className="text-white">{mockDetail.totalProducts}</p></div>
-                    <div><span className="text-slate-400">Delivery Date</span> <p className="text-white">{mockDetail.deliveryDate}</p></div>
-                    <div><span className="text-slate-400">Received By</span> <p className="text-white">{mockDetail.receivedBy}</p></div>
-                    <div><span className="text-slate-400">Received Value</span> <p className="text-white">₱{mockDetail.receivedValue.toLocaleString()}</p></div>
-                    <div><span className="text-slate-400">Prepared By</span> <p className="text-white">{mockDetail.preparedBy}</p></div>
-                    <div><span className="text-slate-400">QA Inspector</span> <p className="text-white">{mockDetail.qaInspector}</p></div>
-                    <div className="col-span-2"><span className="text-slate-400">Remarks</span> <p className="text-white">{mockDetail.remarks}</p></div>
-                  </>
-                )}
-                {activeTab === 'items' && (
-                  <div className="col-span-2 text-center text-slate-400 py-4">Items list will appear here</div>
-                )}
-                {activeTab === 'attachments' && (
-                  <div className="col-span-2 text-center text-slate-400 py-4">Attachments list</div>
-                )}
-                {activeTab === 'history' && (
-                  <div className="col-span-2 text-center text-slate-400 py-4">History timeline</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Pending Deliveries (Horizontal Cards) */}
           <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
               <Clock className="w-4 h-4 text-cyan-400" />
               Pending Deliveries
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {mockReceivings.slice(0, 4).map((rec) => (
+              {receivings.slice(0, 4).map((rec) => (
                 <div
                   key={rec.id}
                   className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                    selectedReceiving?.id === rec.id
-                      ? 'border-cyan-500/50 bg-cyan-500/10'
-                      : 'border-slate-800/60 hover:border-slate-600'
+                    selectedReceiving?.id === rec.id ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-slate-800/60 hover:border-slate-600'
                   }`}
-                  onClick={() => setSelectedReceiving(rec)}
+                  onClick={() => handleSelect(rec.id)}
                 >
                   <div className="flex items-start justify-between">
                     <span className="text-sm font-semibold text-white">{rec.receivingNo}</span>
                     <QaStatusBadge status={rec.qaStatus} />
                   </div>
                   <p className="text-sm text-slate-300 mt-1">{rec.supplier}</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Expected: {rec.receivingDate}
-                  </p>
+                  <p className="text-xs text-slate-400 mt-1">Received: {rec.receivingDate}</p>
                   <p className="text-xs text-slate-400">
-                    {rec.total} Products · {rec.delivered} Items
+                    {rec.productSummary} · {rec.totalQuantity} {rec.totalQuantity === 1 ? 'unit' : 'units'}
                   </p>
-                  <button className="w-full mt-2 py-1.5 text-xs font-medium text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 rounded-lg transition-colors">
+                  <button
+                    onClick={() => handleSelect(rec.id)}
+                    className="w-full mt-2 py-1.5 text-xs font-medium text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 rounded-lg transition-colors"
+                  >
                     View Receiving
                   </button>
                 </div>
@@ -521,9 +864,7 @@ const StockIn: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN (1/3 span): Timeline, Items Summary, Quick Actions */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Receiving Timeline */}
           <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
               <Clock className="w-4 h-4 text-cyan-400" />
@@ -533,40 +874,28 @@ const StockIn: React.FC = () => {
               {timelineSteps.map((step, idx) => (
                 <div key={idx} className="flex items-start gap-3">
                   <div className="relative flex flex-col items-center">
-                    <div className={`w-3 h-3 rounded-full border-2 ${
-                      idx < 3 ? 'bg-cyan-500 border-cyan-500' : 'bg-slate-700 border-slate-600'
-                    }`} />
-                    {idx < timelineSteps.length - 1 && (
-                      <div className={`w-0.5 h-6 ${idx < 3 ? 'bg-cyan-500' : 'bg-slate-700'}`} />
-                    )}
+                    <div className={`w-3 h-3 rounded-full border-2 ${step.done ? 'bg-cyan-500 border-cyan-500' : 'bg-slate-700 border-slate-600'}`} />
+                    {idx < timelineSteps.length - 1 && <div className={`w-0.5 h-6 ${step.done ? 'bg-cyan-500' : 'bg-slate-700'}`} />}
                   </div>
                   <div>
-                    <p className={`text-sm font-medium ${idx < 3 ? 'text-white' : 'text-slate-500'}`}>{step.label}</p>
+                    <p className={`text-sm font-medium ${step.done ? 'text-white' : 'text-slate-500'}`}>{step.label}</p>
                     <p className="text-xs text-slate-400">{step.time}</p>
                   </div>
                 </div>
               ))}
+              {timelineSteps.length === 0 && <p className="text-xs text-slate-500">Select a receiving to view its timeline.</p>}
             </div>
           </div>
 
-          {/* Items Summary (Donut Chart) */}
           <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
               <Package className="w-4 h-4 text-cyan-400" />
-              Items Summary
+              Receiving Summary
             </h3>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={30}
-                    outerRadius={50}
-                    dataKey="value"
-                    label={false}
-                  >
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} dataKey="value" label={false}>
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -576,42 +905,109 @@ const StockIn: React.FC = () => {
               </ResponsiveContainer>
             </div>
             <div className="flex justify-center gap-4 text-xs">
-              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Accepted 85%</div>
-              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Rejected 10%</div>
-              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Pending 5%</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Ready {Math.round((qaPassed / pieTotal) * 100)}%</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Rejected {Math.round((rejected / pieTotal) * 100)}%</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Pending {Math.round((pendingQa / pieTotal) * 100)}%</div>
             </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-white">Quick Actions</h3>
-            <button className="w-full py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors">
-              View Receiving Checklist
-            </button>
-            <button className="w-full py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors">
-              Print Receiving Slip
-            </button>
-            <button className="w-full py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors">
-              Upload Attachments
-            </button>
-            <button
-              disabled={!canPerformStockIn}
-              className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
-                canPerformStockIn
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                  : 'bg-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
-              }`}
-            >
-              <ArrowDownToLine className="w-4 h-4" />
-              Perform Stock In
-              {!canPerformStockIn && <AlertCircle className="w-4 h-4 ml-1" />}
-            </button>
-            {!canPerformStockIn && (
-              <p className="text-xs text-amber-400 text-center">QA status must be "QA Passed" to enable stock in.</p>
-            )}
           </div>
         </div>
       </div>
+
+      {drawerMode && (
+        <div className="fixed inset-y-0 right-0 z-40 w-full max-w-md border-l border-slate-800 bg-[#0b101d] shadow-2xl">
+          <div className="h-full overflow-y-auto p-5 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {drawerMode === 'receiving' ? 'Receiving Details' : 'Stock In Details'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  {drawerMode === 'receiving' ? 'Review the selected receiving before posting Stock In.' : 'Most recent stocked-in inventory detail.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setDrawerMode(null)}
+                className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+              >
+                <PanelRightClose className="w-4 h-4" />
+              </button>
+            </div>
+
+            {drawerMode === 'receiving' && selectedReceiving && (
+              <>
+                <div className="rounded-xl border border-slate-800 bg-[#070a12] p-4 space-y-3 text-sm">
+                  <div><span className="text-slate-400">Receiving No.</span><p className="text-white">{selectedReceiving.receivingNo}</p></div>
+                  <div><span className="text-slate-400">Supplier</span><p className="text-white">{selectedReceiving.supplier}</p></div>
+                  <div><span className="text-slate-400">Purchase Order</span><p className="text-white">{selectedReceiving.purchaseOrder}</p></div>
+                  <div><span className="text-slate-400">Reference No.</span><p className="text-white">{selectedReceiving.refNo}</p></div>
+                  <div><span className="text-slate-400">Receiving Date</span><p className="text-white">{selectedReceiving.receivingDate}</p></div>
+                  <div><span className="text-slate-400">Prepared By</span><p className="text-white">{selectedReceiving.preparedBy ?? '—'}</p></div>
+                  <div><span className="text-slate-400">Product</span><p className="text-white">{selectedReceiving.productSummary}</p></div>
+                  <div><span className="text-slate-400">Quantity</span><p className="text-white">{selectedReceiving.eligibleQuantity} units</p></div>
+                  <div><span className="text-slate-400">Status</span><div className="pt-1"><ReceivingStatusBadge status={selectedReceiving.status} /></div></div>
+                  <div><span className="text-slate-400">Received Value</span><p className="text-white">₱{selectedReceiving.receivedValue.toLocaleString()}</p></div>
+                </div>
+
+                <div className="rounded-xl border border-slate-800 bg-[#070a12] p-4">
+                  <h4 className="text-sm font-semibold text-white mb-3">Products</h4>
+                  <div className="space-y-3">
+                    {selectedReceiving.items.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-slate-800 p-3">
+                        <p className="text-white text-sm font-medium">{item.productName}</p>
+                        <p className="text-xs text-slate-400 mt-1">Accepted Quantity: <span className="text-white">{item.acceptedQuantity} {item.unit}</span></p>
+                        <p className="text-xs text-slate-400">Eligible Quantity: <span className="text-white">{item.stockableQuantity} {item.unit}</span></p>
+                        {item.barcode && <p className="text-xs text-slate-400">Barcode: <span className="text-cyan-300 font-mono">{item.barcode}</span></p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-800 bg-[#070a12] p-4 space-y-3">
+                  <h4 className="text-sm font-semibold text-white">Quick Actions</h4>
+                  <button
+                    disabled={!canPerformStockIn || isStockingIn}
+                    onClick={handlePerformStockIn}
+                    className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
+                      canPerformStockIn && !isStockingIn
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                        : 'bg-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    {isStockingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowDownToLine className="w-4 h-4" />}
+                    {isStockingIn ? 'Stocking In...' : 'Perform Stock In'}
+                  </button>
+                  {!canPerformStockIn && (
+                    <p className="text-xs text-amber-400 text-center">{selectedReceiving.eligibilityMessage}</p>
+                  )}
+                  <button
+                    onClick={() => setDrawerMode(null)}
+                    className="w-full py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
+
+            {drawerMode === 'stocked' && selectedStocked && (
+              <div className="rounded-xl border border-slate-800 bg-[#070a12] p-4 space-y-3 text-sm">
+                <div><span className="text-slate-400">Product</span><p className="text-white">{selectedStocked.product}</p></div>
+                <div><span className="text-slate-400">Barcode</span><p className="text-cyan-300 font-mono">{selectedStocked.barcode ?? '—'}</p></div>
+                <div><span className="text-slate-400">Warehouse</span><p className="text-white">{selectedStocked.warehouse}</p></div>
+                <div><span className="text-slate-400">Quantity</span><p className="text-white">{selectedStocked.quantity} units</p></div>
+                <div><span className="text-slate-400">Stock In Date</span><p className="text-white">{formatDateTime(selectedStocked.stockInDate)}</p></div>
+                <div><span className="text-slate-400">Status</span><div className="pt-1"><ReceivingStatusBadge status={selectedStocked.status} /></div></div>
+                <button
+                  onClick={() => setDrawerMode(null)}
+                  className="w-full mt-2 py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800/50 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

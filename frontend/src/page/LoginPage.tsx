@@ -28,10 +28,10 @@ const LoginPage: React.FC = () => {
         });
 
         const { token, user } = response.data;
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userRole', user.role?.slug || '');
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
+        sessionStorage.setItem('isAuthenticated', 'true');
+        sessionStorage.setItem('userRole', user.role?.slug || '');
+        sessionStorage.setItem('token', token);
+        sessionStorage.setItem('user', JSON.stringify(user));
 
         const role = user.role?.slug;
         if (role === 'ADMIN') {

@@ -19,14 +19,11 @@ import {
   History,
   X,
   Save,
-  ArrowUp,
-  ArrowDown,
   Coins,
   Layers,
   Truck,
   Filter,
   QrCode,
-  ArrowRight,
   AlertTriangle,
   Info,
   Check,
@@ -166,6 +163,88 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       {status}
     </span>
   );
+};
+
+const code128Patterns = [
+  '11011001100', '11001101100', '11001100110', '10010011000', '10010001100', '10001001100',
+  '10011001000', '10011000100', '10001100100', '11001001000', '11001000100', '11000100100',
+  '10110011100', '10011011100', '10011001110', '10111001100', '10011101100', '10011100110',
+  '11001110010', '11001011100', '11001001110', '11011100100', '11001110100', '11101101110',
+  '11101001100', '11100101100', '11100100110', '11101100100', '11100110100', '11100110010',
+  '11011011000', '11011000110', '11000110110', '10100011000', '10001011000', '10001000110',
+  '10110001000', '10001101000', '10001100010', '11010001000', '11000101000', '11000100010',
+  '10110111000', '10110001110', '10001101110', '10111011000', '10111000110', '10001110110',
+  '11101110110', '11010001110', '11000101110', '11011101000', '11011100010', '11011101110',
+  '11101011000', '11101000110', '11100010110', '11101101000', '11101100010', '11100011010',
+  '11101111010', '11001000010', '11110001010', '10100110000', '10100001100', '10010110000',
+  '10010000110', '10000101100', '10000100110', '10110010000', '10110000100', '10011010000',
+  '10011000010', '10000110100', '10000110010', '11000010010', '11001010000', '11110111010',
+  '11000010100', '10001111010', '10100111100', '10010111100', '10010011110', '10111100100',
+  '10011110100', '10011110010', '11110100100', '11110010100', '11110010010', '11011011110',
+  '11011110110', '11110110110', '10101111000', '10100011110', '10001011110', '10111101000',
+  '10111100010', '11110101000', '11110100010', '10111011110', '10111101110', '11101011110',
+  '11110101110', '11010000100', '11010010000', '11010011100', '1100011101011',
+];
+
+const encodeCode128B = (value: string): string => {
+  const codes = [104];
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    codes.push(code >= 32 && code <= 127 ? code - 32 : 0);
+  }
+  const checksum = codes.reduce((sum, code, index) => sum + (index === 0 ? code : code * index), 0) % 103;
+  return [...codes, checksum, 106].map((code) => code128Patterns[code]).join('');
+};
+
+const BarcodeSvg: React.FC<{ value: string; className?: string }> = ({ value, className = '' }) => {
+  const pattern = encodeCode128B(value);
+  const moduleWidth = 2;
+  const height = 46;
+  const quietZone = 10;
+  const width = pattern.length * moduleWidth + quietZone * 2;
+  let cursor = quietZone;
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className={className}
+      role="img"
+      aria-label={`Barcode ${value}`}
+      preserveAspectRatio="none"
+      shapeRendering="crispEdges"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect width={width} height={height} fill="#ffffff" />
+      {pattern.split('').map((bit, index) => {
+        const x = cursor;
+        cursor += moduleWidth;
+        return bit === '1' ? <rect key={index} x={x} y="4" width={moduleWidth} height="38" fill="#000000" /> : null;
+      })}
+    </svg>
+  );
+};
+
+const BarcodeDisplay: React.FC<{ value: string }> = ({ value }) => (
+  <div className="inline-flex min-w-[150px] flex-col gap-1">
+    <span className="font-mono text-xs text-slate-300 sm:text-sm">{value}</span>
+    <BarcodeSvg value={value} className="h-10 w-40 rounded bg-white" />
+  </div>
+);
+
+const getBarcodeSvgMarkup = (value: string): string => {
+  const pattern = encodeCode128B(value);
+  const moduleWidth = 2;
+  const height = 72;
+  const quietZone = 14;
+  const width = pattern.length * moduleWidth + quietZone * 2;
+  let cursor = quietZone;
+  const bars = pattern.split('').map((bit) => {
+    const x = cursor;
+    cursor += moduleWidth;
+    return bit === '1' ? `<rect x="${x}" y="6" width="${moduleWidth}" height="58" fill="#000000" />` : '';
+  }).join('');
+
+  return `<svg viewBox="0 0 ${width} ${height}" width="320" height="96" preserveAspectRatio="none" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="#ffffff" />${bars}</svg>`;
 };
 
 // ----- KPI Card -----
@@ -787,8 +866,10 @@ const InventoryGrid: React.FC<{
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-white font-semibold text-base truncate">{item.product}</h3>
-                <p className="text-slate-400 text-xs truncate">Barcode: {item.barcode}</p>
               </div>
+            </div>
+            <div className="mb-3 rounded-lg border border-slate-800 bg-[#0b0f19] p-2">
+              <BarcodeDisplay value={item.barcode} />
             </div>
 
             {/* Category & Warehouse */}
@@ -920,7 +1001,7 @@ export const InventoryList: React.FC = () => {
     try {
       const response = await apiClient.get('/warehouses');
       setWarehouses(response.data);
-    } catch (e) {
+    } catch {
       // ignore — warehouse dropdown will just be empty
     }
   }, []);
@@ -935,18 +1016,6 @@ export const InventoryList: React.FC = () => {
     setSelectedProduct(null);
     setFormMode('create');
     setShowFormModal(true);
-  };
-
-  const handleStockIn = () => {
-    alert('Stock In: select a record from the table and use its Edit action to adjust Available Stock.');
-  };
-
-  const handleStockOut = () => {
-    alert('Stock Out: select a record from the table and use its Edit action to adjust Available Stock.');
-  };
-
-  const handleTransferStock = () => {
-    alert('Transfer Stock: select a record from the table and use its Edit action to change Warehouse.');
   };
 
   const handleExport = () => {
@@ -998,16 +1067,17 @@ export const InventoryList: React.FC = () => {
   const handlePrintBarcode = (product: InventoryItem) => {
     const printWindow = window.open('', '_blank', 'width=400,height=300');
     if (!printWindow) return;
+    const barcodeSvg = getBarcodeSvgMarkup(product.barcode);
     printWindow.document.write(`
       <html>
         <head><title>Print Barcode</title></head>
-        <body style="font-family: sans-serif; text-align: center; padding: 24px;">
-          <h2 style="margin-bottom: 4px;">${product.product}</h2>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 24px; color: #111;">
+          <h2 style="margin-bottom: 4px; font-size: 18px;">${product.product}</h2>
           <p style="color: #555; margin-top: 0;">${product.warehouse}</p>
-          <div style="font-size: 28px; letter-spacing: 4px; font-family: monospace; margin: 24px 0; padding: 16px; border: 1px solid #ccc;">
-            *${product.barcode}*
+          <div style="display: inline-block; margin: 18px 0; padding: 14px; border: 1px solid #ddd; background: #fff;">
+            ${barcodeSvg}
+            <p style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 1px; margin: 6px 0 0;">${product.barcode}</p>
           </div>
-          <p>${product.barcode}</p>
         </body>
       </html>
     `);
@@ -1152,24 +1222,6 @@ export const InventoryList: React.FC = () => {
             className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Receive Stock
-          </button>
-          <button
-            onClick={handleStockIn}
-            className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
-          >
-            <ArrowUp className="w-4 h-4" /> Stock In
-          </button>
-          <button
-            onClick={handleStockOut}
-            className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
-          >
-            <ArrowDown className="w-4 h-4" /> Stock Out
-          </button>
-          <button
-            onClick={handleTransferStock}
-            className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
-          >
-            <ArrowRight className="w-4 h-4" /> Transfer Stock
           </button>
           <button
             onClick={handleExport}
@@ -1376,7 +1428,9 @@ export const InventoryList: React.FC = () => {
               <tbody>
                 {paginatedItems.map((item) => (
                   <tr key={item.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all">
-                    <td className="px-2 py-2 text-xs font-mono text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.barcode}</td>
+                    <td className="px-2 py-2 sm:px-4 sm:py-3.5">
+                      <BarcodeDisplay value={item.barcode} />
+                    </td>
                     <td className="px-2 py-2 sm:px-4 sm:py-3.5">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-md sm:rounded-lg bg-slate-800/50 border border-slate-700 flex items-center justify-center text-slate-400">

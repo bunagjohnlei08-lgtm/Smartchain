@@ -5,7 +5,10 @@ export default function AdminHeader() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.clear();
+    sessionStorage.removeItem('isAuthenticated');
+    sessionStorage.removeItem('userRole');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     navigate('/login', { replace: true });
   };
 

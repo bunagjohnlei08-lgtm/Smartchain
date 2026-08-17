@@ -21,7 +21,7 @@ const QALayout: React.FC = () => {
 
   React.useEffect(() => {
     try {
-      const raw = localStorage.getItem('user');
+      const raw = sessionStorage.getItem('user');
       if (raw) {
         const user: { name?: string } = JSON.parse(raw);
         const fullName = user.name?.trim() || '';
@@ -39,8 +39,10 @@ const QALayout: React.FC = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userRole');
+    sessionStorage.removeItem('isAuthenticated');
+    sessionStorage.removeItem('userRole');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     navigate('/login');
   };
 

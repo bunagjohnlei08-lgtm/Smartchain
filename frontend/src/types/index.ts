@@ -106,6 +106,40 @@ export interface ApiInventoryItem {
   updated_at: string;
 }
 
+export interface ApiReceivingItem {
+  id: number;
+  product_id: number;
+  product_name: string;
+  delivered_quantity: number;
+  unit: string;
+  inspection_status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiReceivingTimelineEvent {
+  status: string;
+  performed_by: string;
+  occurred_at: string;
+}
+
+export interface ApiReceiving {
+  id: number;
+  receiving_no: string;
+  purchase_order: string;
+  supplier: string;
+  reference_no: string | null;
+  delivery_date: string;
+  status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial';
+  prepared_by: string | null;
+  product_summary: string;
+  items_count: number;
+  items: ApiReceivingItem[];
+  timeline: ApiReceivingTimelineEvent[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ApiUser {
   id: number;
   employee_id: string;

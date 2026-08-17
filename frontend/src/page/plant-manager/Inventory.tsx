@@ -1,5 +1,5 @@
 // src/page/plant-manager/Inventory.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Download,
@@ -8,108 +8,20 @@ import {
   ChevronRight,
   RefreshCw,
 } from 'lucide-react';
+import type { ApiInventoryItem } from '../../types';
+import { apiClient } from '../../lib/api';
 
 // ============================================
 // TYPES
 // ============================================
 
-interface InventoryItem {
-  id: string;
-  barcode: string;
-  sku: string;
-  product: string;
-  location: string;
-  available: number;
-  reserved: number;
-  damaged: number;
-  unit: string;
-  status: 'In Stock' | 'Low Stock' | 'Out Of Stock';
-}
-
-// ============================================
-// MOCK DATA
-// ============================================
-
-const mockInventory: InventoryItem[] = [
-  {
-    id: '1',
-    barcode: '8801234500011',
-    sku: 'ELC-LED-040',
-    product: 'Industrial LED Panel 40W',
-    location: 'A-04-12',
-    available: 428,
-    reserved: 40,
-    damaged: 2,
-    unit: 'pcs',
-    status: 'In Stock',
-  },
-  {
-    id: '2',
-    barcode: '8801234500028',
-    sku: 'PKG-BOX-604',
-    product: 'Corrugated Box 60x40x40',
-    location: 'B-02-07',
-    available: 92,
-    reserved: 30,
-    damaged: 6,
-    unit: 'pcs',
-    status: 'Low Stock',
-  },
-  {
-    id: '3',
-    barcode: '8801234500035',
-    sku: 'RAW-SST-002',
-    product: 'Stainless Steel Sheet 2mm',
-    location: 'B-06-01',
-    available: 0,
-    reserved: 0,
-    damaged: 1,
-    unit: 'sheet',
-    status: 'Out Of Stock',
-  },
-  {
-    id: '4',
-    barcode: '8801234500042',
-    sku: 'TLS-IMP-018',
-    product: 'Cordless Impact Driver',
-    location: 'A-08-03',
-    available: 176,
-    reserved: 18,
-    damaged: 0,
-    unit: 'pcs',
-    status: 'In Stock',
-  },
-  {
-    id: '5',
-    barcode: '8801234500059',
-    sku: 'SAF-HLM-001',
-    product: 'Safety Helmet Class E',
-    location: 'C-01-09',
-    available: 64,
-    reserved: 12,
-    damaged: 3,
-    unit: 'pcs',
-    status: 'Low Stock',
-  },
-  {
-    id: '6',
-    barcode: '8801234500066',
-    sku: 'PKG-LBL-046',
-    product: 'Thermal Label Roll 4x6',
-    location: 'A-02-14',
-    available: 512,
-    reserved: 60,
-    damaged: 0,
-    unit: 'roll',
-    status: 'In Stock',
-  },
-];
+type InventoryItem = ApiInventoryItem;
 
 // ============================================
 // CONSTANTS
 // ============================================
 
-const statusOptions = ['All statuses', 'In Stock', 'Low Stock', 'Out Of Stock'];
+const statusOptions = ['All statuses', 'Available', 'Low Stock', 'Out of Stock'];
 
 // ============================================
 // HELPER COMPONENTS
@@ -120,7 +32,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     string,
     { color: string; bg: string; dotColor: string }
   > = {
-    'In Stock': {
+    Available: {
       color: 'text-emerald-400',
       bg: 'bg-emerald-950/60 border-emerald-800/60',
       dotColor: 'bg-emerald-400',
@@ -130,13 +42,13 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       bg: 'bg-amber-950/60 border-amber-800/60',
       dotColor: 'bg-amber-400',
     },
-    'Out Of Stock': {
+    'Out of Stock': {
       color: 'text-rose-400',
       bg: 'bg-rose-950/60 border-rose-800/60',
       dotColor: 'bg-rose-400',
     },
   };
-  const { color, bg, dotColor } = config[status] || config['In Stock'];
+  const { color, bg, dotColor } = config[status] || config.Available;
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
@@ -147,33 +59,145 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
+const code128Patterns = [
+  '11011001100', '11001101100', '11001100110', '10010011000', '10010001100', '10001001100',
+  '10011001000', '10011000100', '10001100100', '11001001000', '11001000100', '11000100100',
+  '10110011100', '10011011100', '10011001110', '10111001100', '10011101100', '10011100110',
+  '11001110010', '11001011100', '11001001110', '11011100100', '11001110100', '11101101110',
+  '11101001100', '11100101100', '11100100110', '11101100100', '11100110100', '11100110010',
+  '11011011000', '11011000110', '11000110110', '10100011000', '10001011000', '10001000110',
+  '10110001000', '10001101000', '10001100010', '11010001000', '11000101000', '11000100010',
+  '10110111000', '10110001110', '10001101110', '10111011000', '10111000110', '10001110110',
+  '11101110110', '11010001110', '11000101110', '11011101000', '11011100010', '11011101110',
+  '11101011000', '11101000110', '11100010110', '11101101000', '11101100010', '11100011010',
+  '11101111010', '11001000010', '11110001010', '10100110000', '10100001100', '10010110000',
+  '10010000110', '10000101100', '10000100110', '10110010000', '10110000100', '10011010000',
+  '10011000010', '10000110100', '10000110010', '11000010010', '11001010000', '11110111010',
+  '11000010100', '10001111010', '10100111100', '10010111100', '10010011110', '10111100100',
+  '10011110100', '10011110010', '11110100100', '11110010100', '11110010010', '11011011110',
+  '11011110110', '11110110110', '10101111000', '10100011110', '10001011110', '10111101000',
+  '10111100010', '11110101000', '11110100010', '10111011110', '10111101110', '11101011110',
+  '11110101110', '11010000100', '11010010000', '11010011100', '1100011101011',
+];
+
+const encodeCode128B = (value: string): string => {
+  const codes = [104];
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    codes.push(code >= 32 && code <= 127 ? code - 32 : 0);
+  }
+  const checksum = codes.reduce((sum, code, index) => sum + (index === 0 ? code : code * index), 0) % 103;
+  return [...codes, checksum, 106].map((code) => code128Patterns[code]).join('');
+};
+
+const BarcodeDisplay: React.FC<{ value: string }> = ({ value }) => {
+  const pattern = encodeCode128B(value);
+  const moduleWidth = 2;
+  const height = 46;
+  const quietZone = 10;
+  const width = pattern.length * moduleWidth + quietZone * 2;
+  let cursor = quietZone;
+
+  return (
+    <div className="inline-flex min-w-[150px] flex-col gap-1">
+      <span className="font-mono text-xs text-slate-300 sm:text-sm">{value}</span>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-10 w-40 rounded bg-white"
+        role="img"
+        aria-label={`Barcode ${value}`}
+        preserveAspectRatio="none"
+        shapeRendering="crispEdges"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width={width} height={height} fill="#ffffff" />
+        {pattern.split('').map((bit, index) => {
+          const x = cursor;
+          cursor += moduleWidth;
+          return bit === '1' ? <rect key={index} x={x} y="4" width={moduleWidth} height="38" fill="#000000" /> : null;
+        })}
+      </svg>
+    </div>
+  );
+};
+
+function formatLastUpdated(dateString: string): string {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
 
 const Inventory: React.FC = () => {
   // State
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
 
+  const fetchInventory = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.get('/inventory');
+      setInventory(response.data.data ?? response.data);
+    } catch {
+      setError('Unable to load inventory records.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInventory();
+  }, [fetchInventory]);
+
   // Filtered inventory
   const filteredInventory = useMemo(() => {
-    return mockInventory.filter((item) => {
+    return inventory.filter((item) => {
+      const query = searchQuery.toLowerCase();
       const matchSearch =
-        item.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.barcode.includes(searchQuery) ||
-        item.location.toLowerCase().includes(searchQuery.toLowerCase());
+        item.product.toLowerCase().includes(query) ||
+        item.barcode.toLowerCase().includes(query) ||
+        item.warehouse.toLowerCase().includes(query);
       const matchStatus =
         statusFilter === 'All statuses' || item.status === statusFilter;
       return matchSearch && matchStatus;
     });
-  }, [searchQuery, statusFilter]);
+  }, [inventory, searchQuery, statusFilter]);
 
   // Calculate totals
-  const totalAvailable = mockInventory.reduce((sum, item) => sum + item.available, 0);
-  const totalReserved = mockInventory.reduce((sum, item) => sum + item.reserved, 0);
-  const totalDamaged = mockInventory.reduce((sum, item) => sum + item.damaged, 0);
+  const totalAvailable = inventory.reduce((sum, item) => sum + item.available_stock, 0);
+  const totalReserved = inventory.reduce((sum, item) => sum + item.reserved_stock, 0);
+  const totalBackload = inventory.reduce((sum, item) => sum + item.backload, 0);
+
+  const handleExport = () => {
+    const header = ['Barcode', 'Product', 'Warehouse', 'Available', 'Reserved', 'Backload', 'Status', 'Last Updated'];
+    const rows = filteredInventory.map((item) => [
+      item.barcode,
+      item.product,
+      item.warehouse,
+      item.available_stock,
+      item.reserved_stock,
+      item.backload,
+      item.status,
+      item.updated_at,
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'plant-manager-inventory-export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
@@ -193,10 +217,10 @@ const Inventory: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+          <button onClick={handleExport} className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
             <Download className="w-4 h-4" /> Export
           </button>
-          <button className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+          <button onClick={() => window.print()} className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
             <Printer className="w-4 h-4" /> Print
           </button>
         </div>
@@ -222,10 +246,10 @@ const Inventory: React.FC = () => {
         </div>
         <div className="bg-[#0f172a]/70 border border-slate-800/80 rounded-2xl p-5 md:p-6 shadow-sm space-y-2">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Damaged Stock
+            Backload Stock
           </p>
           <p className="text-3xl md:text-4xl font-bold text-rose-500">
-            {totalDamaged.toLocaleString()}
+            {totalBackload.toLocaleString()}
           </p>
         </div>
       </div>
@@ -238,7 +262,7 @@ const Inventory: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search barcode, SKU, product or location"
+              placeholder="Search barcode, product or warehouse"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#101929] border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
@@ -256,13 +280,19 @@ const Inventory: React.FC = () => {
                 </option>
               ))}
             </select>
-            <button className="p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/30 transition-colors text-slate-400 hover:text-slate-200">
+            <button onClick={fetchInventory} className="p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/30 transition-colors text-slate-400 hover:text-slate-200">
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Table */}
+        {error && (
+          <div className="rounded-xl border border-rose-900/60 bg-rose-950/30 px-4 py-3 text-sm text-rose-300">
+            {error}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
             <thead className="border-b border-slate-800/80">
@@ -271,13 +301,10 @@ const Inventory: React.FC = () => {
                   Barcode
                 </th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                  SKU
-                </th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Product
                 </th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Location
+                  Warehouse
                 </th>
                 <th className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Available
@@ -286,56 +313,60 @@ const Inventory: React.FC = () => {
                   Reserved
                 </th>
                 <th className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Damaged
-                </th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Unit
+                  Backload
                 </th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Status
                 </th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  Last Updated
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredInventory.map((item) => (
+              {isLoading && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                    Loading inventory...
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filteredInventory.map((item) => (
                 <tr
                   key={item.id}
                   className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors"
                 >
-                  <td className="px-4 py-3.5 text-sm font-mono text-slate-400">
-                    {item.barcode}
-                  </td>
-                  <td className="px-4 py-3.5 text-xs font-mono uppercase text-slate-500">
-                    {item.sku}
+                  <td className="px-4 py-3.5">
+                    <BarcodeDisplay value={item.barcode} />
                   </td>
                   <td className="px-4 py-3.5 text-sm font-medium text-white">
                     {item.product}
                   </td>
                   <td className="px-4 py-3.5 text-sm text-slate-400">
-                    {item.location}
+                    {item.warehouse}
                   </td>
                   <td className="px-4 py-3.5 text-right text-sm text-white">
-                    {item.available}
+                    {item.available_stock}
                   </td>
                   <td className="px-4 py-3.5 text-right text-sm font-medium text-cyan-400">
-                    {item.reserved}
+                    {item.reserved_stock}
                   </td>
                   <td className={`px-4 py-3.5 text-right text-sm font-medium ${
-                    item.damaged > 0 ? 'text-rose-400' : 'text-slate-500'
+                    item.backload > 0 ? 'text-rose-400' : 'text-slate-500'
                   }`}>
-                    {item.damaged}
-                  </td>
-                  <td className="px-4 py-3.5 text-sm text-slate-400">
-                    {item.unit}
+                    {item.backload}
                   </td>
                   <td className="px-4 py-3.5">
                     <StatusBadge status={item.status} />
                   </td>
+                  <td className="px-4 py-3.5 text-sm text-slate-400">
+                    {formatLastUpdated(item.updated_at)}
+                  </td>
                 </tr>
               ))}
-              {filteredInventory.length === 0 && (
+              {!isLoading && filteredInventory.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     No inventory items found matching your filters.
                   </td>
                 </tr>
@@ -349,7 +380,7 @@ const Inventory: React.FC = () => {
           <div className="text-sm text-slate-400">
             Showing <span className="text-white font-medium">1</span> to{' '}
             <span className="text-white font-medium">{filteredInventory.length}</span> of{' '}
-            <span className="text-white font-medium">{mockInventory.length}</span> items
+            <span className="text-white font-medium">{inventory.length}</span> items
           </div>
           <div className="flex items-center gap-1">
             <button className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
