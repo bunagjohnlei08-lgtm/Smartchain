@@ -1,5 +1,6 @@
 // src/pages/plant-manager/OrderManagement.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiClient } from '../../lib/api';
 import {
   RefreshCw,
   Printer,
@@ -27,6 +28,8 @@ import {
 type OrderStatus =
   | 'Assigned'
   | 'Preparing'
+  | 'Ready for Stock Out'
+  | 'Stock Out Completed'
   | 'Ready for Shipment'
   | 'In Transit'
   | 'Delivered'
@@ -34,12 +37,12 @@ type OrderStatus =
 
 type Priority = 'High' | 'Medium' | 'Low';
 
-type StockAllocationStatus = '100% Reserved' | 'Partial Stock' | 'No Stock';
+type StockAllocationStatus = '100% Reserved' | 'Partial Stock' | 'No Stock' | 'Not Tracked';
 
 interface OrderItem {
   id: string;
   productName: string;
-  sku: string;
+  productReferenceRequired: boolean;
   requiredQty: number;
   availableQty: number; // in assigned warehouse
   allocatedQty: number;
@@ -63,188 +66,57 @@ interface Order {
   allocationStatus: StockAllocationStatus;
 }
 
-// ============================================
-// MOCK DATA
-// ============================================
+interface OrderSummary {
+  assigned: number;
+  preparing: number;
+  readyForStockOut: number;
+  inTransit: number;
+  delivered: number;
+  cancelled: number;
+}
 
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'SO-2025-0717',
-    customer: 'BuildRight Corp.',
-    destination: '789 Ayala Ave, Makati City, Metro Manila, 1200',
-    contact: '+63 912 345 6789',
-    assignedDate: '2025-07-17',
-    targetDelivery: '2025-07-24',
-    assignedWarehouse: 'Central Depot',
-    priority: 'High',
-    status: 'Assigned',
-    items: [
-      {
-        id: 'i1',
-        productName: 'Industrial LED Panel 400W',
-        sku: 'LED-PNL-400W',
-        requiredQty: 20,
-        availableQty: 35,
-        allocatedQty: 20,
-        unit: 'pcs',
-      },
-      {
-        id: 'i2',
-        productName: 'Corrugated Box 60x40x40',
-        sku: 'CBX-60X40',
-        requiredQty: 50,
-        availableQty: 92,
-        allocatedQty: 50,
-        unit: 'pcs',
-      },
-    ],
-    totalItems: 2,
-    totalAmount: 184500,
-    allocationStatus: '100% Reserved',
-  },
-  {
-    id: '2',
-    orderNumber: 'SO-2025-0716',
-    customer: 'Prime Structures',
-    destination: '456 Bonifacio Ave, Taguig City, Metro Manila, 1630',
-    contact: '+63 987 654 3210',
-    assignedDate: '2025-07-16',
-    targetDelivery: '2025-07-23',
-    assignedWarehouse: 'Northgate',
-    priority: 'High',
-    status: 'Preparing',
-    items: [
-      {
-        id: 'i3',
-        productName: 'Stainless Steel Sheet 2mm',
-        sku: 'SS-SHEET-2MM',
-        requiredQty: 10,
-        availableQty: 8,
-        allocatedQty: 8,
-        unit: 'sheets',
-      },
-      {
-        id: 'i4',
-        productName: 'Safety Helmet Class E',
-        sku: 'SH-CLASS-E',
-        requiredQty: 6,
-        availableQty: 64,
-        allocatedQty: 6,
-        unit: 'pcs',
-      },
-    ],
-    totalItems: 2,
-    totalAmount: 62400,
-    allocationStatus: 'Partial Stock',
-  },
-  {
-    id: '3',
-    orderNumber: 'SO-2025-0715',
-    customer: 'Metro Textile Mills',
-    destination: '123 Pioneer St, Pasig City, Metro Manila, 1600',
-    contact: '+63 917 555 1234',
-    assignedDate: '2025-07-15',
-    targetDelivery: '2025-07-22',
-    assignedWarehouse: 'Southpark',
-    priority: 'Medium',
-    status: 'Ready for Shipment',
-    items: [
-      {
-        id: 'i5',
-        productName: 'Industrial Sewing Machine',
-        sku: 'SM-IND-01',
-        requiredQty: 2,
-        availableQty: 2,
-        allocatedQty: 2,
-        unit: 'units',
-      },
-    ],
-    totalItems: 1,
-    totalAmount: 428000,
-    allocationStatus: '100% Reserved',
-  },
-  {
-    id: '4',
-    orderNumber: 'SO-2025-0709',
-    customer: 'Peak Health Supply',
-    destination: '678 San Miguel Ave, Ortigas Center, Pasig City, 1605',
-    contact: '+63 918 222 3344',
-    assignedDate: '2025-07-09',
-    targetDelivery: '2025-07-16',
-    assignedWarehouse: 'Eastside',
-    priority: 'Low',
-    status: 'In Transit',
-    items: [
-      {
-        id: 'i6',
-        productName: 'Medical Grade Gloves',
-        sku: 'MG-GLOVES',
-        requiredQty: 100,
-        availableQty: 100,
-        allocatedQty: 100,
-        unit: 'boxes',
-      },
-    ],
-    totalItems: 1,
-    totalAmount: 96700,
-    allocationStatus: '100% Reserved',
-  },
-  {
-    id: '5',
-    orderNumber: 'SO-2025-0710',
-    customer: 'Bayview Home Goods',
-    destination: '901 Seaside Blvd, Pasay City, 1300',
-    contact: '+63 916 777 8899',
-    assignedDate: '2025-07-10',
-    targetDelivery: '2025-07-17',
-    assignedWarehouse: 'Central Depot',
-    priority: 'Low',
-    status: 'Delivered',
-    items: [
-      {
-        id: 'i7',
-        productName: 'Decorative Vases Set',
-        sku: 'DV-SET-01',
-        requiredQty: 12,
-        availableQty: 12,
-        allocatedQty: 12,
-        unit: 'sets',
-      },
-    ],
-    totalItems: 1,
-    totalAmount: 18900,
-    allocationStatus: '100% Reserved',
-  },
-  {
-    id: '6',
-    orderNumber: 'SO-2025-0712',
-    customer: 'Steel Works Ph',
-    destination: '567 Industrial Ave, Bulacan, 3000',
-    contact: '+63 919 888 1122',
-    assignedDate: '2025-07-12',
-    targetDelivery: '2025-07-19',
-    assignedWarehouse: 'Southpark',
-    priority: 'High',
-    status: 'Cancelled',
-    items: [
-      {
-        id: 'i8',
-        productName: 'Steel I-Beam 6m',
-        sku: 'SB-IB-6M',
-        requiredQty: 8,
-        availableQty: 8,
-        allocatedQty: 0,
-        unit: 'pcs',
-      },
-    ],
-    totalItems: 1,
-    totalAmount: 320000,
-    allocationStatus: 'No Stock',
-  },
-];
+const statusLabels: Record<string, OrderStatus> = {
+  ASSIGNED: 'Assigned',
+  PREPARING: 'Preparing',
+  READY_FOR_STOCK_OUT: 'Ready for Stock Out',
+  STOCK_OUT_COMPLETED: 'Stock Out Completed',
+  READY_FOR_SHIPMENT: 'Ready for Shipment',
+  IN_TRANSIT: 'In Transit',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+};
 
-// ============================================
+const formatDate = (value?: string | null) => value
+  ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(value))
+  : '—';
+
+const mapOrder = (order: any): Order => ({
+  id: String(order.id),
+  orderNumber: order.order_no,
+  customer: order.customer_name,
+  destination: order.customer_address || '—',
+  contact: order.customer_contact || '—',
+  assignedDate: formatDate(order.assigned_at),
+  targetDelivery: formatDate(order.required_delivery_date),
+  assignedWarehouse: order.warehouse?.name || 'Unassigned',
+  priority: `${order.priority?.slice(0, 1)}${order.priority?.slice(1).toLowerCase()}` as Priority,
+  status: statusLabels[order.status],
+  items: (order.items || []).map((item: any) => ({
+    id: String(item.id),
+    productName: item.product_name,
+    productReferenceRequired: Boolean(item.product_reference_required || !item.product_id),
+    requiredQty: Number(item.required_quantity),
+    availableQty: Number(item.available_quantity || 0),
+    allocatedQty: Number(item.allocated_quantity || 0),
+    unit: item.unit,
+  })),
+  totalItems: Number(order.items_count ?? order.items?.length ?? 0),
+  totalAmount: Number(order.total_amount),
+  allocationStatus: order.allocation_status === 'FULLY_RESERVED' ? '100% Reserved'
+    : order.allocation_status === 'PARTIAL' ? 'Partial Stock'
+      : order.allocation_status === 'NO_STOCK' ? 'No Stock' : 'Not Tracked',
+});
+
 // HELPER FUNCTIONS
 // ============================================
 
@@ -254,6 +126,10 @@ const getStatusColor = (status: OrderStatus) => {
       return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
     case 'Preparing':
       return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+    case 'Ready for Stock Out':
+      return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    case 'Stock Out Completed':
+      return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
     case 'Ready for Shipment':
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     case 'In Transit':
@@ -267,32 +143,6 @@ const getStatusColor = (status: OrderStatus) => {
   }
 };
 
-const getPriorityColor = (priority: Priority) => {
-  switch (priority) {
-    case 'High':
-      return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
-    case 'Medium':
-      return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-    case 'Low':
-      return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-    default:
-      return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
-  }
-};
-
-const getStockAllocationColor = (status: StockAllocationStatus) => {
-  switch (status) {
-    case '100% Reserved':
-      return 'text-emerald-400';
-    case 'Partial Stock':
-      return 'text-amber-400';
-    case 'No Stock':
-      return 'text-rose-400';
-    default:
-      return 'text-slate-400';
-  }
-};
-
 // ============================================
 // SUB-COMPONENTS
 // ============================================
@@ -302,15 +152,6 @@ const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
       {status}
-    </span>
-  );
-};
-
-// Priority Badge
-const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getPriorityColor(priority)}`}>
-      {priority}
     </span>
   );
 };
@@ -357,16 +198,33 @@ const OrderManagement: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [summary, setSummary] = useState<OrderSummary>({ assigned: 0, preparing: 0, readyForStockOut: 0, inTransit: 0, delivered: 0, cancelled: 0 });
+  const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    const [ordersResponse, summaryResponse] = await Promise.all([
+      apiClient.get('/plant-manager/orders', { params: { per_page: 100 } }),
+      apiClient.get('/plant-manager/orders/summary'),
+    ]);
+    setOrders(ordersResponse.data.data.map(mapOrder));
+    setSummary(summaryResponse.data);
+  }, []);
+
+  useEffect(() => { void loadOrders(); }, [loadOrders]);
 
   // Derived stats
-  const orders = mockOrders;
-  const assignedCount = orders.filter(o => o.status === 'Assigned').length;
-  const preparingCount = orders.filter(o => o.status === 'Preparing').length;
-  const readyCount = orders.filter(o => o.status === 'Ready for Shipment').length;
-  const inTransitCount = orders.filter(o => o.status === 'In Transit').length;
-  const deliveredCount = orders.filter(o => o.status === 'Delivered').length;
-  const cancelledCount = orders.filter(o => o.status === 'Cancelled').length;
-  const totalOrders = orders.length;
+  const assignedCount = summary.assigned;
+  const preparingCount = summary.preparing;
+  const readyCount = summary.readyForStockOut;
+  const inTransitCount = summary.inTransit;
+  const deliveredCount = summary.delivered;
+  const cancelledCount = summary.cancelled;
+  const warehouseOptions = useMemo(
+    () => [...new Set(orders.map(order => order.assignedWarehouse).filter(name => name !== 'Unassigned'))],
+    [orders],
+  );
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -374,45 +232,61 @@ const OrderManagement: React.FC = () => {
       const matchesSearch =
         order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.items.some(item => item.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+        order.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
       const matchesWarehouse = warehouseFilter === 'All' || order.assignedWarehouse === warehouseFilter;
       const matchesPriority = priorityFilter === 'All' || order.priority === priorityFilter;
       return matchesSearch && matchesStatus && matchesWarehouse && matchesPriority;
     });
-  }, [searchTerm, statusFilter, warehouseFilter, priorityFilter]);
+  }, [orders, searchTerm, statusFilter, warehouseFilter, priorityFilter]);
 
   // KPI data
   const kpiData = [
     { label: 'Assigned to Me', value: assignedCount, icon: <UserCheck className="w-5 h-5" />, colorClass: 'text-orange-500' },
     { label: 'Preparing', value: preparingCount, icon: <Package className="w-5 h-5" />, colorClass: 'text-purple-500' },
-    { label: 'Ready for Shipment', value: readyCount, icon: <Truck className="w-5 h-5" />, colorClass: 'text-green-500' },
+    { label: 'Ready for Stock Out', value: readyCount, icon: <Truck className="w-5 h-5" />, colorClass: 'text-green-500' },
     { label: 'In Transit', value: inTransitCount, icon: <Truck className="w-5 h-5" />, colorClass: 'text-blue-500' },
     { label: 'Delivered', value: deliveredCount, icon: <CheckCircle2 className="w-5 h-5" />, colorClass: 'text-emerald-500' },
     { label: 'Cancelled', value: cancelledCount, icon: <XCircle className="w-5 h-5" />, colorClass: 'text-red-500' },
   ];
 
   // Handlers
-  const handleViewOrder = (order: Order) => {
-    setSelectedOrder(order);
+  const handleViewOrder = async (order: Order) => {
+    setActionError(null);
+    const response = await apiClient.get(`/plant-manager/orders/${order.id}`);
+    setSelectedOrder(mapOrder(response.data));
     setIsPanelOpen(true);
   };
 
   const handleClosePanel = () => {
     setIsPanelOpen(false);
     setSelectedOrder(null);
+    setActionError(null);
   };
 
-  const handleStartPreparation = (orderId: string) => {
-    // In real app, update status to 'Preparing'
-    alert(`Started preparation for order ${orderId}`);
-    // For demo, we just close panel
+  const handleStartPreparation = async (orderId: string) => {
+    await apiClient.post(`/plant-manager/orders/${orderId}/start-preparing`);
+    await loadOrders();
     handleClosePanel();
   };
 
-  const handleMarkReady = (orderId: string) => {
-    alert(`Order ${orderId} marked as Ready for Shipment`);
-    handleClosePanel();
+  const handleReadyForStockOut = async (orderId: string) => {
+    setProcessingOrderId(orderId);
+    setActionError(null);
+
+    try {
+      const response = await apiClient.post(`/plant-manager/orders/${orderId}/ready-for-stock-out`);
+      setSelectedOrder(mapOrder(response.data));
+      await loadOrders();
+    } catch (error: any) {
+      const validationErrors = error?.response?.data?.errors;
+      const firstValidationError = validationErrors
+        ? Object.values(validationErrors).flat().find((message): message is string => typeof message === 'string')
+        : null;
+      setActionError(firstValidationError || error?.response?.data?.message || 'Unable to mark this order ready for Stock Out.');
+    } finally {
+      setProcessingOrderId(null);
+    }
   };
 
   const handleGeneratePickList = (orderId: string) => {
@@ -435,7 +309,7 @@ const OrderManagement: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-800 text-sm font-medium text-slate-300 hover:bg-slate-800/50 transition-colors">
+          <button onClick={() => void loadOrders()} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-800 text-sm font-medium text-slate-300 hover:bg-slate-800/50 transition-colors">
             <RefreshCw className="w-4 h-4" />
             Refresh List
           </button>
@@ -467,7 +341,7 @@ const OrderManagement: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
-              placeholder="Search Order #, Customer, or SKU..."
+              placeholder="Search Order #, Customer, or Product..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-[#070a12] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -483,6 +357,8 @@ const OrderManagement: React.FC = () => {
             <option value="All">All Status</option>
             <option value="Assigned">Assigned</option>
             <option value="Preparing">Preparing</option>
+            <option value="Ready for Stock Out">Ready for Stock Out</option>
+            <option value="Stock Out Completed">Stock Out Completed</option>
             <option value="Ready for Shipment">Ready for Shipment</option>
             <option value="In Transit">In Transit</option>
             <option value="Delivered">Delivered</option>
@@ -495,10 +371,7 @@ const OrderManagement: React.FC = () => {
             className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
           >
             <option value="All">All Warehouses</option>
-            <option value="Central Depot">Central Depot</option>
-            <option value="Northgate">Northgate</option>
-            <option value="Southpark">Southpark</option>
-            <option value="Eastside">Eastside</option>
+            {warehouseOptions.map(warehouse => <option key={warehouse} value={warehouse}>{warehouse}</option>)}
           </select>
 
           <select
@@ -526,16 +399,15 @@ const OrderManagement: React.FC = () => {
       {/* ORDER TABLE */}
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Customer / Destination</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Products</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Assigned Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Target Delivery</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Warehouse</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Allocation</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Priority</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
               </tr>
@@ -550,19 +422,24 @@ const OrderManagement: React.FC = () => {
                       <span className="text-xs text-slate-400 truncate max-w-[150px]">{order.destination}</span>
                     </div>
                   </td>
+                  <td className="max-w-56 px-4 py-3">
+                    <p className="truncate text-slate-200" title={order.items[0]?.productName}>
+                      {order.items[0]?.productName || 'No products'}
+                    </p>
+                    {order.items.length > 1 && (
+                      <p className="text-xs text-slate-500">+ {order.items.length - 1} more</p>
+                    )}
+                    {order.items.some(item => item.productReferenceRequired) && (
+                      <p className="mt-1 text-xs text-amber-400">Product reference required</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-slate-300">{order.totalItems} items</td>
                   <td className="px-4 py-3 text-slate-300">{order.assignedDate}</td>
                   <td className="px-4 py-3 text-slate-300">{order.targetDelivery}</td>
-                  <td className="px-4 py-3 text-slate-300">{order.assignedWarehouse}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium ${getStockAllocationColor(order.allocationStatus)}`}>
-                      {order.allocationStatus}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3"><PriorityBadge priority={order.priority} /></td>
                   <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => handleViewOrder(order)}
+                      onClick={() => void handleViewOrder(order)}
                       className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                       title="View / Process Order"
                     >
@@ -573,7 +450,7 @@ const OrderManagement: React.FC = () => {
               ))}
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     No orders match your filters.
                   </td>
                 </tr>
@@ -628,17 +505,16 @@ const OrderManagement: React.FC = () => {
             Assigned Inventory Reserved Summary
           </h3>
           <div className="space-y-3">
-            {mockOrders
+            {orders
               .filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled')
               .flatMap(o => o.items)
               .reduce((acc, item) => {
-                const existing = acc.find(i => i.sku === item.sku);
+                const existing = acc.find(i => i.productName === item.productName && i.unit === item.unit);
                 if (existing) {
                   existing.totalRequired += item.requiredQty;
                   existing.totalAllocated += item.allocatedQty;
                 } else {
                   acc.push({
-                    sku: item.sku,
                     productName: item.productName,
                     totalRequired: item.requiredQty,
                     totalAllocated: item.allocatedQty,
@@ -646,13 +522,12 @@ const OrderManagement: React.FC = () => {
                   });
                 }
                 return acc;
-              }, [] as { sku: string; productName: string; totalRequired: number; totalAllocated: number; unit: string; }[])
+              }, [] as { productName: string; totalRequired: number; totalAllocated: number; unit: string; }[])
               .slice(0, 5)
               .map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between border-b border-slate-800/60 pb-2">
                   <div>
                     <p className="text-sm text-slate-200">{item.productName}</p>
-                    <p className="text-xs text-slate-400">{item.sku}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-white">
@@ -664,7 +539,7 @@ const OrderManagement: React.FC = () => {
                   </div>
                 </div>
               ))}
-            <p className="text-xs text-slate-500 mt-2">Showing top 5 reserved SKUs</p>
+            <p className="text-xs text-slate-500 mt-2">Showing top 5 reserved products</p>
           </div>
         </div>
       </div>
@@ -711,7 +586,6 @@ const OrderManagement: React.FC = () => {
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="text-sm text-white font-medium">{item.productName}</p>
-                          <p className="text-xs text-slate-400">SKU: {item.sku}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm text-white">
@@ -737,10 +611,15 @@ const OrderManagement: React.FC = () => {
             {/* Workflow Actions */}
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-white">Plant Manager Actions</h3>
+              {actionError && (
+                <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+                  {actionError}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {selectedOrder.status === 'Assigned' && (
                   <button
-                    onClick={() => handleStartPreparation(selectedOrder.id)}
+                    onClick={() => void handleStartPreparation(selectedOrder.id)}
                     className="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     <Package className="w-4 h-4" />
@@ -749,11 +628,12 @@ const OrderManagement: React.FC = () => {
                 )}
                 {selectedOrder.status === 'Preparing' && (
                   <button
-                    onClick={() => handleMarkReady(selectedOrder.id)}
-                    className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    onClick={() => void handleReadyForStockOut(selectedOrder.id)}
+                    disabled={processingOrderId === selectedOrder.id}
+                    className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     <Check className="w-4 h-4" />
-                    Mark Ready for Shipment
+                    {processingOrderId === selectedOrder.id ? 'Updating...' : 'Ready for Stock Out'}
                   </button>
                 )}
                 <button

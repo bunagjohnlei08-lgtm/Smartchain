@@ -7,6 +7,9 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\StockInController;
 use App\Http\Controllers\Api\ReceivingController;
 use App\Http\Controllers\Api\QaInspectionController;
+use App\Http\Controllers\Api\AdminOrderController;
+use App\Http\Controllers\Api\PlantManagerOrderController;
+use App\Http\Controllers\Api\StockOutController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -47,4 +50,33 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/qa/inspections/{receivingId}', [QaInspectionController::class, 'show']);
     Route::post('/qa/inspections/{receivingId}', [QaInspectionController::class, 'store']);
     Route::put('/qa/inspections/{receivingId}', [QaInspectionController::class, 'update']);
+
+    Route::prefix('admin/orders')->group(function () {
+        Route::get('/', [AdminOrderController::class, 'index']);
+        Route::get('/summary', [AdminOrderController::class, 'summary']);
+        Route::get('/plant-managers', [AdminOrderController::class, 'plantManagers']);
+        Route::get('/products', [AdminOrderController::class, 'products']);
+        Route::post('/', [AdminOrderController::class, 'store']);
+        Route::get('/{order}', [AdminOrderController::class, 'show']);
+        Route::patch('/{order}/assign', [AdminOrderController::class, 'assign']);
+        Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus']);
+    });
+
+    Route::prefix('plant-manager/orders')->group(function () {
+        Route::get('/', [PlantManagerOrderController::class, 'index']);
+        Route::get('/summary', [PlantManagerOrderController::class, 'summary']);
+        Route::get('/{order}', [PlantManagerOrderController::class, 'show']);
+        Route::post('/{order}/start-preparing', [PlantManagerOrderController::class, 'startPreparing']);
+        Route::post('/{order}/ready-for-stock-out', [PlantManagerOrderController::class, 'readyForStockOut']);
+    });
+
+    Route::prefix('stock-out')->group(function () {
+        Route::get('/summary', [StockOutController::class, 'summary']);
+        Route::get('/orders', [StockOutController::class, 'index']);
+        Route::get('/orders/{order}', [StockOutController::class, 'show']);
+        Route::post('/orders/{order}/start', [StockOutController::class, 'start']);
+        Route::post('/orders/{order}/scan', [StockOutController::class, 'scan']);
+        Route::post('/orders/{order}/release', [StockOutController::class, 'release']);
+        Route::post('/orders/{order}/submit-to-shipment', [StockOutController::class, 'submitToShipment']);
+    });
 });
