@@ -1,5 +1,6 @@
 // src/page/plant-manager/Shipments.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { apiClient } from '../../lib/api';
 import {
   Search,
   ChevronRight,
@@ -12,9 +13,9 @@ import {
   ChevronLeft,
   Check,
   Plus,
-  Play,
-  FileText,
+  Truck,
   AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 
 // ============================================
@@ -43,12 +44,16 @@ interface Shipment {
   shipmentNo: string;
   orderNo: string;
   customer: string;
+  destination: string;
   warehouse: string;
   preparedBy: string;
   preparedDate: string;
+  assignedDate: string;
+  targetDelivery: string;
   status: ShipmentStatus;
   items: ShipmentItem[];
   totalItems: number;
+  totalQuantity: number;
   totalWeight?: number;
   weightUnit?: string;
   packing: {
@@ -74,49 +79,39 @@ interface Shipment {
 }
 
 // ============================================
-// MOCK DATA
+// ORDER -> SHIPMENT MAPPING (existing orders / order_items)
 // ============================================
 
-const initialMockShipments: Shipment[] = [
-  {
-    id: '1',
-    shipmentNo: 'SHP-3301',
-    orderNo: 'PO-2857',
-    customer: 'Northwind Traders',
-    warehouse: 'Central Depot',
-    preparedBy: 'M. Santos',
-    preparedDate: '2026-08-01',
-    status: 'Preparing',
-    items: [
-      {
-        id: 'i1',
-        name: 'Industrial LED Panel 40W',
-        sku: 'ELC-LED-040',
-        requestedQty: 12,
-        availableQty: 15,
-        barcode: '8801234500011',
-        verified: false,
-      },
-      {
-        id: 'i2',
-        name: 'Aluminium Profile 6m',
-        sku: 'RAW-ALU-006',
-        requestedQty: 8,
-        availableQty: 10,
-        barcode: '8801234500097',
-        verified: false,
-      },
-    ],
-    totalItems: 20,
-    totalWeight: 450,
-    weightUnit: 'kg',
-    packing: {
-      packageId: '',
-      boxes: 0,
-      weight: 0,
-      fragile: false,
-      notes: '',
-    },
+const formatDate = (value?: string | null) =>
+  value ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(value)) : '—';
+
+const mapOrderToShipment = (order: any): Shipment => {
+  const items: ShipmentItem[] = (order.items || []).map((item: any) => ({
+    id: String(item.id),
+    name: item.product_name,
+    sku: '',
+    requestedQty: Number(item.required_quantity) || 0,
+    availableQty: Number(item.required_quantity) || 0,
+    barcode: '',
+    verified: true,
+  }));
+
+  return {
+    id: String(order.id),
+    shipmentNo: order.order_no,
+    orderNo: order.order_no,
+    customer: order.customer_name,
+    destination: order.customer_address || '—',
+    warehouse: order.warehouse?.name || 'Unassigned',
+    preparedBy: order.prepared_by || '—',
+    preparedDate: formatDate(order.assigned_at),
+    assignedDate: formatDate(order.assigned_at),
+    targetDelivery: formatDate(order.required_delivery_date),
+    status: 'Ready for Shipment',
+    items,
+    totalItems: Number(order.items_count ?? items.length),
+    totalQuantity: items.reduce((sum, item) => sum + item.requestedQty, 0),
+    packing: { packageId: '', boxes: 0, weight: 0, fragile: false, notes: '' },
     checklist: {
       correctProduct: false,
       correctQty: false,
@@ -125,194 +120,9 @@ const initialMockShipments: Shipment[] = [
       itemsComplete: false,
     },
     barcodeVerifiedAll: false,
-    timeline: [
-      { step: 'Shipment Created', completed: true, timestamp: '2026-08-01 10:30' },
-      { step: 'Preparing', completed: false },
-    ],
-  },
-  {
-    id: '2',
-    shipmentNo: 'SHP-3302',
-    orderNo: 'PO-2851',
-    customer: 'Cebu Logistics Co.',
-    warehouse: 'Northgate',
-    preparedBy: 'L. Cruz',
-    preparedDate: '2026-07-30',
-    status: 'Packing',
-    items: [
-      {
-        id: 'i3',
-        name: 'Corrugated Box 60x40x40',
-        sku: 'PKG-BOX-604',
-        requestedQty: 8,
-        availableQty: 12,
-        barcode: '8801234500028',
-        verified: true,
-      },
-    ],
-    totalItems: 8,
-    totalWeight: 620,
-    weightUnit: 'kg',
-    packing: {
-      packageId: 'PKG-001',
-      boxes: 2,
-      weight: 620,
-      fragile: false,
-      notes: 'Stack carefully',
-    },
-    checklist: {
-      correctProduct: true,
-      correctQty: true,
-      barcodeVerified: true,
-      packageCondition: true,
-      itemsComplete: true,
-    },
-    barcodeVerifiedAll: true,
-    timeline: [
-      { step: 'Shipment Created', completed: true, timestamp: '2026-07-30 09:00' },
-      { step: 'Preparing', completed: true, timestamp: '2026-07-30 10:15' },
-      { step: 'Packing', completed: false },
-    ],
-  },
-  {
-    id: '3',
-    shipmentNo: 'SHP-3303',
-    orderNo: 'PO-2855',
-    customer: 'Kraft Industrial',
-    warehouse: 'Southpark',
-    preparedBy: 'R. Diaz',
-    preparedDate: '2026-07-28',
-    status: 'Ready for Shipment',
-    items: [
-      {
-        id: 'i4',
-        name: 'Steel Sheet 2mm',
-        sku: 'RAW-SST-002',
-        requestedQty: 20,
-        availableQty: 25,
-        barcode: '8801234500035',
-        verified: true,
-      },
-    ],
-    totalItems: 20,
-    totalWeight: 1200,
-    weightUnit: 'kg',
-    packing: {
-      packageId: 'PKG-002',
-      boxes: 4,
-      weight: 1200,
-      fragile: true,
-      notes: 'Heavy, use forklift',
-    },
-    checklist: {
-      correctProduct: true,
-      correctQty: true,
-      barcodeVerified: true,
-      packageCondition: true,
-      itemsComplete: true,
-    },
-    barcodeVerifiedAll: true,
-    timeline: [
-      { step: 'Shipment Created', completed: true, timestamp: '2026-07-28 11:00' },
-      { step: 'Preparing', completed: true, timestamp: '2026-07-28 12:30' },
-      { step: 'Packing', completed: true, timestamp: '2026-07-28 15:00' },
-      { step: 'Ready for Shipment', completed: true, timestamp: '2026-07-28 16:45' },
-    ],
-  },
-  {
-    id: '4',
-    shipmentNo: 'SHP-3304',
-    orderNo: 'PO-2843',
-    customer: 'Apex Components',
-    warehouse: 'Eastside',
-    preparedBy: 'J. Santos',
-    preparedDate: '2026-08-02',
-    status: 'Delivered',
-    items: [
-      {
-        id: 'i5',
-        name: 'Wireless Earbuds Pro',
-        sku: 'SKU-1001',
-        requestedQty: 3,
-        availableQty: 5,
-        barcode: '8801234500042',
-        verified: true,
-      },
-    ],
-    totalItems: 3,
-    totalWeight: 120,
-    weightUnit: 'kg',
-    packing: {
-      packageId: 'PKG-003',
-      boxes: 1,
-      weight: 120,
-      fragile: true,
-      notes: 'Handle with care',
-    },
-    checklist: {
-      correctProduct: true,
-      correctQty: true,
-      barcodeVerified: true,
-      packageCondition: true,
-      itemsComplete: true,
-    },
-    barcodeVerifiedAll: true,
-    timeline: [
-      { step: 'Shipment Created', completed: true, timestamp: '2026-08-02 08:00' },
-      { step: 'Preparing', completed: true, timestamp: '2026-08-02 08:30' },
-      { step: 'Packing', completed: true, timestamp: '2026-08-02 09:00' },
-      { step: 'Ready for Shipment', completed: true, timestamp: '2026-08-02 09:30' },
-      { step: 'Picked Up', completed: true, timestamp: '2026-08-02 10:00' },
-      { step: 'Delivered', completed: true, timestamp: '2026-08-02 14:00' },
-    ],
-  },
-  {
-    id: '5',
-    shipmentNo: 'SHP-3305',
-    orderNo: 'PO-2859',
-    customer: 'Meridian Supply',
-    warehouse: 'Central Depot',
-    preparedBy: 'L. Reyes',
-    preparedDate: '2026-07-31',
-    status: 'Picked Up',
-    items: [
-      {
-        id: 'i6',
-        name: 'Safety Helmet Class E',
-        sku: 'SAF-HLM-001',
-        requestedQty: 5,
-        availableQty: 10,
-        barcode: '8801234500059',
-        verified: true,
-      },
-    ],
-    totalItems: 5,
-    totalWeight: 240,
-    weightUnit: 'kg',
-    packing: {
-      packageId: 'PKG-004',
-      boxes: 1,
-      weight: 240,
-      fragile: false,
-      notes: '',
-    },
-    checklist: {
-      correctProduct: true,
-      correctQty: true,
-      barcodeVerified: true,
-      packageCondition: true,
-      itemsComplete: true,
-    },
-    barcodeVerifiedAll: true,
-    timeline: [
-      { step: 'Shipment Created', completed: true, timestamp: '2026-07-31 14:00' },
-      { step: 'Preparing', completed: true, timestamp: '2026-07-31 14:30' },
-      { step: 'Packing', completed: true, timestamp: '2026-07-31 15:30' },
-      { step: 'Ready for Shipment', completed: true, timestamp: '2026-07-31 16:00' },
-      { step: 'Picked Up', completed: true, timestamp: '2026-08-01 08:00' },
-    ],
-  },
-];
+    timeline: [],
+  };
+};
 
 // ============================================
 // CONSTANTS
@@ -924,9 +734,42 @@ const Shipments: React.FC = () => {
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [showPrepareModal, setShowPrepareModal] = useState(false);
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
-  const [shipments, setShipments] = useState<Shipment[]>(initialMockShipments);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [confirmForwardFor, setConfirmForwardFor] = useState<Shipment | null>(null);
+  const [isForwarding, setIsForwarding] = useState(false);
+
+  // Strictly the orders sitting in the Shipment stage (status READY_FOR_SHIPMENT).
+  // Forwarded orders move to FORWARDED_TO_LOGISTICS and drop out of this endpoint.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadReadyOrders = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const response = await apiClient.get('/plant-manager/shipments', {
+          params: { per_page: 100 },
+        });
+        const records = response.data?.data ?? [];
+        if (!cancelled) setShipments(records.map(mapOrderToShipment));
+      } catch (error: any) {
+        if (!cancelled) {
+          setLoadError(error?.response?.data?.message ?? 'Unable to load orders ready for shipment.');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadReadyOrders();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Filtered shipments
   const filteredShipments = useMemo(() => {
@@ -939,7 +782,7 @@ const Shipments: React.FC = () => {
       const matchStatus = statusFilter === 'All' || s.status === statusFilter;
       return matchSearch && matchStatus;
     });
-  }, [search, statusFilter]);
+  }, [shipments, search, statusFilter]);
 
   const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
   const paginatedShipments = filteredShipments.slice(
@@ -971,6 +814,44 @@ const Shipments: React.FC = () => {
     setTimeout(() => setToast(null), 5000);
   };
 
+  // Forwarding moves the order to FORWARDED_TO_LOGISTICS, so it leaves this stage.
+  const dropForwardedShipment = (id: string) => {
+    setShipments((prev) => prev.filter((item) => item.id !== id));
+    setSelectedShipment((prev) => (prev?.id === id ? null : prev));
+    setIsViewDrawerOpen(false);
+  };
+
+  const handleForwardToLogistics = (shipment: Shipment) => {
+    setConfirmForwardFor(shipment);
+  };
+
+  const handleConfirmForward = async () => {
+    const shipment = confirmForwardFor;
+    if (!shipment) return;
+
+    setConfirmForwardFor(null);
+    setIsForwarding(true);
+    try {
+      await apiClient.post(`/plant-manager/shipments/${shipment.id}/forward-to-logistics`);
+      dropForwardedShipment(shipment.id);
+      showToast(`${shipment.orderNo} forwarded to Admin Logistics (DTRS).`, 'success');
+    } catch (error: any) {
+      // This stage serves only READY_FOR_SHIPMENT orders, so a 404 means the order was
+      // already forwarded elsewhere rather than a failure.
+      if (error?.response?.status === 404) {
+        dropForwardedShipment(shipment.id);
+        showToast(`${shipment.orderNo} was already forwarded to Admin Logistics (DTRS).`, 'info');
+      } else {
+        showToast(
+          error?.response?.data?.message ?? `Unable to forward ${shipment.orderNo} to Admin Logistics.`,
+          'error',
+        );
+      }
+    } finally {
+      setIsForwarding(false);
+    }
+  };
+
   const handleCreateShipment = (data: {
     orderNo: string;
     customer: string;
@@ -987,9 +868,12 @@ const Shipments: React.FC = () => {
       shipmentNo: data.shipmentNo,
       orderNo: data.orderNo,
       customer: data.customer,
+      destination: '—',
       warehouse: data.warehouse,
       preparedBy: data.preparedBy,
       preparedDate: today,
+      assignedDate: today,
+      targetDelivery: '—',
       status: 'Preparing',
       items: data.productSummary
         ? [
@@ -1005,6 +889,7 @@ const Shipments: React.FC = () => {
           ]
         : [],
       totalItems: 0,
+      totalQuantity: 0,
       totalWeight: 0,
       weightUnit: 'kg',
       packing: {
@@ -1121,12 +1006,12 @@ const Shipments: React.FC = () => {
           <table className="w-full min-w-[1000px]">
             <thead className="bg-[#0b0f19]/50 border-b border-slate-800">
               <tr>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Shipment No.</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Customer</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Warehouse</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Products Summary</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Prepared By</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Customer / Destination</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Products</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Assigned Date</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Target Delivery</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
                 <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
               </tr>
@@ -1134,14 +1019,26 @@ const Shipments: React.FC = () => {
             <tbody>
               {paginatedShipments.map((shipment) => (
                 <tr key={shipment.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-all">
-                  <td className="px-4 py-3.5 text-sm font-medium text-white">{shipment.shipmentNo}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{shipment.orderNo}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{shipment.customer}</td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{shipment.warehouse}</td>
+                  <td className="px-4 py-3.5 text-sm font-medium text-white">{shipment.orderNo}</td>
                   <td className="px-4 py-3.5 text-sm text-slate-300">
-                    {shipment.items.length} item{shipment.items.length > 1 ? 's' : ''}
+                    <p className="text-white">{shipment.customer}</p>
+                    <p className="text-xs text-slate-500">{shipment.destination}</p>
                   </td>
-                  <td className="px-4 py-3.5 text-sm text-slate-300">{shipment.preparedBy}</td>
+                  <td className="px-4 py-3.5 text-sm text-slate-300">
+                    {shipment.items.length === 0 && '—'}
+                    {shipment.items.slice(0, 2).map((item) => (
+                      <p key={item.id}>{item.name}</p>
+                    ))}
+                    {shipment.items.length > 2 && (
+                      <p className="text-xs text-slate-500">+{shipment.items.length - 2} more</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-slate-300">
+                    <p className="text-white">{shipment.totalItems} item{shipment.totalItems === 1 ? '' : 's'}</p>
+                    <p className="text-xs text-slate-500">{shipment.totalQuantity} units</p>
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-slate-300">{shipment.assignedDate}</td>
+                  <td className="px-4 py-3.5 text-sm text-slate-300">{shipment.targetDelivery}</td>
                   <td className="px-4 py-3.5"><StatusBadge status={shipment.status} /></td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center justify-center gap-1">
@@ -1171,7 +1068,9 @@ const Shipments: React.FC = () => {
               {paginatedShipments.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                    No shipments found matching your criteria.
+                    {isLoading
+                      ? 'Loading orders ready for shipment...'
+                      : loadError ?? 'No shipments found matching your criteria.'}
                   </td>
                 </tr>
               )}
@@ -1299,8 +1198,7 @@ const Shipments: React.FC = () => {
                             {isAllocated ? 'Allocated' : 'Insufficient'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 mb-2">SKU: {item.sku}</p>
-                        <div className="w-full bg-slate-700 rounded-full h-2 mb-1">
+                        <div className="w-full bg-slate-700 rounded-full h-2 mb-1 mt-2">
                           <div
                             className="bg-cyan-500 h-2 rounded-full transition-all"
                             style={{ width: `${progress}%` }}
@@ -1318,19 +1216,63 @@ const Shipments: React.FC = () => {
 
               {/* Plant Manager Actions */}
               <div className="space-y-2 pt-4 border-t border-slate-800">
-                <button className="w-full px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2">
-                  <Play className="w-4 h-4" />
-                  {selectedShipment.status === 'Packing' ? 'Mark as Packed' : 'Start Preparation'}
-                </button>
-                <button className="w-full px-4 py-2.5 border border-slate-700 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-all text-sm flex items-center justify-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Generate Pick List
+                <button
+                  onClick={() => handleForwardToLogistics(selectedShipment)}
+                  disabled={isForwarding}
+                  className={`w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                    isForwarding
+                      ? 'bg-cyan-500/50 text-slate-950/70 cursor-not-allowed'
+                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  {isForwarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
+                  {isForwarding ? 'Forwarding...' : 'Forward to Logistics'}
                 </button>
                 <button className="w-full px-4 py-2.5 border border-red-700/50 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all text-sm flex items-center justify-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   Flag Stock Issue
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forward to Logistics Confirmation */}
+      {confirmForwardFor && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setConfirmForwardFor(null)}
+        >
+          <div
+            className="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                <Truck className="w-5 h-5 text-cyan-400" />
+              </div>
+              <h2 className="text-lg font-bold text-white">Forward to Logistics</h2>
+            </div>
+
+            <p className="text-sm text-slate-400 mt-4">
+              Are you sure you want to forward Order {confirmForwardFor.orderNo} to Admin Logistics?
+              This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-5 mt-5 border-t border-slate-800">
+              <button
+                onClick={() => setConfirmForwardFor(null)}
+                className="px-5 py-2.5 border border-slate-700 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmForward}
+                className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all"
+              >
+                Confirm
+              </button>
             </div>
           </div>
         </div>

@@ -375,7 +375,7 @@ const OrderManagement: React.FC = () => {
 
         {/* Table */}
         <div className="w-full max-w-full overflow-x-auto overscroll-x-contain custom-scrollbar">
-          <table className="table-auto w-full min-w-[1400px] border-separate border-spacing-0 text-sm [&_thead]:table-header-group [&_tbody]:table-row-group [&_tr]:table-row [&_th]:table-cell [&_td]:table-cell [&_th:not(:last-child)]:border-r [&_th:not(:last-child)]:border-slate-800/80 [&_td:not(:last-child)]:border-r [&_td:not(:last-child)]:border-slate-800/60">
+          <table className="table-auto w-full min-w-[1400px] border-collapse text-sm">
             <thead className="border-b border-slate-800/80">
               <tr>
                 <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
@@ -390,9 +390,9 @@ const OrderManagement: React.FC = () => {
                 <th className="text-right py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody>
               {orders.map((order) => (
-                <tr key={order.id} className="hover:bg-slate-800/20 transition-colors cursor-pointer" onClick={() => handleViewOrder(order)}>
+                <tr key={order.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors cursor-pointer" onClick={() => handleViewOrder(order)}>
                   <td className="py-3 px-3">
                     <p className="font-mono text-blue-400 hover:underline font-medium">{order.orderNo}</p>
                     <p className="text-xs text-slate-500">{order.refNo}</p>

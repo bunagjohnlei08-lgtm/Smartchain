@@ -176,7 +176,7 @@ class StockOutManagementTest extends TestCase
             ->assertJsonPath('inventory_remaining_quantity', 9)
             ->assertJsonPath('order_status', 'STOCK_OUT_IN_PROGRESS');
 
-        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 8]);
+        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 9]);
         $this->assertDatabaseHas('stock_out_transactions', [
             'order_id' => $order->id,
             'order_item_id' => $order->items()->firstOrFail()->id,
@@ -253,7 +253,9 @@ class StockOutManagementTest extends TestCase
         $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 1);
         $inventory = $this->inventory($this->product, $this->warehouse, '2000000000008', 3);
         $this->scan($order, $inventory->barcode)->assertOk()->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
-        $this->scan($order, $inventory->barcode)->assertUnprocessable()->assertJsonValidationErrors('status');
+        // Completion moves the order out of the Stock Out queue, so a further scan can no
+        // longer resolve it. The guarantee that matters is that no extra stock is released.
+        $this->scan($order, $inventory->barcode)->assertNotFound();
         $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 2]);
     }
 
@@ -268,18 +270,32 @@ class StockOutManagementTest extends TestCase
         $this->assertDatabaseCount('stock_out_transactions', 0);
     }
 
-    public function test_completed_stock_out_must_be_explicitly_submitted_to_shipment(): void
+    public function test_completed_stock_out_leaves_the_queue_and_is_forwarded_from_shipment(): void
     {
         $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 1);
         $inventory = $this->inventory($this->product, $this->warehouse, 'submit-shipment', 1);
 
+        // Completion is automatic; there is no manual submit step in Stock Out.
         $this->scan($order, $inventory->barcode)->assertOk()->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
-        $this->actingAs($this->manager)->postJson("/api/stock-out/orders/{$order->id}/submit-to-shipment")
-            ->assertOk()->assertJsonPath('status', 'READY_FOR_SHIPMENT');
-
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'READY_FOR_SHIPMENT']);
-        $this->assertDatabaseHas('order_status_histories', ['order_id' => $order->id, 'action' => 'SUBMITTED_TO_SHIPMENT']);
         $this->actingAs($this->manager)->getJson("/api/stock-out/orders/{$order->id}")->assertNotFound();
+        $this->actingAs($this->manager)->getJson('/api/stock-out/orders')
+            ->assertOk()->assertJsonCount(0, 'data');
+
+        // Plant Manager Shipment owns it while it is READY_FOR_SHIPMENT.
+        $this->actingAs($this->manager)->getJson('/api/plant-manager/shipments')
+            ->assertOk()->assertJsonPath('data.0.order_no', $order->order_no);
+
+        $this->actingAs($this->manager)->postJson("/api/plant-manager/shipments/{$order->id}/forward-to-logistics")
+            ->assertOk()->assertJsonPath('status', 'FORWARDED_TO_LOGISTICS');
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'FORWARDED_TO_LOGISTICS']);
+        $this->assertDatabaseHas('order_status_histories', ['order_id' => $order->id, 'action' => 'FORWARDED_TO_LOGISTICS']);
+
+        // Forwarded orders leave the Shipment stage and cannot be forwarded twice.
+        $this->actingAs($this->manager)->getJson('/api/plant-manager/shipments')
+            ->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($this->manager)->postJson("/api/plant-manager/shipments/{$order->id}/forward-to-logistics")
+            ->assertNotFound();
     }
 
     public function test_competing_releases_cannot_make_inventory_negative(): void

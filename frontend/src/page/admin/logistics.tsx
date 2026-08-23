@@ -1,5 +1,6 @@
 // src/page/admin/Logistics.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { apiClient } from '../../lib/api';
 import {
   Truck,
   Search,
@@ -56,8 +57,57 @@ interface Shipment {
 }
 
 // ============================================
-// MOCK DATA (initial state now lives inside the component body)
+// ORDER/SHIPMENT MAPPING (existing Plant Manager Shipment data)
 // ============================================
+
+// A shipment is the existing order once Stock Out released it; there is no
+// separate shipment record to duplicate.
+// Only FORWARDED_TO_LOGISTICS orders reach this module; anything still in
+// READY_FOR_SHIPMENT belongs to Plant Manager Shipment.
+const orderStatusToShipmentStatus: Record<string, ShipmentStatus> = {
+  FORWARDED_TO_LOGISTICS: 'Pending Approval',
+  IN_TRANSIT: 'In Transit',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+};
+
+const formatDate = (value?: string | null) =>
+  value ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(value)) : '—';
+
+const formatTimestamp = (value?: string | null) =>
+  value ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : undefined;
+
+const humanize = (value?: string | null) =>
+  (value ?? '').split('_').map((word) => word.charAt(0) + word.slice(1).toLowerCase()).join(' ');
+
+const mapShipment = (record: any): Shipment => ({
+  id: String(record.id),
+  shipmentNo: record.shipment_no,
+  poNumber: record.order_no,
+  customer: record.customer_name,
+  warehouse: record.warehouse || 'Unassigned',
+  preparedBy: record.prepared_by || '—',
+  destination: record.destination || '—',
+  preparedDate: formatDate(record.prepared_date),
+  assignedLogistics: record.assigned_logistics ?? null,
+  status: orderStatusToShipmentStatus[record.status] ?? 'Pending Approval',
+  items: (record.items || []).map((item: any) => ({
+    name: item.product_name,
+    sku: '—',
+    qty: Number(item.quantity) || 0,
+    unit: item.unit,
+  })),
+  totalItems: Number(record.items_count ?? record.items?.length ?? 0),
+  totalWeight: 0,
+  weightUnit: 'kg',
+  timeline: (record.timeline || []).map((entry: any) => ({
+    step: humanize(entry.action),
+    completed: true,
+    timestamp: formatTimestamp(entry.occurred_at),
+  })),
+  barcodeVerified: true,
+  expectedDelivery: formatDate(record.required_delivery_date),
+});
 
 // ============================================
 // CONSTANTS
@@ -259,172 +309,35 @@ const Logistics: React.FC = () => {
  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
-  // Shipment data (useState must be at the top level of the component body)
-  const [shipments, setShipments] = useState<Shipment[]>([
-   {
-    id: '1',
-    shipmentNo: 'SHP-3301',
-    poNumber: 'PO-2857',
-    customer: 'Northwind Traders',
-    warehouse: 'Central Depot',
-    preparedBy: 'M. Santos (Plant Manager)',
-    destination: 'QC Central Hub, PH',
-    preparedDate: '2026-08-01',
-    assignedLogistics: null,
-    status: 'Pending Approval',
-    items: [
-     { name: 'Industrial LED Panel 40W', sku: 'ELC-LED-040', qty: 12, unit: 'pcs' },
-     { name: 'Aluminium Profile 6m', sku: 'RAW-ALU-006', qty: 8, unit: 'bar' },
-    ],
-    totalItems: 20,
-    totalWeight: 450,
-    weightUnit: 'kg',
-    timeline: [
-     { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-01 10:30' },
-     { step: 'Admin Approved', completed: false },
-     { step: 'Assigned to Logistics', completed: false },
-     { step: 'Picked Up', completed: false },
-     { step: 'In Transit', completed: false },
-     { step: 'Delivered', completed: false },
-    ],
-    barcodeVerified: true,
-   },
-   {
-    id: '2',
-    shipmentNo: 'SHP-3302',
-    poNumber: 'PO-2851',
-    customer: 'Cebu Logistics Co.',
-    warehouse: 'Northgate',
-    preparedBy: 'L. Cruz (Plant Manager)',
-    destination: 'Davao DC, PH',
-    preparedDate: '2026-07-30',
-    assignedLogistics: 'Integrated Logistics System',
-    status: 'Assigned',
-    items: [
-     { name: 'Corrugated Box 60x40x40', sku: 'PKG-BOX-604', qty: 8, unit: 'pcs' },
-    ],
-    totalItems: 8,
-    totalWeight: 620,
-    weightUnit: 'kg',
-    timeline: [
-     { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-30 09:00' },
-     { step: 'Admin Approved', completed: true, timestamp: '2026-07-30 14:20' },
-     { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-30 15:00' },
-     { step: 'Picked Up', completed: false },
-     { step: 'In Transit', completed: false },
-     { step: 'Delivered', completed: false },
-    ],
-    barcodeVerified: true,
-   },
-   {
-    id: '3',
-    shipmentNo: 'SHP-3303',
-    poNumber: 'PO-2855',
-    customer: 'Kraft Industrial',
-    warehouse: 'Southpark',
-    preparedBy: 'R. Diaz (Plant Manager)',
-    destination: 'Cebu Port, PH',
-    preparedDate: '2026-07-28',
-    assignedLogistics: 'External Delivery Group',
-    status: 'In Transit',
-    items: [
-     { name: 'Steel Sheet 2mm', sku: 'RAW-SST-002', qty: 20, unit: 'sheet' },
-    ],
-    totalItems: 20,
-    totalWeight: 1200,
-    weightUnit: 'kg',
-    timeline: [
-     { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-28 11:00' },
-     { step: 'Admin Approved', completed: true, timestamp: '2026-07-28 15:30' },
-     { step: 'Assigned to Logistics', completed: true, timestamp: '2026-07-28 16:45' },
-     { step: 'Picked Up', completed: true, timestamp: '2026-07-29 08:00' },
-     { step: 'In Transit', completed: true, timestamp: '2026-07-29 10:00' },
-     { step: 'Delivered', completed: false },
-    ],
-    barcodeVerified: true,
-   },
-   {
-    id: '4',
-    shipmentNo: 'SHP-3304',
-    poNumber: 'PO-2843',
-    customer: 'Apex Components',
-    warehouse: 'Eastside',
-    preparedBy: 'J. Santos (Plant Manager)',
-    destination: 'Makati Branch, PH',
-    preparedDate: '2026-08-02',
-    assignedLogistics: 'Internal Fleet',
-    status: 'Delivered',
-    items: [
-     { name: 'Wireless Earbuds Pro', sku: 'SKU-1001', qty: 3, unit: 'pcs' },
-    ],
-    totalItems: 3,
-    totalWeight: 120,
-    weightUnit: 'kg',
-    timeline: [
-     { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 08:00' },
-     { step: 'Admin Approved', completed: true, timestamp: '2026-08-02 09:15' },
-     { step: 'Assigned to Logistics', completed: true, timestamp: '2026-08-02 09:45' },
-     { step: 'Picked Up', completed: true, timestamp: '2026-08-02 10:00' },
-     { step: 'In Transit', completed: true, timestamp: '2026-08-02 11:30' },
-     { step: 'Delivered', completed: true, timestamp: '2026-08-02 14:00' },
-    ],
-    barcodeVerified: true,
-   },
-   {
-    id: '5',
-    shipmentNo: 'SHP-3305',
-    poNumber: 'PO-2859',
-    customer: 'Meridian Supply',
-    warehouse: 'Central Depot',
-    preparedBy: 'L. Reyes (Plant Manager)',
-    destination: 'Bohol Warehouse',
-    preparedDate: '2026-07-31',
-    assignedLogistics: null,
-    status: 'Approved',
-    items: [
-     { name: 'Safety Helmet Class E', sku: 'SAF-HLM-001', qty: 5, unit: 'pcs' },
-    ],
-    totalItems: 5,
-    totalWeight: 240,
-    weightUnit: 'kg',
-    timeline: [
-     { step: 'Shipment Prepared', completed: true, timestamp: '2026-07-31 14:00' },
-     { step: 'Admin Approved', completed: true, timestamp: '2026-08-01 10:00' },
-     { step: 'Assigned to Logistics', completed: false },
-     { step: 'Picked Up', completed: false },
-     { step: 'In Transit', completed: false },
-     { step: 'Delivered', completed: false },
-    ],
-    barcodeVerified: false,
-   },
-   {
-    id: '6',
-    shipmentNo: 'SHP-3306',
-    poNumber: 'PO-2860',
-    customer: 'Bayview Home Goods',
-    warehouse: 'Northgate',
-    preparedBy: 'M. Santos (Plant Manager)',
-    destination: 'Clark Freeport Zone',
-    preparedDate: '2026-08-02',
-    assignedLogistics: null,
-    status: 'Cancelled',
-    items: [
-     { name: 'Pallet Wrap Film 500mm', sku: 'PKG-WRP-500', qty: 15, unit: 'roll' },
-    ],
-    totalItems: 15,
-    totalWeight: 760,
-    weightUnit: 'kg',
-    timeline: [
-     { step: 'Shipment Prepared', completed: true, timestamp: '2026-08-02 13:00' },
-     { step: 'Admin Approved', completed: false },
-     { step: 'Assigned to Logistics', completed: false },
-     { step: 'Picked Up', completed: false },
-     { step: 'In Transit', completed: false },
-     { step: 'Delivered', completed: false },
-    ],
-    barcodeVerified: false,
-   },
-  ]);
+  // Shipment data comes from the orders released by Stock Out (Plant Manager Shipment)
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadShipments = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const response = await apiClient.get('/admin/logistics/shipments', { params: { per_page: 100 } });
+        const records = response.data?.data ?? [];
+        if (!cancelled) setShipments(records.map(mapShipment));
+      } catch (error: any) {
+        if (!cancelled) {
+          setLoadError(error?.response?.data?.message ?? 'Unable to load shipments from Plant Manager Shipment.');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadShipments();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Modal states
   const [showViewModal, setShowViewModal] = useState(false);
@@ -465,7 +378,7 @@ const Logistics: React.FC = () => {
     (logisticsFilter === 'Not Assigned' && !shipment.assignedLogistics);
    return matchSearch && matchStatus && matchWarehouse && matchLogistics;
   });
- }, [search, statusFilter, warehouseFilter, logisticsFilter]);
+ }, [shipments, search, statusFilter, warehouseFilter, logisticsFilter]);
 
  const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
  const paginatedShipments = filteredShipments.slice(
@@ -679,7 +592,9 @@ const Logistics: React.FC = () => {
        {paginatedShipments.length === 0 && (
         <tr>
          <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-          No shipments found matching your criteria.
+          {isLoading
+           ? 'Loading shipments...'
+           : loadError ?? 'No shipments found matching your criteria.'}
          </td>
         </tr>
        )}

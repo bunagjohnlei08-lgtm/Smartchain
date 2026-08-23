@@ -155,6 +155,7 @@ const StockOut: React.FC = () => {
   const [scannerError, setScannerError] = useState('');
   const [manualBarcode, setManualBarcode] = useState('');
   const [scanSuccess, setScanSuccess] = useState('');
+  const [completionNotice, setCompletionNotice] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const scanBusyRef = useRef(false);
@@ -232,9 +233,21 @@ const StockOut: React.FC = () => {
       });
       setScanSuccess(response.data.message || 'One unit stocked out successfully.');
       setManualBarcode('');
-      const refreshed = await loadDetails(selectedOrder.id);
+
+      // The backend flips the order to READY_FOR_SHIPMENT as soon as every item is
+      // released, which removes it from the Stock Out queue. Drop the selection instead
+      // of re-fetching a detail the queue no longer serves.
+      if (response.data?.order_status === 'READY_FOR_SHIPMENT') {
+        stopCamera();
+        setScannerOpen(false);
+        setSelectedOrder(null);
+        setCompletionNotice(`${selectedOrder.orderNo} is fully released and moved to Ready for Shipment.`);
+        await loadOrders();
+        return;
+      }
+
+      await loadDetails(selectedOrder.id);
       await loadOrders();
-      if (refreshed.status === 'Ready for Shipment') stopCamera();
     } catch (error) {
       setScannerError(getError(error));
     } finally {
@@ -282,21 +295,6 @@ const StockOut: React.FC = () => {
       await loadDetails(order.id);
     } catch (error) {
       setPageError(getError(error));
-    }
-  };
-
-  const submitToShipment = async () => {
-    if (!selectedOrder) return;
-    setActionBusy(true);
-    setPageError('');
-    try {
-      await apiClient.post(`/stock-out/orders/${selectedOrder.id}/submit-to-shipment`);
-      setSelectedOrder(null);
-      await loadOrders();
-    } catch (error) {
-      setPageError(getError(error));
-    } finally {
-      setActionBusy(false);
     }
   };
 
@@ -355,7 +353,6 @@ const StockOut: React.FC = () => {
               <option value="">All Stock Out Statuses</option>
               <option value="READY_FOR_STOCK_OUT">Ready for Stock Out</option>
               <option value="STOCK_OUT_IN_PROGRESS">Stock Out In Progress</option>
-              <option value="READY_FOR_SHIPMENT">Ready for Shipment</option>
             </select>
           </label>
         </div>
@@ -391,8 +388,7 @@ const StockOut: React.FC = () => {
         <div className="space-y-5 rounded-xl border border-slate-800/80 bg-[#0b101d] p-5 xl:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
             <div><div className="flex items-center gap-3"><h2 className="text-lg font-semibold text-white">{selectedOrder.orderNo}</h2><StatusBadge status={selectedOrder.status} /></div><p className="mt-1 text-sm text-slate-400">{selectedOrder.customer} · {selectedOrder.warehouse}</p></div>
-            {selectedOrder.status !== 'Ready for Shipment' && <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"><ScanLine className="h-4 w-4" /> Scan Barcode</button>}
-            {selectedOrder.status === 'Ready for Shipment' && <button onClick={() => void submitToShipment()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"><PackageCheck className="h-4 w-4" /> Submit to Shipment</button>}
+            <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"><ScanLine className="h-4 w-4" /> Scan Barcode</button>
           </div>
           <div><div className="flex justify-between text-sm"><span className="text-slate-400">Release progress</span><span className="font-medium text-white">{progress.released} / {progress.ordered} units</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress.percentage}%` }} /></div></div>
           <div className="overflow-x-auto">
@@ -415,7 +411,6 @@ const StockOut: React.FC = () => {
             </div>)}
             {!selectedOrder.history?.length && <p className="text-sm text-slate-400">No Stock Out events recorded yet.</p>}
           </div>
-          {selectedOrder.status === 'Ready for Shipment' && <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4"><p className="flex items-center gap-2 text-sm font-semibold text-emerald-300"><PackageCheck className="h-4 w-4" /> Ready for Shipment</p><p className="mt-1 text-xs text-slate-400">All required inventory has been released.</p></div>}
         </aside>
       </section>}
 

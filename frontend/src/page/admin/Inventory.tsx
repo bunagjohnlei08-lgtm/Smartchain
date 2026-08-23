@@ -31,7 +31,7 @@ import {
   LayoutGrid,
   Loader2,
 } from 'lucide-react';
-import type { ApiInventoryItem, ApiWarehouse } from '../../types';
+import type { ApiInventoryItem, ApiInventoryMovement, ApiWarehouse, InventoryMovementType } from '../../types';
 import type { AxiosError } from 'axios';
 import { apiClient } from '../../lib/api';
 
@@ -953,6 +953,52 @@ const InventoryGrid: React.FC<{
   );
 };
 
+const movementDate = (value: string) => new Date(value).toLocaleString(undefined, {
+  month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+});
+
+const MovementTypeBadge: React.FC<{ type: InventoryMovementType }> = ({ type }) => (
+  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${
+    type === 'STOCK_IN'
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+      : 'border-orange-500/20 bg-orange-500/10 text-orange-300'
+  }`}>
+    {type === 'STOCK_IN' ? 'Stock In' : 'Stock Out'}
+  </span>
+);
+
+const MovementTable: React.FC<{ movements: ApiInventoryMovement[]; loading?: boolean }> = ({ movements, loading }) => (
+  <div className="overflow-x-auto custom-scrollbar">
+    <table className="w-full min-w-[820px]">
+      <thead className="border-b border-slate-800 bg-[#0b0f19]/50">
+        <tr>
+          {['Type', 'Product', 'Barcode', 'Warehouse', 'Quantity', 'Date / Time'].map(label => (
+            <th key={label} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">{label}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {movements.map((movement, index) => (
+          <tr key={`${movement.type}-${movement.occurred_at}-${movement.barcode ?? index}`} className="border-b border-slate-800 transition-colors hover:bg-slate-800/30">
+            <td className="px-4 py-3"><MovementTypeBadge type={movement.type} /></td>
+            <td className="px-4 py-3 text-sm font-medium text-white">{movement.product || '—'}</td>
+            <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">{movement.barcode || '—'}</td>
+            <td className="px-4 py-3 text-sm text-slate-300">{movement.warehouse || '—'}</td>
+            <td className="px-4 py-3 text-sm font-semibold text-white">{movement.quantity}</td>
+            <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-300">{movementDate(movement.occurred_at)}</td>
+          </tr>
+        ))}
+        {!loading && movements.length === 0 && (
+          <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">No inventory movements found.</td></tr>
+        )}
+        {loading && (
+          <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">Loading movements...</td></tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+);
+
 // ============================================
 // MAIN INVENTORY LIST COMPONENT
 // ============================================
@@ -963,6 +1009,18 @@ export const InventoryList: React.FC = () => {
   const [warehouses, setWarehouses] = useState<ApiWarehouse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recentMovements, setRecentMovements] = useState<ApiInventoryMovement[]>([]);
+  const [historyMovements, setHistoryMovements] = useState<ApiInventoryMovement[]>([]);
+  const [recentMovementsLoading, setRecentMovementsLoading] = useState(true);
+  const [movementsLoading, setMovementsLoading] = useState(true);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyType, setHistoryType] = useState<'ALL' | InventoryMovementType>('ALL');
+  const [historyWarehouse, setHistoryWarehouse] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyLastPage, setHistoryLastPage] = useState(1);
 
   // Filter/view state
   const [search, setSearch] = useState('');
@@ -1006,10 +1064,47 @@ export const InventoryList: React.FC = () => {
     }
   }, []);
 
+  const fetchRecentMovements = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/inventory/movements/recent', { params: { limit: 10 } });
+      setRecentMovements(response.data.data ?? []);
+    } finally {
+      setRecentMovementsLoading(false);
+    }
+  }, []);
+
+  const fetchHistory = useCallback(async () => {
+    setMovementsLoading(true);
+    try {
+      const response = await apiClient.get('/inventory/movements', { params: {
+        search: historySearch || undefined,
+        type: historyType === 'ALL' ? undefined : historyType,
+        warehouse_id: historyWarehouse || undefined,
+        date_from: historyDateFrom || undefined,
+        date_to: historyDateTo || undefined,
+        page: historyPage,
+        per_page: 10,
+      } });
+      setHistoryMovements(response.data.data ?? []);
+      setHistoryTotal(response.data.total ?? 0);
+      setHistoryLastPage(response.data.last_page ?? 1);
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    } finally {
+      setMovementsLoading(false);
+    }
+  }, [historySearch, historyType, historyWarehouse, historyDateFrom, historyDateTo, historyPage]);
+
   useEffect(() => {
     fetchInventory();
     fetchWarehouses();
-  }, [fetchInventory, fetchWarehouses]);
+    fetchRecentMovements().catch(e => setError(getApiErrorMessage(e)));
+  }, [fetchInventory, fetchWarehouses, fetchRecentMovements]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(fetchHistory, 250);
+    return () => window.clearTimeout(timeout);
+  }, [fetchHistory]);
 
   // Quick actions handlers
   const handleReceiveStock = () => {
@@ -1531,6 +1626,50 @@ export const InventoryList: React.FC = () => {
           />
         </>
       )}
+
+      <section className="overflow-hidden rounded-2xl border border-slate-800 bg-[#0d1322]" aria-labelledby="recent-movements-title">
+        <div className="border-b border-slate-800 px-4 py-4 sm:px-5">
+          <h2 id="recent-movements-title" className="text-lg font-semibold text-white">Recent Inventory Movements</h2>
+          <p className="mt-1 text-sm text-slate-400">Latest completed Stock In and Stock Out activity.</p>
+        </div>
+        <MovementTable movements={recentMovements} loading={recentMovementsLoading} />
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-800 bg-[#0d1322]" aria-labelledby="inventory-history-title">
+        <div className="border-b border-slate-800 px-4 py-4 sm:px-5">
+          <h2 id="inventory-history-title" className="text-lg font-semibold text-white">Inventory History</h2>
+          <p className="mt-1 text-sm text-slate-400">Historical activity from existing Stock In and Stock Out records.</p>
+        </div>
+        <div className="grid gap-3 border-b border-slate-800 p-4 sm:grid-cols-2 xl:grid-cols-5">
+          <label className="xl:col-span-1">
+            <span className="mb-1.5 block text-xs font-medium text-slate-400">Search</span>
+            <input value={historySearch} onChange={event => { setHistorySearch(event.target.value); setHistoryPage(1); }} placeholder="Product, barcode, warehouse..." className="min-h-11 w-full rounded-xl border border-slate-700 bg-[#090d16] px-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-slate-400">Type</span>
+            <select value={historyType} onChange={event => { setHistoryType(event.target.value as 'ALL' | InventoryMovementType); setHistoryPage(1); }} className="min-h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-[#090d16] px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <option value="ALL">All Types</option><option value="STOCK_IN">Stock In</option><option value="STOCK_OUT">Stock Out</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-slate-400">Warehouse</span>
+            <select value={historyWarehouse} onChange={event => { setHistoryWarehouse(event.target.value); setHistoryPage(1); }} className="min-h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-[#090d16] px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <option value="">All Warehouses</option>
+              {warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-slate-400">From</span>
+            <input type="date" value={historyDateFrom} onChange={event => { setHistoryDateFrom(event.target.value); setHistoryPage(1); }} className="min-h-11 w-full rounded-xl border border-slate-700 bg-[#090d16] px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-slate-400">To</span>
+            <input type="date" min={historyDateFrom || undefined} value={historyDateTo} onChange={event => { setHistoryDateTo(event.target.value); setHistoryPage(1); }} className="min-h-11 w-full rounded-xl border border-slate-700 bg-[#090d16] px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+          </label>
+        </div>
+        <MovementTable movements={historyMovements} loading={movementsLoading} />
+        <Pagination currentPage={historyPage} totalPages={historyLastPage} onPageChange={setHistoryPage} totalItems={historyTotal} itemsPerPage={10} />
+      </section>
 
       {/* Modals */}
       <InventoryFormModal

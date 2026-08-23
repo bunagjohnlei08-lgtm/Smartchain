@@ -16,7 +16,7 @@ class PlantManagerOrderController extends Controller
 {
     private const VISIBLE_STATUSES = [
         'ASSIGNED', 'PREPARING', 'READY_FOR_STOCK_OUT',
-        'STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT',
+        'STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS',
         'IN_TRANSIT', 'DELIVERED', 'CANCELLED',
     ];
 
@@ -196,7 +196,8 @@ class PlantManagerOrderController extends Controller
         return match ($status) {
             'ASSIGNED' => 0,
             'PREPARING' => 50,
-            'READY_FOR_STOCK_OUT', 'STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT', 'IN_TRANSIT', 'DELIVERED' => 100,
+            'READY_FOR_STOCK_OUT', 'STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT',
+            'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED' => 100,
             default => 0,
         };
     }

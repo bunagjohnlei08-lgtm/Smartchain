@@ -50,16 +50,16 @@ class InventoryController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('barcode', 'like', "%{$search}%")
-                  ->orWhereHas('product', function ($pq) use ($search) {
-                      $pq->where('name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('warehouse', function ($wq) use ($search) {
-                      $wq->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhereHas('product', function ($pq) use ($search) {
+                        $pq->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('warehouse', function ($wq) use ($search) {
+                        $wq->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
-        $items = $query->get()->map(fn (Inventory $inventory) => $this->present($inventory));
+        $items = $query->get()->map(fn(Inventory $inventory) => $this->present($inventory));
 
         return response()->json(['data' => $items]);
     }
@@ -86,6 +86,7 @@ class InventoryController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeAdmin($request);
         $validated = $request->validate([
             'barcode' => 'required|string|unique:inventories,barcode',
             'product' => 'required|string|max:255',
@@ -119,6 +120,7 @@ class InventoryController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->authorizeAdmin($request);
         $inventory = Inventory::findOrFail($id);
 
         $validated = $request->validate([
@@ -149,9 +151,15 @@ class InventoryController extends Controller
 
     public function destroy(Request $request, $id)
     {
+        $this->authorizeAdmin($request);
         $inventory = Inventory::findOrFail($id);
         $inventory->delete();
 
         return response()->json(['message' => 'Inventory record deleted.']);
+    }
+
+    private function authorizeAdmin(Request $request): void
+    {
+        abort_unless($request->user()?->isAdmin(), 403, 'Admin access is required.');
     }
 }

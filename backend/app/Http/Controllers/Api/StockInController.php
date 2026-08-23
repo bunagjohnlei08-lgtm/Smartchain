@@ -195,8 +195,10 @@ class StockInController extends Controller
 
     public function performStockIn(Request $request, $id)
     {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
         try {
-            $receiving = DB::transaction(function () use ($id) {
+            $receiving = DB::transaction(function () use ($id, $request) {
                 $receiving = Receiving::query()
                     ->with(['items.qaInspectionItem'])
                     ->lockForUpdate()
@@ -214,6 +216,9 @@ class StockInController extends Controller
                 if (! $warehouse) {
                     abort(422, 'No warehouse is configured to receive stock.');
                 }
+                // Serialize creation/update of inventory rows in this warehouse,
+                // including the case where the product row does not exist yet.
+                $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($warehouse->id);
 
                 foreach ($eligibleItems as $item) {
                     $stockQuantity = $this->resolveStockableQuantity($item);
@@ -231,7 +236,7 @@ class StockInController extends Controller
                         $inventory->pending_receiving = false;
                         $inventory->save();
                     } else {
-                        Inventory::create([
+                        $inventory = Inventory::create([
                             'barcode' => $this->generateUniqueBarcode(),
                             'product_id' => $item->product_id,
                             'warehouse_id' => $warehouse->id,

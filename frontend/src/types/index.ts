@@ -106,6 +106,18 @@ export interface ApiInventoryItem {
   updated_at: string;
 }
 
+export type InventoryMovementType = 'STOCK_IN' | 'STOCK_OUT';
+
+export interface ApiInventoryMovement {
+  type: InventoryMovementType;
+  product: string | null;
+  barcode: string | null;
+  warehouse: string | null;
+  warehouse_id: number | null;
+  quantity: number;
+  occurred_at: string;
+}
+
 export interface ApiReceivingItem {
   id: number;
   product_id: number;

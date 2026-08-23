@@ -4,12 +4,15 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\InventoryHistoryController;
 use App\Http\Controllers\Api\StockInController;
 use App\Http\Controllers\Api\ReceivingController;
 use App\Http\Controllers\Api\QaInspectionController;
 use App\Http\Controllers\Api\AdminOrderController;
 use App\Http\Controllers\Api\PlantManagerOrderController;
 use App\Http\Controllers\Api\StockOutController;
+use App\Http\Controllers\Api\AdminLogisticsController;
+use App\Http\Controllers\Api\PlantManagerShipmentController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -31,6 +34,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/warehouses', [UserController::class, 'warehouses']);
 
     Route::get('/inventory', [InventoryController::class, 'index']);
+    Route::get('/inventory/movements/recent', [InventoryHistoryController::class, 'recent']);
+    Route::get('/inventory/movements', [InventoryHistoryController::class, 'index']);
     Route::post('/inventory', [InventoryController::class, 'store']);
     Route::get('/inventory/{id}', [InventoryController::class, 'show']);
     Route::put('/inventory/{id}', [InventoryController::class, 'update']);
@@ -62,6 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus']);
     });
 
+    Route::get('/admin/logistics/shipments', [AdminLogisticsController::class, 'index']);
+
     Route::prefix('plant-manager/orders')->group(function () {
         Route::get('/', [PlantManagerOrderController::class, 'index']);
         Route::get('/summary', [PlantManagerOrderController::class, 'summary']);
@@ -77,6 +84,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/orders/{order}/start', [StockOutController::class, 'start']);
         Route::post('/orders/{order}/scan', [StockOutController::class, 'scan']);
         Route::post('/orders/{order}/release', [StockOutController::class, 'release']);
-        Route::post('/orders/{order}/submit-to-shipment', [StockOutController::class, 'submitToShipment']);
+    });
+
+    Route::prefix('plant-manager/shipments')->group(function () {
+        Route::get('/', [PlantManagerShipmentController::class, 'index']);
+        Route::post('/{order}/forward-to-logistics', [PlantManagerShipmentController::class, 'forwardToLogistics']);
     });
 });

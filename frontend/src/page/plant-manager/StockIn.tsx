@@ -827,9 +827,9 @@ const StockIn: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 items-stretch">
+        <div className="lg:col-span-2 flex">
+          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 w-full">
             <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
               <Clock className="w-4 h-4 text-cyan-400" />
               Pending Deliveries
@@ -864,38 +864,16 @@ const StockIn: React.FC = () => {
           </div>
         </div>
 
-        <div className="lg:col-span-1 space-y-4">
-          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-cyan-400" />
-              Receiving Timeline
-            </h3>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-              {timelineSteps.map((step, idx) => (
-                <div key={idx} className="flex items-start gap-3">
-                  <div className="relative flex flex-col items-center">
-                    <div className={`w-3 h-3 rounded-full border-2 ${step.done ? 'bg-cyan-500 border-cyan-500' : 'bg-slate-700 border-slate-600'}`} />
-                    {idx < timelineSteps.length - 1 && <div className={`w-0.5 h-6 ${step.done ? 'bg-cyan-500' : 'bg-slate-700'}`} />}
-                  </div>
-                  <div>
-                    <p className={`text-sm font-medium ${step.done ? 'text-white' : 'text-slate-500'}`}>{step.label}</p>
-                    <p className="text-xs text-slate-400">{step.time}</p>
-                  </div>
-                </div>
-              ))}
-              {timelineSteps.length === 0 && <p className="text-xs text-slate-500">Select a receiving to view its timeline.</p>}
-            </div>
-          </div>
-
-          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
+        <div className="lg:col-span-1 flex">
+          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 w-full h-full min-h-[320px] flex flex-col">
             <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
               <Package className="w-4 h-4 text-cyan-400" />
               Receiving Summary
             </h3>
-            <div className="h-36">
+            <div className="flex-1 min-h-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} dataKey="value" label={false}>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" dataKey="value" label={false}>
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -904,11 +882,55 @@ const StockIn: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex justify-center gap-4 text-xs">
+            <div className="flex justify-center flex-wrap gap-4 text-xs pt-2">
               <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Ready {Math.round((qaPassed / pieTotal) * 100)}%</div>
               <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Rejected {Math.round((rejected / pieTotal) * 100)}%</div>
               <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Pending {Math.round((pendingQa / pieTotal) * 100)}%</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full mt-6">
+        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-cyan-400" />
+            Receiving Timeline
+          </h3>
+          <div className="overflow-x-auto pb-1">
+            <div className="flex items-start min-w-[700px]">
+              {timelineSteps.map((step, idx) => {
+                const isFirst = idx === 0;
+                const isLast = idx === timelineSteps.length - 1;
+                const incomingDone = !isFirst && timelineSteps[idx - 1].done;
+                return (
+                  <div key={idx} className="flex-1 min-w-0 flex flex-col items-center text-center">
+                    <div className="flex items-center w-full">
+                      <div
+                        className={`h-0.5 flex-1 ${
+                          isFirst ? 'bg-transparent' : incomingDone ? 'bg-cyan-500' : 'bg-slate-700'
+                        }`}
+                      />
+                      <div
+                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
+                          step.done ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : 'border-slate-600 bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {step.done ? <Check className="w-4 h-4 text-cyan-400" /> : idx + 1}
+                      </div>
+                      <div
+                        className={`h-0.5 flex-1 ${
+                          isLast ? 'bg-transparent' : step.done ? 'bg-cyan-500' : 'bg-slate-700'
+                        }`}
+                      />
+                    </div>
+                    <p className={`text-sm font-medium mt-2 px-2 ${step.done ? 'text-white' : 'text-slate-500'}`}>{step.label}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 px-2">{step.time}</p>
+                  </div>
+                );
+              })}
+            </div>
+            {timelineSteps.length === 0 && <p className="text-xs text-slate-500">Select a receiving to view its timeline.</p>}
           </div>
         </div>
       </div>

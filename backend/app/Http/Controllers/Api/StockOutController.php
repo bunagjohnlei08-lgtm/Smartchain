@@ -19,7 +19,11 @@ use Illuminate\Validation\ValidationException;
 
 class StockOutController extends Controller
 {
-    private const STATUSES = ['READY_FOR_STOCK_OUT', 'STOCK_OUT_IN_PROGRESS', 'READY_FOR_SHIPMENT'];
+    /**
+     * Stock Out only owns orders that are still being picked. The moment every item is
+     * released the order becomes READY_FOR_SHIPMENT and leaves this module for good.
+     */
+    private const STATUSES = Order::STOCK_OUT_STATUSES;
 
     public function index(Request $request): JsonResponse
     {
@@ -71,7 +75,10 @@ class StockOutController extends Controller
     {
         $user = $this->plantManager($request);
         $orders = $this->ordersFor($user);
-        $counts = (clone $orders)->selectRaw('status, COUNT(*) aggregate')->groupBy('status')->pluck('aggregate', 'status');
+        // Counts for stages after Stock Out must span every assigned order, because the
+        // work-queue scope above deliberately stops at STOCK_OUT_IN_PROGRESS.
+        $assigned = $this->assignedOrders($user);
+        $counts = (clone $assigned)->selectRaw('status, COUNT(*) aggregate')->groupBy('status')->pluck('aggregate', 'status');
         $today = StockOutTransaction::query()
             ->whereHas('order', fn(Builder $query) => $query->where('assigned_to', $user->id))
             ->whereDate('stock_out_transactions.created_at', today());
@@ -80,9 +87,11 @@ class StockOutController extends Controller
             'orders_ready' => (int) ($counts['READY_FOR_STOCK_OUT'] ?? 0),
             'picking_today' => (clone $orders)->where('status', 'STOCK_OUT_IN_PROGRESS')
                 ->whereHas('histories', fn(Builder $history) => $history->where('action', 'STOCK_OUT_STARTED')->whereDate('created_at', today()))->count(),
-            'ready_for_shipment' => (int) ($counts['READY_FOR_SHIPMENT'] ?? 0),
-            'waiting_logistics' => (int) ($counts['READY_FOR_SHIPMENT'] ?? 0),
-            'released_today' => (clone $orders)->where('status', 'READY_FOR_SHIPMENT')
+            'ready_for_shipment' => (int) ($counts[Order::SHIPMENT_STATUS] ?? 0),
+            'waiting_logistics' => (int) ($counts[Order::LOGISTICS_STATUS] ?? 0),
+            // Released today is a historical fact, so it must not depend on where the
+            // order has since moved to.
+            'released_today' => (clone $assigned)
                 ->whereHas('histories', fn(Builder $history) => $history->where('action', 'STOCK_OUT_COMPLETED')->whereDate('created_at', today()))->count(),
             'items_released' => (int) (clone $today)->sum('quantity'),
             'value_released' => round((float) (clone $today)->join('order_items', 'stock_out_transactions.order_item_id', '=', 'order_items.id')
@@ -215,31 +224,6 @@ class StockOutController extends Controller
         return response()->json($result);
     }
 
-    public function submitToShipment(Request $request, int $order): JsonResponse
-    {
-        $user = $this->plantManager($request);
-        $record = DB::transaction(function () use ($user, $order) {
-            $record = $this->ordersFor($user)->lockForUpdate()->findOrFail($order);
-            if ($record->status !== 'READY_FOR_SHIPMENT') {
-                throw ValidationException::withMessages(['status' => 'Complete Stock Out before submitting this order to Shipment.']);
-            }
-            if (!$this->allItemsReleased($record)) {
-                throw ValidationException::withMessages(['items' => 'All required order items must be stocked out before shipment submission.']);
-            }
-
-            $record->histories()->create([
-                'previous_status' => 'READY_FOR_SHIPMENT',
-                'new_status' => 'READY_FOR_SHIPMENT',
-                'action' => 'SUBMITTED_TO_SHIPMENT',
-                'performed_by' => $user->id,
-            ]);
-
-            return $record;
-        });
-
-        return response()->json(['id' => $record->id, 'status' => $record->status]);
-    }
-
     private function assertOrderReady(Order $order, ?int $warehouseId): void
     {
         $errors = [];
@@ -330,12 +314,18 @@ class StockOutController extends Controller
         return $user;
     }
 
+    /** The Stock Out work queue: strictly orders still being picked. */
     private function ordersFor(User $user): Builder
     {
         return Order::query()
             ->where('assigned_to', $user->id)
-            ->whereIn('status', self::STATUSES)
-            ->whereDoesntHave('histories', fn (Builder $history) => $history->where('action', 'SUBMITTED_TO_SHIPMENT'));
+            ->whereIn('status', self::STATUSES);
+    }
+
+    /** Every order assigned to the manager, for KPI counters that span later stages. */
+    private function assignedOrders(User $user): Builder
+    {
+        return Order::query()->where('assigned_to', $user->id);
     }
 
     private function releasedFor(OrderItem $item): int

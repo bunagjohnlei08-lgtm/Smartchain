@@ -11,8 +11,17 @@ class Order extends Model
     public const STATUSES = [
         'NEW', 'ASSIGNED', 'PREPARING', 'READY_FOR_STOCK_OUT',
         'STOCK_OUT_IN_PROGRESS', 'STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT',
-        'IN_TRANSIT', 'DELIVERED', 'CANCELLED',
+        'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED',
     ];
+
+    /** Orders still inside the Stock Out work queue. */
+    public const STOCK_OUT_STATUSES = ['READY_FOR_STOCK_OUT', 'STOCK_OUT_IN_PROGRESS'];
+
+    /** Stock Out is done; waiting for the Plant Manager to forward to Logistics. */
+    public const SHIPMENT_STATUS = 'READY_FOR_SHIPMENT';
+
+    /** Handed to Admin Logistics (DTRS). */
+    public const LOGISTICS_STATUS = 'FORWARDED_TO_LOGISTICS';
 
     protected $fillable = [
         'order_no', 'reference_no', 'customer_name', 'customer_address',
