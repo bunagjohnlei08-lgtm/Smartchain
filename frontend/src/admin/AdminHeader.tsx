@@ -1,8 +1,30 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, LogOut } from 'lucide-react';
 
 export default function AdminHeader() {
+  const [userName, setUserName] = useState('User');
+  const [userInitials, setUserInitials] = useState('U');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('user');
+      if (raw) {
+        const user: { name?: string } = JSON.parse(raw);
+        const fullName = user.name?.trim() || '';
+        if (fullName) {
+          setUserName(fullName);
+          const parts = fullName.split(/\s+/);
+          const first = parts[0]?.[0] ?? '';
+          const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+          setUserInitials((first + last).toUpperCase() || 'U');
+        }
+      }
+    } catch {
+      // ignore parse errors; fallback initials remain
+    }
+  }, []);
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAuthenticated');
@@ -25,9 +47,9 @@ export default function AdminHeader() {
         {/* User Profile */}
         <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-gray-800 rounded-xl px-2 py-1 transition-all">
            <div className="w-9 h-9 bg-blue-900/60 text-blue-400 font-semibold rounded-full flex items-center justify-center text-sm border border-blue-700/40">
-              JL
+              {userInitials}
            </div>
-           <span className="hidden sm:inline text-sm text-gray-300">John Lei</span>
+           <span className="hidden sm:inline text-sm text-gray-300">{userName}</span>
           <ChevronDown className="w-4 h-4 text-gray-400" />
         </div>
 

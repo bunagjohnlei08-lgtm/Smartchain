@@ -31,6 +31,7 @@ class ReceivingController extends Controller
             'purchase_order' => $receiving->purchase_order,
             'supplier' => $receiving->supplier,
             'reference_no' => $receiving->reference_no,
+            'notes' => $receiving->notes,
             'delivery_date' => $receiving->delivery_date?->toDateString(),
             'status' => $receiving->status,
             'prepared_by' => $receiving->preparedBy?->name,
@@ -58,6 +59,8 @@ class ReceivingController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
         $query = Receiving::query()->with(['items', 'timeline', 'preparedBy']);
 
         if ($request->filled('status')) {
@@ -86,6 +89,8 @@ class ReceivingController extends Controller
 
     public function show(Request $request, $id)
     {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
         $receiving = Receiving::findOrFail($id);
 
         return response()->json($this->present($receiving));
@@ -108,6 +113,8 @@ class ReceivingController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
         $validated = $request->validate([
             'purchase_order' => 'required|string|max:255',
             'supplier' => 'required|string|max:255',

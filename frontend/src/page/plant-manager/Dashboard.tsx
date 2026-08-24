@@ -6,7 +6,6 @@ import {
   Wallet,
   AlertTriangle,
   ShieldAlert,
-  ClipboardList,
   ArrowDownCircle,
   ArrowUpCircle,
   Search,
@@ -36,9 +35,6 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  PieChart as RePieChart,
-  Pie,
-  Cell,
   Legend,
 } from 'recharts';
 
@@ -99,7 +95,6 @@ const kpiData: KPI[] = [
   { label: 'Stock Value', value: '$2.48M', change: '+5.8%', icon: <Wallet className="w-5 h-5" />, trend: 'up' },
   { label: 'Low Stock Items', value: '42', change: '-6', icon: <AlertTriangle className="w-5 h-5" />, trend: 'down' },
   { label: 'Out of Stock', value: '9', change: '-2', icon: <ShieldAlert className="w-5 h-5" />, trend: 'down' },
-  { label: 'Pending POs', value: '14', change: '+4', icon: <ClipboardList className="w-5 h-5" />, trend: 'up' },
   { label: "Today's Stock In", value: '1,860', change: '+12.4%', icon: <ArrowDownCircle className="w-5 h-5" />, trend: 'up' },
   { label: "Today's Stock Out", value: '1,204', change: '-4.1%', icon: <ArrowUpCircle className="w-5 h-5" />, trend: 'down' },
 ];
@@ -113,12 +108,9 @@ const lowStockItems: LowStockItem[] = [
 ];
 
 const transactions: Transaction[] = [
-  { id: '1', reference: 'PO-2857', type: 'Approved', product: 'Industrial LED Panel 40W', qty: 240, user: 'A. Reyes', time: '12 min ago' },
   { id: '2', reference: 'SO-4412', type: 'Info', product: 'Thermal Label Roll 4x6', qty: 60, user: 'M. Lim', time: '34 min ago' },
-  { id: '3', reference: 'PO-2855', type: 'Approved', product: 'Aluminium Profile 6m', qty: 120, user: 'A. Reyes', time: '1 hr ago' },
   { id: '4', reference: 'SO-4411', type: 'Info', product: 'Cordless Impact Driver', qty: 18, user: 'R. Diaz', time: '2 hr ago' },
   { id: '5', reference: 'ADJ-221', type: 'Draft', product: 'Safety Helmet Class E', qty: -3, user: 'L. Cruz', time: '3 hr ago' },
-  { id: '6', reference: 'PO-2851', type: 'Approved', product: 'Servo Motor 400W', qty: 24, user: 'A. Reyes', time: '5 hr ago' },
 ];
 
 const supplierData: SupplierPerformance[] = [
@@ -144,14 +136,6 @@ const inventoryTrendData = [
   { month: 'May', stock: 58000, value: 2.2 },
   { month: 'Jun', stock: 60000, value: 2.4 },
   { month: 'Jul', stock: 59000, value: 2.48 },
-];
-
-const poStatusData = [
-  { name: 'Completed', value: 1204, color: '#10b981' },
-  { name: 'Approved', value: 42, color: '#06b6d4' },
-  { name: 'Draft', value: 8, color: '#a855f7' },
-  { name: 'Pending', value: 14, color: '#f59e0b' },
-  { name: 'Partially Received', value: 12, color: '#0284c7' },
 ];
 
 const stockMovementData = [
@@ -233,7 +217,7 @@ const Dashboard: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                <input
                  type="text"
-                 placeholder="Search products, PO, SKU..."
+                 placeholder="Search products or SKU..."
                  className="pl-9 pr-4 py-2 rounded-xl bg-[#0d1322] border border-slate-800 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full sm:w-72"
                />
             </div>
@@ -255,13 +239,13 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* ============================================================
-          KPI METRICS GRID — 4 CARDS PER ROW
+          KPI METRICS GRID
       ============================================================ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-4 lg:gap-6">
         {kpiData.map((kpi, idx) => (
           <div
             key={idx}
-            className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-slate-600 transition-all group"
+            className={`bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-slate-600 transition-all group ${idx === kpiData.length - 1 ? 'sm:col-span-2 xl:col-span-1' : ''}`}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
@@ -283,11 +267,11 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* ============================================================
-          CHARTS SECTION 1 — Inventory Trend (8/12) + PO Status (4/12)
+          CHARTS SECTION 1 — Inventory Trend
       ============================================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div>
         {/* Inventory Trend */}
-        <div className="lg:col-span-8 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
+        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Inventory Trend</h3>
@@ -330,63 +314,14 @@ const Dashboard: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* PO Status Donut Chart */}
-        <div className="lg:col-span-4 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6 flex flex-col justify-between items-center h-full min-h-[340px]">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-white font-semibold">Purchase Order Status</h3>
-              <p className="text-slate-400 text-sm">Distribution across the last 90 days</p>
-            </div>
-            <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-              <MoreVertical className="w-4 h-4" />
-            </button>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <RePieChart>
-              <Pie
-                data={poStatusData}
-                cx="50%"
-                cy="45%"
-                innerRadius={55}
-                outerRadius={80}
-                paddingAngle={3}
-                dataKey="value"
-                label={false}
-                labelLine={false}
-                isAnimationActive={true}
-                animationDuration={1400}
-                animationEasing="ease-out"
-                animationBegin={200}
-              >
-                {poStatusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} stroke="#0f172a" strokeWidth={2} />
-                ))}
-              </Pie>
-            </RePieChart>
-          </ResponsiveContainer>
-          {/* CUSTOM CLEAN LEGEND */}
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-2 px-2 text-xs font-medium">
-            {poStatusData.map((entry, index) => (
-              <div key={`legend-${index}`} className="flex items-center gap-1.5">
-                <span
-                  className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                  style={{ backgroundColor: entry.color }}
-                />
-                <span style={{ color: entry.color }} className="whitespace-nowrap">
-                  {entry.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* ============================================================
           CHARTS SECTION 2 — Stock Movement (6/12) + Monthly Activity (6/12)
       ============================================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Stock Movement */}
-        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
+        <div className="min-w-0 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Stock Movement</h3>
@@ -412,7 +347,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Monthly Inventory Activity */}
-        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
+        <div className="min-w-0 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Monthly Inventory Activity</h3>
@@ -442,9 +377,9 @@ const Dashboard: React.FC = () => {
       {/* ============================================================
           BOTTOM DATA PANELS — Low Stock Summary (4/12) + Recent Transactions (8/12)
       ============================================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid min-w-0 grid-cols-1 xl:grid-cols-12 gap-6">
         {/* Low Stock Summary */}
-        <div className="lg:col-span-4 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
+        <div className="min-w-0 xl:col-span-4 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Low Stock Summary</h3>
@@ -482,7 +417,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Recent Transactions */}
-        <div className="lg:col-span-8 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
+        <div className="min-w-0 xl:col-span-8 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-lg font-semibold text-white">Recent Transactions</h3>
@@ -537,10 +472,10 @@ const Dashboard: React.FC = () => {
       {/* ============================================================
           NEW BOTTOM SECTION: Supplier Performance & AI Forecast
       ============================================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Supplier Performance */}
-        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="min-w-0 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6">
+          <div className="flex flex-col items-start justify-between gap-3 mb-4 sm:flex-row sm:items-center">
             <div>
               <h3 className="text-white font-semibold">Supplier Performance</h3>
               <p className="text-slate-400 text-sm">On-time delivery and quality score</p>
@@ -591,8 +526,8 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* AI Forecast Summary */}
-        <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-1">
+        <div className="min-w-0 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6">
+          <div className="flex flex-col items-start justify-between gap-3 mb-1 sm:flex-row sm:items-center">
             <div>
               <h3 className="text-white font-semibold">AI Forecast Summary</h3>
               <p className="text-slate-400 text-xs">View only — model training is not available to Plant Manager</p>
@@ -611,9 +546,9 @@ const Dashboard: React.FC = () => {
             {forecastData.map((product) => (
               <div
                 key={product.id}
-                className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-4"
+                className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4"
               >
-                <div>
+                <div className="min-w-0">
                   <p className="text-white text-sm font-medium">{product.name}</p>
                   <p className="text-slate-400 text-xs">
                     Demand {product.demand} · Reorder {product.reorder}

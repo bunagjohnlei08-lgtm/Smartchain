@@ -26,16 +26,16 @@ const FormButton: React.FC<FormButtonProps> = ({
   isLoading = false,
   disabled = false,
 }) => {
-  const baseClasses = 'w-full flex justify-center py-3 px-4 border text-sm font-medium rounded-lg transition-all duration-200 min-h-[44px]';
+  const baseClasses = 'w-full flex items-center justify-center gap-2 py-3 px-4 border text-sm font-semibold rounded-xl transition-all duration-200 min-h-12 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#081526] disabled:cursor-not-allowed disabled:opacity-60';
 
   const variantClasses: Record<FormButtonVariant, string> = {
-    primary: 'border-transparent hover:opacity-90 hover:shadow-lg',
+    primary: 'border-transparent hover:brightness-110 hover:shadow-[0_10px_30px_rgba(37,99,235,0.24)] active:brightness-95 active:shadow-none',
     secondary: 'hover:opacity-80',
     google: 'inline-flex items-center gap-2 hover:opacity-80',
   };
 
   const styleMap: Record<FormButtonVariant, React.CSSProperties> = {
-    primary: { backgroundColor: '#5B8CFF', color: '#F5F7FA' },
+    primary: { background: 'linear-gradient(90deg, #5B8CFF 0%, #2563EB 100%)', color: '#F5F7FA' },
     secondary: { backgroundColor: 'transparent', borderColor: '#2A3447', color: '#A2AAB8' },
     google: { backgroundColor: '#091018', borderColor: '#2A3447', color: '#F5F7FA' },
   };
@@ -45,6 +45,7 @@ const FormButton: React.FC<FormButtonProps> = ({
       type={type}
       onClick={onClick}
       disabled={disabled || isLoading}
+      aria-busy={isLoading}
       className={`${baseClasses} ${variantClasses[variant]}`}
       style={styleMap[variant]}
     >

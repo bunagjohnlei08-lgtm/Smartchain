@@ -51,33 +51,42 @@ const QALayout: React.FC = () => {
       {/* Mobile Hamburger */}
       <button
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-slate-900 text-white shadow-lg"
+        className="xl:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-slate-900 text-white shadow-lg"
+        aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        aria-expanded={isMobileMenuOpen}
+        aria-controls="qa-sidebar"
       >
         {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
       {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0">
+      <div
+        id="qa-sidebar"
+        className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ease-in-out xl:relative xl:translate-x-0 ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         <QASidebar />
       </div>
 
       {/* Overlay for mobile */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-30 xl:hidden"
+          aria-hidden="true"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#090d16]">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#090d16]">
         {/* Top Bar */}
-        <header className="flex items-center h-16 px-4 md:px-6 border-b border-slate-800/80 bg-[#090d16] sticky top-0 z-40 flex-shrink-0">
-          <div className="flex items-center flex-1 min-w-0">
-            <div className="lg:hidden w-10" />
-            <div>
-              <h1 className="text-sm font-semibold text-white">Quality Assurance & Control</h1>
-              <p className="text-xs text-slate-400">Plant 02 — Receiving Inspection</p>
+        <header className="sticky top-0 z-40 flex h-16 min-h-16 max-h-16 flex-shrink-0 items-center overflow-hidden border-b border-slate-800/80 bg-[#090d16] px-4 md:px-6">
+          <div className="flex min-w-0 flex-1 items-center">
+            <div className="w-10 flex-shrink-0 xl:hidden" />
+            <div className="hidden min-w-0 md:block">
+              <h1 className="truncate whitespace-nowrap text-sm font-semibold text-white">Quality Assurance & Control</h1>
+              <p className="truncate whitespace-nowrap text-xs text-slate-400">Plant 02 — Receiving Inspection</p>
             </div>
           </div>
 
@@ -120,7 +129,7 @@ const QALayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-[#090d16]">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16]">
           <Outlet />
         </main>
       </div>

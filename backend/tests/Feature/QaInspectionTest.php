@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Product;
 use App\Models\QaInspection;
+use App\Models\Branch;
+use App\Models\Inventory;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -110,7 +113,8 @@ class QaInspectionTest extends TestCase
                     'receiving_item_id' => $receiving->items[1]->id,
                     'accepted_quantity' => 3,
                     'rejected_quantity' => 2,
-                    'inspection_result' => 'Partial',
+                    // The server must derive the auditable result from quantities.
+                    'inspection_result' => 'Passed',
                     'remarks' => 'Two damaged pieces.',
                 ],
             ],
@@ -138,6 +142,74 @@ class QaInspectionTest extends TestCase
             'inspection_status' => 'Partial',
         ]);
 
+        $this->assertDatabaseHas('qa_inspections', [
+            'receiving_id' => $receiving->id,
+            'status' => 'Partial',
+        ]);
+        $this->assertDatabaseHas('qa_inspection_items', [
+            'receiving_item_id' => $receiving->items[1]->id,
+            'remarks' => 'Two damaged pieces.',
+        ]);
+        $this->assertDatabaseHas('receiving_timelines', [
+            'receiving_id' => $receiving->id,
+            'status' => 'Ready for Stock In',
+        ]);
+
+        $this->actingAs($qa)
+            ->getJson('/api/qa/inspections')
+            ->assertOk()
+            ->assertJsonMissing(['receiving_no' => $receiving->receiving_no]);
+    }
+
+    public function test_partial_inspection_moves_only_accepted_quantity_to_stock_in(): void
+    {
+        $qa = $this->qaUser();
+        $plantManagerRole = Role::create([
+            'name' => 'Plant Manager',
+            'slug' => 'PLANT_MANAGER',
+        ]);
+        $plantManager = User::factory()->create(['role_id' => $plantManagerRole->id]);
+        $branch = Branch::create(['name' => 'Main Branch', 'code' => 'BR-MAIN']);
+        Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id]);
+        $receiving = $this->makeReceiving([
+            ['product' => 'Partial Widget', 'qty' => 5],
+        ]);
+        $item = $receiving->items->firstOrFail();
+
+        $inspection = $this->actingAs($qa)->postJson("/api/qa/inspections/{$receiving->id}", [
+            'items' => [[
+                'receiving_item_id' => $item->id,
+                'accepted_quantity' => 3,
+                'rejected_quantity' => 2,
+                'inspection_result' => 'Partial',
+                'remarks' => 'Two rejected units.',
+            ]],
+        ]);
+
+        $inspection->assertOk()
+            ->assertJsonPath('inspection_status', 'Partial')
+            ->assertJsonPath('products.0.inspection_result', 'Partial');
+
+        $stockInList = $this->actingAs($plantManager)->getJson('/api/stock-in/receivings');
+        $stockInList->assertOk()
+            ->assertJsonPath('data.0.qa_status', 'Partial')
+            ->assertJsonPath('data.0.stock_in_status', 'Ready for Stock In')
+            ->assertJsonPath('data.0.eligible_quantity', 3);
+
+        $this->actingAs($plantManager)
+            ->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")
+            ->assertOk()
+            ->assertJsonPath('qa_status', 'Partial')
+            ->assertJsonPath('stock_in_status', 'Completed');
+
+        $this->assertDatabaseHas('inventories', [
+            'product_id' => $item->product_id,
+            'available_stock' => 3,
+        ]);
+        $this->assertDatabaseMissing('inventories', [
+            'product_id' => $item->product_id,
+            'available_stock' => 5,
+        ]);
         $this->assertDatabaseHas('qa_inspections', [
             'receiving_id' => $receiving->id,
             'status' => 'Partial',
@@ -179,5 +251,37 @@ class QaInspectionTest extends TestCase
 
         $response->assertStatus(403);
         $response->assertJsonPath('message', 'Unauthorized QA access.');
+    }
+
+    public function test_admin_can_view_but_cannot_update_qa_notes(): void
+    {
+        $adminRole = Role::create(['name' => 'Admin', 'slug' => 'ADMIN']);
+        $admin = User::factory()->create(['role_id' => $adminRole->id]);
+        $receiving = $this->makeReceiving([
+            ['product' => 'Widget A', 'qty' => 5],
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson("/api/qa/inspections/{$receiving->id}")
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->postJson("/api/qa/inspections/{$receiving->id}", [
+                'submit' => false,
+                'items' => [[
+                    'receiving_item_id' => $receiving->items[0]->id,
+                    'accepted_quantity' => 0,
+                    'rejected_quantity' => 0,
+                    'inspection_result' => 'Pending',
+                    'remarks' => 'Admin must not be able to save this note.',
+                ]],
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Only QA Supervisors can save QA inspections and notes.');
+
+        $this->assertDatabaseMissing('qa_inspection_items', [
+            'receiving_item_id' => $receiving->items[0]->id,
+            'remarks' => 'Admin must not be able to save this note.',
+        ]);
     }
 }

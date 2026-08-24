@@ -8,11 +8,16 @@ use App\Http\Controllers\Api\InventoryHistoryController;
 use App\Http\Controllers\Api\StockInController;
 use App\Http\Controllers\Api\ReceivingController;
 use App\Http\Controllers\Api\QaInspectionController;
+use App\Http\Controllers\Api\QaInspectionHistoryController;
+use App\Http\Controllers\Api\QaRejectedItemsController;
+use App\Http\Controllers\Api\QaQualityReportController;
+use App\Http\Controllers\Api\QaDashboardController;
 use App\Http\Controllers\Api\AdminOrderController;
 use App\Http\Controllers\Api\PlantManagerOrderController;
 use App\Http\Controllers\Api\StockOutController;
 use App\Http\Controllers\Api\AdminLogisticsController;
 use App\Http\Controllers\Api\PlantManagerShipmentController;
+use App\Http\Controllers\Api\PlantManagerReceivingNoteController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -51,7 +56,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/receivings/{id}', [ReceivingController::class, 'show']);
     Route::post('/receivings', [ReceivingController::class, 'store']);
 
+    Route::put('/plant-manager/receivings/{receiving}/notes', [PlantManagerReceivingNoteController::class, 'update']);
+
     Route::get('/qa/inspections', [QaInspectionController::class, 'index']);
+    Route::get('/qa/dashboard', [QaDashboardController::class, 'index']);
+    Route::get('/qa/inspection-history', [QaInspectionHistoryController::class, 'index']);
+    Route::get('/qa/rejected-items', [QaRejectedItemsController::class, 'index']);
+    Route::get('/qa/quality-reports', [QaQualityReportController::class, 'index']);
     Route::get('/qa/inspections/{receivingId}', [QaInspectionController::class, 'show']);
     Route::post('/qa/inspections/{receivingId}', [QaInspectionController::class, 'store']);
     Route::put('/qa/inspections/{receivingId}', [QaInspectionController::class, 'update']);

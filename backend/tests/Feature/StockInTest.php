@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\Inventory;
 use App\Models\Product;
+use App\Models\QaInspection;
+use App\Models\QaInspectionItem;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\Role;
@@ -19,14 +21,31 @@ class StockInTest extends TestCase
 
     private function makeReceiving(array $itemStates): Receiving
     {
+        $hasAcceptedItems = collect($itemStates)->contains(
+            fn (array $state) => in_array($state['inspection_status'], ['Passed', 'Partial'], true)
+        );
+        $hasRejectedItems = collect($itemStates)->contains(
+            fn (array $state) => $state['inspection_status'] === 'Rejected'
+        );
+        $overallStatus = $hasAcceptedItems ? ($hasRejectedItems ? 'Partial' : 'Passed') : ($hasRejectedItems ? 'Rejected' : 'Pending QA');
+
         $receiving = Receiving::create([
             'receiving_no' => 'RCV-'.uniqid(),
             'purchase_order' => 'PO-1',
             'supplier' => 'Test Supplier',
             'reference_no' => 'REF-1',
             'delivery_date' => now()->toDateString(),
-            'status' => 'Passed',
+            'status' => $overallStatus,
         ]);
+
+        $inspection = $overallStatus !== 'Pending QA'
+            ? QaInspection::create([
+                'receiving_id' => $receiving->id,
+                'status' => $overallStatus,
+                'started_at' => now()->subMinute(),
+                'completed_at' => now(),
+            ])
+            : null;
 
         foreach ($itemStates as $state) {
             $product = Product::create([
@@ -35,7 +54,7 @@ class StockInTest extends TestCase
                 'cost_price' => 100,
             ]);
 
-            ReceivingItem::create([
+            $receivingItem = ReceivingItem::create([
                 'receiving_id' => $receiving->id,
                 'product_id' => $product->id,
                 'product_name' => $product->name,
@@ -43,6 +62,17 @@ class StockInTest extends TestCase
                 'unit' => 'pcs',
                 'inspection_status' => $state['inspection_status'],
             ]);
+
+            if ($inspection) {
+                $accepted = in_array($state['inspection_status'], ['Passed', 'Partial'], true) ? $state['qty'] : 0;
+                QaInspectionItem::create([
+                    'qa_inspection_id' => $inspection->id,
+                    'receiving_item_id' => $receivingItem->id,
+                    'accepted_quantity' => $accepted,
+                    'rejected_quantity' => $state['qty'] - $accepted,
+                    'inspection_result' => $state['inspection_status'],
+                ]);
+            }
         }
 
         return $receiving;
@@ -94,6 +124,11 @@ class StockInTest extends TestCase
             'product_id' => $passedItem->product_id,
             'available_stock' => 10,
         ]);
+        $this->assertDatabaseHas('receiving_timelines', [
+            'receiving_id' => $receiving->id,
+            'status' => 'Stock In Completed',
+            'performed_by' => $user->name,
+        ]);
 
         $rejectedItem = $receiving->items()->where('product_name', 'Widget B')->first();
         $this->assertNull($rejectedItem->stocked_in_at);
@@ -143,6 +178,14 @@ class StockInTest extends TestCase
         $receiving = $this->makeReceiving([['product' => 'Restricted', 'qty' => 2, 'inspection_status' => 'Passed']]);
 
         $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")->assertForbidden();
+        $this->assertDatabaseCount('inventories', 0);
+    }
+
+    public function test_unauthenticated_user_cannot_perform_stock_in(): void
+    {
+        $receiving = $this->makeReceiving([['product' => 'Restricted', 'qty' => 2, 'inspection_status' => 'Passed']]);
+
+        $this->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")->assertUnauthorized();
         $this->assertDatabaseCount('inventories', 0);
     }
 }

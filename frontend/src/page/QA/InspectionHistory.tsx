@@ -1,133 +1,43 @@
-// src/page/qa/InspectionHistory.tsx
-import React, { useState, useMemo } from 'react';
-import {
-  User,
-  Calendar,
-  ChevronDown,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-  Filter,
-} from 'lucide-react';
-
-// ============================================
-// TYPES
-// ============================================
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Calendar, CheckCircle2, User, XCircle } from 'lucide-react';
+import { apiClient } from '../../lib/api';
+import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus';
 
 type DecisionStatus = 'Passed' | 'Partial' | 'Rejected';
+
+interface InspectionHistoryApi {
+  id: number;
+  receiving_no: string;
+  supplier: string;
+  product: string | null;
+  accepted_qty: number;
+  rejected_qty: number;
+  inspection_result: unknown;
+  remarks: string | null;
+  inspected_by: string | null;
+  submitted_by: string | null;
+  completed_at: string | null;
+}
 
 interface InspectionRecord {
   id: string;
   product: string;
   supplier: string;
   inspector: string;
-  timestamp: string; // e.g., "2026-08-05 • 09:14"
+  completedAt: string;
   passed: number;
   rejected: number;
-  inspectionId: string;
-  status: DecisionStatus;
+  receivingNo: string;
+  status: unknown;
+  normalizedStatus: DecisionStatus | null;
   remarks: string;
 }
 
-// ============================================
-// MOCK DATA
-// ============================================
+const timeFilters = ['Today', 'This Week', 'This Month'] as const;
+const statusOptions: Array<'All decisions' | DecisionStatus> = ['All decisions', 'Passed', 'Partial', 'Rejected'];
 
-const mockData: InspectionRecord[] = [
-  {
-    id: '1',
-    product: 'Portland Cement Type 1 (40kg)',
-    supplier: 'Cordillera Cement Corp.',
-    inspector: 'R. Villanueva',
-    timestamp: '2026-08-05 • 09:14',
-    passed: 1166,
-    rejected: 34,
-    inspectionId: 'INS-9101',
-    status: 'Partial',
-    remarks: '34 bags torn on arrival, remainder within spec.',
-  },
-  {
-    id: '2',
-    product: 'PVC Pipe Series 1000 4" x 3m',
-    supplier: 'Atlas Polymer Supply',
-    inspector: 'M. Santos',
-    timestamp: '2026-08-05 • 11:02',
-    passed: 260,
-    rejected: 0,
-    inspectionId: 'INS-9102',
-    status: 'Passed',
-    remarks: 'Dimensions and wall thickness verified on 10 samples.',
-  },
-  {
-    id: '3',
-    product: 'Deformed Steel Bar 16mm x 6m',
-    supplier: 'Northgate Steel Works',
-    inspector: 'R. Villanueva',
-    timestamp: '2026-08-05 • 13:40',
-    passed: 480,
-    rejected: 0,
-    inspectionId: 'INS-9103',
-    status: 'Passed',
-    remarks: 'Mill certificate matched batch markings.',
-  },
-  {
-    id: '4',
-    product: 'THHN Copper Wire #12 (150m)',
-    supplier: 'Volt Prime Electricals',
-    inspector: 'J. Delos Reyes',
-    timestamp: '2026-08-04 • 15:25',
-    passed: 66,
-    rejected: 9,
-    inspectionId: 'INS-9104',
-    status: 'Partial',
-    remarks: '9 rolls under-gauge; flagged for supplier return.',
-  },
-  {
-    id: '5',
-    product: 'Hex Bolt M12 x 60mm Galvanized',
-    supplier: 'Ironclad Fasteners Inc.',
-    inspector: 'A. Bautista',
-    timestamp: '2026-08-03 • 10:08',
-    passed: 0,
-    rejected: 5000,
-    inspectionId: 'INS-9105',
-    status: 'Rejected',
-    remarks: 'Entire batch failed tensile spot test. Full return issued.',
-  },
-];
-
-// ============================================
-// CONSTANTS
-// ============================================
-
-const timeFilters = ['Today', 'This Week', 'This Month'];
-const supplierOptions = [
-  'All suppliers',
-  'Cordillera Cement Corp.',
-  'Atlas Polymer Supply',
-  'Northgate Steel Works',
-  'Volt Prime Electricals',
-  'Ironclad Fasteners Inc.',
-];
-const productOptions = [
-  'All products',
-  'Portland Cement Type 1 (40kg)',
-  'PVC Pipe Series 1000 4" x 3m',
-  'Deformed Steel Bar 16mm x 6m',
-  'THHN Copper Wire #12 (150m)',
-  'Hex Bolt M12 x 60mm Galvanized',
-];
-const statusOptions = ['All decisions', 'Passed', 'Partial', 'Rejected'];
-
-// ============================================
-// HELPER COMPONENTS
-// ============================================
-
-const StatusBadge: React.FC<{ status: DecisionStatus }> = ({ status }) => {
-  const config: Record<
-    DecisionStatus,
-    { color: string; bg: string; icon: React.ReactNode }
-  > = {
+const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
+  const config: Record<DecisionStatus, { color: string; bg: string; icon: React.ReactNode }> = {
     Passed: {
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10 border-emerald-500/20',
@@ -144,184 +54,179 @@ const StatusBadge: React.FC<{ status: DecisionStatus }> = ({ status }) => {
       icon: <XCircle className="w-3.5 h-3.5" />,
     },
   };
-  const { color, bg, icon } = config[status];
+  const normalizedStatus = normalizeInspectionStatus(status);
+  const badgeConfig = normalizedStatus && normalizedStatus in config
+    ? config[normalizedStatus as DecisionStatus]
+    : {
+        color: 'text-slate-300',
+        bg: 'bg-slate-500/10 border-slate-500/20',
+        icon: <AlertCircle className="w-3.5 h-3.5" />,
+      };
+  const label = normalizedStatus && normalizedStatus in config
+    ? normalizedStatus
+    : formatStatusLabel(status);
+
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}>
-      {icon}
-      {status}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeConfig.color} ${badgeConfig.bg}`}>
+      {badgeConfig.icon}
+      {label}
     </span>
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+const isWithinTimeFilter = (dateString: string, filter: typeof timeFilters[number]): boolean => {
+  const completedAt = new Date(dateString);
+  if (Number.isNaN(completedAt.getTime())) return false;
+
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+
+  if (filter === 'This Week') {
+    start.setDate(start.getDate() - start.getDay());
+  } else if (filter === 'This Month') {
+    start.setDate(1);
+  }
+
+  return completedAt >= start && completedAt <= now;
+};
 
 const InspectionHistory: React.FC = () => {
-  // State for filters
-  const [activeTimeFilter, setActiveTimeFilter] = useState('This Week');
+  const [records, setRecords] = useState<InspectionRecord[]>([]);
+  const [activeTimeFilter, setActiveTimeFilter] = useState<typeof timeFilters[number]>('This Week');
   const [supplier, setSupplier] = useState('All suppliers');
   const [product, setProduct] = useState('All products');
-  const [status, setStatus] = useState('All decisions');
+  const [status, setStatus] = useState<'All decisions' | DecisionStatus>('All decisions');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Filter data (simplified; for mock we just filter by status and product/supplier)
-  const filteredData = useMemo(() => {
-    return mockData.filter((item) => {
-      const matchSupplier = supplier === 'All suppliers' || item.supplier === supplier;
-      const matchProduct = product === 'All products' || item.product === product;
-      const matchStatus = status === 'All decisions' || item.status === status;
-      // For time filter, we could filter by date range; for mock we just show all
-      // but we can simulate by checking if timestamp contains the current date part
-      // Since we don't have actual date objects, we'll skip time filtering for simplicity.
-      return matchSupplier && matchProduct && matchStatus;
-    });
-  }, [supplier, product, status]);
+  const fetchHistory = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiClient.get<{ data: InspectionHistoryApi[] }>('/qa/inspection-history');
+      const history = (response.data.data ?? []).map((item) => {
+        const normalizedStatus = normalizeInspectionStatus(item.inspection_result);
+        const decisionStatus = normalizedStatus && ['Passed', 'Partial', 'Rejected'].includes(normalizedStatus)
+          ? normalizedStatus as DecisionStatus
+          : null;
+
+        return {
+          id: String(item.id),
+          product: item.product ?? '-',
+          supplier: item.supplier,
+          inspector: item.submitted_by ?? item.inspected_by ?? '-',
+          completedAt: item.completed_at ?? '',
+          passed: item.accepted_qty,
+          rejected: item.rejected_qty,
+          receivingNo: item.receiving_no,
+          status: item.inspection_result,
+          normalizedStatus: decisionStatus,
+          remarks: item.remarks?.trim() || '-',
+        };
+      });
+
+      setRecords(history.sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt)));
+    } catch {
+      setError('Unable to load inspection history. Please try again.');
+      setRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  const supplierOptions = useMemo(
+    () => ['All suppliers', ...Array.from(new Set(records.map((item) => item.supplier))).sort()],
+    [records]
+  );
+  const productOptions = useMemo(
+    () => ['All products', ...Array.from(new Set(records.map((item) => item.product))).sort()],
+    [records]
+  );
+  const filteredData = useMemo(() => records.filter((item) =>
+    (supplier === 'All suppliers' || item.supplier === supplier) &&
+    (product === 'All products' || item.product === product) &&
+    (status === 'All decisions' || item.normalizedStatus === status) &&
+    isWithinTimeFilter(item.completedAt, activeTimeFilter)
+  ), [activeTimeFilter, product, records, status, supplier]);
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Inspection History</h1>
-        <p className="text-sm text-slate-400">
-          Full audit trail of quality decisions made on received deliveries.
-        </p>
+        <p className="text-sm text-slate-400">Full audit trail of quality decisions made on received deliveries.</p>
       </div>
 
-      {/* Time Filter & Dropdown Toolbar */}
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
-        {/* Time filter buttons */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {timeFilters.map((label) => (
-            <button
-              key={label}
-              onClick={() => setActiveTimeFilter(label)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                activeTimeFilter === label
-                  ? 'bg-cyan-500 text-black'
-                  : 'bg-transparent border border-gray-700 text-slate-400 hover:text-white'
-              }`}
-            >
+            <button key={label} onClick={() => setActiveTimeFilter(label)} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTimeFilter === label ? 'bg-cyan-500 text-black' : 'bg-transparent border border-gray-700 text-slate-400 hover:text-white'}`}>
               {label}
             </button>
           ))}
         </div>
 
-        {/* Dropdown filters grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Supplier</label>
-            <select
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              className="w-full bg-[#090d16] border border-gray-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 appearance-none"
-            >
-              {supplierOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Product</label>
-            <select
-              value={product}
-              onChange={(e) => setProduct(e.target.value)}
-              className="w-full bg-[#090d16] border border-gray-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 appearance-none"
-            >
-              {productOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[
+            { label: 'Supplier', value: supplier, setValue: setSupplier, options: supplierOptions },
+            { label: 'Product', value: product, setValue: setProduct, options: productOptions },
+          ].map((filter) => (
+            <div key={filter.label}>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">{filter.label}</label>
+              <select value={filter.value} onChange={(event) => filter.setValue(event.target.value)} className="w-full bg-[#090d16] border border-gray-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 appearance-none">
+                {filter.options.map((option) => <option key={option}>{option}</option>)}
+              </select>
+            </div>
+          ))}
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full bg-[#090d16] border border-gray-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 appearance-none"
-            >
-              {statusOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
+            <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="w-full bg-[#090d16] border border-gray-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 appearance-none">
+              {statusOptions.map((option) => <option key={option}>{option}</option>)}
             </select>
           </div>
         </div>
       </div>
 
-      {/* Vertical Timeline */}
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-3 text-sm text-rose-300 flex items-center justify-between gap-3">
+          <span>{error}</span>
+          <button onClick={fetchHistory} className="px-3 py-1.5 rounded-lg border border-rose-400/30 hover:bg-rose-500/10">Retry</button>
+        </div>
+      )}
+
       <div className="space-y-6">
-        {filteredData.length === 0 ? (
-          <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-8 text-center text-slate-400">
-            No inspection records found.
-          </div>
-        ) : (
-          filteredData.map((record, index) => {
-            // Determine dot color based on status
-            const dotColor =
-              record.status === 'Passed'
-                ? 'bg-emerald-500'
-                : record.status === 'Partial'
-                ? 'bg-blue-500'
-                : 'bg-red-500';
-            const dotBorder =
-              record.status === 'Passed'
-                ? 'border-emerald-500'
-                : record.status === 'Partial'
-                ? 'border-blue-500'
-                : 'border-red-500';
-
-            return (
-              <div key={record.id} className="relative pl-6">
-                {/* Vertical line (connect nodes) */}
-                {index < filteredData.length - 1 && (
-                  <div className="absolute left-1.5 top-7 bottom-0 w-0.5 bg-gray-800" />
-                )}
-                {/* Node indicator */}
-                <div
-                  className={`absolute left-0 top-1.5 w-3.5 h-3.5 rounded-full border-2 ${dotBorder} ${dotColor} ring-2 ring-gray-800/80`}
-                />
-                {/* Audit card */}
-                <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 space-y-3">
-                  {/* Header row */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">{record.product}</h3>
-                      <p className="text-sm text-slate-400">{record.supplier}</p>
-                    </div>
-                    <StatusBadge status={record.status} />
-                  </div>
-
-                  {/* Metadata row */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-300">
-                    <span className="flex items-center gap-1.5">
-                      <User className="w-4 h-4 text-slate-500" />
-                      {record.inspector}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-slate-500" />
-                      {record.timestamp}
-                    </span>
-                    <span>
-                      Passed <span className="text-emerald-400 font-medium">{record.passed.toLocaleString()}</span> /{' '}
-                      Rejected <span className="text-red-400 font-medium">{record.rejected.toLocaleString()}</span>
-                    </span>
-                    <span className="text-slate-500 font-mono text-xs">{record.inspectionId}</span>
-                  </div>
-
-                  {/* Remarks box */}
-                  <div className="bg-[#090d16] border border-gray-800/60 rounded-xl p-3.5 text-sm text-gray-300">
-                    {record.remarks}
-                  </div>
+        {loading ? (
+          <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-8 text-center text-slate-400">Loading inspection history...</div>
+        ) : filteredData.length === 0 ? (
+          <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-8 text-center text-slate-400">No inspection records found.</div>
+        ) : filteredData.map((record, index) => {
+          const dotColor = record.normalizedStatus === 'Passed' ? 'bg-emerald-500' : record.normalizedStatus === 'Partial' ? 'bg-blue-500' : record.normalizedStatus === 'Rejected' ? 'bg-red-500' : 'bg-slate-500';
+          const dotBorder = record.normalizedStatus === 'Passed' ? 'border-emerald-500' : record.normalizedStatus === 'Partial' ? 'border-blue-500' : record.normalizedStatus === 'Rejected' ? 'border-red-500' : 'border-slate-500';
+          return (
+            <div key={record.id} className="relative pl-6">
+              {index < filteredData.length - 1 && <div className="absolute left-1.5 top-7 bottom-0 w-0.5 bg-gray-800" />}
+              <div className={`absolute left-0 top-1.5 w-3.5 h-3.5 rounded-full border-2 ${dotBorder} ${dotColor} ring-2 ring-gray-800/80`} />
+              <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div><h3 className="text-lg font-semibold text-white">{record.product}</h3><p className="text-sm text-slate-400">{record.supplier}</p></div>
+                  <StatusBadge status={record.status} />
                 </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-300">
+                  <span className="flex items-center gap-1.5"><User className="w-4 h-4 text-slate-500" />{record.inspector}</span>
+                  <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-slate-500" />{record.completedAt ? new Date(record.completedAt).toLocaleString() : '-'}</span>
+                  <span>Accepted <span className="text-emerald-400 font-medium">{record.passed.toLocaleString()}</span> / Rejected <span className="text-red-400 font-medium">{record.rejected.toLocaleString()}</span></span>
+                  <span className="text-slate-500 font-mono text-xs">{record.receivingNo}</span>
+                </div>
+                <div className="bg-[#090d16] border border-gray-800/60 rounded-xl p-3.5 text-sm text-gray-300">{record.remarks}</div>
               </div>
-            );
-          })
-        )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -98,16 +98,7 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'employee_id' => 'required|string|unique:users,employee_id',
-            'role_id' => [
-                'required',
-                'exists:roles,id',
-                function ($attribute, $value, $fail) {
-                    $role = Role::find($value);
-                    if ($role && $role->slug === 'ADMIN') {
-                        $fail('Creating ADMIN accounts via this flow is not permitted.');
-                    }
-                },
-            ],
+            'role_id' => $this->roleAssignmentRules($request, true),
             'department_id' => 'nullable|exists:departments,id',
             'branch_id' => 'nullable|exists:branches,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
@@ -132,7 +123,7 @@ class UserController extends Controller
             'email' => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => 'sometimes|string|min:6',
             'employee_id' => ['sometimes', 'string', Rule::unique('users', 'employee_id')->ignore($user->id)],
-            'role_id' => ['sometimes', 'exists:roles,id'],
+            'role_id' => $this->roleAssignmentRules($request),
             'department_id' => ['sometimes', 'nullable', 'exists:departments,id'],
             'branch_id' => ['sometimes', 'nullable', 'exists:branches,id'],
             'warehouse_id' => ['sometimes', 'nullable', 'exists:warehouses,id'],
@@ -203,5 +194,29 @@ class UserController extends Controller
         }
 
         return response()->json($query->get(['id', 'name', 'code', 'branch_id']));
+    }
+
+    private function roleAssignmentRules(Request $request, bool $creating = false): array
+    {
+        return [
+            $creating ? 'required' : 'sometimes',
+            'exists:roles,id',
+            function ($attribute, $value, $fail) use ($request, $creating) {
+                $role = Role::find($value);
+
+                if ($role?->slug !== 'ADMIN') {
+                    return;
+                }
+
+                if ($creating) {
+                    $fail('Creating ADMIN accounts via this flow is not permitted.');
+                    return;
+                }
+
+                if (! $request->user()?->isAdmin()) {
+                    $fail('Only an ADMIN may assign the ADMIN role.');
+                }
+            },
+        ];
     }
 }

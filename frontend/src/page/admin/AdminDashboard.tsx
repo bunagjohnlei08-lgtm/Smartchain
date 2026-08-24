@@ -135,7 +135,7 @@ const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
 export default function AdminDashboard() {
   return (
-    <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-6 space-y-6">
+    <div className="w-full min-w-0 min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 space-y-6 overflow-x-hidden">
       
       {/* HEADER */}
       <div>
@@ -146,7 +146,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* 1. TOP STAT CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {topStats.map((stat, idx) => (
           <div
             key={idx}
@@ -175,9 +175,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* 2. CHARTS SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Inventory Movement */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between">
+        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-semibold text-white">Inventory Movement</h2>
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* AI Demand Forecast */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between">
+        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-semibold text-white">AI Demand Forecast</h2>
@@ -262,9 +262,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* 3. MIDDLE TABLES SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Recent Purchase Orders */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
+        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-semibold text-white">Recent Purchase Orders</h2>
@@ -302,7 +302,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Inventory Status */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
+        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-semibold text-white">Inventory Status</h2>
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
       {/* 4. QUICK ACTIONS */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-300">Quick Actions</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {quickActions.map((label, idx) => (
             <button
               key={idx}

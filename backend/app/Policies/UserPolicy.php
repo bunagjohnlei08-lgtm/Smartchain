@@ -63,7 +63,9 @@ class UserPolicy
         }
 
         if ($authUser->isPlantManager()) {
-            return $authUser->hasPermission('users.update') && $user->branch_id === $authUser->branch_id;
+            return ! $user->isAdmin()
+                && $authUser->hasPermission('users.update')
+                && $user->branch_id === $authUser->branch_id;
         }
 
         return false;

@@ -32,6 +32,7 @@ type OrderStatus =
   | 'Stock Out In Progress'
   | 'Stock Out Completed'
   | 'Ready for Shipment'
+  | 'Forwarded to Logistics'
   | 'In Transit'
   | 'Delivered'
   | 'Cancelled';
@@ -59,7 +60,7 @@ interface Order {
   items: OrderItem[];
   itemCount: number;
   totalAmount: number;
-  status: OrderStatus;
+  status: string;
   assignedTo: string | null;
   assignedDate: string | null;
   products: string[];
@@ -70,7 +71,19 @@ const statusLabels: Record<string, OrderStatus> = {
   NEW: 'New', ASSIGNED: 'Assigned', PREPARING: 'Preparing',
   READY_FOR_STOCK_OUT: 'Ready for Stock Out', STOCK_OUT_IN_PROGRESS: 'Stock Out In Progress', STOCK_OUT_COMPLETED: 'Stock Out Completed',
   READY_FOR_SHIPMENT: 'Ready for Shipment', IN_TRANSIT: 'In Transit',
+  FORWARDED_TO_LOGISTICS: 'Forwarded to Logistics',
   DELIVERED: 'Delivered', CANCELLED: 'Cancelled',
+};
+
+const normalizeStatusKey = (status: unknown) => String(status ?? '')
+  .trim()
+  .replace(/[\s-]+/g, '_')
+  .replace(/_+/g, '_')
+  .toUpperCase();
+
+const normalizeOrderStatus = (status: unknown): string => {
+  const originalStatus = String(status ?? '').trim();
+  return statusLabels[normalizeStatusKey(status)] ?? (originalStatus || 'Unknown');
 };
 
 const formatDate = (value: string | null) => value
@@ -83,7 +96,7 @@ const mapOrder = (order: any): Order => ({
   orderDate: formatDate(order.order_date), requiredDelivery: formatDate(order.required_delivery_date),
   items: (order.items || []).map((item: any) => ({ id: String(item.id), productId: item.product_id ? Number(item.product_id) : null, name: item.product_name || 'Unnamed product', quantity: Number(item.quantity), unit: item.unit, unitPrice: Number(item.unit_price), subtotal: Number(item.subtotal), productReferenceRequired: Boolean(item.product_reference_required || !item.product_id) })),
   itemCount: Number(order.items_count ?? order.items?.length ?? 0),
-  totalAmount: Number(order.total_amount), status: statusLabels[order.status],
+  totalAmount: Number(order.total_amount), status: normalizeOrderStatus(order.status),
   assignedTo: order.assigned_to?.name || null, assignedDate: formatDate(order.assigned_at) || null,
   products: order.products || (order.items || []).map((item: any) => item.product_name || 'Unnamed product'),
   hasInvalidProductReferences: Boolean(order.has_invalid_product_references),
@@ -151,6 +164,13 @@ const statusConfigs: Record<OrderStatus, StatusConfig> = {
     border: 'border-green-500/30',
     icon: <Check className="w-3 h-3 text-green-400" />,
   },
+  'Forwarded to Logistics': {
+    label: 'Forwarded to Logistics',
+    color: 'text-sky-400',
+    bg: 'bg-sky-500/10',
+    border: 'border-sky-500/30',
+    icon: <Truck className="w-3 h-3 text-sky-400" />,
+  },
   'In Transit': {
     label: 'In Transit',
     color: 'text-cyan-400',
@@ -174,8 +194,15 @@ const statusConfigs: Record<OrderStatus, StatusConfig> = {
   },
 };
 
-const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
-  const config = statusConfigs[status];
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const normalizedStatus = normalizeOrderStatus(status);
+  const config = statusConfigs[normalizedStatus as OrderStatus] ?? {
+    label: normalizedStatus,
+    color: 'text-slate-300',
+    bg: 'bg-slate-500/10',
+    border: 'border-slate-500/30',
+    icon: <Circle className="w-3 h-3 text-slate-400" />,
+  };
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${config.color} ${config.bg} ${config.border}`}
@@ -286,7 +313,7 @@ const OrderManagement: React.FC = () => {
   ];
 
   // Lifecycle steps for timeline
-  const lifecycleSteps: OrderStatus[] = ['New', 'Assigned', 'Preparing', 'Ready for Stock Out', 'Stock Out In Progress', 'Stock Out Completed', 'Ready for Shipment', 'In Transit', 'Delivered'];
+  const lifecycleSteps: string[] = ['New', 'Assigned', 'Preparing', 'Ready for Stock Out', 'Stock Out In Progress', 'Stock Out Completed', 'Ready for Shipment', 'Forwarded to Logistics', 'In Transit', 'Delivered'];
 
   return (
     <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
@@ -346,6 +373,7 @@ const OrderManagement: React.FC = () => {
             <option value="STOCK_OUT_IN_PROGRESS">Stock Out In Progress</option>
             <option value="STOCK_OUT_COMPLETED">Stock Out Completed</option>
             <option value="READY_FOR_SHIPMENT">Ready for Shipment</option>
+            <option value="FORWARDED_TO_LOGISTICS">Forwarded to Logistics</option>
             <option value="IN_TRANSIT">In Transit</option>
             <option value="DELIVERED">Delivered</option>
             <option value="CANCELLED">Cancelled</option>

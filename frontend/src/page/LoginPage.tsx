@@ -6,19 +6,22 @@ import FormButton from '../components/auth/FormButton';
 import FormInput from '../components/auth/FormInput';
 import api from '../lib/api';
 import type { AxiosError } from 'axios';
+import { Lock, LockKeyhole, LogIn, Mail } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const {
     formData,
     errors,
     isSubmitting,
     updateField,
     handleSubmit,
-    handleCancel,
   } = useAuthForm({
     initialMode: 'login',
     onLogin: async (data) => {
+      setIsAuthenticating(true);
       try {
         await api.get('/sanctum/csrf-cookie', { withCredentials: true });
 
@@ -53,43 +56,66 @@ const LoginPage: React.FC = () => {
               apiErrors[key] = Array.isArray(messages) ? String(messages[0]) : String(messages);
             });
           } else if (data.message) {
-            apiErrors.email = String(data.message);
+            apiErrors.form = 'Invalid email or password.';
           }
+        }
+        if (Object.keys(apiErrors).length === 0) {
+          apiErrors.form = 'Unable to sign in. Please try again.';
         }
         updateField('email', data.email);
         updateField('password', data.password);
         setLoginErrors(apiErrors);
+      } finally {
+        setIsAuthenticating(false);
       }
     },
   });
 
-  const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
+  const isLoginBusy = isSubmitting || isAuthenticating;
+
+  const updateLoginField = (field: 'email' | 'password', value: string) => {
+    updateField(field, value);
+    setLoginErrors((current) => {
+      const next = { ...current };
+      delete next[field];
+      delete next.form;
+      return next;
+    });
+  };
 
   return (
     <AuthLayout>
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold tracking-wide" style={{ color: '#F5F7FA' }}>
-          FORM LOGIN
+      <div className="mb-5 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-blue-400/10 bg-blue-500/10 text-blue-400 shadow-[0_0_24px_rgba(37,99,235,0.12)]">
+          <LockKeyhole className="h-8 w-8" strokeWidth={1.8} />
+        </div>
+        <h2 className="mt-4 text-2xl font-bold tracking-tight text-white md:text-[1.625rem] lg:text-[1.75rem] xl:text-[1.875rem]">
+          Sign in to <span className="text-blue-500">SmartChain</span>
         </h2>
+        <p className="mt-2 text-sm text-slate-400 md:text-[15px] xl:text-base">
+          Welcome back! Please enter your credentials.
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {loginErrors.email && (
-          <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#FCA5A5', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-            {loginErrors.email}
+      <form onSubmit={handleSubmit} className="space-y-[18px]">
+        {loginErrors.form && (
+          <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+            {loginErrors.form}
           </div>
         )}
 
         <FormInput
-          label="Email"
+          label="Email Address"
           type="email"
           name="email"
-          autoComplete="username"
+          autoComplete="email"
           placeholder="Enter your email"
           value={formData.email}
-          onChange={(value) => updateField('email', value)}
+          onChange={(value) => updateLoginField('email', value)}
           error={errors.email || loginErrors.email}
           required
+          leadingIcon={<Mail className="h-5 w-5" />}
+          disabled={isLoginBusy}
         />
 
         <FormInput
@@ -99,23 +125,24 @@ const LoginPage: React.FC = () => {
           autoComplete="current-password"
           placeholder="Enter your password"
           value={formData.password}
-          onChange={(value) => updateField('password', value)}
+          onChange={(value) => updateLoginField('password', value)}
           error={errors.password || loginErrors.password}
           required
           showPasswordToggle
+          leadingIcon={<Lock className="h-5 w-5" />}
+          disabled={isLoginBusy}
         />
 
-        <div className="flex items-center justify-between pt-2">
-          <label className="flex items-center cursor-pointer">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <label className="group flex min-h-11 cursor-pointer items-center rounded-lg focus-within:ring-2 focus-within:ring-blue-500/40">
             <input
               type="checkbox"
               id="rememberMe"
               checked={formData.rememberMe}
               onChange={(e) => updateField('rememberMe', e.target.checked)}
-              className="w-4 h-4 rounded border-2 focus:ring-2 focus:ring-offset-0 transition-colors"
+              disabled={isLoginBusy}
+              className="h-5 w-5 cursor-pointer rounded border-2 border-slate-700 bg-[#091018] accent-blue-500 transition-colors group-hover:border-blue-400 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 checked:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               style={{
-                backgroundColor: '#091018',
-                borderColor: '#2A3447',
                 accentColor: '#5B8CFF',
               }}
             />
@@ -126,22 +153,24 @@ const LoginPage: React.FC = () => {
           <button
             type="button"
             onClick={() => {}}
-            className="text-sm hover:opacity-80 transition-opacity bg-transparent border-none cursor-pointer font-medium"
-            style={{ color: '#5B8CFF' }}
+            className="min-h-11 rounded-lg border-none bg-transparent px-1 text-sm font-medium text-blue-400 transition-colors hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
           >
             Forgot Password?
           </button>
         </div>
 
-        <div className="mt-6 space-y-3">
-          <FormButton type="submit" variant="primary" isLoading={isSubmitting}>
-            LOGIN
-          </FormButton>
-          <FormButton type="button" variant="secondary" onClick={handleCancel}>
-            CANCEL
+        <div className="pt-3">
+          <FormButton type="submit" variant="primary" isLoading={isLoginBusy} disabled={isLoginBusy}>
+            {!isLoginBusy && <LogIn className="h-5 w-5" />}
+            {isLoginBusy ? 'Signing in...' : 'Sign In'}
           </FormButton>
         </div>
       </form>
+
+      <footer className="mt-6 border-t border-slate-700/60 pt-4 text-center text-sm leading-6 text-slate-500">
+        <p>&copy; 2026 Archon Nell Incorporated</p>
+        <p>All rights reserved.</p>
+      </footer>
     </AuthLayout>
   );
 };

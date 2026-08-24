@@ -23,7 +23,6 @@ import AdminUserManagement from '../page/admin/userManagement';
 import AdminOrderManagement from '../page/admin/orderManagement';
 
 import PlantManagerDashboard from '../page/plant-manager/Dashboard';
-import PlantManagerPurchaseOrders from '../page/plant-manager/PurchaseOrders';
 import PlantManagerProcurement from '../page/plant-manager/Procurement';
 import PlantManagerWarehouse from '../page/plant-manager/Warehouse';
 import PlantManagerInventory from '../page/plant-manager/Inventory';
@@ -40,11 +39,9 @@ import PlantManagerOrderManagement from '../page/plant-manager/OrderManagement';
 
 import QADashboard from '../page/QA/Dashboard';
 import QAInspection from '../page/QA/QualityInspection';
-import QADamagedItems from '../page/QA/DamagedItems';
 import QARejectedItems from '../page/QA/RejectedItems';
 import QAInspectionHistory from '../page/QA/InspectionHistory';
 import QAQualityReports from '../page/QA/QualityReports';
-import QAInventoryView from '../page/QA/InventoryView';
 
 const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/login" replace /> },
@@ -81,7 +78,6 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/plant-manager/dashboard" replace /> },
       { path: 'products', element: <Navigate to="/plant-manager/dashboard" replace /> },
       { path: 'dashboard', element: <PlantManagerDashboard /> },
-      { path: 'purchase-orders', element: <PlantManagerPurchaseOrders /> },
       { path: 'procurement', element: <PlantManagerProcurement /> },
       { path: 'warehouse', element: <PlantManagerWarehouse /> },
       { path: 'inventory', element: <PlantManagerInventory /> },
@@ -104,11 +100,9 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/qa/dashboard" replace /> },
       { path: 'dashboard', element: <QADashboard /> },
       { path: 'inspection', element: <QAInspection /> },
-      { path: 'damaged-items', element: <QADamagedItems /> },
       { path: 'rejected-items', element: <QARejectedItems /> },
       { path: 'history', element: <QAInspectionHistory /> },
       { path: 'reports', element: <QAQualityReports /> },
-      { path: 'inventory', element: <QAInventoryView /> },
     ],
   },
   { path: '*', element: <Navigate to="/login" replace /> },

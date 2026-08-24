@@ -14,6 +14,7 @@ class Receiving extends Model
         'purchase_order',
         'supplier',
         'reference_no',
+        'notes',
         'delivery_date',
         'status',
         'prepared_by_id',

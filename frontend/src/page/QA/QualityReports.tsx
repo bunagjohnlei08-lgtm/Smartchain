@@ -1,354 +1,118 @@
-// src/page/qa/QualityReports.tsx
-import React, { useState, useEffect } from 'react';
-import {
-  FileText,
-  FileSpreadsheet,
-  Printer,
-  ClipboardList,
-  CheckCircle2,
-  XCircle,
-  PackageX,
-  Download,
-} from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  LabelList,
-} from 'recharts';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, Printer, XCircle } from 'lucide-react';
+import { CartesianGrid, Cell, Legend as ChartLegend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { apiClient } from '../../lib/api';
 
-// ============================================
-// TYPES
-// ============================================
-
-interface KpiData {
-  label: string;
-  value: string | number;
-  subtext: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
+interface QualityReportData {
+  summary: {
+    completed_inspections: number;
+    passed_count: number;
+    passed_rate: number;
+    rejected_count: number;
+    rejected_rate: number;
+    rejected_quantity: number;
+  };
+  trend: { date: string; passed: number; rejected: number }[];
+  distribution: { name: 'Passed' | 'Rejected'; count: number; percentage: number }[];
+  top_rejected_products: { product: string; quantity: number }[];
+  supplier_quality: { name: string; inspections: number; accepted_quantity: number; rejected_quantity: number; pass_rate: number }[];
 }
 
-// ============================================
-// MOCK DATA
-// ============================================
+const distributionColors: Record<string, string> = { Passed: '#22C55E', Rejected: '#EF4444' };
+const escapeCsv = (value: string | number): string => `"${String(value).replace(/"/g, '""')}"`;
+const escapeHtml = (value: string | number): string => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
-// Data for Inspection Trend (line chart)
-const trendData = [
-  { date: 'Jul 30', passed: 28, rejected: 6, damaged: 3 },
-  { date: 'Jul 31', passed: 35, rejected: 8, damaged: 5 },
-  { date: 'Aug 01', passed: 42, rejected: 9, damaged: 4 },
-  { date: 'Aug 02', passed: 30, rejected: 5, damaged: 2 },
-  { date: 'Aug 03', passed: 38, rejected: 7, damaged: 6 },
-  { date: 'Aug 04', passed: 45, rejected: 10, damaged: 4 },
-  { date: 'Aug 05', passed: 40, rejected: 6, damaged: 3 },
-];
-
-// Data for Donut chart
-const donutData = [
-  { name: 'Passed', value: 77.1, color: '#22C55E' },
-  { name: 'Rejected', value: 13.4, color: '#EF4444' },
-  { name: 'Damaged', value: 9.5, color: '#F59E0B' },
-];
-
-// Data for Top Rejected Products (horizontal bar)
-const topRejectedData = [
-  { product: 'Hex Bolt M12', quantity: 5000 },
-  { product: 'Tile Adhesive', quantity: 1800 },
-  { product: 'Steel Angle Bar', quantity: 1200 },
-  { product: 'G.I. Pipe 2"', quantity: 800 },
-  { product: 'PVC Pipe 4"', quantity: 600 },
-  { product: 'THHN Wire #12', quantity: 400 },
-];
-
-// Data for Supplier Quality Rating
-const supplierQualityData = [
-  { name: 'Northgate Steel Works', passRate: 96, inspections: 42 },
-  { name: 'Cordillera Cement Corp.', passRate: 91, inspections: 55 },
-  { name: 'Atlas Polymer Supply', passRate: 94, inspections: 30 },
-  { name: 'Volt Prime Electricals', passRate: 84, inspections: 27 },
-  { name: 'Ironclad Fasteners Inc.', passRate: 62, inspections: 21 },
-  { name: 'Pacific Metal Traders', passRate: 88, inspections: 18 },
-  { name: 'Summit Industrial Supply', passRate: 97, inspections: 15 },
-];
-
-// ============================================
-// HELPER COMPONENTS
-// ============================================
-
-const KpiCard: React.FC<{
-  label: string;
-  value: string | number;
-  subtext: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
-}> = ({ label, value, subtext, icon, iconBg, iconColor }) => (
+const KpiCard: React.FC<{ label: string; value: string | number; subtext: string; icon: React.ReactNode; iconBg: string; iconColor: string }> = ({ label, value, subtext, icon, iconBg, iconColor }) => (
   <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-        <p className="text-xs text-slate-500 mt-1">{subtext}</p>
-      </div>
-      <div className={`p-2.5 rounded-full ${iconBg} ${iconColor}`}>{icon}</div>
-    </div>
+    <div className="flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p><p className="text-2xl font-bold text-white mt-1.5">{value}</p><p className="text-xs text-slate-500 mt-1">{subtext}</p></div><div className={`p-2.5 rounded-full ${iconBg} ${iconColor}`}>{icon}</div></div>
   </div>
 );
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+const EmptyChart: React.FC<{ message: string }> = ({ message }) => <div className="h-[300px] flex items-center justify-center text-sm text-slate-500">{message}</div>;
 
 const QualityReports: React.FC = () => {
+  const [report, setReport] = useState<QualityReportData | null>(null);
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchReport = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.get<{ data: QualityReportData }>('/qa/quality-reports');
+      setReport(response.data.data);
+    } catch {
+      setReport(null);
+      setError('Unable to load quality reports. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { setMounted(true); fetchReport(); }, [fetchReport]);
+
+  const exportExcel = () => {
+    if (!report) return;
+    const rows: Array<Array<string | number>> = [
+      ['Quality Reports'],
+      ['Generated', new Date().toLocaleString()],
+      [],
+      ['Summary', 'Count', 'Rate'],
+      ['Completed Inspections', report.summary.completed_inspections, ''],
+      ['Passed', report.summary.passed_count, `${report.summary.passed_rate}%`],
+      ['Rejected', report.summary.rejected_count, `${report.summary.rejected_rate}%`],
+      ['Rejected Quantity', report.summary.rejected_quantity, ''],
+      [], ['Inspection Trend', 'Passed', 'Rejected'],
+      ...report.trend.map((item) => [item.date, item.passed, item.rejected]),
+      [], ['Top Rejected Products', 'Rejected Quantity'],
+      ...report.top_rejected_products.map((item) => [item.product, item.quantity]),
+      [], ['Supplier Quality Rating', 'Inspections', 'Accepted Quantity', 'Rejected Quantity', 'Pass Rate'],
+      ...report.supplier_quality.map((item) => [item.name, item.inspections, item.accepted_quantity, item.rejected_quantity, `${item.pass_rate}%`]),
+    ];
+    const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `qa-quality-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printReport = () => {
+    if (!report) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { setError('The report window was blocked. Allow pop-ups and try again.'); return; }
+    printWindow.opener = null;
+    const trendRows = report.trend.map((item) => `<tr><td>${escapeHtml(item.date)}</td><td>${item.passed}</td><td>${item.rejected}</td></tr>`).join('');
+    const productRows = report.top_rejected_products.map((item) => `<tr><td>${escapeHtml(item.product)}</td><td>${item.quantity}</td></tr>`).join('');
+    const supplierRows = report.supplier_quality.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.inspections}</td><td>${item.accepted_quantity}</td><td>${item.rejected_quantity}</td><td>${item.pass_rate}%</td></tr>`).join('');
+    printWindow.document.write(`<!doctype html><html><head><title>QA Quality Report</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px}h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin-top:24px}p{color:#555}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#eee}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card{border:1px solid #bbb;padding:10px}.value{font-size:18px;font-weight:bold}@media print{body{padding:0}}</style></head><body><h1>QA Quality Report</h1><p>Generated ${escapeHtml(new Date().toLocaleString())}</p><div class="summary"><div class="card">Completed<div class="value">${report.summary.completed_inspections}</div></div><div class="card">Passed<div class="value">${report.summary.passed_rate}%</div></div><div class="card">Rejected<div class="value">${report.summary.rejected_rate}%</div></div></div><h2>Inspection Trend</h2><table><thead><tr><th>Date</th><th>Passed</th><th>Rejected</th></tr></thead><tbody>${trendRows}</tbody></table><h2>Top Rejected Products</h2><table><thead><tr><th>Product</th><th>Rejected Quantity</th></tr></thead><tbody>${productRows}</tbody></table><h2>Supplier Quality Rating</h2><table><thead><tr><th>Supplier</th><th>Inspections</th><th>Accepted</th><th>Rejected</th><th>Pass Rate</th></tr></thead><tbody>${supplierRows}</tbody></table></body></html>`);
+    printWindow.document.close(); printWindow.focus(); printWindow.print();
+  };
+
+  const summary = report?.summary;
+  const donutData = report?.distribution.filter((item) => item.count > 0).map((item) => ({ ...item, value: item.count, color: distributionColors[item.name] })) ?? [];
+  const hasData = Boolean(summary?.completed_inspections);
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Quality Reports</h1>
-          <p className="text-sm text-slate-400">
-            Aggregated quality performance for the current reporting period.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button className="border border-gray-700 bg-[#0d1322] hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-all">
-            <FileText className="w-4 h-4" /> Export PDF
-          </button>
-          <button className="border border-gray-700 bg-[#0d1322] hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-all">
-            <FileSpreadsheet className="w-4 h-4" /> Export Excel
-          </button>
-          <button className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-all">
-            <Printer className="w-4 h-4" /> Print
-          </button>
-        </div>
-      </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h1 className="text-2xl font-bold text-white">Quality Reports</h1><p className="text-sm text-slate-400">Aggregated quality performance from completed QA inspections.</p></div><div className="flex flex-wrap items-center gap-3"><button onClick={printReport} disabled={!report || loading} className="cursor-pointer border border-gray-700 bg-[#0d1322] hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileText className="w-4 h-4" /> Export PDF</button><button onClick={exportExcel} disabled={!report || loading} className="cursor-pointer border border-gray-700 bg-[#0d1322] hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileSpreadsheet className="w-4 h-4" /> Export Excel</button><button onClick={printReport} disabled={!report || loading} className="cursor-pointer bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"><Printer className="w-4 h-4" /> Print</button></div></div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          label="INSPECTION SUMMARY"
-          value="284"
-          subtext="Inspections completed"
-          icon={<ClipboardList className="w-6 h-6" />}
-          iconBg="bg-blue-500/10"
-          iconColor="text-blue-400"
-        />
-        <KpiCard
-          label="PASSED"
-          value="77.1%"
-          subtext="219 batches"
-          icon={<CheckCircle2 className="w-6 h-6" />}
-          iconBg="bg-emerald-500/10"
-          iconColor="text-emerald-400"
-        />
-        <KpiCard
-          label="REJECTED"
-          value="13.4%"
-          subtext="38 batches"
-          icon={<XCircle className="w-6 h-6" />}
-          iconBg="bg-red-500/10"
-          iconColor="text-red-400"
-        />
-        <KpiCard
-          label="DAMAGED"
-          value="9.5%"
-          subtext="27 batches"
-          icon={<PackageX className="w-6 h-6" />}
-          iconBg="bg-amber-500/10"
-          iconColor="text-amber-400"
-        />
-      </div>
+      {error && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300 flex items-center justify-between gap-3"><span className="flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</span><button onClick={fetchReport} className="cursor-pointer rounded-lg border border-rose-400/30 px-3 py-1.5 hover:bg-rose-500/10 focus:outline-none focus:ring-2 focus:ring-rose-400">Retry</button></div>}
+      {loading && <div className="h-24 rounded-2xl border border-gray-800/50 bg-[#0d1322] flex items-center justify-center text-sm text-slate-400">Loading quality report...</div>}
 
-      {/* Row 1: Inspection Trend + Pass vs Reject */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Inspection Trend */}
-        <div className="lg:col-span-7 bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
-          <h3 className="text-lg font-semibold text-white">Inspection Trend</h3>
-          <p className="text-sm text-slate-400 mb-4">
-            Passed, rejected and damaged batches per day.
-          </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="date" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
-              <YAxis stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0f172a',
-                  borderColor: '#1e293b',
-                  color: '#f1f5f9',
-                }}
-              />
-              <Legend
-                iconType="circle"
-                formatter={(value) => (
-                  <span className="text-slate-300 text-sm">{value}</span>
-                )}
-              />
-              <Line
-                type="monotone"
-                dataKey="passed"
-                stroke="#22C55E"
-                strokeWidth={2}
-                dot={{ r: 4, fill: '#22C55E' }}
-                activeDot={{ r: 6 }}
-                name="Passed"
-                isAnimationActive={true}
-                animationDuration={1500}
-                animationEasing="ease-in-out"
-                animationBegin={100}
-              />
-              <Line
-                type="monotone"
-                dataKey="rejected"
-                stroke="#EF4444"
-                strokeWidth={2}
-                dot={{ r: 4, fill: '#EF4444' }}
-                activeDot={{ r: 6 }}
-                name="Rejected"
-                isAnimationActive={true}
-                animationDuration={1500}
-                animationEasing="ease-in-out"
-                animationBegin={100}
-              />
-              <Line
-                type="monotone"
-                dataKey="damaged"
-                stroke="#F59E0B"
-                strokeWidth={2}
-                dot={{ r: 4, fill: '#F59E0B' }}
-                activeDot={{ r: 6 }}
-                name="Damaged"
-                isAnimationActive={true}
-                animationDuration={1500}
-                animationEasing="ease-in-out"
-                animationBegin={100}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      {!loading && report && <>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><KpiCard label="INSPECTION SUMMARY" value={summary?.completed_inspections ?? 0} subtext="Inspections completed" icon={<ClipboardList className="w-6 h-6" />} iconBg="bg-blue-500/10" iconColor="text-blue-400" /><KpiCard label="PASSED" value={`${summary?.passed_rate ?? 0}%`} subtext={`${summary?.passed_count ?? 0} batches`} icon={<CheckCircle2 className="w-6 h-6" />} iconBg="bg-emerald-500/10" iconColor="text-emerald-400" /><KpiCard label="REJECTED" value={`${summary?.rejected_rate ?? 0}%`} subtext={`${summary?.rejected_count ?? 0} batches • ${summary?.rejected_quantity ?? 0} units`} icon={<XCircle className="w-6 h-6" />} iconBg="bg-red-500/10" iconColor="text-red-400" /></div>
 
-        {/* Pass vs Reject Donut */}
-        <div className="lg:col-span-5 bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
-          <h3 className="text-lg font-semibold text-white">Pass vs Reject</h3>
-          <p className="text-sm text-slate-400 mb-4">
-            Distribution of inspection outcomes.
-          </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={donutData}
-                cx="50%"
-                cy="50%"
-                innerRadius="60%"
-                outerRadius="85%"
-                paddingAngle={4}
-                dataKey="value"
-                label={false}
-                isAnimationActive={true}
-                animationDuration={1300}
-                animationEasing="ease-out"
-                animationBegin={200}
-              >
-                {donutData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} stroke="#0d1322" strokeWidth={2} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex items-center justify-center gap-6 mt-4">
-            {donutData.map((entry) => (
-              <span key={entry.name} className="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                {entry.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
+        {!hasData && <div className="rounded-2xl border border-gray-800/50 bg-[#0d1322] p-8 text-center text-sm text-slate-400">No completed QA inspections are available for reporting.</div>}
 
-      {/* Row 2: Top Rejected Products + Supplier Quality Rating */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Rejected Products */}
-        <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
-          <h3 className="text-lg font-semibold text-white">Top Rejected Products</h3>
-          <p className="text-sm text-slate-400 mb-4">
-            Rejected quantity by product.
-          </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              layout="vertical"
-              data={topRejectedData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-              <XAxis type="number" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
-              <YAxis
-                type="category"
-                dataKey="product"
-                stroke="#94a3b8"
-                tick={{ fill: '#94a3b8' }}
-                width={100}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0f172a',
-                  borderColor: '#1e293b',
-                  color: '#f1f5f9',
-                }}
-              />
-              <Bar dataKey="quantity" fill="#06b6d4" radius={[0, 4, 4, 0]} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" animationBegin={300}>
-                <LabelList
-                  dataKey="quantity"
-                  position="right"
-                  style={{ fill: '#94a3b8', fontSize: 12 }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <div className="grid min-w-0 grid-cols-1 xl:grid-cols-12 gap-6"><div className="min-w-0 xl:col-span-7 bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5"><h3 className="text-lg font-semibold text-white">Inspection Trend</h3><p className="text-sm text-slate-400 mb-4">Completed Passed and Rejected inspections per day.</p>{report.trend.length === 0 ? <EmptyChart message="No completed inspection trend data." /> : <ResponsiveContainer width="100%" height={300}><LineChart data={report.trend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="date" stroke="#94a3b8" tick={{ fill: '#94a3b8' }} /><YAxis allowDecimals={false} stroke="#94a3b8" tick={{ fill: '#94a3b8' }} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }} /><ChartLegend iconType="circle" /><Line type="monotone" dataKey="passed" stroke="#22C55E" strokeWidth={2} name="Passed" isAnimationActive={mounted} /><Line type="monotone" dataKey="rejected" stroke="#EF4444" strokeWidth={2} name="Rejected" isAnimationActive={mounted} /></LineChart></ResponsiveContainer>}</div>
+          <div className="min-w-0 xl:col-span-5 bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5"><h3 className="text-lg font-semibold text-white">Pass vs Reject</h3><p className="text-sm text-slate-400 mb-4">Distribution of completed Passed and Rejected outcomes.</p>{donutData.length === 0 ? <EmptyChart message="No Passed or Rejected outcome data." /> : <><ResponsiveContainer width="100%" height={300}><PieChart><Pie data={donutData} cx="50%" cy="50%" innerRadius="60%" outerRadius="85%" paddingAngle={4} dataKey="value" isAnimationActive={mounted}>{donutData.map((entry) => <Cell key={entry.name} fill={entry.color} stroke="#0d1322" strokeWidth={2} />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9' }} /></PieChart></ResponsiveContainer><div className="flex flex-wrap items-center justify-center gap-5 mt-4">{donutData.map((entry) => <span key={entry.name} className="flex items-center gap-2 text-sm text-slate-300 font-medium"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />{entry.name} {entry.percentage}%</span>)}</div></>}</div></div>
 
-        {/* Supplier Quality Rating */}
-        <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
-          <h3 className="text-lg font-semibold text-white">Supplier Quality Rating</h3>
-          <p className="text-sm text-slate-400 mb-4">
-            Pass rate weighted by inspected volume.
-          </p>
-          <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-            {supplierQualityData.map((item, idx) => (
-              <div key={idx}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-200">{item.name}</span>
-                  <span className="text-slate-300 font-medium">
-                    {item.passRate}% • {item.inspections} insp.
-                  </span>
-                </div>
-                <div className="w-full h-1.5 bg-gray-800 rounded-full mt-1 overflow-hidden">
-                 <div
-                   className="h-full rounded-full bg-cyan-500"
-                   style={{ width: mounted ? `${item.passRate}%` : '0%', transition: 'width 1s ease-out 0.4s' }}
-                 />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+        <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6"><div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5"><h3 className="text-lg font-semibold text-white">Top Rejected Products</h3><p className="text-sm text-slate-400 mb-4">Sum of actual rejected quantity by product.</p>{report.top_rejected_products.length === 0 ? <EmptyChart message="No rejected quantities recorded." /> : <div className="max-h-[320px] space-y-1 overflow-y-auto pr-2 custom-scrollbar">{report.top_rejected_products.map((item, index) => { const maximum = report.top_rejected_products[0]?.quantity || 1; const width = Math.max(4, (item.quantity / maximum) * 100); return <div key={item.product} className="border-b border-slate-800/80 px-1 py-3 last:border-b-0"><div className="mb-2 flex items-start justify-between gap-4"><div className="min-w-0 flex-1"><span className="mr-2 text-xs font-semibold text-slate-500">{index + 1}</span><span className="break-words text-sm leading-5 text-slate-200">{item.product}</span></div><span className="shrink-0 text-sm font-semibold tabular-nums text-cyan-400">{item.quantity.toLocaleString()}</span></div><div className="h-2 w-full overflow-hidden rounded-full bg-slate-800" role="img" aria-label={`${item.product}: ${item.quantity} rejected`}><div className="h-full rounded-full bg-cyan-500 transition-[width] duration-700" style={{ width: mounted ? `${width}%` : '0%' }} /></div></div>; })}</div>}</div>
+          <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5"><h3 className="text-lg font-semibold text-white">Supplier Quality Rating</h3><p className="text-sm text-slate-400 mb-4">Accepted quantity as a share of inspected quantity.</p>{report.supplier_quality.length === 0 ? <EmptyChart message="No supplier inspection data." /> : <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">{report.supplier_quality.map((item) => <div key={item.name}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-200 truncate">{item.name}</span><span className="text-slate-300 font-medium whitespace-nowrap">{item.pass_rate}% • {item.inspections} insp.</span></div><div className="w-full h-1.5 bg-gray-800 rounded-full mt-1 overflow-hidden"><div className="h-full rounded-full bg-cyan-500" style={{ width: mounted ? `${item.pass_rate}%` : '0%', transition: 'width 1s ease-out 0.4s' }} /></div></div>)}</div>}</div></div>
+      </>}
     </div>
   );
 };

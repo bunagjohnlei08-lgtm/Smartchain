@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
+use App\Models\ReceivingTimeline;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -29,11 +30,15 @@ class StockInController extends Controller
 
     private function resolveStockableQuantity(ReceivingItem $item): int
     {
-        $acceptedQuantity = (int) ($item->qaInspectionItem?->accepted_quantity ?? 0);
+        $inspectionItem = $item->qaInspectionItem;
+        if (! $inspectionItem?->inspection?->completed_at || $item->stocked_in_at) {
+            return 0;
+        }
+
+        $acceptedQuantity = (int) $inspectionItem->accepted_quantity;
 
         return match ($item->inspection_status) {
-            'Passed' => $item->stocked_in_at ? 0 : max($acceptedQuantity, $item->delivered_quantity),
-            'Partial' => $item->stocked_in_at ? 0 : $acceptedQuantity,
+            'Passed', 'Partial' => $acceptedQuantity,
             default => 0,
         };
     }
@@ -81,7 +86,7 @@ class StockInController extends Controller
 
     private function present(Receiving $receiving): array
     {
-        $receiving->loadMissing(['items.product', 'items.warehouse', 'items.qaInspectionItem', 'timeline', 'preparedBy']);
+        $receiving->loadMissing(['items.product', 'items.warehouse', 'items.qaInspectionItem.inspection', 'timeline', 'preparedBy']);
 
         $items = $receiving->items;
         $productSummary = match (true) {
@@ -153,7 +158,9 @@ class StockInController extends Controller
 
     public function index(Request $request)
     {
-        $query = Receiving::query()->with(['items.product', 'items.warehouse', 'items.qaInspectionItem', 'timeline', 'preparedBy']);
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
+        $query = Receiving::query()->with(['items.product', 'items.warehouse', 'items.qaInspectionItem.inspection', 'timeline', 'preparedBy']);
 
         if ($request->filled('qa_status')) {
             $query->where('status', $request->qa_status);
@@ -179,7 +186,9 @@ class StockInController extends Controller
 
     public function show(Request $request, $id)
     {
-        $receiving = Receiving::with(['items.product', 'items.warehouse', 'items.qaInspectionItem', 'timeline', 'preparedBy'])->findOrFail($id);
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
+        $receiving = Receiving::with(['items.product', 'items.warehouse', 'items.qaInspectionItem.inspection', 'timeline', 'preparedBy'])->findOrFail($id);
 
         return response()->json($this->present($receiving));
     }
@@ -200,7 +209,7 @@ class StockInController extends Controller
         try {
             $receiving = DB::transaction(function () use ($id, $request) {
                 $receiving = Receiving::query()
-                    ->with(['items.qaInspectionItem'])
+                    ->with(['items.qaInspectionItem.inspection'])
                     ->lockForUpdate()
                     ->findOrFail($id);
 
@@ -253,7 +262,12 @@ class StockInController extends Controller
                     $item->save();
                 }
 
-                return $receiving->fresh(['items.product', 'items.warehouse', 'items.qaInspectionItem', 'timeline', 'preparedBy']);
+                ReceivingTimeline::firstOrCreate(
+                    ['receiving_id' => $receiving->id, 'status' => 'Stock In Completed'],
+                    ['performed_by' => $request->user()->name, 'occurred_at' => now()]
+                );
+
+                return $receiving->fresh(['items.product', 'items.warehouse', 'items.qaInspectionItem.inspection', 'timeline', 'preparedBy']);
             });
         } catch (Throwable $e) {
             if ($e instanceof ModelNotFoundException) {
@@ -274,8 +288,10 @@ class StockInController extends Controller
 
     public function recentStockedIn(Request $request)
     {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
         $items = ReceivingItem::query()
-            ->with(['receiving', 'warehouse', 'qaInspectionItem'])
+            ->with(['receiving', 'warehouse', 'qaInspectionItem.inspection'])
             ->whereNotNull('stocked_in_at')
             ->orderByDesc('stocked_in_at')
             ->get()
@@ -302,8 +318,10 @@ class StockInController extends Controller
 
     public function history(Request $request)
     {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
         $items = ReceivingItem::query()
-            ->with(['receiving', 'warehouse', 'qaInspectionItem'])
+            ->with(['receiving', 'warehouse', 'qaInspectionItem.inspection'])
             ->whereNotNull('stocked_in_at')
             ->orderByDesc('stocked_in_at')
             ->get()

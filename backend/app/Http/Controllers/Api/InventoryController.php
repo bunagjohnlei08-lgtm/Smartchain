@@ -5,38 +5,50 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;
 use App\Models\Product;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
 {
-    private function present(Inventory $inventory): array
+    private function present(Inventory $inventory, User $user): array
     {
         $inventory->loadMissing(['product', 'warehouse']);
 
-        return [
+        $data = [
             'id' => $inventory->id,
             'barcode' => $inventory->barcode,
             'product' => $inventory->product->name,
             'category' => $inventory->product->category,
             'brand' => $inventory->product->brand,
             'unit' => $inventory->product->unit,
-            'cost_price' => (float) $inventory->product->cost_price,
             'warehouse' => $inventory->warehouse->name,
             'warehouse_id' => $inventory->warehouse_id,
             'available_stock' => $inventory->available_stock,
-            'reserved_stock' => $inventory->reserved_stock,
-            'backload' => $inventory->backload,
             'status' => $inventory->status,
-            'pending_receiving' => $inventory->pending_receiving,
-            'created_at' => $inventory->created_at,
             'updated_at' => $inventory->updated_at,
         ];
+
+        if ($user->isPlantManager() || $user->isAdmin()) {
+            $data['reserved_stock'] = $inventory->reserved_stock;
+            $data['backload'] = $inventory->backload;
+        }
+
+        if ($user->isAdmin()) {
+            $data['cost_price'] = (float) $inventory->product->cost_price;
+            $data['pending_receiving'] = $inventory->pending_receiving;
+            $data['created_at'] = $inventory->created_at;
+        }
+
+        return $data;
     }
 
     public function index(Request $request)
     {
-        $query = Inventory::query()->with(['product', 'warehouse']);
+        $this->authorize('viewAny', Inventory::class);
+        $user = $request->user();
+        $query = $this->readableInventoryQuery($user)->with(['product', 'warehouse']);
 
         if ($request->filled('warehouse_id')) {
             $query->where('warehouse_id', $request->warehouse_id);
@@ -59,16 +71,20 @@ class InventoryController extends Controller
             });
         }
 
-        $items = $query->get()->map(fn(Inventory $inventory) => $this->present($inventory));
+        $items = $query->get()->map(fn(Inventory $inventory) => $this->present($inventory, $user));
 
         return response()->json(['data' => $items]);
     }
 
     public function show(Request $request, $id)
     {
-        $inventory = Inventory::with(['product', 'warehouse'])->findOrFail($id);
+        $this->authorize('viewAny', Inventory::class);
+        $user = $request->user();
+        $inventory = $this->readableInventoryQuery($user)
+            ->with(['product', 'warehouse'])
+            ->findOrFail($id);
 
-        return response()->json($this->present($inventory));
+        return response()->json($this->present($inventory, $user));
     }
 
     private function resolveProduct(array $validated): Product
@@ -115,7 +131,7 @@ class InventoryController extends Controller
             'pending_receiving' => $validated['pending_receiving'] ?? false,
         ]);
 
-        return response()->json($this->present($inventory), 201);
+        return response()->json($this->present($inventory, $request->user()), 201);
     }
 
     public function update(Request $request, $id)
@@ -146,7 +162,7 @@ class InventoryController extends Controller
         $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray());
         $inventory->save();
 
-        return response()->json($this->present($inventory));
+        return response()->json($this->present($inventory, $request->user()));
     }
 
     public function destroy(Request $request, $id)
@@ -161,5 +177,23 @@ class InventoryController extends Controller
     private function authorizeAdmin(Request $request): void
     {
         abort_unless($request->user()?->isAdmin(), 403, 'Admin access is required.');
+    }
+
+    private function readableInventoryQuery(User $user): Builder
+    {
+        $query = Inventory::query();
+
+        if ($user->isAdmin()) {
+            return $query;
+        }
+
+        if ($user->warehouse_id) {
+            return $query->where('warehouse_id', $user->warehouse_id);
+        }
+
+        return $query->whereHas(
+            'warehouse',
+            fn (Builder $warehouse) => $warehouse->where('branch_id', $user->branch_id)
+        );
     }
 }

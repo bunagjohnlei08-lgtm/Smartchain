@@ -4,11 +4,9 @@ import { Link } from 'react-router-dom';
 import {
   ClipboardList,
   Search,
-  PackageX,
   Ban,
   History,
   BarChart3,
-  Boxes,
 } from 'lucide-react';
 
 const navGroups = [
@@ -17,11 +15,9 @@ const navGroups = [
     items: [
       { id: 'dashboard', icon: ClipboardList, label: 'Dashboard', path: '/qa/dashboard' },
       { id: 'inspection', icon: Search, label: 'Quality Inspection', path: '/qa/inspection' },
-      { id: 'damaged-items', icon: PackageX, label: 'Damaged Items', path: '/qa/damaged-items' },
       { id: 'rejected-items', icon: Ban, label: 'Rejected Items', path: '/qa/rejected-items' },
       { id: 'history', icon: History, label: 'Inspection History', path: '/qa/history' },
       { id: 'reports', icon: BarChart3, label: 'Quality Reports', path: '/qa/reports' },
-      { id: 'inventory', icon: Boxes, label: 'Inventory', path: '/qa/inventory' },
     ],
   },
 ];

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { apiClient } from '../../lib/api';
+import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus';
 import {
   Search,
   ChevronLeft,
@@ -157,7 +158,7 @@ function getApiErrorMessage(error: unknown): string {
   return 'An unexpected error occurred. Please try again.';
 }
 
-const StatusBadge: React.FC<{ status: InspectionStatus }> = ({ status }) => {
+const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
   const config: Record<InspectionStatus, { color: string; bg: string; dotColor: string }> = {
     Pending: {
       color: 'text-amber-400',
@@ -186,12 +187,20 @@ const StatusBadge: React.FC<{ status: InspectionStatus }> = ({ status }) => {
     },
   };
 
-  const { color, bg, dotColor } = config[status];
+  const normalizedStatus = normalizeInspectionStatus(status);
+  const badgeConfig = normalizedStatus
+    ? config[normalizedStatus]
+    : {
+        color: 'text-slate-300',
+        bg: 'bg-slate-500/10 border-slate-500/20',
+        dotColor: 'bg-slate-400',
+      };
+  const label = normalizedStatus ?? formatStatusLabel(status);
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
-      {status}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeConfig.color} ${badgeConfig.bg}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${badgeConfig.dotColor}`} />
+      {label}
     </span>
   );
 };
@@ -406,12 +415,46 @@ const QualityInspection: React.FC = () => {
     });
   };
 
-  const validateProducts = (): string | null => {
+  const updateInspectionResult = (product: ReceivingProduct, result: InspectionStatus) => {
+    const quantityPatch = result === 'Passed'
+      ? { acceptedQty: product.deliveredQty, rejectedQty: 0 }
+      : result === 'Rejected'
+        ? { acceptedQty: 0, rejectedQty: product.deliveredQty }
+        : {};
+
+    updateProductField(product.id, { ...quantityPatch, inspectionResult: result });
+  };
+
+  const validateProducts = (submit: boolean): string | null => {
     if (!selectedReceiving) return 'Select a receiving record first.';
 
     for (const product of selectedReceiving.products) {
-      if (product.acceptedQty + product.rejectedQty > product.deliveredQty) {
+      const inspectedQuantity = product.acceptedQty + product.rejectedQty;
+
+      if (inspectedQuantity > product.deliveredQty) {
         return `${product.product}: accepted and rejected quantities cannot exceed delivered quantity.`;
+      }
+
+      if (!submit) continue;
+
+      if (inspectedQuantity !== product.deliveredQty) {
+        return `${product.product}: accepted and rejected quantities must equal delivered quantity before submission.`;
+      }
+
+      if (product.inspectionResult === 'Passed' && (product.acceptedQty !== product.deliveredQty || product.rejectedQty !== 0)) {
+        return `${product.product}: Passed requires the full delivered quantity to be accepted.`;
+      }
+
+      if (product.inspectionResult === 'Rejected' && (product.acceptedQty !== 0 || product.rejectedQty !== product.deliveredQty)) {
+        return `${product.product}: Rejected requires the full delivered quantity to be rejected.`;
+      }
+
+      if (product.inspectionResult === 'Partial' && (product.acceptedQty === 0 || product.rejectedQty === 0)) {
+        return `${product.product}: Partial requires both an accepted and a rejected quantity.`;
+      }
+
+      if (product.inspectionResult === 'Pending' || product.inspectionResult === 'In Progress') {
+        return `${product.product}: select Passed, Partial, or Rejected before submission.`;
       }
     }
 
@@ -421,7 +464,7 @@ const QualityInspection: React.FC = () => {
   const saveInspection = async (submit: boolean) => {
     if (!selectedReceiving) return;
 
-    const validationError = validateProducts();
+    const validationError = validateProducts(submit);
     if (validationError) {
       setActionMessage({ type: 'error', text: validationError });
       return;
@@ -444,8 +487,14 @@ const QualityInspection: React.FC = () => {
 
       const method = selectedReceiving.action === 'Start Inspection' ? 'post' : 'put';
       await apiClient[method](`/qa/inspections/${selectedReceiving.id}`, payload);
-      await fetchList();
-      await fetchDetail(selectedReceiving.id);
+      if (submit) {
+        setSelectedReceivingId(null);
+        setSelectedReceiving(null);
+        await fetchList();
+      } else {
+        await fetchList();
+        await fetchDetail(selectedReceiving.id);
+      }
       setActionMessage({
         type: 'success',
         text: submit ? 'Inspection submitted successfully.' : 'Inspection draft saved.',
@@ -501,6 +550,8 @@ const QualityInspection: React.FC = () => {
     );
   };
 
+  const inspectionIsFinal = selectedReceiving !== null && ['Passed', 'Rejected', 'Partial'].includes(selectedReceiving.inspectionStatus);
+
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -510,7 +561,7 @@ const QualityInspection: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <KPICard label="Pending Inspection" value={pending} subtitle="Awaiting QA Review" icon={<Clock className="w-5 h-5 text-amber-400" />} color="text-amber-400" />
         <KPICard label="Inspected Today" value={inspectedToday} subtitle="Completed Today" icon={<CheckCircle className="w-5 h-5 text-emerald-400" />} color="text-emerald-400" />
         <KPICard label="Passed Deliveries" value={passed} subtitle="Approved" icon={<CheckCircle className="w-5 h-5 text-emerald-400" />} color="text-emerald-400" />
@@ -664,7 +715,7 @@ const QualityInspection: React.FC = () => {
       </div>
 
       {selectedReceivingId !== null && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden">
               <div className="p-5 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4">
@@ -674,14 +725,14 @@ const QualityInspection: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    disabled={isSaving || isLoadingDetail || !selectedReceiving}
+                    disabled={isSaving || isLoadingDetail || !selectedReceiving || inspectionIsFinal}
                     onClick={() => saveInspection(false)}
                     className="px-3 py-1.5 border border-gray-700 hover:bg-gray-800 text-slate-300 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Save className="w-4 h-4 inline mr-1.5" /> Save Draft
                   </button>
                   <button
-                    disabled={isSaving || isLoadingDetail || !selectedReceiving}
+                    disabled={isSaving || isLoadingDetail || !selectedReceiving || inspectionIsFinal}
                     onClick={() => saveInspection(true)}
                     className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -807,7 +858,7 @@ const QualityInspection: React.FC = () => {
                                     <select
                                       disabled={readOnly}
                                       value={product.inspectionResult}
-                                      onChange={(event) => updateProductField(product.id, { inspectionResult: event.target.value as InspectionStatus })}
+                                      onChange={(event) => updateInspectionResult(product, event.target.value as InspectionStatus)}
                                       className="bg-[#090d16] border border-gray-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:opacity-60"
                                     >
                                       <option value="Pending">Pending</option>
@@ -872,17 +923,22 @@ const QualityInspection: React.FC = () => {
 
                     {activeTab === 'notes' && (
                       <div className="space-y-3 text-sm">
-                        <div>
-                          <p className="text-slate-400">Plant Manager Notes</p>
-                          <p className="text-white bg-[#090d16] p-3 rounded-lg border border-gray-800">-</p>
-                        </div>
-                        <div>
+                        <div className="space-y-2">
                           <p className="text-slate-400">QA Notes</p>
-                          <p className="text-white bg-[#090d16] p-3 rounded-lg border border-gray-800">{selectedReceiving.summaryRemarks}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400">Admin Notes</p>
-                          <p className="text-white bg-[#090d16] p-3 rounded-lg border border-gray-800">-</p>
+                          {selectedReceiving.products.map((product) => (
+                            <div key={product.id}>
+                              <label className="mb-1 block text-xs text-slate-500">{product.product}</label>
+                              <textarea
+                                value={product.remarks}
+                                onChange={(event) => updateProductField(product.id, { remarks: event.target.value })}
+                                disabled={inspectionIsFinal}
+                                maxLength={1000}
+                                rows={3}
+                                placeholder="Enter QA inspection findings"
+                                className="w-full rounded-lg border border-gray-800 bg-[#090d16] p-3 text-white placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none disabled:opacity-60"
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
