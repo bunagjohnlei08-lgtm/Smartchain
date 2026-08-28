@@ -16,13 +16,21 @@ use App\Http\Controllers\Api\AdminOrderController;
 use App\Http\Controllers\Api\PlantManagerOrderController;
 use App\Http\Controllers\Api\StockOutController;
 use App\Http\Controllers\Api\AdminLogisticsController;
+use App\Http\Controllers\Api\AdminProcurementController;
 use App\Http\Controllers\Api\PlantManagerShipmentController;
 use App\Http\Controllers\Api\PlantManagerReceivingNoteController;
+use App\Http\Controllers\Api\PlantManagerProcurementController;
+use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\PlantManagerDashboardController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/admin/dashboard', [DashboardController::class, 'index']);
+    Route::get('/plant-manager/dashboard', [PlantManagerDashboardController::class, 'index']);
 
     Route::get('/users/statistics', [UserController::class, 'statistics']);
     Route::get('/users', [UserController::class, 'index']);
@@ -77,6 +85,33 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{order}/assign', [AdminOrderController::class, 'assign']);
         Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus']);
     });
+
+    Route::prefix('admin/procurement')->group(function () {
+        Route::get('/requests', [AdminProcurementController::class, 'index']);
+        Route::get('/summary', [AdminProcurementController::class, 'summary']);
+        Route::get('/requests/{replenishmentRequest}', [AdminProcurementController::class, 'show']);
+        Route::post('/requests/{replenishmentRequest}/approve', [AdminProcurementController::class, 'approve']);
+        Route::post('/requests/{replenishmentRequest}/decline', [AdminProcurementController::class, 'decline']);
+    });
+
+    Route::prefix('plant-manager/procurement')->group(function () {
+        Route::get('/options', [PlantManagerProcurementController::class, 'options']);
+        Route::get('/requests', [PlantManagerProcurementController::class, 'index']);
+        Route::post('/requests', [PlantManagerProcurementController::class, 'store']);
+        Route::post('/requests/{replenishmentRequest}/submit', [PlantManagerProcurementController::class, 'submit']);
+    });
+
+    Route::get('/purchase-orders/approved', [PurchaseOrderController::class, 'approved']);
+    Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
+    Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+    Route::patch('/purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send']);
+
+    Route::get('/suppliers', [SupplierController::class, 'index']);
+    Route::post('/suppliers', [SupplierController::class, 'store']);
+    Route::get('/suppliers/{supplier}', [SupplierController::class, 'show']);
+    Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
+    Route::patch('/suppliers/{supplier}/status', [SupplierController::class, 'updateStatus']);
+    Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
 
     Route::get('/admin/logistics/shipments', [AdminLogisticsController::class, 'index']);
 

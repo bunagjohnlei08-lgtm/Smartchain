@@ -1,5 +1,6 @@
 @layer sidebar-lock;
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   * {

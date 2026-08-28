@@ -1,11 +1,11 @@
 // src/page/plant-manager/ReplenishmentPlanning.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import { apiClient } from '../../lib/api';
 import {
   Search,
   Eye,
   Plus,
   X,
-  Trash2,
   Clock,
   CheckCircle,
   XCircle,
@@ -13,7 +13,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Truck,
+  FileText,
   RefreshCw,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
@@ -24,10 +24,12 @@ import {
 // ============================================
 
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
-type RequestStatus = 'Ready for Request' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Awaiting Delivery';
+type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order';
 
 interface Product {
   id: string;
+  productId: number;
+  warehouseId: number;
   name: string;
   sku: string;
   warehouse: string;
@@ -35,9 +37,8 @@ interface Product {
   minStock: number;
   forecastedDemand: number;
   recommendedReorderQty: number;
-  supplier: string;
   priority: Priority;
-  status: RequestStatus;
+  needsReplenishment: boolean;
 }
 
 interface RequestHistory {
@@ -45,151 +46,13 @@ interface RequestHistory {
   requestNo: string;
   product: string;
   warehouse: string;
-  supplier: string;
-  quantity: number;
+  requestedQty: number;
   submittedDate: string;
   status: RequestStatus;
   adminDecision?: string;
-  submittedBy?: string;
-  priority?: Priority;
+  requestedBy: string;
+  priority: Priority;
 }
-
-// ============================================
-// MOCK DATA
-// ============================================
-
-const initialProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Corrugated Box 60x40x40',
-    sku: 'PKG-BOX-604',
-    warehouse: 'Warehouse B',
-    currentStock: 92,
-    minStock: 150,
-    forecastedDemand: 500,
-    recommendedReorderQty: 400,
-    supplier: 'Kraftline',
-    priority: 'Critical',
-    status: 'Ready for Request',
-  },
-  {
-    id: '2',
-    name: 'Stainless Steel Sheet 2mm',
-    sku: 'RAW-SST-002',
-    warehouse: 'Production Line 2',
-    currentStock: 34,
-    minStock: 40,
-    forecastedDemand: 120,
-    recommendedReorderQty: 80,
-    supplier: 'Nordis',
-    priority: 'High',
-    status: 'Ready for Request',
-  },
-  {
-    id: '3',
-    name: 'Nitrile Gloves (Box 100)',
-    sku: 'SAF-GLV-100',
-    warehouse: 'Safety Office',
-    currentStock: 0,
-    minStock: 20,
-    forecastedDemand: 80,
-    recommendedReorderQty: 60,
-    supplier: 'Sentra',
-    priority: 'Critical',
-    status: 'Pending Approval',
-  },
-  {
-    id: '4',
-    name: 'Pallet Wrap Film 500mm',
-    sku: 'PKG-WRP-500',
-    warehouse: 'Warehouse A',
-    currentStock: 74,
-    minStock: 120,
-    forecastedDemand: 240,
-    recommendedReorderQty: 150,
-    supplier: 'Kraftline',
-    priority: 'Medium',
-    status: 'Approved',
-  },
-  {
-    id: '5',
-    name: 'Safety Helmet Class E',
-    sku: 'SAF-HLM-001',
-    warehouse: 'Warehouse C',
-    currentStock: 64,
-    minStock: 80,
-    forecastedDemand: 100,
-    recommendedReorderQty: 50,
-    supplier: 'Sentra',
-    priority: 'Low',
-    status: 'Rejected',
-  },
-];
-
-const initialHistory: RequestHistory[] = [
-  {
-    id: '1',
-    requestNo: 'RR-1001',
-    product: 'Industrial LED Panel 40W',
-    warehouse: 'Central Depot',
-    supplier: 'Volt Systems',
-    quantity: 400,
-    submittedDate: '2026-08-01',
-    status: 'Pending Approval',
-    submittedBy: 'M. Santos',
-    priority: 'High',
-  },
-  {
-    id: '2',
-    requestNo: 'RR-1002',
-    product: 'Nitrile Gloves (Box 100)',
-    warehouse: 'Safety Office',
-    supplier: 'Sentra',
-    quantity: 60,
-    submittedDate: '2026-07-29',
-    status: 'Approved',
-    submittedBy: 'M. Santos',
-    priority: 'Medium',
-    adminDecision: 'Approved - Contact supplier',
-  },
-  {
-    id: '3',
-    requestNo: 'RR-1003',
-    product: 'Safety Helmet Class E',
-    warehouse: 'Warehouse C',
-    supplier: 'Sentra',
-    quantity: 50,
-    submittedDate: '2026-07-25',
-    status: 'Rejected',
-    submittedBy: 'A. Reyes',
-    priority: 'Low',
-    adminDecision: 'Insufficient budget',
-  },
-  {
-    id: '4',
-    requestNo: 'RR-1004',
-    product: 'Corrugated Box 60x40x40',
-    warehouse: 'Warehouse B',
-    supplier: 'Kraftline',
-    quantity: 400,
-    submittedDate: '2026-08-02',
-    status: 'Pending Approval',
-    submittedBy: 'M. Santos',
-    priority: 'Critical',
-  },
-  {
-    id: '5',
-    requestNo: 'RR-1005',
-    product: 'Pallet Wrap Film 500mm',
-    warehouse: 'Warehouse A',
-    supplier: 'Kraftline',
-    quantity: 150,
-    submittedDate: '2026-08-03',
-    status: 'Awaiting Delivery',
-    submittedBy: 'L. Cruz',
-    priority: 'Medium',
-  },
-];
 
 // ============================================
 // HELPER COMPONENTS
@@ -197,17 +60,18 @@ const initialHistory: RequestHistory[] = [
 
 const StatusBadge: React.FC<{ status: RequestStatus | string }> = ({ status }) => {
   const config: Record<string, { color: string; icon: React.ElementType }> = {
-    'Ready for Request': { color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', icon: Minus },
-    'Pending Approval': { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Clock },
-    'Approved': { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', icon: CheckCircle },
-    'Rejected': { color: 'text-red-400 bg-red-500/10 border-red-500/20', icon: XCircle },
-    'Awaiting Delivery': { color: 'text-sky-400 bg-sky-500/10 border-sky-500/20', icon: Truck },
+    draft: { color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', icon: FileText },
+    pending: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Clock },
+    approved: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', icon: CheckCircle },
+    rejected: { color: 'text-red-400 bg-red-500/10 border-red-500/20', icon: XCircle },
+    for_purchase_order: { color: 'text-sky-400 bg-sky-500/10 border-sky-500/20', icon: FileText },
   };
-  const { color, icon: Icon } = config[status] || config['Ready for Request'];
+  const labels: Record<string, string> = { draft: 'Draft', pending: 'Pending Approval', approved: 'Approved', rejected: 'Rejected', for_purchase_order: 'For Purchase Order' };
+  const { color, icon: Icon } = config[status] || config.draft;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
       <Icon className="w-3 h-3" />
-      {status}
+      {labels[status] || status}
     </span>
   );
 };
@@ -370,9 +234,10 @@ const Pagination: React.FC<{
 // ============================================
 
 const ReplenishmentPlanning: React.FC = () => {
-  // State for products and history
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [history, setHistory] = useState<RequestHistory[]>(initialHistory);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [history, setHistory] = useState<RequestHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   // Filter states
   const [search, setSearch] = useState('');
@@ -386,6 +251,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showNewRequestModal, setShowNewRequestModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<RequestHistory | null>(null);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -395,11 +261,41 @@ const ReplenishmentPlanning: React.FC = () => {
     requestNo: '',
     product: '',
     warehouse: '',
-    supplier: '',
     quantity: '',
+    priority: 'Medium' as Priority,
     submittedDate: new Date().toISOString().slice(0, 10),
-    status: 'Pending Approval',
+    status: 'pending' as RequestStatus,
   });
+
+  const loadProcurement = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [requestsResponse, optionsResponse] = await Promise.all([
+        apiClient.get('/plant-manager/procurement/requests'),
+        apiClient.get('/plant-manager/procurement/options'),
+      ]);
+      setHistory((requestsResponse.data?.data ?? []).map((request: any) => ({
+        id: String(request.id),
+        requestNo: request.request_no,
+        product: request.product_name,
+        warehouse: request.warehouse_name,
+        requestedQty: Number(request.requested_qty),
+        submittedDate: request.submitted_date ?? '',
+        status: request.status as RequestStatus,
+        requestedBy: request.requested_by ?? '—',
+        priority: request.priority as Priority,
+      })));
+      setProducts(optionsResponse.data?.data ?? []);
+    } catch (error: any) {
+      setToast({ message: error?.response?.data?.message || 'Unable to load procurement data.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProcurement();
+  }, [loadProcurement]);
 
   // Filtered products
   const filteredRequests = useMemo(() => {
@@ -408,8 +304,7 @@ const ReplenishmentPlanning: React.FC = () => {
         r.requestNo.toLowerCase().includes(search.toLowerCase()) ||
         r.product.toLowerCase().includes(search.toLowerCase()) ||
         r.warehouse.toLowerCase().includes(search.toLowerCase()) ||
-        r.supplier.toLowerCase().includes(search.toLowerCase()) ||
-        (r.submittedBy && r.submittedBy.toLowerCase().includes(search.toLowerCase()));
+        r.requestedBy.toLowerCase().includes(search.toLowerCase());
       const matchStatus = statusFilter === 'All Status' || r.status === statusFilter;
       const matchPriority = priorityFilter === 'All Priorities' || (r.priority || '') === priorityFilter;
       return matchSearch && matchStatus && matchPriority;
@@ -423,12 +318,13 @@ const ReplenishmentPlanning: React.FC = () => {
   );
 
   // Summary counts
-  const needingReplenishment = products.filter((p) => p.currentStock < p.minStock).length;
+  const needingReplenishment = products.filter((p) => p.needsReplenishment).length;
   const criticalStock = products.filter((p) => p.priority === 'Critical').length;
-  const pendingRequests = products.filter((p) => p.status === 'Pending Approval').length;
-  const approvedRequests = products.filter((p) => p.status === 'Approved').length;
-  const rejectedRequests = products.filter((p) => p.status === 'Rejected').length;
-  const forecastAccuracy = 92; // mock
+  const pendingRequests = history.filter((r) => r.status === 'pending').length;
+  const approvedRequests = history.filter((r) => r.status === 'approved').length;
+  const rejectedRequests = history.filter((r) => r.status === 'rejected').length;
+  const criticalRequests = history.filter((r) => r.priority === 'Critical').length;
+  const completedRequests = history.filter((r) => r.status === 'for_purchase_order').length;
 
   // Handlers
   const handleCreateRequest = (product: Product) => {
@@ -439,86 +335,61 @@ const ReplenishmentPlanning: React.FC = () => {
   };
 
   const handleViewDetails = (request: RequestHistory) => {
-    // Convert RequestHistory to Product for viewing
-    const product: Product = {
-      id: request.id,
-      name: request.product,
-      sku: '',
-      warehouse: request.warehouse,
-      currentStock: 0,
-      minStock: 0,
-      forecastedDemand: 0,
-      recommendedReorderQty: request.quantity,
-      supplier: request.supplier,
-      priority: request.priority || 'Medium',
-      status: request.status,
-    };
-    setSelectedProduct(product);
+    setSelectedRequest(request);
     setShowViewModal(true);
   };
 
-  const submitRequest = () => {
+  const submitRequest = async () => {
     if (!selectedProduct) return;
-    // Update product status to Pending Approval
-    const updatedProducts = products.map((p) => {
-      if (p.id === selectedProduct.id) {
-        return { ...p, status: 'Pending Approval' as RequestStatus };
-      }
-      return p;
-    });
-    setProducts(updatedProducts);
-
-    // Add to history
-    const newHistory: RequestHistory = {
-      id: String(Date.now()),
-      requestNo: `RR-${String(history.length + 1).padStart(4, '0')}`,
-      product: selectedProduct.name,
-      warehouse: selectedProduct.warehouse,
-      supplier: selectedProduct.supplier,
-      quantity: selectedProduct.recommendedReorderQty,
-      submittedDate: new Date().toISOString().slice(0, 10),
-      status: 'Pending Approval',
-    };
-    setHistory([newHistory, ...history]);
-
-    setShowCreateModal(false);
-    setSelectedProduct(null);
-    showToast('Request submitted successfully!', 'success');
+    setSubmitting(true);
+    try {
+      await apiClient.post('/plant-manager/procurement/requests', {
+        product_id: selectedProduct.productId,
+        warehouse_id: selectedProduct.warehouseId,
+        requested_qty: selectedProduct.recommendedReorderQty,
+        priority: selectedProduct.priority,
+        status: 'pending',
+      });
+      await loadProcurement();
+      setShowCreateModal(false);
+      setSelectedProduct(null);
+      showToast('Request submitted successfully!', 'success');
+    } catch (error: any) {
+      showToast(error?.response?.data?.message || 'Request could not be submitted.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleNewRequestSubmit = () => {
-    if (!newRequest.product || !newRequest.warehouse || !newRequest.supplier || !newRequest.quantity) {
+  const handleNewRequestSubmit = async () => {
+    if (!newRequest.product || !newRequest.warehouse || !newRequest.quantity || Number(newRequest.quantity) <= 0) {
       showToast('Please fill in all required fields.', 'error');
       return;
     }
 
-    const lastRequestNo = history.length > 0 ? history[0].requestNo : 'RR-0000';
-    const nextNo = parseInt(lastRequestNo.replace('RR-', ''), 10) + 1;
-    const requestNo = newRequest.requestNo || `RR-${String(nextNo).padStart(4, '0')}`;
-
-    const newHistoryEntry: RequestHistory = {
-      id: String(Date.now()),
-      requestNo,
-      product: newRequest.product,
-      warehouse: newRequest.warehouse,
-      supplier: newRequest.supplier,
-      quantity: Number(newRequest.quantity),
-      submittedDate: newRequest.submittedDate,
-      status: 'Pending Approval',
-    };
-
-    setHistory([newHistoryEntry, ...history]);
-    setShowNewRequestModal(false);
-    setNewRequest({
-      requestNo: '',
-      product: '',
-      warehouse: '',
-      supplier: '',
-      quantity: '',
-      submittedDate: new Date().toISOString().slice(0, 10),
-      status: 'Pending Approval',
-    });
-    showToast('Request created successfully!', 'success');
+    const product = products.find((item) => item.name === newRequest.product && item.warehouse === newRequest.warehouse);
+    if (!product) {
+      showToast('Select a valid inventory product and warehouse.', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiClient.post('/plant-manager/procurement/requests', {
+        product_id: product.productId,
+        warehouse_id: product.warehouseId,
+        requested_qty: Number(newRequest.quantity),
+        priority: newRequest.priority,
+        status: 'pending',
+      });
+      await loadProcurement();
+      setShowNewRequestModal(false);
+      setNewRequest({ requestNo: '', product: '', warehouse: '', quantity: '', priority: 'Medium', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
+      showToast('Request created successfully!', 'success');
+    } catch (error: any) {
+      showToast(error?.response?.data?.message || 'Request could not be created.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const showToast = (message: string, type: 'success' | 'info' | 'error') => {
@@ -526,30 +397,9 @@ const ReplenishmentPlanning: React.FC = () => {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handleApproveRequest = (id: string) => {
-    const updatedHistory = history.map((r) =>
-      r.id === id ? { ...r, status: 'Approved' as RequestStatus, adminDecision: 'Approved' } : r
-    );
-    setHistory(updatedHistory);
-    showToast('Request approved successfully!', 'success');
-  };
-
-  const handleRejectRequest = (id: string) => {
-    const updatedHistory = history.map((r) =>
-      r.id === id ? { ...r, status: 'Rejected' as RequestStatus, adminDecision: 'Rejected' } : r
-    );
-    setHistory(updatedHistory);
-    showToast('Request rejected.', 'error');
-  };
-
-  const handleCancelRequest = (id: string) => {
-    const updatedHistory = history.filter((r) => r.id !== id);
-    setHistory(updatedHistory);
-    showToast('Request withdrawn successfully.', 'info');
-  };
-
-  // AI Recommendations mock
-  const recommendations = products.filter((p) => p.currentStock < p.minStock).slice(0, 3);
+  const recommendations = products
+    .filter((p) => p.needsReplenishment && p.recommendedReorderQty > 0)
+    .slice(0, 3);
 
   {/* FIX: Prevent UI horizontal overflow and align container spacing */}
   return (
@@ -563,8 +413,8 @@ const ReplenishmentPlanning: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)]">
-            <RefreshCw className="w-4 h-4" /> Refresh
+          <button onClick={() => void loadProcurement()} disabled={loading} className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)] disabled:opacity-50 disabled:cursor-not-allowed">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
           <button
             onClick={() => setShowNewRequestModal(true)}
@@ -581,8 +431,6 @@ const ReplenishmentPlanning: React.FC = () => {
           label="Needing Replenishment"
           value={needingReplenishment}
           icon={<AlertTriangle className="w-5 h-5 text-amber-400" />}
-          trend="+2 vs last week"
-          trendType="up"
         />
         <KPICard
           label="Critical Stock Items"
@@ -605,18 +453,16 @@ const ReplenishmentPlanning: React.FC = () => {
           icon={<XCircle className="w-5 h-5 text-red-400" />}
         />
         <KPICard
-          label="Forecast Accuracy"
-          value={`${forecastAccuracy}%`}
-          icon={<TrendingUp className="w-5 h-5 text-cyan-400" />}
-          trend="+2%"
-          trendType="up"
+          label="For Purchase Order"
+          value={completedRequests}
+          icon={<CheckCircle className="w-5 h-5 text-cyan-400" />}
         />
       </div>
 
       {/* Search & Filters */}
       <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-4 flex flex-wrap items-center gap-3">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search products, SKU, warehouse..." />
-        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'Pending Approval', 'Approved', 'Rejected', 'Awaiting Delivery']} />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search request, requester, product, or warehouse..." />
+        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'draft', 'pending', 'approved', 'rejected', 'for_purchase_order']} />
         <FilterSelect value={priorityFilter} onChange={setPriorityFilter} options={['All Priorities', 'Low', 'Medium', 'High', 'Critical']} />
         <button
           onClick={() => {
@@ -640,7 +486,7 @@ const ReplenishmentPlanning: React.FC = () => {
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Supplier</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
@@ -651,11 +497,11 @@ const ReplenishmentPlanning: React.FC = () => {
               {paginatedRequests.map((req) => (
                 <tr key={req.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
                   <td className="px-4 py-3.5 text-sm font-medium text-[var(--text-primary)]">{req.requestNo}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.submittedBy || '—'}</td>
+                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.requestedBy}</td>
                   <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.warehouse}</td>
                   <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.product}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.supplier}</td>
-                  <td className="px-4 py-3.5"><PriorityBadge priority={req.priority || 'Medium'} /></td>
+                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.requestedQty.toLocaleString()}</td>
+                  <td className="px-4 py-3.5"><PriorityBadge priority={req.priority} /></td>
                   <td className="px-4 py-3.5"><StatusBadge status={req.status} /></td>
                   <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.submittedDate}</td>
                   <td className="px-4 py-3.5">
@@ -667,15 +513,6 @@ const ReplenishmentPlanning: React.FC = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      {req.status === 'Pending Approval' && (
-                        <button
-                          onClick={() => handleCancelRequest(req.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all"
-                          title="Cancel Request"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
                     </div>
                   </td>
                 </tr>
@@ -716,7 +553,7 @@ const ReplenishmentPlanning: React.FC = () => {
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Supplier</th>
+                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
@@ -727,11 +564,11 @@ const ReplenishmentPlanning: React.FC = () => {
               {history.map((item) => (
                 <tr key={item.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
                   <td className="px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]">{item.requestNo}</td>
-                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.submittedBy || '—'}</td>
+                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.requestedBy}</td>
                   <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.warehouse}</td>
                   <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.product}</td>
-                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.supplier}</td>
-                  <td className="px-4 py-2.5"><PriorityBadge priority={item.priority || 'Medium'} /></td>
+                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.requestedQty.toLocaleString()}</td>
+                  <td className="px-4 py-2.5"><PriorityBadge priority={item.priority} /></td>
                   <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
                   <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.submittedDate}</td>
                   <td className="px-4 py-2.5">
@@ -763,19 +600,19 @@ const ReplenishmentPlanning: React.FC = () => {
         <div className="space-y-3">
           <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5" />
-            <span>AI recommends replenishment for <strong>{needingReplenishment}</strong> products.</span>
+            <span><strong>{pendingRequests}</strong> requests are waiting for Admin approval.</span>
           </div>
           <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5" />
-            <span><strong>{criticalStock}</strong> products are below minimum stock.</span>
+            <span><strong>{approvedRequests}</strong> replenishment requests have been approved.</span>
           </div>
           <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <Clock className="w-4 h-4 text-amber-400 mt-0.5" />
-            <span><strong>{pendingRequests}</strong> requests waiting for Admin approval.</span>
+            <span><strong>{rejectedRequests}</strong> replenishment requests have been rejected.</span>
           </div>
           <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5" />
-            <span>Forecast confidence: <strong>{forecastAccuracy}%</strong></span>
+            <span><strong>{criticalRequests}</strong> requests are marked critical.</span>
           </div>
         </div>
       </div>
@@ -845,8 +682,8 @@ const ReplenishmentPlanning: React.FC = () => {
                     <input
                       type="text"
                       value={newRequest.requestNo}
-                      onChange={(e) => setNewRequest({ ...newRequest, requestNo: e.target.value })}
-                      placeholder="Auto-generated if empty"
+                      readOnly
+                      placeholder="Assigned on submission"
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
@@ -855,39 +692,43 @@ const ReplenishmentPlanning: React.FC = () => {
                     <input
                       type="date"
                       value={newRequest.submittedDate}
-                      onChange={(e) => setNewRequest({ ...newRequest, submittedDate: e.target.value })}
+                      readOnly
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
-                    <input
-                      type="text"
+                    <select
                       value={newRequest.product}
-                      onChange={(e) => setNewRequest({ ...newRequest, product: e.target.value })}
-                      placeholder="Product name"
+                      onChange={(e) => {
+                        const product = products.find((item) => item.name === e.target.value);
+                        setNewRequest({ ...newRequest, product: e.target.value, warehouse: product?.warehouse || '', priority: product?.priority || 'Medium' });
+                      }}
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    />
+                    >
+                      <option value="">Select an inventory product</option>
+                      {products.map((product) => <option key={product.id} value={product.name}>{product.name}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Warehouse <span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       value={newRequest.warehouse}
-                      onChange={(e) => setNewRequest({ ...newRequest, warehouse: e.target.value })}
-                      placeholder="Warehouse name"
+                      readOnly
+                      placeholder="Selected from inventory"
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Supplier <span className="text-red-400">*</span></label>
-                    <input
-                      type="text"
-                      value={newRequest.supplier}
-                      onChange={(e) => setNewRequest({ ...newRequest, supplier: e.target.value })}
-                      placeholder="Supplier name"
+                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Priority <span className="text-red-400">*</span></label>
+                    <select
+                      value={newRequest.priority}
+                      onChange={(e) => setNewRequest({ ...newRequest, priority: e.target.value as Priority })}
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    />
+                    >
+                      {(['Low', 'Medium', 'High', 'Critical'] as Priority[]).map((priority) => <option key={priority}>{priority}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Quantity <span className="text-red-400">*</span></label>
@@ -896,7 +737,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       value={newRequest.quantity}
                       onChange={(e) => setNewRequest({ ...newRequest, quantity: e.target.value })}
                       placeholder="0"
-                      min="0"
+                      min="1"
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
@@ -917,7 +758,8 @@ const ReplenishmentPlanning: React.FC = () => {
                 </button>
                 <button
                   onClick={handleNewRequestSubmit}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+                  disabled={submitting}
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Submit Request
                 </button>
@@ -972,10 +814,6 @@ const ReplenishmentPlanning: React.FC = () => {
                     <p className="text-xs text-[var(--text-muted)]">Recommended Quantity</p>
                     <p className="text-[var(--text-primary)] font-semibold">{selectedProduct.recommendedReorderQty}</p>
                   </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-[var(--text-muted)]">Supplier</p>
-                    <p className="text-[var(--text-primary)]">{selectedProduct.supplier}</p>
-                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Reason *</label>
@@ -1006,7 +844,8 @@ const ReplenishmentPlanning: React.FC = () => {
                 </button>
                 <button
                   onClick={submitRequest}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+                  disabled={submitting}
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Submit Request
                 </button>
@@ -1017,7 +856,7 @@ const ReplenishmentPlanning: React.FC = () => {
       )}
 
       {/* View Details Modal */}
-      {showViewModal && selectedProduct && (
+      {showViewModal && selectedRequest && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={() => setShowViewModal(false)}
@@ -1027,7 +866,7 @@ const ReplenishmentPlanning: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Product Details</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Replenishment Request Details</h2>
               <button
                 onClick={() => setShowViewModal(false)}
                 className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
@@ -1037,44 +876,36 @@ const ReplenishmentPlanning: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-[var(--text-muted)]">Product</p>
-                <p className="text-[var(--text-primary)] font-medium">{selectedProduct.name}</p>
+                <p className="text-xs text-[var(--text-muted)]">Request No.</p>
+                <p className="text-[var(--text-primary)] font-medium">{selectedRequest.requestNo}</p>
               </div>
               <div>
-                <p className="text-xs text-[var(--text-muted)]">SKU</p>
-                <p className="text-[var(--text-primary)] font-mono">{selectedProduct.sku}</p>
+                <p className="text-xs text-[var(--text-muted)]">Requested By</p>
+                <p className="text-[var(--text-primary)]">{selectedRequest.requestedBy}</p>
               </div>
               <div>
                 <p className="text-xs text-[var(--text-muted)]">Warehouse</p>
-                <p className="text-[var(--text-primary)]">{selectedProduct.warehouse}</p>
+                <p className="text-[var(--text-primary)]">{selectedRequest.warehouse}</p>
               </div>
               <div>
-                <p className="text-xs text-[var(--text-muted)]">Supplier</p>
-                <p className="text-[var(--text-primary)]">{selectedProduct.supplier}</p>
+                <p className="text-xs text-[var(--text-muted)]">Product</p>
+                <p className="text-[var(--text-primary)]">{selectedRequest.product}</p>
               </div>
               <div>
-                <p className="text-xs text-[var(--text-muted)]">Current Stock</p>
-                <p className="text-[var(--text-primary)]">{selectedProduct.currentStock}</p>
+                <p className="text-xs text-[var(--text-muted)]">Requested Quantity</p>
+                <p className="text-[var(--text-primary)]">{selectedRequest.requestedQty.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-xs text-[var(--text-muted)]">Minimum Stock</p>
-                <p className="text-[var(--text-primary)]">{selectedProduct.minStock}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Forecasted Demand</p>
-                <p className="text-[var(--text-primary)]">{selectedProduct.forecastedDemand}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Recommended Qty</p>
-                <p className="text-[var(--text-primary)] font-semibold">{selectedProduct.recommendedReorderQty}</p>
+                <p className="text-xs text-[var(--text-muted)]">Date</p>
+                <p className="text-[var(--text-primary)]">{selectedRequest.submittedDate}</p>
               </div>
               <div>
                 <p className="text-xs text-[var(--text-muted)]">Priority</p>
-                <PriorityBadge priority={selectedProduct.priority} />
+                <PriorityBadge priority={selectedRequest.priority} />
               </div>
               <div>
                 <p className="text-xs text-[var(--text-muted)]">Status</p>
-                <StatusBadge status={selectedProduct.status} />
+                <StatusBadge status={selectedRequest.status} />
               </div>
             </div>
             <div className="mt-6 flex justify-end">

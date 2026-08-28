@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\AdminOrderExampleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -173,6 +174,57 @@ class AdminOrderManagementTest extends TestCase
 
         $this->actingAs($admin)->getJson('/api/admin/orders/summary')->assertOk()
             ->assertJsonPath('NEW', 1)->assertJsonPath('CANCELLED', 1)->assertJsonPath('DELIVERED', 0);
+    }
+
+    public function test_example_order_seeder_is_idempotent_and_orders_are_returned_by_the_api(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $manager = $this->userWithRole('PLANT_MANAGER');
+        Product::create(['name' => 'Industrial Valve', 'unit' => 'pcs', 'cost_price' => 750]);
+        Product::create(['name' => 'Welding Rod', 'unit' => 'box', 'cost_price' => 50]);
+
+        $this->seed(AdminOrderExampleSeeder::class);
+        $this->seed(AdminOrderExampleSeeder::class);
+
+        $this->assertSame(5, Order::query()->whereBetween('order_no', ['SO-2026-0009', 'SO-2026-0013'])->count());
+        $this->assertSame(9, Order::query()->whereBetween('order_no', ['SO-2026-0009', 'SO-2026-0013'])->withCount('items')->get()->sum('items_count'));
+        Order::query()->whereBetween('order_no', ['SO-2026-0009', 'SO-2026-0013'])->with('items')->get()
+            ->each(fn (Order $order) => $this->assertEqualsWithDelta(
+                (float) $order->total_amount,
+                $order->items->sum(fn ($item) => (float) $item->subtotal),
+                0.001
+            ));
+        foreach (range(9, 13) as $sequence) {
+            $this->assertDatabaseHas('orders', [
+                'order_no' => sprintf('SO-2026-%04d', $sequence),
+                'status' => 'NEW',
+                'assigned_to' => null,
+                'assigned_at' => null,
+            ]);
+        }
+
+        $response = $this->actingAs($admin)->getJson('/api/admin/orders?search=SO-2026-00&per_page=100')
+            ->assertOk()
+            ->assertJsonPath('total', 5)
+            ->assertJsonCount(5, 'data');
+
+        foreach ($response->json('data') as $order) {
+            $this->assertGreaterThanOrEqual(1, $order['items_count']);
+            $this->assertLessThanOrEqual(3, $order['items_count']);
+            $this->actingAs($admin)->getJson("/api/admin/orders/{$order['id']}")
+                ->assertOk()
+                ->assertJsonCount($order['items_count'], 'items');
+        }
+
+        $this->actingAs($manager)->getJson('/api/plant-manager/orders?per_page=100')
+            ->assertOk()->assertJsonPath('total', 0);
+
+        $orderId = Order::query()->where('order_no', 'SO-2026-0009')->value('id');
+        $this->actingAs($admin)->patchJson("/api/admin/orders/{$orderId}/assign", ['assigned_to' => $manager->id])
+            ->assertOk()->assertJsonPath('id', $orderId)->assertJsonPath('status', 'ASSIGNED');
+        $this->assertSame(5, Order::query()->whereBetween('order_no', ['SO-2026-0009', 'SO-2026-0013'])->count());
+        $this->actingAs($manager)->getJson('/api/plant-manager/orders?per_page=100')
+            ->assertOk()->assertJsonPath('total', 1)->assertJsonPath('data.0.id', $orderId);
     }
 
     public function test_non_admin_cannot_access_admin_order_management(): void

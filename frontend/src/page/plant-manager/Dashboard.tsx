@@ -1,5 +1,6 @@
 // src/page/plant-manager/Dashboard.tsx
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { apiClient } from '../../lib/api';
 import {
   Package,
   Layers,
@@ -85,77 +86,22 @@ interface ForecastProduct {
   confidence: number;
 }
 
-// ============================================
-// MOCK DATA
-// ============================================
+interface DashboardData {
+  metrics: { total_products: number; total_categories: number; stock_value: number; low_stock_items: number; out_of_stock: number; todays_stock_in: number; todays_stock_out: number };
+  inventory_trend: Array<{ month: string; stock: number; value: number }>;
+  stock_movement: Array<{ day: string; in: number; out: number }>;
+  monthly_inventory_activity: Array<{ month: string; receiving: number; release: number; transfers: number }>;
+  low_stock_summary: LowStockItem[];
+  recent_transactions: Transaction[];
+  supplier_performance: SupplierPerformance[];
+  ai_forecast_summary: { headline: string; products: ForecastProduct[]; source: string };
+}
 
-const kpiData: KPI[] = [
-  { label: 'Total Products', value: '1,284', change: '+3.2%', icon: <Package className="w-5 h-5" />, trend: 'up' },
-  { label: 'Total Categories', value: '36', change: '+1', icon: <Layers className="w-5 h-5" />, trend: 'up' },
-  { label: 'Stock Value', value: '$2.48M', change: '+5.8%', icon: <Wallet className="w-5 h-5" />, trend: 'up' },
-  { label: 'Low Stock Items', value: '42', change: '-6', icon: <AlertTriangle className="w-5 h-5" />, trend: 'down' },
-  { label: 'Out of Stock', value: '9', change: '-2', icon: <ShieldAlert className="w-5 h-5" />, trend: 'down' },
-  { label: "Today's Stock In", value: '1,860', change: '+12.4%', icon: <ArrowDownCircle className="w-5 h-5" />, trend: 'up' },
-  { label: "Today's Stock Out", value: '1,204', change: '-4.1%', icon: <ArrowUpCircle className="w-5 h-5" />, trend: 'down' },
-];
-
-const lowStockItems: LowStockItem[] = [
-  { id: '1', name: 'Corrugated Box 60x40x40', sku: 'PKG-BOX-604', currentStock: 92, reorderLevel: 150, status: 'warning' },
-  { id: '2', name: 'Stainless Steel Sheet 2mm', sku: 'RAW-SST-002', currentStock: 0, reorderLevel: 40, status: 'critical' },
-  { id: '3', name: 'Safety Helmet Class E', sku: 'SAF-HLM-001', currentStock: 64, reorderLevel: 80, status: 'low' },
-  { id: '4', name: 'Nitrile Gloves (Box 100)', sku: 'SAF-GLV-100', currentStock: 0, reorderLevel: 50, status: 'critical' },
-  { id: '5', name: 'Pallet Wrap Film 500mm', sku: 'PKG-WRP-500', currentStock: 74, reorderLevel: 120, status: 'low' },
-];
-
-const transactions: Transaction[] = [
-  { id: '2', reference: 'SO-4412', type: 'Info', product: 'Thermal Label Roll 4x6', qty: 60, user: 'M. Lim', time: '34 min ago' },
-  { id: '4', reference: 'SO-4411', type: 'Info', product: 'Cordless Impact Driver', qty: 18, user: 'R. Diaz', time: '2 hr ago' },
-  { id: '5', reference: 'ADJ-221', type: 'Draft', product: 'Safety Helmet Class E', qty: -3, user: 'L. Cruz', time: '3 hr ago' },
-];
-
-const supplierData: SupplierPerformance[] = [
-  { id: '1', name: 'Northwind Traders', orders: 42, onTime: 96, quality: 94 },
-  { id: '2', name: 'Kraft Industrial', orders: 31, onTime: 88, quality: 91 },
-  { id: '3', name: 'Cebu Logistics Co.', orders: 24, onTime: 79, quality: 85 },
-  { id: '4', name: 'Apex Components', orders: 37, onTime: 92, quality: 89 },
-  { id: '5', name: 'Meridian Supply', orders: 18, onTime: 71, quality: 80 },
-];
-
-const forecastData: ForecastProduct[] = [
-  { id: '1', name: 'Industrial LED Panel 40W', demand: 640, reorder: 480, confidence: 94 },
-  { id: '2', name: 'Corrugated Box 60x40x40', demand: 2100, reorder: 1800, confidence: 91 },
-  { id: '3', name: 'Stainless Steel Sheet 2mm', demand: 180, reorder: 220, confidence: 87 },
-  { id: '4', name: 'Nitrile Gloves (Box 100)', demand: 320, reorder: 400, confidence: 82 },
-];
-
-const inventoryTrendData = [
-  { month: 'Jan', stock: 52000, value: 1.8 },
-  { month: 'Feb', stock: 48000, value: 1.7 },
-  { month: 'Mar', stock: 53000, value: 1.9 },
-  { month: 'Apr', stock: 56000, value: 2.1 },
-  { month: 'May', stock: 58000, value: 2.2 },
-  { month: 'Jun', stock: 60000, value: 2.4 },
-  { month: 'Jul', stock: 59000, value: 2.48 },
-];
-
-const stockMovementData = [
-  { day: 'Mon', in: 320, out: 280 },
-  { day: 'Tue', in: 450, out: 390 },
-  { day: 'Wed', in: 380, out: 410 },
-  { day: 'Thu', in: 510, out: 460 },
-  { day: 'Fri', in: 490, out: 520 },
-  { day: 'Sat', in: 280, out: 240 },
-  { day: 'Sun', in: 190, out: 170 },
-];
-
-const monthlyActivityData = [
-  { month: 'Feb', receiving: 420, release: 380, transfers: 120 },
-  { month: 'Mar', receiving: 480, release: 410, transfers: 140 },
-  { month: 'Apr', receiving: 530, release: 460, transfers: 160 },
-  { month: 'May', receiving: 560, release: 510, transfers: 180 },
-  { month: 'Jun', receiving: 610, release: 540, transfers: 200 },
-  { month: 'Jul', receiving: 650, release: 580, transfers: 220 },
-];
+const emptyDashboard: DashboardData = {
+  metrics: { total_products: 0, total_categories: 0, stock_value: 0, low_stock_items: 0, out_of_stock: 0, todays_stock_in: 0, todays_stock_out: 0 },
+  inventory_trend: [], stock_movement: [], monthly_inventory_activity: [], low_stock_summary: [], recent_transactions: [], supplier_performance: [],
+  ai_forecast_summary: { headline: '', products: [], source: 'placeholder' },
+};
 
 // ============================================
 // HELPERS
@@ -194,6 +140,42 @@ const LowStockBadge: React.FC<{ status: string }> = ({ status }) => {
 const Dashboard: React.FC = () => {
   const [date] = useState(new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
   const [location] = useState('Central Distribution Center');
+  const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.get('/plant-manager/dashboard');
+      setDashboard(response.data?.data ?? emptyDashboard);
+      setError('');
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.message || 'Unable to load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+
+  const formatCurrency = (value: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value);
+  const kpiData: KPI[] = [
+    { label: 'Total Products', value: loading ? '—' : dashboard.metrics.total_products.toLocaleString(), change: 'Live', icon: <Package className="w-5 h-5" />, trend: 'neutral' },
+    { label: 'Total Categories', value: loading ? '—' : dashboard.metrics.total_categories.toLocaleString(), change: 'Live', icon: <Layers className="w-5 h-5" />, trend: 'neutral' },
+    { label: 'Stock Value', value: loading ? '—' : formatCurrency(dashboard.metrics.stock_value), change: 'Live', icon: <Wallet className="w-5 h-5" />, trend: 'neutral' },
+    { label: 'Low Stock Items', value: loading ? '—' : dashboard.metrics.low_stock_items.toLocaleString(), change: '≤ 20 units', icon: <AlertTriangle className="w-5 h-5" />, trend: 'down' },
+    { label: 'Out of Stock', value: loading ? '—' : dashboard.metrics.out_of_stock.toLocaleString(), change: '0 units', icon: <ShieldAlert className="w-5 h-5" />, trend: 'down' },
+    { label: "Today's Stock In", value: loading ? '—' : dashboard.metrics.todays_stock_in.toLocaleString(), change: 'Today', icon: <ArrowDownCircle className="w-5 h-5" />, trend: 'up' },
+    { label: "Today's Stock Out", value: loading ? '—' : dashboard.metrics.todays_stock_out.toLocaleString(), change: 'Today', icon: <ArrowUpCircle className="w-5 h-5" />, trend: 'down' },
+  ];
+  const inventoryTrendData = dashboard.inventory_trend;
+  const stockMovementData = dashboard.stock_movement;
+  const monthlyActivityData = dashboard.monthly_inventory_activity;
+  const lowStockItems = dashboard.low_stock_summary;
+  const transactions = dashboard.recent_transactions;
+  const supplierData = dashboard.supplier_performance;
+  const forecastData = dashboard.ai_forecast_summary.products;
 
   const trendColor = (trend: 'up' | 'down' | 'neutral') =>
     trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-400';
@@ -217,7 +199,7 @@ const Dashboard: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                <input
                  type="text"
-                 placeholder="Search products or SKU..."
+                 placeholder="Search products or barcode..."
                  className="pl-9 pr-4 py-2 rounded-xl bg-[#0d1322] border border-slate-800 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full sm:w-72"
                />
             </div>
@@ -238,14 +220,17 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>}
+      {loading && <div role="status" className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">Loading real-time dashboard data…</div>}
+
       {/* ============================================================
           KPI METRICS GRID
       ============================================================ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiData.map((kpi, idx) => (
           <div
             key={idx}
-            className={`bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-slate-600 transition-all group ${idx === kpiData.length - 1 ? 'sm:col-span-2 xl:col-span-1' : ''}`}
+            className="min-w-0 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-slate-600 transition-all group"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
@@ -539,7 +524,7 @@ const Dashboard: React.FC = () => {
 
           <div className="mt-3 bg-sky-950/40 border border-sky-500/30 rounded-xl p-3 flex items-start gap-2.5 text-sky-400 text-xs">
             <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            <span>Next 30 days demand is projected to rise 6.4% across 4 categories.</span>
+            <span>{dashboard.ai_forecast_summary.headline || 'Forecast summary will appear when dashboard data is available.'}</span>
           </div>
 
           <div className="mt-4 space-y-2">

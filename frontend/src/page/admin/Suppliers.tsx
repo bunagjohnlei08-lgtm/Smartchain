@@ -1,5 +1,6 @@
 // src/pages/admin/Suppliers.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { apiClient } from '../../lib/api';
 import {
   Search,
   Plus,
@@ -37,86 +38,8 @@ interface Supplier {
   openPOs: number;
   paymentTerms: string;
   status: 'Active' | 'On Hold' | 'Inactive';
+  notes: string;
 }
-
-// ============================================
-// MOCK DATA
-// ============================================
-
-const mockSuppliers: Supplier[] = [
-  {
-    id: '1',
-    code: 'SUP-001',
-    name: 'Northwind Traders',
-    contactPerson: 'Elena Vasquez',
-    email: 'elena@northwind.co',
-    phone: '+1 415 220 8891',
-    location: 'Seattle, WA',
-    openPOs: 4,
-    paymentTerms: 'Net 30',
-    status: 'Active',
-  },
-  {
-    id: '2',
-    code: 'SUP-002',
-    name: 'Kraft Industrial',
-    contactPerson: 'Marcus Feld',
-    email: 'm.feld@kraftind.de',
-    phone: '+49 30 5540 1187',
-    location: 'Berlin, Germany',
-    openPOs: 2,
-    paymentTerms: 'Net 60',
-    status: 'Active',
-  },
-  {
-    id: '3',
-    code: 'SUP-003',
-    name: 'Cebu Logistics Co.',
-    contactPerson: 'Rina Delgado',
-    email: 'rina@cebulog.ph',
-    phone: '+63 32 415 7720',
-    location: 'Cebu, Philippines',
-    openPOs: 3,
-    paymentTerms: 'Net 15',
-    status: 'On Hold',
-  },
-  {
-    id: '4',
-    code: 'SUP-004',
-    name: 'Apex Components',
-    contactPerson: 'Daniel Okafor',
-    email: 'd.okafor@apexcomp.uk',
-    phone: '+44 20 7946 0332',
-    location: 'Manchester, UK',
-    openPOs: 5,
-    paymentTerms: 'Net 30',
-    status: 'Active',
-  },
-  {
-    id: '5',
-    code: 'SUP-005',
-    name: 'Meridian Supply',
-    contactPerson: 'Aiko Tanaka',
-    email: 'aiko@meridian.jp',
-    phone: '+81 3 6803 1120',
-    location: 'Tokyo, Japan',
-    openPOs: 1,
-    paymentTerms: 'Net 45',
-    status: 'Inactive',
-  },
-  {
-    id: '6',
-    code: 'SUP-006',
-    name: 'Summit Logistics',
-    contactPerson: 'Carlos Mendez',
-    email: 'carlos@summitlog.com',
-    phone: '+52 55 1234 5678',
-    location: 'Mexico City, MX',
-    openPOs: 0,
-    paymentTerms: 'Net 30',
-    status: 'Active',
-  },
-];
 
 // ============================================
 // CONSTANTS
@@ -166,31 +89,83 @@ const Suppliers: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  // Filtered suppliers
-  const filteredSuppliers = useMemo(() => {
-    return mockSuppliers.filter((s) => {
-      const matchSearch =
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
-        s.email.toLowerCase().includes(search.toLowerCase()) ||
-        s.code.toLowerCase().includes(search.toLowerCase()) ||
-        s.location.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === 'All' || s.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
+  const apiStatus = (status: string) => status === 'On Hold' ? 'ON_HOLD' : status.toUpperCase();
+  const uiStatus = (status: string): Supplier['status'] => status === 'ON_HOLD' ? 'On Hold' : status === 'INACTIVE' ? 'Inactive' : 'Active';
+  const mapSupplier = (supplier: any): Supplier => ({
+    id: String(supplier.id), code: supplier.supplier_code, name: supplier.name,
+    contactPerson: supplier.contact_person || '', email: supplier.email || '', phone: supplier.phone || '',
+    location: supplier.address || '', openPOs: 0, paymentTerms: supplier.payment_terms || '',
+    status: uiStatus(supplier.status), notes: supplier.notes || '',
+  });
+
+  const loadSuppliers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.get('/suppliers', { params: { search: search || undefined, status: statusFilter === 'All' ? undefined : apiStatus(statusFilter) } });
+      setSuppliers((response.data?.data ?? []).map(mapSupplier));
+      setError('');
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.message || 'Unable to load suppliers.');
+    } finally {
+      setLoading(false);
+    }
   }, [search, statusFilter]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadSuppliers(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [loadSuppliers]);
+
+  const filteredSuppliers = suppliers;
+
   // KPI counts
-  const totalSuppliers = mockSuppliers.length;
-  const activeSuppliers = mockSuppliers.filter((s) => s.status === 'Active').length;
-  const onHoldSuppliers = mockSuppliers.filter((s) => s.status === 'On Hold').length;
-  const inactiveSuppliers = mockSuppliers.filter((s) => s.status === 'Inactive').length;
-  const totalOpenPOs = mockSuppliers.reduce((sum, s) => sum + s.openPOs, 0);
+  const totalSuppliers = suppliers.length;
+  const activeSuppliers = suppliers.filter((s) => s.status === 'Active').length;
+  const onHoldSuppliers = suppliers.filter((s) => s.status === 'On Hold').length;
+  const totalOpenPOs = suppliers.reduce((sum, s) => sum + s.openPOs, 0);
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
     setShowEditModal(true);
+  };
+
+  const handleViewDetails = async (supplier: Supplier) => {
+    try {
+      const response = await apiClient.get(`/suppliers/${supplier.id}`);
+      handleEdit(mapSupplier(response.data.data));
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.message || 'Unable to load supplier details.');
+    }
+  };
+
+  const payloadFromForm = (form: HTMLFormElement) => {
+    const data = new FormData(form);
+    return {
+      supplier_code: String(data.get('supplier_code') || '').trim(), name: String(data.get('name') || '').trim(),
+      contact_person: String(data.get('contact_person') || '').trim() || null,
+      email: String(data.get('email') || '').trim() || null, phone: String(data.get('phone') || '').trim() || null,
+      address: String(data.get('address') || '').trim() || null, status: apiStatus(String(data.get('status') || 'Active')),
+      payment_terms: String(data.get('payment_terms') || '').trim() || null, notes: String(data.get('notes') || '').trim() || null,
+    };
+  };
+
+  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setSaving(true); setError('');
+    try { await apiClient.post('/suppliers', payloadFromForm(event.currentTarget)); setShowAddModal(false); await loadSuppliers(); }
+    catch (requestError: any) { setError(requestError?.response?.data?.message || 'Supplier could not be created.'); }
+    finally { setSaving(false); }
+  };
+
+  const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); if (!selectedSupplier) return; setSaving(true); setError('');
+    try { await apiClient.put(`/suppliers/${selectedSupplier.id}`, payloadFromForm(event.currentTarget)); setShowEditModal(false); setSelectedSupplier(null); await loadSuppliers(); }
+    catch (requestError: any) { setError(requestError?.response?.data?.message || 'Supplier could not be updated.'); }
+    finally { setSaving(false); }
   };
 
   {/* FIX: Dark mode canvas adaptation */}
@@ -211,10 +186,12 @@ const Suppliers: React.FC = () => {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
+            onClick={() => void loadSuppliers()}
+            disabled={loading}
             className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             title="Refresh"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -313,6 +290,8 @@ const Suppliers: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>}
 
       {/* Supplier Cards Grid */}
       {viewMode === 'cards' && (
@@ -451,6 +430,7 @@ const Suppliers: React.FC = () => {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => void handleViewDetails(supplier)}
                           className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                           title="View Details"
                         >
@@ -476,7 +456,7 @@ const Suppliers: React.FC = () => {
             <div className="text-sm text-[var(--text-muted)]">
               Showing <span className="text-[var(--text-primary)] font-medium">1</span> to{' '}
               <span className="text-[var(--text-primary)] font-medium">{filteredSuppliers.length}</span> of{' '}
-              <span className="text-[var(--text-primary)] font-medium">{mockSuppliers.length}</span> suppliers
+              <span className="text-[var(--text-primary)] font-medium">{suppliers.length}</span> suppliers
             </div>
             <div className="flex items-center gap-1">
               <button className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -515,12 +495,18 @@ const Suppliers: React.FC = () => {
               </button>
             </div>
 
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleCreate}>
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Supplier Code *</label>
+                <input name="supplier_code" required maxLength={50} type="text" className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40" placeholder="SUP-001" />
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Supplier Name *
                 </label>
                 <input
+                  name="name"
+                  required
                   type="text"
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="Enter supplier name"
@@ -528,9 +514,10 @@ const Suppliers: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
-                  Contact Person *
+                  Contact Person
                 </label>
                 <input
+                  name="contact_person"
                   type="text"
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="Full name"
@@ -539,9 +526,10 @@ const Suppliers: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
-                    Email *
+                    Email
                   </label>
                   <input
+                    name="email"
                     type="email"
                     className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     placeholder="contact@company.com"
@@ -549,9 +537,10 @@ const Suppliers: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
-                    Phone *
+                    Phone
                   </label>
                   <input
+                    name="phone"
                     type="text"
                     className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     placeholder="+1 234 567 8900"
@@ -563,6 +552,7 @@ const Suppliers: React.FC = () => {
                   Location
                 </label>
                 <input
+                  name="address"
                   type="text"
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                   placeholder="City, Country"
@@ -572,7 +562,7 @@ const Suppliers: React.FC = () => {
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Payment Terms
                 </label>
-                <select className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                <select name="payment_terms" className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                   <option>Net 15</option>
                   <option>Net 30</option>
                   <option>Net 45</option>
@@ -583,11 +573,15 @@ const Suppliers: React.FC = () => {
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Status
                 </label>
-                <select className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                <select name="status" className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                   <option>Active</option>
                   <option>On Hold</option>
                   <option>Inactive</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Notes</label>
+                <textarea name="notes" rows={3} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40" placeholder="Optional supplier notes" />
               </div>
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                 <button
@@ -599,9 +593,10 @@ const Suppliers: React.FC = () => {
                 </button>
                 <button
                   type="submit"
+                  disabled={saving}
                   className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
                 >
-                  <Save className="w-4 h-4" /> Add Supplier
+                  <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Add Supplier'}
                 </button>
               </div>
             </form>
@@ -631,12 +626,18 @@ const Suppliers: React.FC = () => {
               </button>
             </div>
 
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleUpdate}>
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Supplier Code *</label>
+                <input name="supplier_code" required maxLength={50} type="text" defaultValue={selectedSupplier.code} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
                   Supplier Name *
                 </label>
                 <input
+                  name="name"
+                  required
                   type="text"
                   defaultValue={selectedSupplier.name}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -644,9 +645,10 @@ const Suppliers: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
-                  Contact Person *
+                  Contact Person
                 </label>
                 <input
+                  name="contact_person"
                   type="text"
                   defaultValue={selectedSupplier.contactPerson}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -655,9 +657,10 @@ const Suppliers: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
-                    Email *
+                    Email
                   </label>
                   <input
+                    name="email"
                     type="email"
                     defaultValue={selectedSupplier.email}
                     className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -665,9 +668,10 @@ const Suppliers: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">
-                    Phone *
+                    Phone
                   </label>
                   <input
+                    name="phone"
                     type="text"
                     defaultValue={selectedSupplier.phone}
                     className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -679,6 +683,7 @@ const Suppliers: React.FC = () => {
                   Location
                 </label>
                 <input
+                  name="address"
                   type="text"
                   defaultValue={selectedSupplier.location}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -689,6 +694,7 @@ const Suppliers: React.FC = () => {
                   Payment Terms
                 </label>
                 <select
+                  name="payment_terms"
                   defaultValue={selectedSupplier.paymentTerms}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 >
@@ -703,6 +709,7 @@ const Suppliers: React.FC = () => {
                   Status
                 </label>
                 <select
+                  name="status"
                   defaultValue={selectedSupplier.status}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 >
@@ -710,6 +717,10 @@ const Suppliers: React.FC = () => {
                   <option>On Hold</option>
                   <option>Inactive</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Notes</label>
+                <textarea name="notes" rows={3} defaultValue={selectedSupplier.notes} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
               </div>
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                 <button
@@ -721,9 +732,10 @@ const Suppliers: React.FC = () => {
                 </button>
                 <button
                   type="submit"
+                  disabled={saving}
                   className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
                 >
-                  <Save className="w-4 h-4" /> Save Changes
+                  <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </form>
