@@ -24,13 +24,23 @@ use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PlantManagerDashboardController;
+use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\AdminReportController;
+use App\Http\Controllers\Api\AdminWarehouseLocationController;
+use App\Http\Controllers\Api\PlantManagerWarehouseController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/admin/dashboard', [DashboardController::class, 'index']);
+    Route::get('/admin/reports/dashboard', [AdminReportController::class, 'dashboard']);
+    Route::get('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'show']);
+    Route::put('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'update']);
+    Route::apiResource('/admin/products', ProductController::class);
     Route::get('/plant-manager/dashboard', [PlantManagerDashboardController::class, 'index']);
+    Route::get('/plant-manager/warehouse', [PlantManagerWarehouseController::class, 'show']);
+    Route::get('/products', [ProductController::class, 'options'])->name('products.options');
 
     Route::get('/users/statistics', [UserController::class, 'statistics']);
     Route::get('/users', [UserController::class, 'index']);

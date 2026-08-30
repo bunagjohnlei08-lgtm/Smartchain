@@ -85,8 +85,8 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($request->user()->isAdmin() || $request->user()->isPlantManager(), 403);
         $orders = PurchaseOrder::query()
-            ->where('status', 'Approved')
-            ->with(['items', 'approver:id,name'])
+            ->whereIn('status', ['Approved', 'Sent to Supplier'])
+            ->with(['items', 'approver:id,name', 'receivings.items'])
             ->latest()
             ->get();
         return response()->json(['data' => $orders->map(fn (PurchaseOrder $order) => $this->present($order))]);
@@ -130,13 +130,20 @@ class PurchaseOrderController extends Controller
             'approved_by' => $order->approver?->name,
             'signature_data' => $order->signature_data,
             'created_at' => $order->created_at?->toDateString(),
-            'items' => $order->items->map(fn ($item) => [
+            'items' => $order->items->map(function ($item) use ($order) {
+                $received = (int) $order->receivings->flatMap->items
+                    ->where('product_name', $item->product_name)->sum('delivered_quantity');
+                return [
                 'id' => $item->id,
                 'product_name' => $item->product_name,
                 'ordered_quantity' => $item->ordered_quantity,
+                'received_quantity' => $received,
+                'remaining_quantity' => max(0, $item->ordered_quantity - $received),
+                'unit' => Product::query()->where('name', $item->product_name)->value('unit') ?? 'pcs',
                 'unit_price' => (float) $item->unit_price,
                 'total_price' => (float) $item->total_price,
-            ])->values(),
+                ];
+            })->values(),
         ];
     }
 }

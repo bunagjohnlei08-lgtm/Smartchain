@@ -4,13 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\ReceivingTimeline;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 class ReceivingController extends Controller
 {
@@ -29,6 +28,7 @@ class ReceivingController extends Controller
             'id' => $receiving->id,
             'receiving_no' => $receiving->receiving_no,
             'purchase_order' => $receiving->purchase_order,
+            'purchase_order_id' => $receiving->purchase_order_id,
             'supplier' => $receiving->supplier,
             'reference_no' => $receiving->reference_no,
             'notes' => $receiving->notes,
@@ -41,6 +41,7 @@ class ReceivingController extends Controller
                 'id' => $item->id,
                 'product_id' => $item->product_id,
                 'product_name' => $item->product_name,
+                'ordered_quantity' => $item->ordered_quantity,
                 'delivered_quantity' => $item->delivered_quantity,
                 'unit' => $item->unit,
                 'inspection_status' => $item->inspection_status,
@@ -116,40 +117,56 @@ class ReceivingController extends Controller
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
         $validated = $request->validate([
-            'purchase_order' => 'required|string|max:255',
-            'supplier' => 'required|string|max:255',
+            'purchase_order_id' => 'required|integer|exists:purchase_orders,id',
             'reference_no' => 'nullable|string|max:255',
             'delivery_date' => 'required|date',
             'items' => 'required|array|min:1',
-            'items.*.product' => 'required|string|max:255',
-            'items.*.delivered_quantity' => 'required|integer|min:1',
-            'items.*.unit' => 'required|string|max:50',
+            'items.*.purchase_order_item_id' => 'required|integer|distinct|exists:purchase_order_items,id',
+            'items.*.delivered_quantity' => 'required|integer|min:0',
         ]);
 
-        try {
-            $receiving = DB::transaction(function () use ($validated, $request) {
+        $receiving = DB::transaction(function () use ($validated, $request) {
+                $purchaseOrder = PurchaseOrder::query()->with('items')->lockForUpdate()->findOrFail($validated['purchase_order_id']);
+                abort_unless(in_array($purchaseOrder->status, ['Approved', 'Sent to Supplier'], true), 422, 'This Purchase Order is not active for receiving.');
+
+                $submitted = collect($validated['items'])->keyBy('purchase_order_item_id');
+                abort_unless($submitted->keys()->sort()->values()->all() === $purchaseOrder->items->pluck('id')->sort()->values()->all(), 422, 'Receiving items must exactly match the selected Purchase Order.');
+                abort_unless($submitted->contains(fn ($item) => (int) $item['delivered_quantity'] > 0), 422, 'At least one product must have a delivered quantity greater than zero.');
+
+                $previouslyReceived = ReceivingItem::query()
+                    ->whereHas('receiving', fn ($query) => $query->where('purchase_order_id', $purchaseOrder->id))
+                    ->selectRaw('product_name, SUM(delivered_quantity) as quantity')
+                    ->groupBy('product_name')->pluck('quantity', 'product_name');
+
+                foreach ($purchaseOrder->items as $poItem) {
+                    $quantity = (int) $submitted[$poItem->id]['delivered_quantity'];
+                    $remaining = max(0, $poItem->ordered_quantity - (int) ($previouslyReceived[$poItem->product_name] ?? 0));
+                    abort_if($quantity > $remaining, 422, "Delivered quantity for {$poItem->product_name} exceeds the remaining Purchase Order quantity of {$remaining}.");
+                }
+
                 $receiving = Receiving::create([
                     'receiving_no' => $this->generateReceivingNo(),
-                    'purchase_order' => $validated['purchase_order'],
-                    'supplier' => $validated['supplier'],
+                    'purchase_order_id' => $purchaseOrder->id,
+                    'purchase_order' => $purchaseOrder->po_number,
+                    'supplier' => $purchaseOrder->supplier_name,
                     'reference_no' => $validated['reference_no'] ?? null,
                     'delivery_date' => $validated['delivery_date'],
                     'status' => 'Pending QA',
                     'prepared_by_id' => $request->user()->id,
                 ]);
 
-                foreach ($validated['items'] as $itemData) {
-                    $product = Product::firstOrCreate(
-                        ['name' => $itemData['product']],
-                        ['unit' => $itemData['unit']]
-                    );
+                foreach ($purchaseOrder->items as $poItem) {
+                    $itemData = $submitted[$poItem->id];
+                    if ((int) $itemData['delivered_quantity'] === 0) continue;
+                    $product = Product::query()->where('name', $poItem->product_name)->firstOrFail();
 
                     ReceivingItem::create([
                         'receiving_id' => $receiving->id,
                         'product_id' => $product->id,
                         'product_name' => $product->name,
+                        'ordered_quantity' => $poItem->ordered_quantity,
                         'delivered_quantity' => $itemData['delivered_quantity'],
-                        'unit' => $itemData['unit'],
+                        'unit' => $product->unit,
                         'inspection_status' => 'Pending QA',
                     ]);
                 }
@@ -175,13 +192,14 @@ class ReceivingController extends Controller
                     ],
                 ]);
 
+                $receivedNow = $purchaseOrder->items->every(function ($poItem) use ($previouslyReceived, $submitted) {
+                    return (int) ($previouslyReceived[$poItem->product_name] ?? 0)
+                        + (int) $submitted[$poItem->id]['delivered_quantity'] >= $poItem->ordered_quantity;
+                });
+                if ($receivedNow) $purchaseOrder->update(['status' => 'Completed']);
+
                 return $receiving;
             });
-        } catch (Throwable $e) {
-            Log::error('Receiving creation failed', ['error' => $e->getMessage()]);
-
-            return response()->json(['message' => 'Failed to create receiving due to a server error. Please try again.'], 500);
-        }
 
         return response()->json($this->present($receiving), 201);
     }

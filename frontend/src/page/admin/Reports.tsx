@@ -1,5 +1,6 @@
 // src/pages/admin/Reports.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { apiClient } from '../../lib/api';
 import {
   FileText,
   Eye,
@@ -35,7 +36,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from 'recharts';
 
 // ============================================
@@ -58,6 +58,14 @@ interface Category {
   id: string;
   name: string;
   icon: React.ReactNode;
+}
+
+interface ReportsDashboardResponse {
+  metrics: { total_reports_available:number; exports_today:number; pending_reports:number; generated_today:number; total_inventory_value:number; ai_forecast_accuracy:number };
+  reports_list: Array<{ id:string; name:string; description:string; category:string; last_generated:string|null; format:'PDF'|'Excel'|'CSV'; status:'Generated'|'Pending'; file_size:string; parameters:string }>;
+  inventory_value_by_warehouse: Array<{ name:string; value:number; color:string }>;
+  stock_status_overview: Array<{ name:string; value:number; color:string }>;
+  recent_exports: Array<{ filename:string; date:string; size:string; format:'PDF'|'Excel'|'CSV' }>;
 }
 
 // ============================================
@@ -272,7 +280,13 @@ const Reports: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('inventory');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [reports, setReports] = useState<ReportItem[]>(mockReportsData);
+  const [reports, setReports] = useState<(typeof mockReportsData)[number][]>([]);
+  const [warehouseChartData, setWarehouseChartData] = useState<(typeof warehouseData)[number][]>([]);
+  const [stockChartData, setStockChartData] = useState<(typeof stockStatusData)[number][]>([]);
+  const [exportFiles, setExportFiles] = useState<(typeof recentExports)[number][]>([]);
+  const [metrics, setMetrics] = useState({ total_reports_available:0, exports_today:0, pending_reports:0, generated_today:0, total_inventory_value:0, ai_forecast_accuracy:0 });
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const [isCustomReportOpen, setIsCustomReportOpen] = useState(false);
@@ -286,6 +300,25 @@ const Reports: React.FC = () => {
 
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiClient.get<ReportsDashboardResponse>('/admin/reports/dashboard')
+      .then(({ data }) => {
+        if (!active) return;
+        setMetrics(data.metrics);
+        setReports(data.reports_list.map((report) => ({ id:report.id, name:report.name, description:report.description, category:report.category, lastGenerated:report.last_generated ? new Date(report.last_generated).toLocaleString() : 'Not generated', format:report.format, status:report.status, fileSize:report.file_size, parameters:report.parameters })));
+        setWarehouseChartData(data.inventory_value_by_warehouse);
+        setStockChartData(data.stock_status_overview);
+        setExportFiles(data.recent_exports.map((file) => ({ name:file.filename, format:file.format, date:new Date(file.date).toLocaleString(), size:file.size })));
+        setDashboardError(null);
+      })
+      .catch((error) => { if (active) setDashboardError(error?.response?.data?.message || 'Unable to load reports dashboard.'); })
+      .finally(() => { if (active) setDashboardLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const currency = (value:number) => new Intl.NumberFormat('en-PH', { style:'currency', currency:'PHP' }).format(value);
 
   const openDrawer = (report: ReportItem) => {
     setSelectedReport(report);
@@ -321,6 +354,8 @@ const Reports: React.FC = () => {
         }),
         format: exportFormat,
         status: 'Generated',
+        fileSize: 'N/A',
+        parameters: `Date Range: ${startDate} - ${endDate}`,
       };
       setReports(prev => [newReport, ...prev]);
       setReportTitle('');
@@ -517,14 +552,15 @@ const Reports: React.FC = () => {
       )}
 
       {/* KPI CARDS */}
+      {dashboardError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{dashboardError}</div>}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Total Reports', value: '28', subtitle: 'Available Reports', icon: <FileText className="w-4 h-4 text-blue-400" /> },
-          { label: 'Exports Today', value: '14', subtitle: 'Excel / PDF / CSV', icon: <Download className="w-4 h-4 text-emerald-400" /> },
-          { label: 'Pending Reports', value: '3', subtitle: 'Generating...', icon: <Clock className="w-4 h-4 text-amber-400" /> },
-          { label: 'Generated Today', value: '21', subtitle: 'All Reports', icon: <CheckCircle className="w-4 h-4 text-cyan-400" /> },
-          { label: 'Total Inventory Value', value: '₱24,780,450.00', subtitle: 'Across All Warehouses', icon: <BarChart3 className="w-4 h-4 text-purple-400" /> },
-          { label: 'AI Forecast Accuracy', value: '87.6%', subtitle: 'This Month', icon: <TrendingUp className="w-4 h-4 text-rose-400" /> },
+          { label: 'Total Reports', value: metrics.total_reports_available, subtitle: 'Available Reports', icon: <FileText className="w-4 h-4 text-blue-400" /> },
+          { label: 'Exports Today', value: metrics.exports_today, subtitle: 'Excel / PDF / CSV', icon: <Download className="w-4 h-4 text-emerald-400" /> },
+          { label: 'Pending Reports', value: metrics.pending_reports, subtitle: 'Awaiting data', icon: <Clock className="w-4 h-4 text-amber-400" /> },
+          { label: 'Generated Today', value: metrics.generated_today, subtitle: 'All Reports', icon: <CheckCircle className="w-4 h-4 text-cyan-400" /> },
+          { label: 'Total Inventory Value', value: currency(metrics.total_inventory_value), subtitle: 'Across All Warehouses', icon: <BarChart3 className="w-4 h-4 text-purple-400" /> },
+          { label: 'AI Forecast Accuracy', value: `${metrics.ai_forecast_accuracy}%`, subtitle: 'This Month', icon: <TrendingUp className="w-4 h-4 text-rose-400" /> },
         ].map((kpi, idx) => (
           <div key={idx} className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
             <div className="flex items-start justify-between">
@@ -533,7 +569,7 @@ const Reports: React.FC = () => {
               </div>
             </div>
             <div className="mt-3">
-              <p className="text-xl font-bold text-white">{kpi.value}</p>
+              <p className="text-xl font-bold text-white">{dashboardLoading ? '—' : kpi.value}</p>
               <p className="text-xs text-slate-400">{kpi.label}</p>
               <p className="text-[10px] text-slate-500 mt-0.5">{kpi.subtitle}</p>
             </div>
@@ -594,10 +630,7 @@ const Reports: React.FC = () => {
 
               <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                 <option>All Warehouses</option>
-                <option>Central Depot</option>
-                <option>North Warehouse</option>
-                <option>South Warehouse</option>
-                <option>East Warehouse</option>
+                {warehouseChartData.map((warehouse) => <option key={warehouse.name}>{warehouse.name}</option>)}
               </select>
 
               <div className="flex items-center gap-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300">
@@ -635,7 +668,7 @@ const Reports: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  {paginatedReports.map((report) => (
+                  {dashboardLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Loading reports…</td></tr> : paginatedReports.map((report) => (
                     <tr key={report.id} className="hover:bg-slate-800/20 transition-colors">
                       <td className="px-3 py-3 font-medium text-white">{report.name}</td>
                       <td className="px-3 py-3 text-slate-400 max-w-[180px] truncate">{report.description}</td>
@@ -661,7 +694,7 @@ const Reports: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-                  {paginatedReports.length === 0 && (
+                  {!dashboardLoading && paginatedReports.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                         No reports match your filters.
@@ -720,11 +753,12 @@ const Reports: React.FC = () => {
             Inventory Value by Warehouse
           </h4>
           <div className="flex-1 min-h-[200px] relative">
+            {!dashboardLoading && warehouseChartData.length === 0 && <div className="absolute inset-0 z-10 flex items-center justify-center text-xs text-slate-500">No warehouse inventory data.</div>}
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', borderRadius: '8px', padding: '10px' }} />
                 <Pie
-                  data={warehouseData}
+                  data={warehouseChartData}
                   cx="50%"
                   cy="50%"
                   innerRadius={50}
@@ -736,7 +770,7 @@ const Reports: React.FC = () => {
                   animationDuration={1200}
                   animationEasing="ease-out"
                 >
-                  {warehouseData.map((entry, index) => (
+                  {warehouseChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} stroke="#0b101d" strokeWidth={2} />
                   ))}
                 </Pie>
@@ -745,16 +779,16 @@ const Reports: React.FC = () => {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center">
                 <p className="text-xs text-slate-400">Total Value</p>
-                <p className="text-lg font-bold text-white">₱24.78M</p>
+                <p className="text-lg font-bold text-white">{currency(metrics.total_inventory_value)}</p>
               </div>
             </div>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-            {warehouseData.map((item) => (
+            {warehouseChartData.map((item) => (
               <div key={item.name} className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
                 <span className="text-slate-400 truncate">{item.name}</span>
-                <span className="text-white ml-auto">₱{item.value.toFixed(2)}M</span>
+                <span className="text-white ml-auto">{currency(item.value)}</span>
               </div>
             ))}
           </div>
@@ -767,19 +801,22 @@ const Reports: React.FC = () => {
             Stock Status Overview
           </h4>
           <div className="flex-1 min-h-[180px]">
+            {!dashboardLoading && stockChartData.every((item) => item.value === 0) && <div className="h-full flex items-center justify-center text-xs text-slate-500">No stock data.</div>}
+            {(dashboardLoading || stockChartData.some((item) => item.value > 0)) && (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stockStatusData} layout="vertical" margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+              <BarChart data={stockChartData} layout="vertical" margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
                 <XAxis type="number" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis dataKey="name" type="category" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={60} />
                 <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', borderRadius: '8px', padding: '10px' }} />
                 <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out">
-                  {stockStatusData.map((entry, index) => (
+                  {stockChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -793,7 +830,7 @@ const Reports: React.FC = () => {
             <button className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">View All</button>
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px]">
-            {recentExports.slice(0, 4).map((file, idx) => (
+            {exportFiles.slice(0, 4).map((file, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs border-b border-slate-800/60 pb-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-200 truncate">{file.name}</p>
@@ -804,6 +841,7 @@ const Reports: React.FC = () => {
                 </button>
               </div>
             ))}
+            {!dashboardLoading && exportFiles.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No recent exports.</p>}
           </div>
         </div>
 

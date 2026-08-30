@@ -22,4 +22,5 @@ class PurchaseOrder extends Model
     public function items(): HasMany { return $this->hasMany(PurchaseOrderItem::class); }
     public function approver(): BelongsTo { return $this->belongsTo(User::class, 'approved_by'); }
     public function replenishmentRequest(): BelongsTo { return $this->belongsTo(ReplenishmentRequest::class); }
+    public function receivings(): HasMany { return $this->hasMany(Receiving::class); }
 }

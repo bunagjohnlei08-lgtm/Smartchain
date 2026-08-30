@@ -11,6 +11,7 @@ class Receiving extends Model
 {
     protected $fillable = [
         'receiving_no',
+        'purchase_order_id',
         'purchase_order',
         'supplier',
         'reference_no',
@@ -30,6 +31,11 @@ class Receiving extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ReceivingItem::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
     }
 
     public function timeline(): HasMany

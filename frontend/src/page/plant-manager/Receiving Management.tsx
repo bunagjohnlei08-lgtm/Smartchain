@@ -27,17 +27,28 @@ import {
 // ============================================
 
 interface CreateReceivingItemInput {
+  purchase_order_item_id: number;
   product: string;
+  ordered_quantity: number;
+  remaining_quantity: number;
   delivered_quantity: string;
   unit: string;
 }
 
 interface CreateReceivingFormData {
-  purchase_order: string;
+  purchase_order_id: number | null;
   supplier: string;
   reference_no: string;
   delivery_date: string;
   items: CreateReceivingItemInput[];
+}
+
+interface ApprovedPurchaseOrder {
+  id: number;
+  po_number: string;
+  supplier_name: string;
+  status: string;
+  items: Array<{ id: number; product_name: string; ordered_quantity: number; received_quantity: number; remaining_quantity: number; unit: string }>;
 }
 
 // ============================================
@@ -115,14 +126,12 @@ function getApiErrorMessage(error: unknown): string {
   return 'An unexpected error occurred. Please try again.';
 }
 
-const emptyItem = (): CreateReceivingItemInput => ({ product: '', delivered_quantity: '', unit: 'pcs' });
-
 const emptyForm = (): CreateReceivingFormData => ({
-  purchase_order: '',
+  purchase_order_id: null,
   supplier: '',
   reference_no: '',
   delivery_date: '',
-  items: [emptyItem()],
+  items: [],
 });
 
 // ============================================
@@ -203,11 +212,18 @@ const CreateReceivingModal: React.FC<{
   const [formData, setFormData] = useState<CreateReceivingFormData>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [purchaseOrders, setPurchaseOrders] = useState<ApprovedPurchaseOrder[]>([]);
+  const [loadingPurchaseOrders, setLoadingPurchaseOrders] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setFormData(emptyForm());
       setFormError(null);
+      setLoadingPurchaseOrders(true);
+      apiClient.get<{ data: ApprovedPurchaseOrder[] }>('/purchase-orders/approved')
+        .then((response) => setPurchaseOrders(response.data.data))
+        .catch((error) => setFormError(getApiErrorMessage(error)))
+        .finally(() => setLoadingPurchaseOrders(false));
     }
   }, [isOpen]);
 
@@ -220,14 +236,20 @@ const CreateReceivingModal: React.FC<{
     }));
   };
 
-  const addItem = () => {
-    setFormData((prev) => ({ ...prev, items: [...prev.items, emptyItem()] }));
-  };
-
-  const removeItem = (index: number) => {
+  const selectPurchaseOrder = (purchaseOrderId: string) => {
+    const order = purchaseOrders.find((candidate) => candidate.id === Number(purchaseOrderId));
     setFormData((prev) => ({
       ...prev,
-      items: prev.items.length > 1 ? prev.items.filter((_, i) => i !== index) : prev.items,
+      purchase_order_id: order?.id ?? null,
+      supplier: order?.supplier_name ?? '',
+      items: order?.items.map((item) => ({
+        purchase_order_item_id: item.id,
+        product: item.product_name,
+        ordered_quantity: item.ordered_quantity,
+        remaining_quantity: item.remaining_quantity,
+        delivered_quantity: String(item.remaining_quantity),
+        unit: item.unit,
+      })) ?? [],
     }));
   };
 
@@ -235,15 +257,19 @@ const CreateReceivingModal: React.FC<{
     e.preventDefault();
     setFormError(null);
 
-    if (!formData.purchase_order || !formData.supplier || !formData.delivery_date) {
+    if (!formData.purchase_order_id || !formData.supplier || !formData.delivery_date) {
       setFormError('Please fill in all required fields.');
       return;
     }
     const invalidItem = formData.items.some(
-      (item) => !item.product || !item.unit || !item.delivered_quantity || Number(item.delivered_quantity) <= 0
+      (item) => !item.product || !item.unit || item.delivered_quantity === '' || Number(item.delivered_quantity) < 0 || Number(item.delivered_quantity) > item.remaining_quantity
     );
     if (invalidItem) {
-      setFormError('Each product needs a name, a delivered quantity greater than 0, and a unit.');
+      setFormError('Delivered quantities must be between 0 and the remaining PO quantity.');
+      return;
+    }
+    if (!formData.items.some((item) => Number(item.delivered_quantity) > 0)) {
+      setFormError('Enter a delivered quantity for at least one product.');
       return;
     }
 
@@ -279,23 +305,27 @@ const CreateReceivingModal: React.FC<{
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1.5 text-slate-300">Purchase Order *</label>
-              <input
-                type="text"
-                value={formData.purchase_order}
-                onChange={(e) => setFormData({ ...formData, purchase_order: e.target.value })}
-                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                placeholder="PO-2026-005"
+              <select
+                value={formData.purchase_order_id ?? ''}
+                onChange={(e) => selectPurchaseOrder(e.target.value)}
+                disabled={loadingPurchaseOrders}
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:opacity-60"
                 required
-              />
+              >
+                <option value="">{loadingPurchaseOrders ? 'Loading purchase orders…' : 'Select a purchase order'}</option>
+                {purchaseOrders.map((order) => (
+                  <option key={order.id} value={order.id}>{order.po_number}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5 text-slate-300">Supplier *</label>
               <input
                 type="text"
                 value={formData.supplier}
-                onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                placeholder="ABC Industrial"
+                readOnly
+                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-400"
+                placeholder="Populated from selected PO"
                 required
               />
             </div>
@@ -324,49 +354,25 @@ const CreateReceivingModal: React.FC<{
           <div className="pt-2 border-t border-slate-800">
             <div className="flex items-center justify-between mt-3 mb-2">
               <label className="text-sm font-medium text-slate-300">Products *</label>
-              <button
-                type="button"
-                onClick={addItem}
-                className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Product
-              </button>
+              <span className="text-xs text-slate-500">Expected vs. delivered</span>
             </div>
             <div className="space-y-3">
               {formData.items.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                  <input
-                    type="text"
-                    value={item.product}
-                    onChange={(e) => updateItem(index, { product: e.target.value })}
-                    className="col-span-6 bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    placeholder="Product name"
-                  />
+                <div key={item.purchase_order_item_id} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-5"><p className="text-sm text-slate-200">{item.product}</p><p className="text-xs text-slate-500">Ordered: {item.ordered_quantity} · Remaining: {item.remaining_quantity} {item.unit}</p></div>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
+                    max={item.remaining_quantity}
                     value={item.delivered_quantity}
                     onChange={(e) => updateItem(index, { delivered_quantity: e.target.value })}
-                    className="col-span-3 bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    placeholder="Qty"
+                    className="col-span-4 bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    placeholder="Delivered qty"
                   />
-                  <input
-                    type="text"
-                    value={item.unit}
-                    onChange={(e) => updateItem(index, { unit: e.target.value })}
-                    className="col-span-2 bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    placeholder="Unit"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    disabled={formData.items.length === 1}
-                    className="col-span-1 p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <span className="col-span-3 text-sm text-slate-400">{item.unit}</span>
                 </div>
               ))}
+              {formData.items.length === 0 && <p className="text-sm text-slate-500 py-3">Select a purchase order to load its products.</p>}
             </div>
           </div>
 
@@ -488,14 +494,12 @@ const ReceivingManagement: React.FC = () => {
 
   const handleCreateReceiving = async (formData: CreateReceivingFormData) => {
     const payload = {
-      purchase_order: formData.purchase_order,
-      supplier: formData.supplier,
+      purchase_order_id: formData.purchase_order_id,
       reference_no: formData.reference_no || null,
       delivery_date: formData.delivery_date,
       items: formData.items.map((item) => ({
-        product: item.product,
+        purchase_order_item_id: item.purchase_order_item_id,
         delivered_quantity: Number(item.delivered_quantity),
-        unit: item.unit,
       })),
     };
 

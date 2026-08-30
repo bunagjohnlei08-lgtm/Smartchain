@@ -1,511 +1,115 @@
-// src/page/plant-manager/Warehouse.tsx
-import React, { useState } from 'react';
-import {
-  LayoutGrid,
-  ArrowUp,
-  ArrowDown,
-  Warehouse as WarehouseIcon,
-  BarChart3,
-  Package,
-  Minus,
-  RefreshCw,
-  Download,
-  Printer,
-  X,
-  Eye,
-} from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Archive, Boxes, Loader2, MapPin, PackageCheck, RefreshCw, Warehouse as WarehouseIcon } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 
-// ============================================
-// TYPES
-// ============================================
-
-interface Zone {
-  id: string;
+interface WarehouseOverview {
+  id: number;
   name: string;
-  subtitle: string;
-  utilization: number;
-  used: number;
-  capacity: number;
-  racks: number;
-  freeRacks: number;
+  code: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  capacity: number | null;
+  utilized: number;
+  available: number | null;
+  utilization_percentage: number | null;
+  status: 'Active' | 'Inactive';
+  map_embed_url: string | null;
+  inventory: {
+    total_units: number;
+    available_stock: number;
+    reserved_stock: number;
+    backload: number;
+  };
 }
-
-interface ChartData {
-  name: string;
-  used: number;
-  capacity: number;
-}
-
-// ============================================
-// MOCK DATA
-// ============================================
-
-const zones: Zone[] = [
-  {
-    id: '1',
-    name: 'Zone A',
-    subtitle: 'Ambient storage',
-    utilization: 85,
-    used: 10240,
-    capacity: 12000,
-    racks: 48,
-    freeRacks: 7,
-  },
-  {
-    id: '2',
-    name: 'Zone B',
-    subtitle: 'Heavy materials',
-    utilization: 66,
-    used: 5940,
-    capacity: 9000,
-    racks: 32,
-    freeRacks: 10,
-  },
-  {
-    id: '3',
-    name: 'Zone C',
-    subtitle: 'Electronics / ESD',
-    utilization: 91,
-    used: 6820,
-    capacity: 7500,
-    racks: 40,
-    freeRacks: 4,
-  },
-  {
-    id: '4',
-    name: 'Zone D',
-    subtitle: 'Outbound staging',
-    utilization: 43,
-    used: 2140,
-    capacity: 5000,
-    racks: 24,
-    freeRacks: 13,
-  },
-];
-
-const chartData: ChartData[] = zones.map((zone) => ({
-  name: zone.name,
-  used: zone.used,
-  capacity: zone.capacity,
-}));
-
-// ============================================
-// KPI DATA
-// ============================================
-
-const kpiData = [
-  {
-    label: 'Warehouse Capacity',
-    value: '33,500 u',
-    trend: 'unchanged vs last period',
-    trendType: 'neutral' as const,
-    icon: <WarehouseIcon className="w-5 h-5 text-blue-400" />,
-  },
-  {
-    label: 'Current Utilization',
-    value: '75%',
-    trend: '+3.1% vs last period',
-    trendType: 'up' as const,
-    icon: <BarChart3 className="w-5 h-5 text-emerald-400" />,
-  },
-  {
-    label: 'Storage Zones',
-    value: '4',
-    trend: 'all active vs last period',
-    trendType: 'up' as const,
-    icon: <LayoutGrid className="w-5 h-5 text-emerald-400" />,
-  },
-  {
-    label: 'Rack Availability',
-    value: '34/144',
-    trend: '-4 vs last period',
-    trendType: 'down' as const,
-    icon: <Package className="w-5 h-5 text-amber-400" />,
-  },
-];
-
-// ============================================
-// HELPER COMPONENTS
-// ============================================
-
-const KPICard: React.FC<{
-  label: string;
-  value: string | number;
-  trend: string;
-  trendType: 'up' | 'down' | 'neutral';
-  icon: React.ReactNode;
-}> = ({ label, value, trend, trendType, icon }) => {
-  const trendColor =
-    trendType === 'up'
-      ? 'text-emerald-400'
-      : trendType === 'down'
-      ? 'text-rose-400'
-      : 'text-slate-400';
-
-  const TrendIcon =
-    trendType === 'up'
-      ? ArrowUp
-      : trendType === 'down'
-      ? ArrowDown
-      : Minus;
-
-  return (
-    <div className="bg-[#0f172a]/80 border border-slate-800/90 rounded-2xl p-5 hover:border-slate-700 transition-all duration-200">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            {label}
-          </p>
-          <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-          <p className={`text-xs mt-1 flex items-center gap-1 ${trendColor}`}>
-            <TrendIcon className="w-3 h-3" />
-            {trend}
-          </p>
-        </div>
-        <div className="p-2.5 bg-slate-800/50 rounded-lg">{icon}</div>
-      </div>
-    </div>
-  );
-};
-
-// Custom Tooltip for chart
-const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    const used = payload.find((p) => p.dataKey === 'used')?.value;
-    const capacity = payload.find((p) => p.dataKey === 'capacity')?.value;
-    return (
-      <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-3 shadow-lg">
-        <p className="text-sm font-semibold text-white mb-1">{label}</p>
-        <div className="space-y-1 text-sm">
-          <p className="text-slate-300">
-            Used: <span className="font-medium text-white">{used?.toLocaleString()}</span>
-          </p>
-          <p className="text-slate-300">
-            Capacity: <span className="font-medium text-white">{capacity?.toLocaleString()}</span>
-          </p>
-          <p className="text-xs text-slate-400 border-t border-slate-700 pt-1 mt-1">
-            {used?.toLocaleString()} / {capacity?.toLocaleString()}
-          </p>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
-// ============================================
-// MAIN COMPONENT
-// ============================================
 
 const Warehouse: React.FC = () => {
-  const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
-  const [showZoneModal, setShowZoneModal] = useState(false);
+  const [warehouse, setWarehouse] = useState<WarehouseOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleZoneClick = (zone: Zone) => {
-    setSelectedZone(zone);
-    setShowZoneModal(true);
-  };
+  const loadWarehouse = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await apiClient.get<WarehouseOverview>('/plant-manager/warehouse');
+      setWarehouse(data);
+    } catch {
+      setWarehouse(null);
+      setError('Warehouse details could not be loaded. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadWarehouse(); }, [loadWarehouse]);
+
+  const units = (value: number | null) => value === null ? 'Not configured' : `${value.toLocaleString()} units`;
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Warehouse Overview</h1>
-          <p className="text-sm text-slate-400">Central Distribution Center · 4 storage zones</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="p-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <button className="p-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-            <Download className="w-4 h-4" />
-          </button>
-          <button className="p-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-            <Printer className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpiData.map((kpi, index) => (
-          <KPICard
-            key={index}
-            label={kpi.label}
-            value={kpi.value}
-            trend={kpi.trend}
-            trendType={kpi.trendType}
-            icon={kpi.icon}
-          />
-        ))}
-      </div>
-
-      {/* Storage Zone Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {zones.map((zone) => (
-          <div
-            key={zone.id}
-            onClick={() => handleZoneClick(zone)}
-            className="bg-[#0f172a]/80 border border-slate-800/90 rounded-2xl p-5 hover:border-slate-700 hover:shadow-lg transition-all duration-200 cursor-pointer group"
-          >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-semibold text-white">{zone.name}</h3>
-                <p className="text-xs text-slate-400">{zone.subtitle}</p>
-              </div>
-              <span
-                className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                  zone.utilization > 90
-                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                    : zone.utilization >= 70
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                }`}
-              >
-                {zone.utilization}%
-              </span>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="w-full h-1.5 bg-slate-800 rounded-full mb-4 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${zone.utilization}%`,
-                  backgroundColor:
-                    zone.utilization > 90
-                      ? '#EF4444'
-                      : zone.utilization >= 70
-                      ? '#F59E0B'
-                      : '#10B981',
-                }}
-              />
-            </div>
-
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-                <p className="text-xs text-slate-400">Used</p>
-                <p className="text-sm font-semibold text-white">
-                  {zone.used.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-                <p className="text-xs text-slate-400">Capacity</p>
-                <p className="text-sm font-semibold text-white">
-                  {zone.capacity.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-                <p className="text-xs text-slate-400">Racks</p>
-                <p className="text-sm font-semibold text-white">{zone.racks}</p>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-                <p className="text-xs text-slate-400">Free racks</p>
-                <p className="text-sm font-semibold text-emerald-400">
-                  {zone.freeRacks}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Zone Utilization Chart */}
-      <div className="bg-[#0f172a]/80 border border-slate-800/90 rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
+    <main className="min-h-screen w-full bg-[#090d16] p-4 text-slate-100 md:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-white">Zone Utilization</h3>
-            <p className="text-sm text-slate-400">Used vs available capacity by zone</p>
+            <h1 className="text-2xl font-bold text-white">Warehouse Overview</h1>
+            <p className="mt-1 text-sm text-slate-400">Single-warehouse capacity, inventory, and location monitoring</p>
           </div>
-          <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
-            Export
+          <button type="button" onClick={() => void loadWarehouse()} disabled={loading} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/60 disabled:cursor-not-allowed disabled:opacity-60">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
-        </div>
+        </header>
 
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart
-            data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis
-              dataKey="name"
-              className="text-slate-400 text-xs"
-              tick={{ fill: '#94a3b8' }}
-            />
-            <YAxis
-              className="text-slate-400 text-xs"
-              tick={{ fill: '#94a3b8' }}
-              tickFormatter={(value) => value.toLocaleString()}
-              domain={[0, 13000]}
-              ticks={[0, 3000, 6000, 9000, 12000]}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ color: '#94a3b8' }}
-              formatter={(value) => (
-                <span className="text-slate-300 text-sm">{value}</span>
-              )}
-            />
-            <Bar
-              dataKey="used"
-              fill="#06b6d4"
-              name="Used"
-              radius={[6, 6, 0, 0]}
-              isAnimationActive={true}
-              animationDuration={1200}
-              animationEasing="ease-in-out"
-            />
-            <Bar
-              dataKey="capacity"
-              fill="#475569"
-              stroke="#64748b"
-              strokeWidth={1}
-              name="Total Capacity"
-              radius={[6, 6, 0, 0]}
-              isAnimationActive={true}
-              animationDuration={1200}
-              animationEasing="ease-in-out"
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        {loading && <section className="flex min-h-64 items-center justify-center rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 text-slate-400" aria-live="polite"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading warehouse details…</section>}
+
+        {!loading && error && <section className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6" role="alert"><h2 className="font-semibold text-rose-300">Unable to load warehouse</h2><p className="mt-1 text-sm text-rose-200/80">{error}</p><button type="button" onClick={() => void loadWarehouse()} className="mt-4 min-h-11 cursor-pointer rounded-xl bg-rose-500 px-4 text-sm font-medium text-white transition-colors hover:bg-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-300">Try again</button></section>}
+
+        {!loading && !error && !warehouse && <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-6 text-slate-300">Warehouse details are not configured yet.</section>}
+
+        {warehouse && !loading && <>
+          <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 md:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-cyan-500/10 p-3 text-cyan-400"><WarehouseIcon className="h-6 w-6" /></div>
+                <div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold text-white">{warehouse.name}</h2><StatusBadge status={warehouse.status} /></div><p className="mt-1 text-sm text-slate-400">{warehouse.code}</p><p className="mt-3 flex max-w-2xl items-start gap-2 text-sm leading-6 text-slate-300"><MapPin className="mt-1 h-4 w-4 shrink-0 text-slate-500" />{warehouse.address || 'Address is not configured yet.'}</p></div>
+              </div>
+              <span className="text-xs text-slate-500">Read-only configuration</span>
+            </div>
+          </section>
+
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Warehouse capacity summary">
+            <MetricCard label="Total Capacity" value={units(warehouse.capacity)} icon={<WarehouseIcon className="h-5 w-5 text-blue-400" />} />
+            <MetricCard label="Utilized" value={units(warehouse.utilized)} icon={<Boxes className="h-5 w-5 text-cyan-400" />} />
+            <MetricCard label="Available" value={units(warehouse.available)} icon={<PackageCheck className="h-5 w-5 text-emerald-400" />} />
+            <MetricCard label="Capacity Utilization" value={warehouse.utilization_percentage === null ? 'Not available' : `${warehouse.utilization_percentage}%`} icon={<Archive className="h-5 w-5 text-amber-400" />} />
+          </section>
+
+          <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 md:p-6">
+            <div className="mb-2 flex justify-between text-sm"><span className="font-medium text-slate-300">Capacity utilization</span><span className="text-white">{warehouse.utilization_percentage === null ? 'Not available' : `${warehouse.utilization_percentage}%`}</span></div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label="Warehouse capacity utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={warehouse.utilization_percentage ?? 0}><div className="h-full rounded-full bg-cyan-500 transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${warehouse.utilization_percentage ?? 0}%` }} /></div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 md:p-6">
+            <div className="mb-5"><h2 className="text-lg font-semibold text-white">Inventory Utilization</h2><p className="mt-1 text-sm text-slate-400">Live stock totals assigned to {warehouse.name}</p></div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <InventoryValue label="Total inventory units" value={warehouse.inventory.total_units} />
+              <InventoryValue label="Available inventory" value={warehouse.inventory.available_stock} />
+              <InventoryValue label="Reserved inventory" value={warehouse.inventory.reserved_stock} />
+              <InventoryValue label="Backload" value={warehouse.inventory.backload} />
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0f172a]/80">
+            <div className="border-b border-slate-800 p-5 md:p-6"><h2 className="flex items-center gap-2 text-lg font-semibold text-white"><MapPin className="h-5 w-5 text-cyan-400" /> Warehouse Location</h2><div className="mt-3 grid gap-2 text-sm text-slate-400 md:grid-cols-3"><span><strong className="text-slate-300">Address:</strong> {warehouse.address || 'Not configured'}</span><span><strong className="text-slate-300">Latitude:</strong> {warehouse.latitude ?? '—'}</span><span><strong className="text-slate-300">Longitude:</strong> {warehouse.longitude ?? '—'}</span></div></div>
+            {warehouse.map_embed_url ? <iframe src={warehouse.map_embed_url} width="100%" height="450" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title={`${warehouse.name} location on Google Maps`} /> : <div className="flex min-h-56 items-center justify-center p-6 text-sm text-slate-400">Warehouse map location is not configured yet.</div>}
+          </section>
+        </>}
       </div>
-
-      {/* ============================================ */}
-      {/* ZONE DETAIL MODAL */}
-      {/* ============================================ */}
-      {showZoneModal && selectedZone && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowZoneModal(false)}
-        >
-          <div
-            className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-lg p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">{selectedZone.name}</h2>
-                <p className="text-sm text-slate-400">{selectedZone.subtitle}</p>
-              </div>
-              <button
-                onClick={() => setShowZoneModal(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-5">
-              {/* Utilization */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-slate-400">Utilization</span>
-                  <span className="text-lg font-bold text-white">
-                    {selectedZone.utilization}%
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${selectedZone.utilization}%`,
-                      backgroundColor:
-                        selectedZone.utilization >= 80
-                          ? '#F59E0B'
-                          : selectedZone.utilization >= 60
-                          ? '#3B82F6'
-                          : '#10B981',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Metrics */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-slate-400">Used</p>
-                  <p className="text-lg font-bold text-white">
-                    {selectedZone.used.toLocaleString()}
-                  </p>
-                </div>
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-slate-400">Capacity</p>
-                  <p className="text-lg font-bold text-white">
-                    {selectedZone.capacity.toLocaleString()}
-                  </p>
-                </div>
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-slate-400">Racks</p>
-                  <p className="text-lg font-bold text-white">
-                    {selectedZone.racks}
-                  </p>
-                </div>
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <p className="text-xs text-slate-400">Free Racks</p>
-                  <p className="text-lg font-bold text-emerald-400">
-                    {selectedZone.freeRacks}
-                  </p>
-                </div>
-              </div>
-
-              {/* Capacity Breakdown */}
-              <div className="bg-slate-800/50 rounded-xl p-4">
-                <h4 className="text-sm font-medium text-slate-300 mb-2">
-                  Capacity Breakdown
-                </h4>
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Used</span>
-                    <span className="font-medium text-white">
-                      {Math.round((selectedZone.used / selectedZone.capacity) * 100)}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Available</span>
-                    <span className="font-medium text-white">
-                      {Math.round(
-                        ((selectedZone.capacity - selectedZone.used) /
-                          selectedZone.capacity) *
-                          100
-                      )}
-                      %
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                <button
-                  onClick={() => setShowZoneModal(false)}
-                  className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
-                >
-                  Close
-                </button>
-                <button className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950">
-                  <Eye className="w-4 h-4" /> View Details
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </main>
   );
 };
+
+const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => <article className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p><p className="mt-2 text-xl font-bold text-white">{value}</p></div><div className="rounded-lg bg-slate-800/50 p-2.5">{icon}</div></div></article>;
+const InventoryValue: React.FC<{ label: string; value: number }> = ({ label, value }) => <div className="rounded-xl bg-slate-800/50 p-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-1 text-lg font-semibold text-white">{value.toLocaleString()} units</p></div>;
+const StatusBadge: React.FC<{ status: WarehouseOverview['status'] }> = ({ status }) => <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-slate-600 bg-slate-700/30 text-slate-400'}`}>{status}</span>;
 
 export default Warehouse;

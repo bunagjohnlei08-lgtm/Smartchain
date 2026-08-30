@@ -13,6 +13,7 @@ class ReceivingItem extends Model
         'product_id',
         'warehouse_id',
         'product_name',
+        'ordered_quantity',
         'delivered_quantity',
         'unit',
         'inspection_status',
@@ -23,6 +24,7 @@ class ReceivingItem extends Model
     {
         return [
             'delivered_quantity' => 'integer',
+            'ordered_quantity' => 'integer',
             'stocked_in_at' => 'datetime',
         ];
     }

@@ -1,261 +1,133 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Edit, Loader2, MapPin, Save, Warehouse, X } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
-
-// ============================================
-// TYPES
-// ============================================
+import { apiClient } from '../../../lib/api';
 
 interface WarehouseLocation {
- id: string;
- name: string;
- code: string;
- rack: string;
- shelf: string;
- bin: string;
- capacity: number;
- utilized: number;
- available: number;
- status: 'Active' | 'Inactive' | 'Full';
- zone: string;
+  id: number;
+  name: string;
+  code: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  capacity: number | null;
+  utilized: number;
+  available: number | null;
+  utilization_percentage: number | null;
+  status: 'Active' | 'Inactive';
 }
 
-// ============================================
-// MOCK DATA
-// ============================================
+type WarehouseForm = Pick<WarehouseLocation, 'name' | 'code' | 'address' | 'latitude' | 'longitude' | 'capacity' | 'status'>;
 
-const mockLocations: WarehouseLocation[] = [
- {
-  id: '1',
-  name: 'Central Depot',
-  code: 'WH-CENTRAL',
-  rack: 'A',
-  shelf: '1',
-  bin: '001',
-  capacity: 500,
-  utilized: 320,
-  available: 180,
-  status: 'Active',
-  zone: 'A'
- },
- {
-  id: '2',
-  name: 'Northgate Warehouse',
-  code: 'WH-NORTH',
-  rack: 'B',
-  shelf: '2',
-  bin: '003',
-  capacity: 350,
-  utilized: 280,
-  available: 70,
-  status: 'Active',
-  zone: 'B'
- },
- {
-  id: '3',
-  name: 'Eastside Storage',
-  code: 'WH-EAST',
-  rack: 'C',
-  shelf: '1',
-  bin: '005',
-  capacity: 200,
-  utilized: 200,
-  available: 0,
-  status: 'Full',
-  zone: 'C'
- },
- {
-  id: '4',
-  name: 'Southpark Facility',
-  code: 'WH-SOUTH',
-  rack: 'D',
-  shelf: '3',
-  bin: '002',
-  capacity: 300,
-  utilized: 150,
-  available: 150,
-  status: 'Active',
-  zone: 'D'
- }
-];
-
-// ============================================
-// COMPONENTS
-// ============================================
-
-// ----- Status Badge -----
-const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
- const config: Record<string, { color: string }> = {
-  'Active': { color: 'text-green-400 bg-green-400/10 border-green-400/20' },
-  'Inactive': { color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' },
-  'Full': { color: 'text-red-400 bg-red-400/10 border-red-400/20' }
- };
- const { color } = config[status] || config['Active'];
- return (
-  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${color} flex items-center gap-1.5 whitespace-nowrap`}>
-   {status}
-  </span>
- );
-};
-
-// ----- Search Input -----
-const SearchInput: React.FC<{
- value: string;
- onChange: (value: string) => void;
- placeholder?: string;
-}> = ({ value, onChange, placeholder = 'Search...' }) => (
- <div className="relative flex-1 min-w-[200px]">
-  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-  <input
-   type="text"
-   value={value}
-   onChange={(e) => onChange(e.target.value)}
-   placeholder={placeholder}
-   className="w-full bg-gray-800/50 border-gray-700 text-white rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder-slate-500 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
-  />
- </div>
-);
-
-// ----- Filter Select -----
-const FilterSelect: React.FC<{
- value: string;
- onChange: (value: string) => void;
- options: string[];
-}> = ({ value, onChange, options }) => (
- <div className="min-w-[140px]">
-  <select
-   value={value}
-   onChange={(e) => onChange(e.target.value)}
-   className="w-full bg-gray-800/50 border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all appearance-none cursor-pointer"
-  >
-   {options.map((opt) => (
-    <option key={opt} value={opt}>{opt}</option>
-   ))}
-  </select>
- </div>
-);
-
-// ============================================
-// PAGE: MANAGE LOCATIONS
-// ============================================
+const MAP_URL = 'https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d14717.63615355505!2d121.0884979!3d14.6352911!3m2!1i1024!1i768!4f13.1!3m3!1m2!1s0x3397b9485ea55b87%3A0x2e093784a1e3763b!2sArchon%20Nell%20Incorporated!5e1!3m2!1sen!2sph!4v1787998954055!5m2!1sen!2sph';
+const FIELD_CLASS = 'w-full rounded-xl border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30';
 
 const ManageLocations: React.FC = () => {
- const [search, setSearch] = useState('');
- const [zoneFilter, setZoneFilter] = useState('All Zones');
+  const [location, setLocation] = useState<WarehouseLocation | null>(null);
+  const [form, setForm] = useState<WarehouseForm | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
- const filteredLocations = useMemo(() => {
-  return mockLocations.filter(loc =>
-   loc.name.toLowerCase().includes(search.toLowerCase()) ||
-   loc.code.toLowerCase().includes(search.toLowerCase())
-  );
- }, [search]);
+  useEffect(() => {
+    let active = true;
+    apiClient.get<WarehouseLocation>('/admin/warehouse/location')
+      .then(({ data }) => { if (active) setLocation(data); })
+      .catch(() => { if (active) setError('Unable to load the warehouse location.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
- return (
-  <PageContainer>
-   <div className="space-y-8">
-    {/* Header */}
-    <div>
-   <h1 className="text-2xl font-bold text-white">Manage Locations</h1>
-   <p className="text-gray-400 text-sm mt-2">
-      View and manage warehouse locations, rack assignments, and capacity utilization.
-     </p>
-    </div>
+  const openEditor = () => {
+    if (!location) return;
+    setError('');
+    setForm({ name: location.name, code: location.code, address: location.address, latitude: location.latitude, longitude: location.longitude, capacity: location.capacity, status: location.status });
+  };
 
-   {/* Filter Toolbar */}
-   <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-5">
-    <div className="flex flex-wrap items-center gap-4">
-     <SearchInput
-      value={search}
-      onChange={setSearch}
-      placeholder="Search locations by name or code..."
-     />
-     <FilterSelect
-      value={zoneFilter}
-      onChange={setZoneFilter}
-      options={['All Zones', 'Zone A', 'Zone B', 'Zone C', 'Zone D']}
-     />
-     <button className="px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-1.5 ml-auto"
-      style={{ backgroundColor: '#5B8CFF', color: '#FFFFFF' }}>
-      <Plus className="w-4 h-4" /> Add Location
-     </button>
-    </div>
-   </div>
+  const saveLocation = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!form) return;
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await apiClient.put<WarehouseLocation>('/admin/warehouse/location', form);
+      setLocation(data);
+      setForm(null);
+    } catch (requestError) {
+      const validationErrors = axios.isAxiosError(requestError)
+        ? requestError.response?.data?.errors as Record<string, string[]> | undefined
+        : undefined;
+      const firstValidationMessage = validationErrors
+        ? Object.values(validationErrors).flat().find((message): message is string => typeof message === 'string')
+        : undefined;
+      setError(firstValidationMessage || 'The warehouse details could not be saved. Please check the values and try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-   {/* Location Cards Grid */}
-   <div className="grid grid-cols-2 gap-4">
-    {filteredLocations.map((location) => {
-     const utilizationPercentage = Math.round((location.utilized / location.capacity) * 100);
-     const statusColor = utilizationPercentage >= 90 ? 'text-red-400' :
-               utilizationPercentage >= 70 ? 'text-yellow-400' :
-               'text-green-400';
+  const units = (value: number | null) => value === null ? 'Not configured' : `${value.toLocaleString()} units`;
 
-     return (
-      <div key={location.id} className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-5 hover:border-blue-500/30 transition-all duration-200">
-       <div className="flex items-start justify-between mb-4">
+  return (
+    <PageContainer>
+      <div className="space-y-8">
         <div>
-         <h3 className="text-white font-semibold text-lg">{location.name}</h3>
-         <p className="text-gray-400 text-sm">{location.code}</p>
+          <h1 className="text-2xl font-bold text-white">Manage Locations</h1>
+          <p className="mt-2 text-sm text-gray-400">View and maintain the primary warehouse location.</p>
         </div>
-        <StatusBadge status={location.status} />
-       </div>
 
-       <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-gray-800/50 rounded-xl p-3 text-center">
-         <p className="text-gray-400 text-xs">Rack</p>
-         <p className="text-white font-medium">{location.rack}</p>
-        </div>
-        <div className="bg-gray-800/50 rounded-xl p-3 text-center">
-         <p className="text-gray-400 text-xs">Shelf</p>
-         <p className="text-white font-medium">{location.shelf}</p>
-        </div>
-        <div className="bg-gray-800/50 rounded-xl p-3 text-center">
-         <p className="text-gray-400 text-xs">Bin</p>
-         <p className="text-white font-medium">{location.bin}</p>
-        </div>
-       </div>
+        {loading && <div className="flex min-h-56 items-center justify-center rounded-2xl border border-gray-800/50 bg-[#0d1322] text-gray-400"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading warehouse…</div>}
+        {!loading && !location && <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-300">{error || 'No warehouse location is configured.'}</div>}
 
-        <div className="space-y-2">
-         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Capacity</span>
-          <span className="text-white">{location.capacity} units</span>
-         </div>
-         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Utilized</span>
-          <span className="text-white">{location.utilized} units</span>
-         </div>
-         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Available</span>
-          <span className={`font-medium ${statusColor}`}>{location.available} units</span>
-         </div>
-         <div className="w-full bg-gray-800/50 rounded-full h-1.5 mt-1">
-         <div
-          className="h-1.5 rounded-full transition-all"
-          style={{
-           width: `${utilizationPercentage}%`,
-           backgroundColor: utilizationPercentage >= 90 ? '#EF4444' :
-                   utilizationPercentage >= 70 ? '#F59E0B' :
-                   '#22C55E'
-          }}
-         />
-        </div>
-       </div>
+        {location && <>
+          {error && <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>}
+          <section className="rounded-2xl border border-gray-800/50 bg-[#0d1322] p-5 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex gap-3">
+                <div className="rounded-xl bg-blue-500/10 p-3 text-blue-400"><Warehouse className="h-6 w-6" /></div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-white">{location.name}</h2><StatusBadge status={location.status} /></div>
+                  <p className="mt-1 text-sm text-gray-400">{location.code}</p>
+                  <p className="mt-2 flex items-start gap-2 text-sm text-gray-300"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />{location.address || 'Address not configured'}</p>
+                </div>
+              </div>
+              <button type="button" onClick={openEditor} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#5B8CFF] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-400"><Edit className="h-4 w-4" /> Edit Location</button>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {[['Total Capacity', units(location.capacity)], ['Utilized', units(location.utilized)], ['Available', units(location.available)]].map(([label, value]) => <div key={label} className="rounded-xl bg-gray-800/50 p-4"><p className="text-xs text-gray-400">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>)}
+            </div>
+            <div className="mt-4"><div className="mb-2 flex justify-between text-sm"><span className="text-gray-400">Capacity utilization</span><span className="text-white">{location.utilization_percentage === null ? 'Not available' : `${location.utilization_percentage}%`}</span></div><div className="h-2 overflow-hidden rounded-full bg-gray-800"><div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${location.utilization_percentage ?? 0}%` }} /></div></div>
+          </section>
 
-       <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-gray-800 border-gray-800">
-        <button className="p-1.5 rounded-lg hover:bg-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white transition-all">
-         <Edit className="w-4 h-4" />
-        </button>
-        <button className="p-1.5 rounded-lg hover:bg-gray-800 hover:bg-gray-800 text-gray-400 hover:text-red-400 transition-all">
-         <Trash2 className="w-4 h-4" />
-        </button>
-       </div>
+          <section className="overflow-hidden rounded-2xl border border-gray-800/50 bg-[#0d1322] shadow-sm">
+            <div className="border-b border-gray-800 p-5"><h2 className="flex items-center gap-2 text-lg font-semibold text-white"><MapPin className="h-5 w-5 text-blue-400" /> Warehouse Location</h2><div className="mt-3 grid gap-2 text-sm text-gray-400 sm:grid-cols-2 lg:grid-cols-5"><span><strong className="text-gray-300">Warehouse:</strong> {location.name}</span><span><strong className="text-gray-300">Status:</strong> {location.status}</span><span className="sm:col-span-2"><strong className="text-gray-300">Address:</strong> {location.address || 'Not configured'}</span><span><strong className="text-gray-300">Coordinates:</strong> {location.latitude ?? '—'}, {location.longitude ?? '—'}</span></div></div>
+            <iframe src={MAP_URL} width="100%" height="450" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title="Main Warehouse location on Google Maps" />
+          </section>
+        </>}
       </div>
-     );
-    })}
-   </div>
-  </div>
-  </PageContainer>
- );
+
+      {form && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-warehouse-title">
+        <form onSubmit={saveLocation} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-700 bg-[#0d1322] p-6 shadow-2xl">
+          <div className="mb-6 flex items-center justify-between"><div><h2 id="edit-warehouse-title" className="text-xl font-semibold text-white">Edit Warehouse Location</h2><p className="mt-1 text-sm text-gray-400">Update the primary warehouse details.</p></div><button type="button" onClick={() => setForm(null)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white" aria-label="Close"><X className="h-5 w-5" /></button></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Warehouse name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={FIELD_CLASS} /></Field>
+            <Field label="Warehouse code"><input required value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} className={FIELD_CLASS} /></Field>
+            <div className="sm:col-span-2"><Field label="Address"><textarea rows={3} value={form.address ?? ''} onChange={e => setForm({ ...form, address: e.target.value || null })} className={`${FIELD_CLASS} resize-none`} /></Field></div>
+            <Field label="Latitude"><input type="number" step="any" value={form.latitude ?? ''} onChange={e => setForm({ ...form, latitude: e.target.value === '' ? null : Number(e.target.value) })} className={FIELD_CLASS} /></Field>
+            <Field label="Longitude"><input type="number" step="any" value={form.longitude ?? ''} onChange={e => setForm({ ...form, longitude: e.target.value === '' ? null : Number(e.target.value) })} className={FIELD_CLASS} /></Field>
+            <Field label="Capacity (units)"><input type="number" min="0" value={form.capacity ?? ''} onChange={e => setForm({ ...form, capacity: e.target.value === '' ? null : Number(e.target.value) })} className={FIELD_CLASS} /></Field>
+            <Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as WarehouseForm['status'] })} className={FIELD_CLASS}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></Field>
+          </div>
+          <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setForm(null)} className="min-h-11 rounded-xl border border-gray-700 px-4 text-sm text-gray-300 hover:bg-gray-800">Cancel</button><button disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#5B8CFF] px-4 text-sm font-medium text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save changes</button></div>
+        </form>
+      </div>}
+    </PageContainer>
+  );
 };
+
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <label className="block"><span className="mb-1.5 block text-sm text-gray-300">{label}</span>{children}</label>;
+const StatusBadge: React.FC<{ status: WarehouseLocation['status'] }> = ({ status }) => <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-green-400/20 bg-green-400/10 text-green-400' : 'border-gray-400/20 bg-gray-400/10 text-gray-400'}`}>{status}</span>;
 
 export { ManageLocations };
 export default ManageLocations;

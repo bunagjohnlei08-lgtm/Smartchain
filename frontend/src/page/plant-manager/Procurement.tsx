@@ -41,6 +41,11 @@ interface Product {
   needsReplenishment: boolean;
 }
 
+interface CatalogProduct {
+  id: number;
+  name: string;
+}
+
 interface RequestHistory {
   id: string;
   requestNo: string;
@@ -235,6 +240,7 @@ const Pagination: React.FC<{
 
 const ReplenishmentPlanning: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [history, setHistory] = useState<RequestHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -260,7 +266,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const [newRequest, setNewRequest] = useState({
     requestNo: '',
     product: '',
-    warehouse: '',
+    warehouse: 'Main Warehouse',
     quantity: '',
     priority: 'Medium' as Priority,
     submittedDate: new Date().toISOString().slice(0, 10),
@@ -296,6 +302,23 @@ const ReplenishmentPlanning: React.FC = () => {
   useEffect(() => {
     void loadProcurement();
   }, [loadProcurement]);
+
+  useEffect(() => {
+    if (!showNewRequestModal) return;
+
+    setNewRequest((current) => ({ ...current, warehouse: 'Main Warehouse' }));
+    apiClient.get('/products')
+      .then((response) => {
+        const records = response.data?.data ?? response.data ?? [];
+        setCatalogProducts(records.map((product: any) => ({
+          id: Number(product.id),
+          name: String(product.name),
+        })));
+      })
+      .catch((error: any) => {
+        showToast(error?.response?.data?.message || 'Unable to load Product Catalog.', 'error');
+      });
+  }, [showNewRequestModal]);
 
   // Filtered products
   const filteredRequests = useMemo(() => {
@@ -367,23 +390,24 @@ const ReplenishmentPlanning: React.FC = () => {
       return;
     }
 
-    const product = products.find((item) => item.name === newRequest.product && item.warehouse === newRequest.warehouse);
-    if (!product) {
-      showToast('Select a valid inventory product and warehouse.', 'error');
+    const product = catalogProducts.find((item) => String(item.id) === newRequest.product);
+    const mainWarehouse = products.find((item) => item.warehouse === 'Main Warehouse');
+    if (!product || !mainWarehouse) {
+      showToast('Select a valid catalog product for Main Warehouse.', 'error');
       return;
     }
     setSubmitting(true);
     try {
       await apiClient.post('/plant-manager/procurement/requests', {
-        product_id: product.productId,
-        warehouse_id: product.warehouseId,
+        product_id: product.id,
+        warehouse_id: mainWarehouse.warehouseId,
         requested_qty: Number(newRequest.quantity),
         priority: newRequest.priority,
         status: 'pending',
       });
       await loadProcurement();
       setShowNewRequestModal(false);
-      setNewRequest({ requestNo: '', product: '', warehouse: '', quantity: '', priority: 'Medium', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
+      setNewRequest({ requestNo: '', product: '', warehouse: 'Main Warehouse', quantity: '', priority: 'Medium', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
       showToast('Request created successfully!', 'success');
     } catch (error: any) {
       showToast(error?.response?.data?.message || 'Request could not be created.', 'error');
@@ -700,24 +724,21 @@ const ReplenishmentPlanning: React.FC = () => {
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
                     <select
                       value={newRequest.product}
-                      onChange={(e) => {
-                        const product = products.find((item) => item.name === e.target.value);
-                        setNewRequest({ ...newRequest, product: e.target.value, warehouse: product?.warehouse || '', priority: product?.priority || 'Medium' });
-                      }}
+                      onChange={(e) => setNewRequest({ ...newRequest, product: e.target.value })}
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     >
-                      <option value="">Select an inventory product</option>
-                      {products.map((product) => <option key={product.id} value={product.name}>{product.name}</option>)}
+                      <option value="">Select a product</option>
+                      {catalogProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Warehouse <span className="text-red-400">*</span></label>
                     <input
                       type="text"
-                      value={newRequest.warehouse}
+                      value="Main Warehouse"
                       readOnly
-                      placeholder="Selected from inventory"
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                      disabled
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] opacity-80 cursor-not-allowed"
                     />
                   </div>
                   <div>
