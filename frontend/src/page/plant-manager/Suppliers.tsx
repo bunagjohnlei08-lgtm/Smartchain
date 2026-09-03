@@ -232,7 +232,7 @@ const Suppliers: React.FC = () => {
               onClick={() => setViewMode('cards')}
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'cards'
-                  ? 'bg-cyan-500 text-slate-950'
+                  ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
                   : 'text-slate-400 hover:text-slate-100'
               }`}
               title="Card View"
@@ -243,7 +243,7 @@ const Suppliers: React.FC = () => {
               onClick={() => setViewMode('table')}
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'table'
-                  ? 'bg-cyan-500 text-slate-950'
+                  ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
                   : 'text-slate-400 hover:text-slate-100'
               }`}
               title="Table View"
@@ -253,7 +253,7 @@ const Suppliers: React.FC = () => {
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
+            className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
           >
             <Plus className="w-4 h-4" /> Add Supplier
           </button>
@@ -598,7 +598,7 @@ const Suppliers: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
                 >
                   <Save className="w-4 h-4" /> Add Supplier
                 </button>
@@ -720,7 +720,7 @@ const Suppliers: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
                 >
                   <Save className="w-4 h-4" /> Save Changes
                 </button>

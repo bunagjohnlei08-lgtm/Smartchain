@@ -7,6 +7,8 @@ use App\Models\QaInspection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class QaQualityReportController extends Controller
 {
@@ -19,6 +21,13 @@ class QaQualityReportController extends Controller
         if (! $user || (! $user->isAdmin() && ! $user->isQaSupervisor())) {
             return response()->json(['message' => 'Unauthorized QA access.'], 403);
         }
+
+        $validated = $request->validate([
+            'days' => ['sometimes', 'integer', Rule::in(range(14, 30))],
+        ]);
+        $trendDays = (int) ($validated['days'] ?? 30);
+        $trendStart = now()->startOfDay()->subDays($trendDays - 1);
+        $trendEnd = now()->addDay()->startOfDay();
 
         $inspections = QaInspection::query()
             ->with(['receiving', 'items.receivingItem'])
@@ -33,14 +42,30 @@ class QaQualityReportController extends Controller
         $comparisonTotal = $passed + $rejected;
         $percentage = fn (int $count): float => $comparisonTotal > 0 ? round(($count / $comparisonTotal) * 100, 1) : 0.0;
 
-        $trend = $inspections
-            ->groupBy(fn (QaInspection $inspection) => $inspection->completed_at->toDateString())
-            ->map(fn (Collection $daily, string $date) => [
+        $trendByDate = DB::table('qa_inspections')
+            ->join('qa_inspection_items', 'qa_inspection_items.qa_inspection_id', '=', 'qa_inspections.id')
+            ->whereNotNull('completed_at')
+            ->where('qa_inspections.completed_at', '>=', $trendStart)
+            ->where('qa_inspections.completed_at', '<', $trendEnd)
+            ->whereIn('qa_inspections.status', self::FINAL_STATUSES)
+            ->selectRaw('DATE(qa_inspections.completed_at) AS inspection_date')
+            ->selectRaw('COALESCE(SUM(qa_inspection_items.accepted_quantity), 0) AS passed')
+            ->selectRaw('COALESCE(SUM(qa_inspection_items.rejected_quantity), 0) AS rejected')
+            ->groupByRaw('DATE(qa_inspections.completed_at)')
+            ->orderByRaw('DATE(qa_inspections.completed_at)')
+            ->get()
+            ->keyBy('inspection_date');
+
+        $trend = collect(range(0, $trendDays - 1))->map(function (int $offset) use ($trendStart, $trendByDate) {
+            $date = $trendStart->copy()->addDays($offset)->toDateString();
+            $daily = $trendByDate->get($date);
+
+            return [
                 'date' => $date,
-                'passed' => $daily->where('status', 'Passed')->count(),
-                'rejected' => $daily->where('status', 'Rejected')->count(),
-            ])
-            ->values();
+                'passed' => (int) ($daily->passed ?? 0),
+                'rejected' => (int) ($daily->rejected ?? 0),
+            ];
+        });
 
         $inspectionItems = $inspections->flatMap(fn (QaInspection $inspection) => $inspection->items);
         $rejectedQuantity = (int) $inspectionItems->sum('rejected_quantity');

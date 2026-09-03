@@ -1,6 +1,7 @@
 // src/pages/admin/Reports.tsx
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../../lib/api';
+import { useTheme } from '../../context/ThemeContext';
 import {
   FileText,
   Eye,
@@ -277,6 +278,7 @@ const CategoryBadge: React.FC<{ category: string }> = ({ category }) => {
 // ============================================
 
 const Reports: React.FC = () => {
+  const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string>('inventory');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -288,6 +290,18 @@ const Reports: React.FC = () => {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const itemsPerPage = 10;
+  const isDark = theme === 'dark';
+  const chartGridColor = isDark ? '#1e293b' : '#E2E8F0';
+  const chartAxisColor = '#64748B';
+  const chartTooltipStyle = {
+    backgroundColor: isDark ? '#0f172a' : '#FFFFFF',
+    border: `1px solid ${isDark ? '#1e293b' : '#CBD5E1'}`,
+    color: isDark ? '#fff' : '#0F172A',
+    fontSize: '12px',
+    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+    borderRadius: '8px',
+    padding: '10px',
+  };
 
   const [isCustomReportOpen, setIsCustomReportOpen] = useState(false);
   const [reportTitle, setReportTitle] = useState('');
@@ -402,25 +416,25 @@ const Reports: React.FC = () => {
     <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+        <div className="max-w-3xl">
           <h1 className="text-2xl font-bold text-white tracking-tight">Reports & Exports</h1>
           <p className="text-slate-400 text-sm mt-1">
             Generate printable reports, export warehouse data, monitor inventory analytics, and review operational performance.
           </p>
         </div>
-        <div className="flex flex-row items-center gap-2.5 shrink-0">
-          <button className="inline-flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap h-9">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
             <Download className="w-4 h-4 shrink-0" />
             Export Data
           </button>
-          <button className="inline-flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap h-9">
+          <button className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
             <Calendar className="w-4 h-4 shrink-0" />
             Schedule Report
           </button>
           <button
             onClick={() => setIsCustomReportOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-medium rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors whitespace-nowrap h-9"
+            className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-300/60"
           >
             <Plus className="w-4 h-4 shrink-0" />
             Create Custom Report
@@ -536,10 +550,10 @@ const Reports: React.FC = () => {
               <button
                 onClick={generateReport}
                 disabled={isGenerating}
-                className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {isGenerating ? (
-                  <svg className="animate-spin h-4 w-4 text-slate-950" viewBox="0 0 24 24" fill="none">
+                  <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -553,7 +567,7 @@ const Reports: React.FC = () => {
 
       {/* KPI CARDS */}
       {dashboardError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{dashboardError}</div>}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {[
           { label: 'Total Reports', value: metrics.total_reports_available, subtitle: 'Available Reports', icon: <FileText className="w-4 h-4 text-blue-400" /> },
           { label: 'Exports Today', value: metrics.exports_today, subtitle: 'Excel / PDF / CSV', icon: <Download className="w-4 h-4 text-emerald-400" /> },
@@ -562,25 +576,25 @@ const Reports: React.FC = () => {
           { label: 'Total Inventory Value', value: currency(metrics.total_inventory_value), subtitle: 'Across All Warehouses', icon: <BarChart3 className="w-4 h-4 text-purple-400" /> },
           { label: 'AI Forecast Accuracy', value: `${metrics.ai_forecast_accuracy}%`, subtitle: 'This Month', icon: <TrendingUp className="w-4 h-4 text-rose-400" /> },
         ].map((kpi, idx) => (
-          <div key={idx} className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
+          <div key={idx} className="min-h-32 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
             <div className="flex items-start justify-between">
               <div className="p-2 rounded-lg border border-slate-700/50 bg-slate-800/50">
                 {kpi.icon}
               </div>
             </div>
-            <div className="mt-3">
+            <div className="mt-4">
               <p className="text-xl font-bold text-white">{dashboardLoading ? '—' : kpi.value}</p>
-              <p className="text-xs text-slate-400">{kpi.label}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">{kpi.subtitle}</p>
+              <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-300">{kpi.label}</p>
+              <p className="text-xs text-slate-500 mt-1">{kpi.subtitle}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* MAIN BODY: CATEGORIES + TABLE */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* LEFT COLUMN: Categories */}
-        <div className="lg:col-span-1 bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-2">
+        <div className="xl:col-span-1 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 space-y-2 self-start">
           <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <LayoutGrid className="w-4 h-4 text-cyan-400" />
             Report Categories
@@ -591,10 +605,10 @@ const Reports: React.FC = () => {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-3 ${
+                className={`w-full min-h-11 text-left px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${
                   isActive
-                    ? 'border border-cyan-500/50 bg-cyan-950/20 text-cyan-400'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                    ? 'border border-cyan-500/60 bg-cyan-500/10 text-cyan-300'
+                    : 'border border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'
                 }`}
               >
                 {cat.icon}
@@ -605,47 +619,47 @@ const Reports: React.FC = () => {
         </div>
 
         {/* RIGHT COLUMN: Search, Filters & Table */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="xl:col-span-3 space-y-5 min-w-0">
           {/* Top Controls */}
-          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 items-center gap-3">
               {/* Search */}
-              <div className="relative flex-1 min-w-[180px]">
+              <div className="relative sm:col-span-2 xl:col-span-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search reports..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-[#070a12] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full min-h-11 bg-[#070a12] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 />
               </div>
 
-              <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <select className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                 <option>All Categories</option>
                 {reportCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
 
-              <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <select className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                 <option>All Warehouses</option>
                 {warehouseChartData.map((warehouse) => <option key={warehouse.name}>{warehouse.name}</option>)}
               </select>
 
-              <div className="flex items-center gap-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300">
+              <div className="min-h-11 sm:col-span-2 xl:col-span-4 flex items-center justify-between gap-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300">
                 <Calendar className="w-4 h-4 text-slate-500" />
                 <span>May 1, 2025 - May 31, 2025</span>
                 <ChevronDown className="w-4 h-4 text-slate-500" />
               </div>
 
-              <select className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <select className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                 <option>All Status</option>
                 <option>Generated</option>
                 <option>Pending</option>
               </select>
 
-              <button className="ml-auto px-4 py-2 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
+              <button className="min-h-11 sm:col-span-2 xl:col-span-3 xl:col-start-10 px-4 py-2 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                 <FileText className="w-4 h-4" />
                 Export History
               </button>
@@ -654,40 +668,40 @@ const Reports: React.FC = () => {
 
           {/* Report Table */}
           <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden">
-            <div className="w-full overflow-x-auto rounded-lg">
-              <table className="w-full table-auto text-left border-collapse text-sm">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[1050px] table-auto text-left border-collapse text-sm">
                 <thead className="bg-[#070a12] border-b border-slate-800/50">
                   <tr>
-                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Report Name</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Description</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Category</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Last Generated</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Format</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
-                    <th className="px-3 py-3 text-right pr-4 min-w-[90px] text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Report Name</th>
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Description</th>
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Category</th>
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Last Generated</th>
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Format</th>
+                    <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Status</th>
+                    <th className="px-4 py-3.5 text-right min-w-[150px] text-xs font-semibold uppercase tracking-wider text-slate-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
                   {dashboardLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Loading reports…</td></tr> : paginatedReports.map((report) => (
-                    <tr key={report.id} className="hover:bg-slate-800/20 transition-colors">
-                      <td className="px-3 py-3 font-medium text-white">{report.name}</td>
-                      <td className="px-3 py-3 text-slate-400 max-w-[180px] truncate">{report.description}</td>
-                      <td className="px-3 py-3"><CategoryBadge category={report.category} /></td>
-                      <td className="px-3 py-3 text-slate-300 text-xs">{report.lastGenerated}</td>
-                      <td className="px-3 py-3"><FormatBadge format={report.format} /></td>
-                      <td className="px-3 py-3"><StatusBadge status={report.status} /></td>
-                      <td className="px-3 py-3 text-right pr-4 min-w-[90px]">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openDrawer(report)} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                    <tr key={report.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-4 font-medium text-white">{report.name}</td>
+                      <td className="px-4 py-4 text-slate-400 max-w-[220px] truncate">{report.description}</td>
+                      <td className="px-4 py-4"><CategoryBadge category={report.category} /></td>
+                      <td className="px-4 py-4 text-slate-300 text-xs whitespace-nowrap">{report.lastGenerated}</td>
+                      <td className="px-4 py-4"><FormatBadge format={report.format} /></td>
+                      <td className="px-4 py-4"><StatusBadge status={report.status} /></td>
+                      <td className="px-4 py-4 text-right min-w-[150px]">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openDrawer(report)} aria-label={`View ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                          <button aria-label={`Download ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <Download className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                          <button aria-label={`Print ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <Printer className="w-4 h-4" />
                           </button>
-                          <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                          <button aria-label={`More actions for ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
@@ -706,7 +720,7 @@ const Reports: React.FC = () => {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800/80 bg-[#070a12]/50">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4 border-t border-slate-800/80 bg-[#070a12]/50">
               <div className="text-sm text-slate-400">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} reports
               </div>
@@ -745,18 +759,18 @@ const Reports: React.FC = () => {
       </div>
 
       {/* BOTTOM ANALYTICS & QUICK ACTIONS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Inventory Value by Warehouse - Donut Chart */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col">
+        <div className="min-h-[320px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
           <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
             <WarehouseIcon className="w-4 h-4 text-cyan-400" />
             Inventory Value by Warehouse
           </h4>
-          <div className="flex-1 min-h-[200px] relative">
+          <div className="flex-1 min-h-[230px] relative">
             {!dashboardLoading && warehouseChartData.length === 0 && <div className="absolute inset-0 z-10 flex items-center justify-center text-xs text-slate-500">No warehouse inventory data.</div>}
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', borderRadius: '8px', padding: '10px' }} />
+                <Tooltip contentStyle={chartTooltipStyle} />
                 <Pie
                   data={warehouseChartData}
                   cx="50%"
@@ -771,7 +785,7 @@ const Reports: React.FC = () => {
                   animationEasing="ease-out"
                 >
                   {warehouseChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke="#0b101d" strokeWidth={2} />
+                    <Cell key={`cell-${index}`} fill={entry.color} stroke={isDark ? '#0b101d' : '#FFFFFF'} strokeWidth={2} />
                   ))}
                 </Pie>
               </PieChart>
@@ -783,7 +797,7 @@ const Reports: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
             {warehouseChartData.map((item) => (
               <div key={item.name} className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
@@ -795,20 +809,20 @@ const Reports: React.FC = () => {
         </div>
 
         {/* Stock Status Overview - Bar Chart */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col">
+        <div className="min-h-[320px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
           <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-cyan-400" />
             Stock Status Overview
           </h4>
-          <div className="flex-1 min-h-[180px]">
+          <div className="flex-1 min-h-[240px]">
             {!dashboardLoading && stockChartData.every((item) => item.value === 0) && <div className="h-full flex items-center justify-center text-xs text-slate-500">No stock data.</div>}
             {(dashboardLoading || stockChartData.some((item) => item.value > 0)) && (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stockChartData} layout="vertical" margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                <XAxis type="number" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} width={60} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', color: '#fff', fontSize: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', borderRadius: '8px', padding: '10px' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} horizontal={false} />
+                <XAxis type="number" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 10 }} axisLine={false} tickLine={false} width={60} />
+                <Tooltip contentStyle={chartTooltipStyle} />
                 <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out">
                   {stockChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -821,7 +835,7 @@ const Reports: React.FC = () => {
         </div>
 
         {/* Recent Exports */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col">
+        <div className="min-h-[280px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-semibold text-white flex items-center gap-2">
               <FileText className="w-4 h-4 text-cyan-400" />
@@ -829,9 +843,9 @@ const Reports: React.FC = () => {
             </h4>
             <button className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">View All</button>
           </div>
-          <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px]">
+          <div className="flex-1 space-y-3 overflow-y-auto max-h-[240px] pr-1">
             {exportFiles.slice(0, 4).map((file, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs border-b border-slate-800/60 pb-2">
+              <div key={idx} className="flex items-center justify-between gap-3 text-xs border-b border-slate-800/60 pb-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-200 truncate">{file.name}</p>
                   <p className="text-slate-500">{file.date} · {file.size}</p>
@@ -846,12 +860,12 @@ const Reports: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col">
+        <div className="min-h-[280px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
           <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <Zap className="w-4 h-4 text-cyan-400" />
             Quick Actions
           </h4>
-          <div className="space-y-2 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
             {[
               { label: 'Create Custom Report', icon: <Plus className="w-4 h-4" />, primary: true },
               { label: 'Schedule Report', icon: <Calendar className="w-4 h-4" />, primary: false },
@@ -862,7 +876,7 @@ const Reports: React.FC = () => {
                 key={idx}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   action.primary
-                    ? 'bg-cyan-500 text-slate-950 hover:bg-cyan-400'
+                    ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950'
                     : 'border border-slate-700 hover:bg-slate-800/50 text-slate-300 hover:text-white'
                 }`}
               >
@@ -963,7 +977,7 @@ const Reports: React.FC = () => {
 
             {/* Drawer Footer Actions */}
             <div className="p-5 border-t border-slate-800/60 flex items-center gap-3 shrink-0">
-              <button className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-medium transition-colors">
+              <button className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-colors">
                 <Download className="w-4 h-4" />
                 Download File
               </button>

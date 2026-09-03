@@ -70,9 +70,9 @@ const AdminLayout: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-transparent">
+      <div className="admin-main flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 dark:bg-transparent">
         {/* Top Bar */}
-        <header className="bg-[#090d16]/80 backdrop-blur-xl border-b border-slate-800/60 px-4 py-3 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
+        <header className="bg-white dark:bg-[#090d16]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/60 px-4 py-3 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
           <div className="xl:hidden w-10" />
 
           {/* Right Action Group */}
@@ -120,7 +120,7 @@ const AdminLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-transparent">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-transparent">
           <Outlet />
         </main>
       </div>

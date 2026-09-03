@@ -92,7 +92,7 @@ const ManageLocations: React.FC = () => {
                   <p className="mt-2 flex items-start gap-2 text-sm text-gray-300"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />{location.address || 'Address not configured'}</p>
                 </div>
               </div>
-              <button type="button" onClick={openEditor} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#5B8CFF] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-400"><Edit className="h-4 w-4" /> Edit Location</button>
+              <button type="button" onClick={openEditor} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-400"><Edit className="h-4 w-4" /> Edit Location</button>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               {[['Total Capacity', units(location.capacity)], ['Utilized', units(location.utilized)], ['Available', units(location.available)]].map(([label, value]) => <div key={label} className="rounded-xl bg-gray-800/50 p-4"><p className="text-xs text-gray-400">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>)}
@@ -119,7 +119,7 @@ const ManageLocations: React.FC = () => {
             <Field label="Capacity (units)"><input type="number" min="0" value={form.capacity ?? ''} onChange={e => setForm({ ...form, capacity: e.target.value === '' ? null : Number(e.target.value) })} className={FIELD_CLASS} /></Field>
             <Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as WarehouseForm['status'] })} className={FIELD_CLASS}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></Field>
           </div>
-          <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setForm(null)} className="min-h-11 rounded-xl border border-gray-700 px-4 text-sm text-gray-300 hover:bg-gray-800">Cancel</button><button disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#5B8CFF] px-4 text-sm font-medium text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save changes</button></div>
+          <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setForm(null)} className="min-h-11 rounded-xl border border-gray-700 px-4 text-sm text-gray-300 hover:bg-gray-800">Cancel</button><button disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save changes</button></div>
         </form>
       </div>}
     </PageContainer>

@@ -14,7 +14,6 @@ import AdminPurchaseOrders from '../page/admin/PurchaseOrders';
 import AdminSuppliers from '../page/admin/Suppliers';
 import AdminLogistics from '../page/admin/logistics';
 import AdminInventory from '../page/admin/Inventory';
-import AdminStockCounting from '../page/admin/warehouse/StockCounting';
 import AdminManageLocations from '../page/admin/warehouse/ManageLocations';
 import AdminBarcodeCenter from '../page/admin/BarcodeCenter';
 import AdminReports from '../page/admin/Reports';
@@ -58,7 +57,6 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <AdminDashboard /> },
       { path: 'product-catalog', element: <AdminProductCatalog /> },
       { path: 'inventory', element: <AdminInventory /> },
-      { path: 'stock-counting', element: <AdminStockCounting /> },
       { path: 'manage-locations', element: <AdminManageLocations /> },
       { path: 'procurement', element: <AdminProcurement /> },
       { path: 'barcode-center', element: <AdminBarcodeCenter /> },

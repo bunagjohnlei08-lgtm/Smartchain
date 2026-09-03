@@ -214,7 +214,7 @@ const Dashboard: React.FC = () => {
             <Download className="w-4 h-4" />
             Export snapshot
           </button>
-          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors">
             Receive products
           </button>
         </div>

@@ -197,7 +197,7 @@ const RejectedItems: React.FC = () => {
         </div>
         <div className="ml-auto flex w-full shrink-0 items-center justify-end gap-3 sm:w-auto">
           <button onClick={exportCsv} disabled={filteredData.length === 0} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-slate-300 transition-all hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"><Download className="w-4 h-4" /> Export CSV</button>
-          <button onClick={printReport} disabled={filteredData.length === 0} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-slate-950 transition-all hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"><Printer className="w-4 h-4" /> Print</button>
+          <button onClick={printReport} disabled={filteredData.length === 0} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-[#092635] px-4 py-2 text-sm font-medium text-white transition-all hover:opacity-90 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"><Printer className="w-4 h-4" /> Print</button>
         </div>
       </div>
 

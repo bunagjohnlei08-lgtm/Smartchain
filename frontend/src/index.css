@@ -248,7 +248,7 @@ body {
     }
 
     /* SLATE / GRAY BACKGROUNDS */
-    &[class~="bg-slate-900"],
+    &[class~="bg-slate-900"]:not([class~="dark:bg-cyan-500"]),
     &[class~="bg-slate-900/80"],
     &[class~="bg-slate-900/60"],
     &[class~="bg-slate-900/40"],
@@ -278,10 +278,13 @@ body {
     &[class~="text-slate-100"],
     &[class~="text-slate-200"],
     &[class~="text-slate-300"],
-    &[class~="text-white"],
     &[class~="text-gray-100"],
     &[class~="text-gray-200"],
     &[class~="text-gray-300"] {
+      color: var(--text-primary) !important;
+    }
+
+    &[class~="text-white"]:not(button):not(a):not([role="button"]):not([class*="bg-"]) {
       color: var(--text-primary) !important;
     }
 
@@ -325,7 +328,7 @@ body {
     }
 
     /* HOVER BACKGROUNDS */
-    &[class~="hover:bg-slate-800"]:hover,
+    &[class~="hover:bg-slate-800"]:not([class~="dark:hover:bg-cyan-400"]):hover,
     &[class~="hover:bg-slate-800/20"]:hover,
     &[class~="hover:bg-slate-800/30"]:hover,
     &[class~="hover:bg-slate-800/40"]:hover,
@@ -347,9 +350,6 @@ body {
       color: var(--text-primary) !important;
   }
 }
-
-.dark .border { border-color: rgba(255, 255, 255, 0.05) !important; }
-
 
   /* LIGHT MODE CUSTOM SCROLLBAR */
   html:not(.dark) .custom-scrollbar {
@@ -385,6 +385,100 @@ body {
    is, so any layered `!important` utility silently won instead.
    ========================================================= */
 
+/* =========================================================
+   ADMIN LIGHT MODE SURFACE SYSTEM
+   Scoped to the routed Admin content region so QA, Plant
+   Manager, authentication, and the permanently dark sidebar
+   retain their existing appearance.
+   ========================================================= */
+
+@layer utilities {
+  html:not(.dark) .admin-main {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  html:not(.dark) .admin-main main {
+    background-color: #f8fafc;
+  }
+
+  html:not(.dark) .admin-main :is(div, section, article, aside)[class~="border"][class~="bg-[#0d1322]"],
+  html:not(.dark) .admin-main :is(div, section, article, aside)[class~="border"][class~="bg-[#0b101d]"],
+  html:not(.dark) .admin-main :is(div, section, article, aside)[class~="border"][class~="bg-[#101929]"],
+  html:not(.dark) .admin-main :is(div, section, article, aside)[class~="border"][class~="bg-[#111827]"] {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+  }
+
+  html:not(.dark) .admin-main [class~="bg-[#0b0f19]/50"],
+  html:not(.dark) .admin-main [class~="bg-[#070a12]/50"],
+  html:not(.dark) .admin-main [class~="bg-slate-800/30"],
+  html:not(.dark) .admin-main [class~="bg-slate-800/50"],
+  html:not(.dark) .admin-main [class~="bg-gray-800/50"] {
+    background-color: #f8fafc !important;
+  }
+
+  html:not(.dark) .admin-main [class~="text-slate-100"] {
+    color: #0f172a !important;
+  }
+
+  html:not(.dark) .admin-main [class~="text-white"]:not(button):not(a):not([role="button"]):not([class*="bg-"]) {
+    color: #0f172a !important;
+  }
+
+  html:not(.dark) .admin-main [class~="text-slate-200"],
+  html:not(.dark) .admin-main [class~="text-slate-300"],
+  html:not(.dark) .admin-main [class~="text-gray-300"] {
+    color: #334155 !important;
+  }
+
+  html:not(.dark) .admin-main [class~="text-slate-400"],
+  html:not(.dark) .admin-main [class~="text-gray-400"] {
+    color: #475569 !important;
+  }
+
+  html:not(.dark) .admin-main [class~="text-slate-500"],
+  html:not(.dark) .admin-main [class~="text-gray-500"] {
+    color: #64748b !important;
+  }
+
+  html:not(.dark) .admin-main [class~="border-slate-800"],
+  html:not(.dark) .admin-main [class~="border-slate-800/80"],
+  html:not(.dark) .admin-main [class~="border-slate-800/60"],
+  html:not(.dark) .admin-main [class~="border-slate-800/50"],
+  html:not(.dark) .admin-main [class~="border-gray-800/50"],
+  html:not(.dark) .admin-main [class~="border-gray-700"] {
+    border-color: #e2e8f0 !important;
+  }
+
+  html:not(.dark) .admin-main input,
+  html:not(.dark) .admin-main select,
+  html:not(.dark) .admin-main textarea,
+  html:not(.dark) .admin-main .catalog-input {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+
+  html:not(.dark) .admin-main input::placeholder,
+  html:not(.dark) .admin-main textarea::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  html:not(.dark) .admin-main [class~="text-emerald-400"] { color: #047857 !important; }
+  html:not(.dark) .admin-main [class~="text-green-400"] { color: #15803d !important; }
+  html:not(.dark) .admin-main [class~="text-amber-400"] { color: #b45309 !important; }
+  html:not(.dark) .admin-main [class~="text-yellow-400"] { color: #a16207 !important; }
+  html:not(.dark) .admin-main [class~="text-orange-400"] { color: #c2410c !important; }
+  html:not(.dark) .admin-main [class~="text-red-400"] { color: #b91c1c !important; }
+  html:not(.dark) .admin-main [class~="text-rose-400"] { color: #be123c !important; }
+  html:not(.dark) .admin-main [class~="text-blue-400"] { color: #2563eb !important; }
+  html:not(.dark) .admin-main [class~="text-cyan-400"] { color: #0891b2 !important; }
+  html:not(.dark) .admin-main [class~="text-purple-400"] { color: #7e22ce !important; }
+  html:not(.dark) .admin-main [class~="text-violet-400"] { color: #7c3aed !important; }
+}
+
 @layer sidebar-lock {
   html:not(.dark) aside,
   html:not(.dark) .sidebar {
@@ -414,5 +508,3 @@ body {
     color: #38bdf8 !important;
   }
 }
-
-.dark .border { border-color: rgba(255, 255, 255, 0.05) !important; }

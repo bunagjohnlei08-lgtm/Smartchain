@@ -272,7 +272,7 @@ const BarcodeCenter: React.FC = () => {
           </button>
           <button
             onClick={handleDownloadPDF}
-            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
+            className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
           >
             <Download className="w-4 h-4" /> Download PDF
           </button>

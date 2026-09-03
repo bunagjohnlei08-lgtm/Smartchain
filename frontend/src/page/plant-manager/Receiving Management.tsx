@@ -393,7 +393,7 @@ const CreateReceivingModal: React.FC<{
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950 disabled:opacity-60"
+              className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-60"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Create Receiving
@@ -522,7 +522,7 @@ const ReceivingManagement: React.FC = () => {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
+          className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
         >
           <Plus className="w-4 h-4" /> Create Receiving
         </button>
@@ -737,7 +737,7 @@ const ReceivingManagement: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-[#0b1220]/30">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-white dark:bg-[#0b1220]/30">
           <div className="text-sm text-slate-400">
             Showing {totalItems > 0 ? start : 0} to {end} of {totalItems} records
           </div>

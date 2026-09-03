@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AdminWarehouseLocationController;
 use App\Http\Controllers\Api\PlantManagerWarehouseController;
+use App\Http\Controllers\Api\ReportsController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -40,6 +41,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('/admin/products', ProductController::class);
     Route::get('/plant-manager/dashboard', [PlantManagerDashboardController::class, 'index']);
     Route::get('/plant-manager/warehouse', [PlantManagerWarehouseController::class, 'show']);
+    Route::prefix('plant-manager/reports')->group(function () {
+        Route::get('/dashboard', [ReportsController::class, 'dashboard']);
+        Route::get('/generate', [ReportsController::class, 'generate']);
+        Route::get('/recent', [ReportsController::class, 'recent']);
+    });
     Route::get('/products', [ProductController::class, 'options'])->name('products.options');
 
     Route::get('/users/statistics', [UserController::class, 'statistics']);

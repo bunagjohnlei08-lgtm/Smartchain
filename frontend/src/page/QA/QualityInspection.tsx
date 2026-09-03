@@ -516,7 +516,7 @@ const QualityInspection: React.FC = () => {
             event.stopPropagation();
             handleRowClick(receiving.id);
           }}
-          className={`${baseClass} bg-cyan-500 hover:bg-cyan-400 text-slate-950`}
+          className={`${baseClass} bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950`}
         >
           Start Inspection
         </button>
@@ -530,7 +530,7 @@ const QualityInspection: React.FC = () => {
             event.stopPropagation();
             handleRowClick(receiving.id);
           }}
-          className={`${baseClass} bg-blue-500 hover:bg-blue-400 text-white`}
+          className={`${baseClass} bg-[#092635] hover:opacity-90 text-white dark:bg-blue-500 dark:hover:bg-blue-400 dark:hover:opacity-100`}
         >
           Continue
         </button>
@@ -681,7 +681,7 @@ const QualityInspection: React.FC = () => {
           </table>
         </div>
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-800 bg-[#090d16]/30">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-800 bg-white dark:bg-[#090d16]/30">
           <div className="text-sm text-slate-400">Showing {totalItems > 0 ? startIndex + 1 : 0} to {endIndex} of {totalItems} records</div>
           <div className="flex items-center gap-1">
             <button
@@ -734,7 +734,7 @@ const QualityInspection: React.FC = () => {
                   <button
                     disabled={isSaving || isLoadingDetail || !selectedReceiving || inspectionIsFinal}
                     onClick={() => saveInspection(true)}
-                    className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-4 h-4" /> Submit Inspection
                   </button>

@@ -332,7 +332,7 @@ const OrderManagement: React.FC = () => {
             <RotateCw className="w-4 h-4" />
             Refresh
           </button>
-          <button disabled title="External order import is not configured" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors shadow-lg shadow-blue-600/20">
+          <button disabled title="External order import is not configured" className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors shadow-lg shadow-[#092635]/20">
             <Plus className="w-4 h-4" />
             Import Orders
           </button>
@@ -395,7 +395,7 @@ const OrderManagement: React.FC = () => {
             Filter
           </button>
 
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-sm font-medium transition-colors ml-auto">
+          <button className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-colors ml-auto">
             <Download className="w-4 h-4" />
             Export
           </button>
@@ -658,7 +658,7 @@ const OrderManagement: React.FC = () => {
           {assignmentError && <p role="alert" className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">{assignmentError}</p>}
           <label className="mt-5 block text-sm text-slate-300">Available Plant Manager<select value={managerId} onChange={event => setManagerId(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><option value="">Select a Plant Manager</option>{plantManagers.map(manager => <option key={manager.id} value={manager.id}>{manager.name}{manager.employee_id ? ` — ${manager.employee_id}` : ''}</option>)}</select></label>
           {!plantManagers.length && <p className="mt-2 text-sm text-amber-300">No active Plant Managers are available.</p>}
-          <div className="mt-6 flex justify-end gap-3"><button onClick={() => setAssignmentOpen(false)} className="min-h-11 cursor-pointer rounded-lg border border-slate-700 px-4 text-slate-300 hover:bg-slate-800">Close</button><button onClick={() => void assignOrder()} disabled={!managerId || assignmentBusy} className="min-h-11 cursor-pointer rounded-lg bg-cyan-500 px-4 font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50">{assignmentBusy ? 'Assigning…' : 'Save Assignment'}</button></div>
+          <div className="mt-6 flex justify-end gap-3"><button onClick={() => setAssignmentOpen(false)} className="min-h-11 cursor-pointer rounded-lg border border-slate-700 px-4 text-slate-300 hover:bg-slate-800">Close</button><button onClick={() => void assignOrder()} disabled={!managerId || assignmentBusy} className="min-h-11 cursor-pointer rounded-lg bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{assignmentBusy ? 'Assigning…' : 'Save Assignment'}</button></div>
         </div>
       </div>}
 

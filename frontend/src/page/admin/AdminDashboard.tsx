@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/api';
+import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import {
   PackageCheck,
@@ -51,12 +52,12 @@ const quickActions = [
 // Helper Badge Components
 const POStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const styles: Record<string, string> = {
-    Approved: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-    Pending: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    'Pending Approval': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    'Sent to Supplier': 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-    Completed: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-    Cancelled: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
+    Approved: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20',
+    Pending: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
+    'Pending Approval': 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
+    'Sent to Supplier': 'text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20',
+    Completed: 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20',
+    Cancelled: 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20',
   };
   return (
     <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Pending}`}>
@@ -67,10 +68,10 @@ const POStatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
 const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const styles: Record<string, string> = {
-    Healthy: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-    'Low Stock': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    Critical: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
-    'Out of Stock': 'text-rose-400 bg-rose-500/10 border-rose-500/20',
+    Healthy: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20',
+    'Low Stock': 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
+    Critical: 'text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20',
+    'Out of Stock': 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20',
   };
   return (
     <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Healthy}`}>
@@ -81,6 +82,7 @@ const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -105,54 +107,71 @@ export default function AdminDashboard() {
   }).format(new Date()), []);
 
   const topStats = [
-    { title: 'Warehouse Utilization', value: loading ? '—' : `${dashboard.metrics.warehouse_utilization}%`, subtitle: 'Capacity placeholder', subtitleColor: 'text-slate-400', icon: <Warehouse className="w-5 h-5 text-blue-400"/>, iconBg: 'bg-blue-500/10' },
-    { title: 'Open Purchase Orders', value: loading ? '—' : dashboard.metrics.open_purchase_orders.toLocaleString(), subtitle: 'Excludes completed/cancelled', subtitleColor: 'text-amber-400', icon: <FileText className="w-5 h-5 text-amber-400"/>, iconBg: 'bg-amber-500/10' },
-    { title: 'Shipments In Transit', value: loading ? '—' : dashboard.metrics.shipments_in_transit.toLocaleString(), subtitle: 'Orders currently in transit', subtitleColor: 'text-emerald-400', icon: <Truck className="w-5 h-5 text-emerald-400"/>, iconBg: 'bg-emerald-500/10' },
-    { title: 'Low Stock Items', value: loading ? '—' : dashboard.metrics.low_stock_items.toLocaleString(), subtitle: `At or below ${dashboard.metrics.low_stock_threshold} units`, subtitleColor: 'text-rose-400', icon: <AlertTriangle className="w-5 h-5 text-rose-400"/>, iconBg: 'bg-rose-500/10' },
-    { title: 'Stock In', value: loading ? '—' : dashboard.metrics.stock_in.toLocaleString(), subtitle: 'Total stocked-in units', subtitleColor: 'text-blue-400', icon: <PackageCheck className="w-5 h-5 text-blue-400"/>, iconBg: 'bg-blue-500/10' },
-    { title: 'Stock Out', value: loading ? '—' : dashboard.metrics.stock_out.toLocaleString(), subtitle: 'Total stocked-out units', subtitleColor: 'text-emerald-400', icon: <PackageMinus className="w-5 h-5 text-emerald-400"/>, iconBg: 'bg-emerald-500/10' },
-    { title: 'Orders', value: loading ? '—' : dashboard.metrics.orders.toLocaleString(), subtitle: 'All order records', subtitleColor: 'text-amber-400', icon: <ShoppingCart className="w-5 h-5 text-amber-400"/>, iconBg: 'bg-amber-500/10' },
-    { title: 'Suppliers', value: loading ? '—' : dashboard.metrics.active_suppliers.toLocaleString(), subtitle: 'Active suppliers', subtitleColor: 'text-cyan-400', icon: <Building2 className="w-5 h-5 text-cyan-400"/>, iconBg: 'bg-cyan-500/10' },
+    { title: 'Warehouse Utilization', value: loading ? '—' : `${dashboard.metrics.warehouse_utilization}%`, subtitle: 'Capacity placeholder', subtitleColor: 'text-slate-500 dark:text-slate-400', icon: <Warehouse className="w-5 h-5 text-blue-600 dark:text-blue-400"/>, iconBg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { title: 'Open Purchase Orders', value: loading ? '—' : dashboard.metrics.open_purchase_orders.toLocaleString(), subtitle: 'Excludes completed/cancelled', subtitleColor: 'text-amber-600 dark:text-amber-400', icon: <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400"/>, iconBg: 'bg-amber-50 dark:bg-amber-500/10' },
+    { title: 'Shipments In Transit', value: loading ? '—' : dashboard.metrics.shipments_in_transit.toLocaleString(), subtitle: 'Orders currently in transit', subtitleColor: 'text-emerald-600 dark:text-emerald-400', icon: <Truck className="w-5 h-5 text-emerald-600 dark:text-emerald-400"/>, iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { title: 'Low Stock Items', value: loading ? '—' : dashboard.metrics.low_stock_items.toLocaleString(), subtitle: `At or below ${dashboard.metrics.low_stock_threshold} units`, subtitleColor: 'text-rose-600 dark:text-rose-400', icon: <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400"/>, iconBg: 'bg-rose-50 dark:bg-rose-500/10' },
+    { title: 'Stock In', value: loading ? '—' : dashboard.metrics.stock_in.toLocaleString(), subtitle: 'Total stocked-in units', subtitleColor: 'text-blue-600 dark:text-blue-400', icon: <PackageCheck className="w-5 h-5 text-blue-600 dark:text-blue-400"/>, iconBg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { title: 'Stock Out', value: loading ? '—' : dashboard.metrics.stock_out.toLocaleString(), subtitle: 'Total stocked-out units', subtitleColor: 'text-emerald-600 dark:text-emerald-400', icon: <PackageMinus className="w-5 h-5 text-emerald-600 dark:text-emerald-400"/>, iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { title: 'Orders', value: loading ? '—' : dashboard.metrics.orders.toLocaleString(), subtitle: 'All order records', subtitleColor: 'text-amber-600 dark:text-amber-400', icon: <ShoppingCart className="w-5 h-5 text-amber-600 dark:text-amber-400"/>, iconBg: 'bg-amber-50 dark:bg-amber-500/10' },
+    { title: 'Suppliers', value: loading ? '—' : dashboard.metrics.active_suppliers.toLocaleString(), subtitle: 'Active suppliers', subtitleColor: 'text-cyan-600 dark:text-cyan-400', icon: <Building2 className="w-5 h-5 text-cyan-600 dark:text-cyan-400"/>, iconBg: 'bg-cyan-50 dark:bg-cyan-500/10' },
   ];
   const movementData = dashboard.inventory_movement;
   const forecastData = dashboard.ai_forecast;
   const purchaseOrders = dashboard.recent_purchase_orders;
   const inventoryStatus = dashboard.inventory_status;
+  const isDark = theme === 'dark';
+  const chartGridColor = isDark ? '#334155' : '#E2E8F0';
+  const chartAxisColor = isDark ? '#CBD5E1' : '#64748B';
+  const chartCardColor = isDark ? '#0d1322' : '#FFFFFF';
+  const stockInColor = isDark ? '#60A5FA' : '#3B82F6';
+  const stockOutColor = isDark ? '#34D399' : '#22C55E';
+  const projectedColor = isDark ? '#FBBF24' : '#F59E0B';
+  const actualColor = isDark ? '#60A5FA' : '#3B82F6';
+  const tooltipStyle = {
+    backgroundColor: isDark ? '#111827' : '#FFFFFF',
+    borderColor: isDark ? '#475569' : '#CBD5E1',
+    color: isDark ? '#F8FAFC' : '#0F172A',
+    borderRadius: '0.75rem',
+    boxShadow: isDark ? '0 12px 30px rgb(0 0 0 / 0.35)' : '0 4px 12px rgb(15 23 42 / 0.08)',
+  };
+  const tooltipLabelStyle = { color: isDark ? '#F8FAFC' : '#0F172A', fontWeight: 600 };
+  const tooltipItemStyle = { color: isDark ? '#E2E8F0' : '#334155' };
 
   return (
-    <div className="w-full min-w-0 min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 space-y-6 overflow-x-hidden">
+    <div className="w-full min-w-0 min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 p-4 sm:p-6 space-y-6 overflow-x-hidden">
       
       {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Operations Overview</h1>
-        <p className="text-slate-400 text-sm mt-0.5">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Operations Overview</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
           {dateLabel} — supply chain operations summary.
         </p>
       </div>
 
-      {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-300">{error}</div>}
 
       {/* 1. TOP STAT CARDS */}
       <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {topStats.map((stat, idx) => (
           <div
             key={idx}
-            className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors"
+            className="bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-lg dark:shadow-black/20 rounded-xl p-5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
           >
             <div className="flex items-start justify-between">
               <div className={`p-2.5 rounded-lg flex items-center justify-center shrink-0 ${stat.iconBg}`}>
                 {stat.icon}
               </div>
-              <button className="text-slate-500 hover:text-slate-300">
+              <button className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
                 <MoreVertical className="w-4 h-4"/>
               </button>
             </div>
 
             <div className="mt-4">
-              <span className="text-xs text-slate-400 font-medium">
+              <span className="text-xs text-slate-500 dark:text-slate-300 font-medium">
                 {stat.title}
               </span>
-              <div className="text-3xl font-bold text-white mt-1">{stat.value}</div>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stat.value}</div>
               <div className={`text-xs mt-1.5 font-medium ${stat.subtitleColor}`}>
                 {stat.subtitle}
               </div>
@@ -164,13 +183,13 @@ export default function AdminDashboard() {
       {/* 2. CHARTS SECTION */}
       <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Inventory Movement */}
-        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between">
+        <div className="min-w-0 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-lg dark:shadow-black/20 rounded-xl p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-base font-semibold text-white">Inventory Movement</h2>
-              <p className="text-xs text-slate-400">Stock In vs Stock Out</p>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Inventory Movement</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Stock In vs Stock Out</p>
             </div>
-            <button className="p-1 text-slate-400 hover:text-white">
+            <button className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
               <Download className="w-4 h-4"/>
             </button>
           </div>
@@ -180,44 +199,44 @@ export default function AdminDashboard() {
               <AreaChart margin={{ left: -20, right: 10, bottom: 0, top: 10 }} data={movementData}>
                 <defs>
                   <linearGradient id="stockInGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor={stockInColor} stopOpacity={isDark ? 0.32 : 0.3} />
+                    <stop offset="95%" stopColor={stockInColor} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="stockOutGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                    <stop offset="5%" stopColor={stockOutColor} stopOpacity={isDark ? 0.28 : 0.3} />
+                    <stop offset="95%" stopColor={stockOutColor} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} allowDecimals={false} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff', borderRadius: '8px' }} />
-                <Area dataKey="stock_in" name="Stock In" fill="url(#stockInGrad)" stroke="#3b82f6" strokeWidth={2.5} type="monotone" isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
-                <Area dataKey="stock_out" name="Stock Out" fill="url(#stockOutGrad)" stroke="#22c55e" strokeWidth={2.5} type="monotone" isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
+                <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" strokeOpacity={isDark ? 0.7 : 1} vertical={false} />
+                <XAxis dataKey="day" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={{ stroke: chartAxisColor, strokeOpacity: 0.35 }} />
+                <Area dataKey="stock_in" name="Stock In" fill="url(#stockInGrad)" stroke={stockInColor} strokeWidth={3} dot={{ r: 3, fill: stockInColor, stroke: chartCardColor, strokeWidth: 2 }} activeDot={{ r: 5, stroke: chartCardColor, strokeWidth: 2 }} type="monotone" isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
+                <Area dataKey="stock_out" name="Stock Out" fill="url(#stockOutGrad)" stroke={stockOutColor} strokeWidth={3} dot={{ r: 3, fill: stockOutColor, stroke: chartCardColor, strokeWidth: 2 }} activeDot={{ r: 5, stroke: chartCardColor, strokeWidth: 2 }} type="monotone" isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
               </AreaChart>
             </ResponsiveContainer>
           </div>
 
           <div className="flex items-center justify-center gap-6 mt-3 text-xs">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-              <span className="text-slate-300">Stock In</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 dark:bg-blue-400"></span>
+              <span className="text-slate-600 dark:text-slate-300">Stock In</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-              <span className="text-slate-300">Stock Out</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
+              <span className="text-slate-600 dark:text-slate-300">Stock Out</span>
             </div>
           </div>
         </div>
 
         {/* AI Demand Forecast */}
-        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between">
+        <div className="min-w-0 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-lg dark:shadow-black/20 rounded-xl p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-base font-semibold text-white">AI Demand Forecast</h2>
-              <p className="text-xs text-slate-400">7-day projection</p>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">AI Demand Forecast</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">7-day projection</p>
             </div>
-            <button onClick={() => void loadDashboard()} disabled={loading} aria-label="Refresh dashboard" className="p-1 text-slate-400 hover:text-white disabled:opacity-50">
+            <button onClick={() => void loadDashboard()} disabled={loading} aria-label="Refresh dashboard" className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-50">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/>
             </button>
           </div>
@@ -225,24 +244,24 @@ export default function AdminDashboard() {
           <div className="h-64 w-full">
             <ResponsiveContainer height="100%" width="100%">
               <LineChart margin={{ left: -20, right: 10, bottom: 0, top: 10 }} data={forecastData}>
-                <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 6000]} ticks={[0, 1500, 3000, 4500, 6000]} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff', borderRadius: '8px' }} />
-                <Line type="monotone" dataKey="projected" stroke="#f59e0b" strokeWidth={2.5} dot={{ fill: '#f59e0b', r: 4 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
-                <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: '#3b82f6', r: 4 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
+                <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" strokeOpacity={isDark ? 0.7 : 1} vertical={false} />
+                <XAxis dataKey="day" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 6000]} ticks={[0, 1500, 3000, 4500, 6000]} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={{ stroke: chartAxisColor, strokeOpacity: 0.35 }} />
+                <Line type="monotone" dataKey="projected" name="Projected" stroke={projectedColor} strokeWidth={3} dot={{ fill: projectedColor, stroke: chartCardColor, strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: chartCardColor, strokeWidth: 2 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
+                <Line type="monotone" dataKey="actual" name="Actual" stroke={actualColor} strokeWidth={2.75} strokeDasharray="5 5" dot={{ fill: actualColor, stroke: chartCardColor, strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: chartCardColor, strokeWidth: 2 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
               </LineChart>
             </ResponsiveContainer>
           </div>
 
           <div className="flex items-center justify-center gap-6 mt-3 text-xs">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-              <span className="text-slate-300">Actual</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 dark:bg-blue-400"></span>
+              <span className="text-slate-600 dark:text-slate-300">Actual</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-              <span className="text-slate-300">Projected</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 dark:bg-amber-400"></span>
+              <span className="text-slate-600 dark:text-slate-300">Projected</span>
             </div>
           </div>
         </div>
@@ -251,13 +270,13 @@ export default function AdminDashboard() {
       {/* 3. MIDDLE TABLES SECTION */}
       <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Recent Purchase Orders */}
-        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
+        <div className="min-w-0 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-lg dark:shadow-black/20 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-base font-semibold text-white">Recent Purchase Orders</h2>
-              <p className="text-xs text-slate-400">Latest activity across suppliers</p>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Recent Purchase Orders</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Latest activity across suppliers</p>
             </div>
-            <button onClick={() => navigate('/admin/purchase-orders')} className="text-xs text-blue-400 hover:text-blue-300 font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded">
+            <button onClick={() => navigate('/admin/purchase-orders')} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded">
               View all &gt;
             </button>
           </div>
@@ -265,39 +284,39 @@ export default function AdminDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="text-slate-400 font-semibold border-b border-slate-800/80 uppercase tracking-wider">
+                <tr className="text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                   <th className="pb-3 pl-1">PO NUMBER</th>
                   <th className="pb-3">SUPPLIER</th>
                   <th className="pb-3">AMOUNT</th>
                   <th className="pb-3 pr-1 text-right">STATUS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50 text-slate-200">
-                {loading && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Loading purchase orders…</td></tr>}
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-slate-700 dark:text-slate-200">
+                {loading && <tr><td colSpan={4} className="py-8 text-center text-slate-500 dark:text-slate-400">Loading purchase orders…</td></tr>}
                 {purchaseOrders.map((po) => (
-                  <tr key={po.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 pl-1 font-mono font-medium text-slate-100">{po.po_number}</td>
-                    <td className="py-3 text-slate-300">{po.supplier_name}</td>
+                  <tr key={po.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="py-3 pl-1 font-mono font-medium text-slate-900 dark:text-slate-100">{po.po_number}</td>
+                    <td className="py-3 text-slate-600 dark:text-slate-300">{po.supplier_name}</td>
                     <td className="py-3 font-medium">₱{po.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="py-3 pr-1 text-right">
                       <POStatusBadge status={po.status}/>
                     </td>
                   </tr>
                 ))}
-                {!loading && purchaseOrders.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">No purchase orders found.</td></tr>}
+                {!loading && purchaseOrders.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500 dark:text-slate-400">No purchase orders found.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
 
         {/* Inventory Status */}
-        <div className="min-w-0 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
+        <div className="min-w-0 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-lg dark:shadow-black/20 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-base font-semibold text-white">Inventory Status</h2>
-              <p className="text-xs text-slate-400">Current stock levels</p>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Inventory Status</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Current stock levels</p>
             </div>
-            <button onClick={() => navigate('/admin/inventory')} className="text-xs text-blue-400 hover:text-blue-300 font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded">
+            <button onClick={() => navigate('/admin/inventory')} className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded">
               Manage &gt;
             </button>
           </div>
@@ -305,26 +324,26 @@ export default function AdminDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="text-slate-400 font-semibold border-b border-slate-800/80 uppercase tracking-wider">
+                <tr className="text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                   <th className="pb-3 pl-1">PRODUCT</th>
                   <th className="pb-3">CATEGORY</th>
                   <th className="pb-3">STOCK</th>
                   <th className="pb-3 pr-1 text-right">STATUS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50 text-slate-200">
-                {loading && <tr><td colSpan={4} className="py-8 text-center text-slate-500">Loading inventory status…</td></tr>}
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50 text-slate-700 dark:text-slate-200">
+                {loading && <tr><td colSpan={4} className="py-8 text-center text-slate-500 dark:text-slate-400">Loading inventory status…</td></tr>}
                 {inventoryStatus.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 pl-1 font-medium text-slate-100">{item.product}</td>
-                    <td className="py-3 text-slate-300">{item.category}</td>
+                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="py-3 pl-1 font-medium text-slate-900 dark:text-slate-100">{item.product}</td>
+                    <td className="py-3 text-slate-600 dark:text-slate-300">{item.category}</td>
                     <td className="py-3 font-medium">{item.stock}</td>
                     <td className="py-3 pr-1 text-right">
                       <InventoryStatusBadge status={item.status}/>
                     </td>
                   </tr>
                 ))}
-                {!loading && inventoryStatus.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500">No inventory records found.</td></tr>}
+                {!loading && inventoryStatus.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-500 dark:text-slate-400">No inventory records found.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -333,18 +352,18 @@ export default function AdminDashboard() {
 
       {/* 4. QUICK ACTIONS */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-300">Quick Actions</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-300">Quick Actions</h3>
         <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {quickActions.map((action) => (
             <button
               key={action.path}
               onClick={() => navigate(action.path)}
-              className="bg-[#0b101d] border border-slate-800/80 hover:border-slate-700 rounded-xl p-5 flex flex-col items-center justify-center gap-3 group transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-lg dark:shadow-black/20 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl p-5 flex flex-col items-center justify-center gap-3 group transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
-              <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400 group-hover:scale-105 transition-all">
+              <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-all">
                 <Plus className="w-5 h-5"/>
               </div>
-              <span className="text-xs font-medium text-slate-300 group-hover:text-white">
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
                 {action.label}
               </span>
             </button>
@@ -353,7 +372,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* FOOTER */}
-      <div className="pt-6 text-center text-xs text-slate-500 border-t border-slate-800/60">
+      <div className="pt-6 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700">
         © 2026 SmartChain. All rights reserved. Powered by AI.
       </div>
     </div>

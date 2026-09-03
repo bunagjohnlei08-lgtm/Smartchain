@@ -326,8 +326,7 @@ const UserModal: React.FC<{
             </button>
             <button
               type="submit"
-              className="h-11 px-5 rounded-lg text-sm font-medium transition-opacity duration-200 hover:opacity-90"
-              style={{ backgroundColor: '#5B8CFF', color: '#FFFFFF' }}
+              className="h-11 px-5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-opacity duration-200"
             >
               {user ? 'Save Changes' : 'Create User'}
             </button>
@@ -572,7 +571,7 @@ const UserManagement: React.FC = () => {
             <Download className="w-3.5 h-3.5" /> Export
           </button>
 
-          <button onClick={() => setIsAddUserModalOpen(true)} className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white rounded-lg transition shadow-lg shadow-blue-600/20">
+          <button onClick={() => setIsAddUserModalOpen(true)} className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg transition shadow-lg shadow-[#092635]/20">
             <UserPlus className="w-3.5 h-3.5" /> + New User
           </button>
         </div>

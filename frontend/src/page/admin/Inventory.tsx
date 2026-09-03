@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Package,
   MapPin,
-  ClipboardList,
   Plus,
   Edit,
   Eye,
@@ -23,7 +22,6 @@ import {
   Layers,
   Truck,
   Filter,
-  QrCode,
   AlertTriangle,
   Info,
   Check,
@@ -226,7 +224,7 @@ const BarcodeSvg: React.FC<{ value: string; className?: string }> = ({ value, cl
 
 const BarcodeDisplay: React.FC<{ value: string }> = ({ value }) => (
   <div className="inline-flex min-w-[150px] flex-col gap-1">
-    <span className="font-mono text-xs text-slate-300 sm:text-sm">{value}</span>
+    <span className="font-mono text-xs text-slate-900 dark:text-slate-300 sm:text-sm">{value}</span>
     <BarcodeSvg value={value} className="h-10 w-40 rounded bg-white" />
   </div>
 );
@@ -357,7 +355,7 @@ const Pagination: React.FC<{
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-3 py-3 sm:px-6 sm:py-4 border-t border-slate-800 bg-[#0b0f19]/30">
+    <div className="flex items-center justify-between px-3 py-3 sm:px-6 sm:py-4 border-t border-slate-800 bg-white dark:bg-[#0b0f19]/30">
       <div className="text-sm text-slate-400">
         Showing <span className="text-white font-medium">{start}</span> to{' '}
         <span className="text-white font-medium">{end}</span> of{' '}
@@ -582,7 +580,7 @@ const InventoryFormModal: React.FC<{
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950 disabled:opacity-60"
+              className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-60"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {mode === 'create' ? 'Create Record' : 'Save Changes'}
@@ -657,7 +655,7 @@ const ReserveStockModal: React.FC<{
             <button type="button" onClick={onClose} className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
               Cancel
             </button>
-            <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-blue-500 text-slate-950">
+            <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950">
               <Save className="w-4 h-4" /> Reserve
             </button>
           </div>
@@ -758,12 +756,10 @@ const DetailsDrawer: React.FC<{
             </div>
           </div>
 
-          <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700 text-center">
-            <p className="text-slate-400 text-xs mb-2">QR Code</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-800/30">
+            <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">Barcode</p>
             <div className="flex justify-center">
-              <div className="w-28 h-28 bg-white rounded-lg flex items-center justify-center">
-                <QrCode className="w-20 h-20 text-black" />
-              </div>
+              <BarcodeDisplay value={product.barcode} />
             </div>
           </div>
 
@@ -868,7 +864,7 @@ const InventoryGrid: React.FC<{
                 <h3 className="text-white font-semibold text-base truncate">{item.product}</h3>
               </div>
             </div>
-            <div className="mb-3 rounded-lg border border-slate-800 bg-[#0b0f19] p-2">
+            <div className="mb-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#0b0f19]">
               <BarcodeDisplay value={item.barcode} />
             </div>
 
@@ -1314,7 +1310,7 @@ export const InventoryList: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleReceiveStock}
-            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Receive Stock
           </button>
@@ -1474,7 +1470,7 @@ export const InventoryList: React.FC = () => {
             onClick={() => setViewMode('table')}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
               viewMode === 'table'
-                ? 'bg-cyan-500 text-slate-950'
+                ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -1484,7 +1480,7 @@ export const InventoryList: React.FC = () => {
             onClick={() => setViewMode('grid')}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
               viewMode === 'grid'
-                ? 'bg-cyan-500 text-slate-950'
+                ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -1707,16 +1703,13 @@ export const InventoryList: React.FC = () => {
 export const ManageLocations: React.FC = () => (
   <div className="text-slate-400 text-center py-12">Manage Locations - Coming Soon</div>
 );
-export const StockCounting: React.FC = () => (
-  <div className="text-slate-400 text-center py-12">Stock Counting - Coming Soon</div>
-);
 
 // ============================================
 // MAIN WAREHOUSE MODULE (with Tabs & outer container)
 // ============================================
 
 const WarehouseModule: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'locations' | 'counting'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'locations'>('inventory');
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#090d16]">
@@ -1754,24 +1747,12 @@ const WarehouseModule: React.FC = () => {
                 <MapPin className="w-4 h-4" />
                 Manage Locations
               </button>
-              <button
-                onClick={() => setActiveTab('counting')}
-                className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
-                  activeTab === 'counting'
-                    ? 'text-white border-b-2 border-cyan-500'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ClipboardList className="w-4 h-4" />
-                Stock Counting
-              </button>
             </div>
           </div>
 
           {/* Page Content */}
           {activeTab === 'inventory' && <InventoryList />}
           {activeTab === 'locations' && <ManageLocations />}
-          {activeTab === 'counting' && <StockCounting />}
         </div>
       </main>
     </div>

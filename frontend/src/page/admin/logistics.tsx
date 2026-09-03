@@ -492,7 +492,7 @@ const Logistics: React.FC = () => {
       Manage delivery routes, fleet status, and shipment tracking across warehouses and branches.
      </p>
     </div>
-     <button onClick={() => setIsCreateModalOpen(true)} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
+     <button onClick={() => setIsCreateModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
       <Plus className="w-4 h-4" /> Create Shipment
      </button>
    </div>
@@ -809,7 +809,7 @@ const Logistics: React.FC = () => {
         <button
          type="submit"
          onClick={handleAssignSubmit}
-         className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+         className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
         >
          <Send className="w-4 h-4" /> Assign & Notify
         </button>
@@ -945,7 +945,7 @@ const Logistics: React.FC = () => {
          <button
           type="button"
           onClick={handleCreateSubmit}
-          className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+          className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
          >
           <Check className="w-4 h-4" /> Create Shipment
          </button>

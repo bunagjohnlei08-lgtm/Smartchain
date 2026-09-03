@@ -414,7 +414,7 @@ const Procurement: React.FC = () => {
                         </>
                       )}
                       {request.status === 'approved' && (
-                        <button onClick={() => handleGeneratePo(request)} className="min-h-9 rounded-lg bg-cyan-600 px-3 text-xs font-semibold text-white hover:bg-cyan-500 transition-colors">Generate PO</button>
+                        <button onClick={() => handleGeneratePo(request)} className="min-h-9 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors">Generate PO</button>
                       )}
                     </div>
                   </td>
@@ -447,7 +447,7 @@ const Procurement: React.FC = () => {
                   onClick={() => setPendingView('cards')}
                   className={`p-1.5 rounded-md transition-all ${
                     pendingView === 'cards'
-                      ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                      ? 'bg-slate-900 text-white shadow-sm dark:bg-cyan-500 dark:text-slate-950'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                   }`}
                   title="Card view"
@@ -458,7 +458,7 @@ const Procurement: React.FC = () => {
                   onClick={() => setPendingView('table')}
                   className={`p-1.5 rounded-md transition-all ${
                     pendingView === 'table'
-                      ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
+                      ? 'bg-slate-900 text-white shadow-sm dark:bg-cyan-500 dark:text-slate-950'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                   }`}
                   title="Table view"
@@ -748,7 +748,7 @@ const Procurement: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleGeneratePo(request)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors"
                       >
                         Generate PO
                       </button>
@@ -987,7 +987,7 @@ const Procurement: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 shadow-none flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" /> Export
                 </button>

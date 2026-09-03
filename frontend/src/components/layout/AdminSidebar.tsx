@@ -145,7 +145,6 @@ const AdminSidebar = () => {
                       {isOpen && (
                         <div className="pl-9 pr-2 py-1 space-y-1 border-l border-gray-700 ml-5 my-1">
                           <NavLink className={subLinkClass} to="/admin/inventory">Inventory</NavLink>
-                          <NavLink className={subLinkClass} to="/admin/stock-counting">Stock Counting</NavLink>
                           <NavLink className={subLinkClass} to="/admin/manage-locations">Manage Locations</NavLink>
                         </div>
                       )}

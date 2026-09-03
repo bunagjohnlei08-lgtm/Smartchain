@@ -354,7 +354,7 @@ const PurchaseOrders: React.FC = () => {
         </button>
         <button
           onClick={openCreateModal}
-          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           <span>New PO</span>
@@ -436,7 +436,7 @@ const PurchaseOrders: React.FC = () => {
           </table>
         </div>
         {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-[#0f172a]/30">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-white dark:bg-[#0f172a]/30">
           <div className="text-sm text-gray-400">
             Showing <span className="text-white font-medium">1</span> to{' '}
             <span className="text-white font-medium">{filteredOrders.length}</span> of{' '}
@@ -524,7 +524,7 @@ const PurchaseOrders: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2 border-t border-[#1f2937] pt-4">
-              <button onClick={() => openPrintablePo(selectedOrder)} className="flex-1 min-h-11 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-300">
+              <button onClick={() => openPrintablePo(selectedOrder)} className="flex-1 min-h-11 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-300">
                 <Printer className="w-4 h-4" /> Print PO
               </button>
               <button onClick={() => openPrintablePo(selectedOrder, true)} className="flex-1 min-h-11 py-2 border border-[#1f2937] hover:bg-slate-800/50 text-gray-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
@@ -630,8 +630,8 @@ const PurchaseOrders: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#1f2937]">
-              <button onClick={closeCreateModal} className="px-4 py-2 border border-[#1f2937] rounded-xl text-sm font-medium text-gray-300 hover:bg-slate-800/50 transition-colors">Cancel</button>
-              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierName} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={closeCreateModal} className="px-4 py-2 border border-[#1f2937] rounded-xl text-sm font-medium text-gray-300 hover:bg-slate-800/50 transition-colors">Cancel</button>
+              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierName} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <Save className="w-4 h-4" /> Create PO
               </button>
             </div>

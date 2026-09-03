@@ -526,7 +526,7 @@ const StockIn: React.FC = () => {
           </button>
           <button
             onClick={handlePrimaryStockIn}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
             Stock In
@@ -991,7 +991,7 @@ const StockIn: React.FC = () => {
                     onClick={handlePerformStockIn}
                     className={`w-full py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
                       canPerformStockIn && !isStockingIn
-                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                        ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950'
                         : 'bg-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
                     }`}
                   >

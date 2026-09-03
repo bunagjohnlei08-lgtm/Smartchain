@@ -263,7 +263,7 @@ const Pagination: React.FC<{
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-[#0b0f19]/30">
+    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-white dark:bg-[#0b0f19]/30">
       <div className="text-sm text-slate-400">
         Showing <span className="text-white font-medium">{start}</span> to{' '}
         <span className="text-white font-medium">{end}</span> of{' '}
@@ -456,7 +456,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                     />
                     <button
                       onClick={() => verifyBarcode(item.id)}
-                      className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-lg text-sm font-medium transition-all"
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-all"
                     >
                       Verify
                     </button>
@@ -566,7 +566,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
               disabled={!allItemsVerified || !checklistComplete}
               className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
                 allItemsVerified && checklistComplete
-                  ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                      ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950'
                   : 'bg-slate-700 text-slate-400 cursor-not-allowed'
               }`}
             >
@@ -712,7 +712,7 @@ const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClo
           </button>
           <button
             onClick={handleSubmit}
-            className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all"
+            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-all"
           >
             Create Shipment
           </button>
@@ -941,7 +941,7 @@ const Shipments: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">Shipments</h1>
           <p className="text-sm text-slate-400">Prepare and pack orders for shipment to customers.</p>
         </div>
-        <button onClick={() => setIsCreateModalOpen(true)} className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
+        <button onClick={() => setIsCreateModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
           <Plus className="w-4 h-4" /> Create Shipment
         </button>
       </div>
@@ -1221,8 +1221,8 @@ const Shipments: React.FC = () => {
                   disabled={isForwarding}
                   className={`w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                     isForwarding
-                      ? 'bg-cyan-500/50 text-slate-950/70 cursor-not-allowed'
-                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                      ? 'bg-slate-900/50 text-white/70 dark:bg-cyan-500/50 dark:text-slate-950/70 cursor-not-allowed'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950'
                   }`}
                 >
                   {isForwarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
@@ -1269,7 +1269,7 @@ const Shipments: React.FC = () => {
               </button>
               <button
                 onClick={handleConfirmForward}
-                className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-all"
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-all"
               >
                 Confirm
               </button>

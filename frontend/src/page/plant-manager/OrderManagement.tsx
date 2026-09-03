@@ -313,7 +313,7 @@ const OrderManagement: React.FC = () => {
             <RefreshCw className="w-4 h-4" />
             Refresh List
           </button>
-          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-medium transition-colors">
+          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-colors">
             <Printer className="w-4 h-4" />
             Print Pick List
           </button>
@@ -389,7 +389,7 @@ const OrderManagement: React.FC = () => {
             <Calendar className="w-4 h-4" />
           </button>
 
-          <button className="ml-auto px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
+          <button className="ml-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Export Pick List
           </button>
@@ -620,7 +620,7 @@ const OrderManagement: React.FC = () => {
                 {selectedOrder.status === 'Assigned' && (
                   <button
                     onClick={() => void handleStartPreparation(selectedOrder.id)}
-                    className="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     <Package className="w-4 h-4" />
                     Start Preparation

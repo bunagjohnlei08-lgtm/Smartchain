@@ -35,6 +35,7 @@ import {
 } from 'recharts';
 
 import PageContainer from '@/components/layout/PageContainer';
+import { useTheme } from '../../context/ThemeContext';
 
 // ============================================
 // TYPES
@@ -324,6 +325,7 @@ const FilterSelect: React.FC<{
 // ============================================
 
 const AIDemandForecast: React.FC = () => {
+ const { theme } = useTheme();
  const [timeFilter, setTimeFilter] = useState('90 Days');
  const [search, setSearch] = useState('');
  const [warehouseFilter, setWarehouseFilter] = useState('All Warehouses');
@@ -333,6 +335,16 @@ const AIDemandForecast: React.FC = () => {
  const [expandedChart, setExpandedChart] = useState(false);
  const [currentPage, setCurrentPage] = useState(1);
  const itemsPerPage = 8;
+ const isDark = theme === 'dark';
+ const chartGridColor = isDark ? '#233047' : '#E2E8F0';
+ const chartAxisColor = isDark ? '#64748B' : '#64748B';
+ const chartTooltipStyle = {
+  backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+  borderColor: isDark ? '#334155' : '#CBD5E1',
+  borderRadius: '12px',
+  color: isDark ? '#F1F5F9' : '#0F172A',
+  boxShadow: isDark ? 'none' : '0 4px 12px rgb(15 23 42 / 0.08)',
+ };
 
  const timeFilters = ['7 Days', '30 Days', '90 Days', '6 Months', '1 Year'];
  const warehouses = ['All Warehouses', 'Central Depot', 'Northgate', 'Eastside', 'Southpark'];
@@ -460,7 +472,7 @@ const AIDemandForecast: React.FC = () => {
        <h3 className="text-white text-xl font-bold">Demand Forecast — Next Quarter</h3>
        <p className="text-gray-400 text-sm mt-1">Historical sales vs Random Forest projection</p>
       </div>
-      <button className="px-5 py-2.5 bg-[#3B82F6] hover:bg-[#3B82F6]/90 text-white rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-md shadow-[#3B82F6]/20">
+      <button className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-md shadow-[#092635]/20">
        <RefreshCw className="w-4 h-4" /> Re-run Forecast
       </button>
      </div>
@@ -472,20 +484,15 @@ const AIDemandForecast: React.FC = () => {
          <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
         </linearGradient>
        </defs>
-       <CartesianGrid strokeDasharray="3 3" stroke="#233047" opacity={0.5} />
-       <XAxis dataKey="month" stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} />
-       <YAxis stroke="#64748B" tick={{ fill: '#64748B', fontSize: 12 }} />
+       <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={isDark ? 0.5 : 1} />
+       <XAxis dataKey="month" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} />
+       <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} />
        <Tooltip
-        contentStyle={{
-         backgroundColor: '#1E293B',
-         borderColor: '#334155',
-         borderRadius: '12px',
-         color: '#F1F5F9',
-        }}
-        itemStyle={{ color: '#F1F5F9', fontSize: '12px' }}
-        labelStyle={{ color: '#94A3B8', fontSize: '12px' }}
+        contentStyle={chartTooltipStyle}
+        itemStyle={{ color: isDark ? '#F1F5F9' : '#334155', fontSize: '12px' }}
+        labelStyle={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: '12px' }}
        />
-       <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '16px', color: '#94A3B8', fontSize: '12px' }} />
+       <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '16px', color: isDark ? '#94A3B8' : '#475569', fontSize: '12px' }} />
         <Area
          type="monotone"
          dataKey="actual"
@@ -809,7 +816,7 @@ const AIDemandForecast: React.FC = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-3 pt-4 border-t border-gray-800/50">
-         <button className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:opacity-90 flex items-center justify-center gap-2 bg-[#3B82F6] text-white">
+         <button className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950">
           <ShoppingCart className="w-4 h-4" /> Create PO
          </button>
          <button className="px-4 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800/50 transition-all duration-200 flex items-center gap-2">

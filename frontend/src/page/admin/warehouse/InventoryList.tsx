@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Package,
   MapPin,
-  ClipboardList,
   Plus,
   Edit,
   Eye,
@@ -1637,16 +1636,13 @@ export const InventoryList: React.FC = () => {
 export const ManageLocations: React.FC = () => (
  <div className="text-gray-400 text-center py-12">Manage Locations - Coming Soon</div>
 );
-export const StockCounting: React.FC = () => (
- <div className="text-gray-400 text-center py-12">Stock Counting - Coming Soon</div>
-);
 
 // ============================================
 // MAIN WAREHOUSE MODULE (with Tabs & outer container)
 // ============================================
 
 const WarehouseModule: React.FC = () => {
- const [activeTab, setActiveTab] = useState<'inventory' | 'locations' | 'counting'>('inventory');
+ const [activeTab, setActiveTab] = useState<'inventory' | 'locations'>('inventory');
 
  return (
   <div className="flex-1 flex flex-col overflow-hidden bg-transparent">
@@ -1684,24 +1680,12 @@ const WarehouseModule: React.FC = () => {
         <MapPin className="w-4 h-4" />
         Manage Locations
        </button>
-       <button
-        onClick={() => setActiveTab('counting')}
-        className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
-         activeTab === 'counting'
-          ? 'text-white border-b-2 border-cyan-500'
-          : 'text-gray-400 hover:text-white'
-        }`}
-       >
-        <ClipboardList className="w-4 h-4" />
-        Stock Counting
-       </button>
       </div>
      </div>
 
      {/* Page Content */}
      {activeTab === 'inventory' && <InventoryList />}
      {activeTab === 'locations' && <ManageLocations />}
-     {activeTab === 'counting' && <StockCounting />}
     </div>
    </main>
   </div>

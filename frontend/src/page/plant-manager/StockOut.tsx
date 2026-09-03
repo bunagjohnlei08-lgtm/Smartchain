@@ -141,6 +141,31 @@ const ItemStatusBadge = ({ status }: { status: StockOutItem['status'] }) => {
   return <span className={`text-xs font-medium ${color}`}>{status}</span>;
 };
 
+const getCameraErrorName = (error: unknown) => error instanceof DOMException
+    ? error.name
+    : typeof error === 'object' && error && 'name' in error
+      ? String(error.name)
+      : '';
+
+const getCameraErrorMessage = (error: unknown) => {
+  switch (getCameraErrorName(error)) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'Camera permission was denied. Allow camera access in your browser settings.';
+    case 'NotFoundError':
+      return 'No camera was detected on this device.';
+    case 'NotReadableError':
+    case 'AbortError':
+      return 'The camera is unavailable or currently being used by another application.';
+    case 'OverconstrainedError':
+      return 'The requested camera is unavailable. No compatible camera could be started.';
+    default:
+      return error instanceof Error && error.message
+        ? error.message
+        : 'The camera could not be started. Please use manual barcode entry.';
+  }
+};
+
 const StockOut: React.FC = () => {
   const [orders, setOrders] = useState<StockOutOrder[]>([]);
   const [summary, setSummary] = useState<Summary>({ ordersReady: 0, pickingToday: 0, readyForShipment: 0, waitingLogistics: 0, releasedToday: 0, itemsReleased: 0, valueReleased: 0 });
@@ -268,24 +293,33 @@ const StockOut: React.FC = () => {
       }
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('No camera is available in this browser. Please use manual barcode entry.');
 
-      const reader = new BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 150, delayBetweenScanSuccess: 1000 });
-      scannerControlsRef.current = await reader.decodeFromConstraints({
-        audio: false,
-        video: { facingMode: { ideal: 'environment' } },
-      }, videoRef.current, (result) => {
+      const handleResult = (result?: { getText: () => string }) => {
         const value = result?.getText().trim();
         const now = Date.now();
         if (!value || scanBusyRef.current || (lastDetectionRef.current.value === value && now - lastDetectionRef.current.at <= 2500)) return;
         lastDetectionRef.current = { value, at: now };
         stopCamera();
         void processScan(value);
-      });
+      };
+      const startDecoder = (constraints: MediaStreamConstraints) => {
+        const reader = new BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 150, delayBetweenScanSuccess: 1000 });
+        return reader.decodeFromConstraints(constraints, videoRef.current!, handleResult);
+      };
+
+      try {
+        scannerControlsRef.current = await startDecoder({
+          audio: false,
+          video: { facingMode: { ideal: 'environment' } },
+        });
+      } catch (preferredCameraError: unknown) {
+        if (!['NotFoundError', 'OverconstrainedError'].includes(getCameraErrorName(preferredCameraError))) throw preferredCameraError;
+        stopCamera();
+        scannerControlsRef.current = await startDecoder({ audio: false, video: true });
+      }
       setCameraActive(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       stopCamera();
-      setScannerError(error?.name === 'NotAllowedError'
-        ? 'Camera permission was denied. Please use manual barcode entry.'
-        : error?.message || 'The camera could not be started. Please use manual barcode entry.');
+      setScannerError(getCameraErrorMessage(error));
     }
   };
 
@@ -325,7 +359,7 @@ const StockOut: React.FC = () => {
           <button onClick={() => void loadOrders()} disabled={loading} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
-          <button onClick={() => void startCamera()} disabled={!selectedOrder || selectedOrder.status === 'Ready for Shipment'} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
+          <button onClick={() => void startCamera()} disabled={!selectedOrder || selectedOrder.status === 'Ready for Shipment'} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
             <ScanLine className="h-4 w-4" /> Scan Barcode
           </button>
         </div>
@@ -388,7 +422,7 @@ const StockOut: React.FC = () => {
         <div className="space-y-5 rounded-xl border border-slate-800/80 bg-[#0b101d] p-5 xl:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
             <div><div className="flex items-center gap-3"><h2 className="text-lg font-semibold text-white">{selectedOrder.orderNo}</h2><StatusBadge status={selectedOrder.status} /></div><p className="mt-1 text-sm text-slate-400">{selectedOrder.customer} · {selectedOrder.warehouse}</p></div>
-            <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"><ScanLine className="h-4 w-4" /> Scan Barcode</button>
+            <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"><ScanLine className="h-4 w-4" /> Scan Barcode</button>
           </div>
           <div><div className="flex justify-between text-sm"><span className="text-slate-400">Release progress</span><span className="font-medium text-white">{progress.released} / {progress.ordered} units</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress.percentage}%` }} /></div></div>
           <div className="overflow-x-auto">
@@ -431,7 +465,7 @@ const StockOut: React.FC = () => {
             <h3 className="text-sm font-semibold text-white">Enter Barcode Manually</h3><p className="mt-1 text-xs text-slate-400">Camera and manual entry use the same backend barcode validation.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
               <label className="text-sm text-slate-300">Barcode<input value={manualBarcode} onChange={event => setManualBarcode(event.target.value)} required maxLength={100} autoComplete="off" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
-              <button type="submit" disabled={actionBusy || !manualBarcode.trim()} className="min-h-11 cursor-pointer rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{actionBusy ? 'Working…' : 'Submit'}</button>
+              <button type="submit" disabled={actionBusy || !manualBarcode.trim()} className="min-h-11 cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{actionBusy ? 'Working…' : 'Submit'}</button>
             </div>
           </form>
         </div>

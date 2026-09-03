@@ -442,7 +442,7 @@ const ReplenishmentPlanning: React.FC = () => {
           </button>
           <button
             onClick={() => setShowNewRequestModal(true)}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950"
+            className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
           >
             <Plus className="w-4 h-4" /> New Request
           </button>
@@ -670,7 +670,7 @@ const ReplenishmentPlanning: React.FC = () => {
                 </div>
                 <button
                   onClick={() => handleCreateRequest(product)}
-                  className="mt-3 w-full py-2 rounded-xl text-sm font-medium bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all"
+                  className="mt-3 w-full py-2 rounded-xl text-sm font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-all"
                 >
                   Create Request
                 </button>
@@ -780,7 +780,7 @@ const ReplenishmentPlanning: React.FC = () => {
                 <button
                   onClick={handleNewRequestSubmit}
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Submit Request
                 </button>
@@ -866,7 +866,7 @@ const ReplenishmentPlanning: React.FC = () => {
                 <button
                   onClick={submitRequest}
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 bg-cyan-500 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Submit Request
                 </button>
