@@ -422,7 +422,7 @@ const OrderManagement: React.FC = () => {
               {orders.map((order) => (
                 <tr key={order.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors cursor-pointer" onClick={() => handleViewOrder(order)}>
                   <td className="py-3 px-3">
-                    <p className="font-mono text-blue-400 hover:underline font-medium">{order.orderNo}</p>
+                    <p className="font-mono text-slate-900 dark:text-blue-400 hover:underline font-medium">{order.orderNo}</p>
                     <p className="text-xs text-slate-500">{order.refNo}</p>
                   </td>
                   <td className="py-3 px-3">
@@ -450,7 +450,7 @@ const OrderManagement: React.FC = () => {
                   <td className="py-3 px-3 text-right">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
-                      className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                      className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                       title="View Details"
                     >
                       <Eye className="w-4 h-4" />
@@ -557,7 +557,7 @@ const OrderManagement: React.FC = () => {
                 <p className="text-sm text-slate-400">{selectedOrder.refNo}</p>
                 <StatusBadge status={selectedOrder.status} />
               </div>
-              <button onClick={handleCloseDrawer} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+              <button onClick={handleCloseDrawer} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>

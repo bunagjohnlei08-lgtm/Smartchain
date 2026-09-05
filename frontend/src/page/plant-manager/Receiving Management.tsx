@@ -296,7 +296,7 @@ const CreateReceivingModal: React.FC<{
           <h2 className="text-xl font-bold text-white">Create Receiving</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
           >
             <X className="w-5 h-5" />
           </button>
@@ -309,7 +309,7 @@ const CreateReceivingModal: React.FC<{
                 value={formData.purchase_order_id ?? ''}
                 onChange={(e) => selectPurchaseOrder(e.target.value)}
                 disabled={loadingPurchaseOrders}
-                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:opacity-60"
+                className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:opacity-60"
                 required
               >
                 <option value="">{loadingPurchaseOrders ? 'Loading purchase orders…' : 'Select a purchase order'}</option>
@@ -324,7 +324,7 @@ const CreateReceivingModal: React.FC<{
                 type="text"
                 value={formData.supplier}
                 readOnly
-                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-400"
+                className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-400 placeholder:text-slate-400 dark:placeholder:text-inherit"
                 placeholder="Populated from selected PO"
                 required
               />
@@ -335,7 +335,7 @@ const CreateReceivingModal: React.FC<{
                 type="text"
                 value={formData.reference_no}
                 onChange={(e) => setFormData({ ...formData, reference_no: e.target.value })}
-                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 placeholder:text-slate-400 dark:placeholder:text-inherit"
                 placeholder="DEL-98765"
               />
             </div>
@@ -345,7 +345,7 @@ const CreateReceivingModal: React.FC<{
                 type="date"
                 value={formData.delivery_date}
                 onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })}
-                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 required
               />
             </div>
@@ -714,11 +714,11 @@ const ReceivingManagement: React.FC = () => {
                             e.stopPropagation();
                             handleRowClick(record.id);
                           }}
-                          className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                          className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
+                        <button className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
                       </div>

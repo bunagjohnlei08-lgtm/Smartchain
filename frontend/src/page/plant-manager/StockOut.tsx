@@ -410,7 +410,7 @@ const StockOut: React.FC = () => {
                 <td className="px-4 py-3 text-slate-300">{order.assignedDate}</td>
                 <td className="px-4 py-3 text-slate-300">{order.requiredDelivery}</td>
                 <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
-                <td className="px-3 py-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-4 w-4" /></button></td>
+                <td className="px-3 py-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-4 w-4" /></button></td>
               </tr>)}
               {!loading && orders.length === 0 && <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400">No eligible Stock Out orders found.</td></tr>}
             </tbody>

@@ -692,16 +692,16 @@ const Reports: React.FC = () => {
                       <td className="px-4 py-4"><StatusBadge status={report.status} /></td>
                       <td className="px-4 py-4 text-right min-w-[150px]">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => openDrawer(report)} aria-label={`View ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                          <button onClick={() => openDrawer(report)} aria-label={`View ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button aria-label={`Download ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                          <button aria-label={`Download ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <Download className="w-4 h-4" />
                           </button>
-                          <button aria-label={`Print ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                          <button aria-label={`Print ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <Printer className="w-4 h-4" />
                           </button>
-                          <button aria-label={`More actions for ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                          <button aria-label={`More actions for ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
@@ -850,7 +850,7 @@ const Reports: React.FC = () => {
                   <p className="text-slate-200 truncate">{file.name}</p>
                   <p className="text-slate-500">{file.date} · {file.size}</p>
                 </div>
-                <button className="ml-2 p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                <button className="ml-2 p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                   <Download className="w-3.5 h-3.5" />
                 </button>
               </div>

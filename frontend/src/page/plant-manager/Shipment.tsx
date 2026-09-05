@@ -657,7 +657,7 @@ const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClo
               type="text"
               value={orderNo}
               onChange={(e) => setOrderNo(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               placeholder="e.g., PO-2860"
             />
           </div>
@@ -667,7 +667,7 @@ const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClo
               type="text"
               value={customer}
               onChange={(e) => setCustomer(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               placeholder="e.g., Northwind Traders"
             />
           </div>
@@ -677,7 +677,7 @@ const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClo
               type="text"
               value={warehouse}
               onChange={(e) => setWarehouse(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               placeholder="e.g., Central Depot"
             />
           </div>
@@ -687,7 +687,7 @@ const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClo
               type="text"
               value={productSummary}
               onChange={(e) => setProductSummary(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               placeholder="e.g., Industrial LED Panel 40W x 12"
             />
           </div>
@@ -697,7 +697,7 @@ const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClo
               type="text"
               value={preparedBy}
               onChange={(e) => setPreparedBy(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               placeholder="e.g., M. Santos"
             />
           </div>
@@ -1004,16 +1004,16 @@ const Shipments: React.FC = () => {
       <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px]">
-            <thead className="bg-[#0b0f19]/50 border-b border-slate-800">
+            <thead className="bg-slate-50 dark:bg-[#0b0f19]/50 border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Customer / Destination</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Products</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Assigned Date</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Target Delivery</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
-                <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Order No.</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Customer / Destination</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Products</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Items</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Assigned Date</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Target Delivery</th>
+                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Status</th>
+                <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Actions</th>
               </tr>
             </thead>
             <tbody>

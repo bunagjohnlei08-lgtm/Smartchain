@@ -412,7 +412,7 @@ const OrderManagement: React.FC = () => {
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
               {filteredOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-slate-800/20 transition-colors">
                   <td className="px-4 py-3 font-mono font-medium text-white">{order.orderNumber}</td>
@@ -440,7 +440,7 @@ const OrderManagement: React.FC = () => {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => void handleViewOrder(order)}
-                      className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                       title="View / Process Order"
                     >
                       <Eye className="w-4 h-4" />
@@ -556,7 +556,7 @@ const OrderManagement: React.FC = () => {
                 {selectedOrder.orderNumber}
                 <StatusBadge status={selectedOrder.status} />
               </h2>
-              <button onClick={handleClosePanel} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+              <button onClick={handleClosePanel} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
@@ -638,7 +638,7 @@ const OrderManagement: React.FC = () => {
                 )}
                 <button
                   onClick={() => handleGeneratePickList(selectedOrder.id)}
-                  className="flex-1 px-4 py-2 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 border border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
                   Generate Pick List

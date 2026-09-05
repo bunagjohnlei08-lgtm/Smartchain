@@ -395,28 +395,28 @@ const PurchaseOrders: React.FC = () => {
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => handleViewDetails(order)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-gray-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         title="View Details"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => openPrintablePo(order, true)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-gray-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         title="Download PO"
                       >
                         <Download className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => openPrintablePo(order)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-gray-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         title="Print PO"
                       >
                         <Printer className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleViewDetails(order)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-gray-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         title="More options"
                       >
                         <MoreVertical className="w-4 h-4" />
@@ -443,11 +443,11 @@ const PurchaseOrders: React.FC = () => {
             <span className="text-white font-medium">{orders.length}</span> entries
           </div>
           <div className="flex items-center gap-1">
-            <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-white hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">1</button>
-            <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-white hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronRightIcon className="w-4 h-4" />
             </button>
           </div>
@@ -470,7 +470,7 @@ const PurchaseOrders: React.FC = () => {
                 </h2>
                 <p className="text-sm text-gray-400">Supplier: {selectedOrder.supplier}</p>
               </div>
-              <button onClick={handleCloseDrawer} className="p-1.5 rounded-lg hover:bg-slate-700 text-gray-400 hover:text-white transition-colors">
+              <button onClick={handleCloseDrawer} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -559,7 +559,7 @@ const PurchaseOrders: React.FC = () => {
           <div className="bg-[#0f172a] border border-[#1f2937] rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white">Create New Purchase Order</h2>
-              <button onClick={closeCreateModal} className="p-1.5 rounded-lg hover:bg-slate-700 text-gray-400 hover:text-white transition-colors">
+              <button onClick={closeCreateModal} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>

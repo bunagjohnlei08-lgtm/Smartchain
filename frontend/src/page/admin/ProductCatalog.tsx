@@ -26,9 +26,9 @@ const normalizeProduct = (value:unknown):Product => {
 };
 
 const StatusBadge = ({status}:{status:Status}) => {
-  const style = status === 'IN STOCK' ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : status === 'LOW STOCK' ? 'text-amber-700 dark:text-yellow-400 bg-amber-50 dark:bg-yellow-500/10 border-amber-200 dark:border-yellow-500/20' : 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
+  const style = status === 'IN STOCK' ? 'text-green-600 dark:text-emerald-400 bg-transparent dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : status === 'LOW STOCK' ? 'text-yellow-600 dark:text-yellow-400 bg-transparent dark:bg-yellow-500/10 border-amber-200 dark:border-yellow-500/20' : 'text-red-600 dark:text-red-400 bg-transparent dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
   const Icon = status === 'IN STOCK' ? CheckCircle : status === 'LOW STOCK' ? AlertCircle : XCircle;
-  return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${style}`}><Icon className="w-3 h-3"/>{status}</span>;
+  return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium dark:font-normal border ${style}`}><Icon className="w-3 h-3"/>{status}</span>;
 };
 const Kpi = ({label,value,icon}:{label:string;value:string|number;icon:ReactNode}) => <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5"><div className="flex justify-between"><div><p className="text-slate-400 text-xs uppercase tracking-wider">{label}</p><p className="text-2xl font-bold text-white mt-1.5">{value}</p></div><div className="p-2.5 bg-slate-800/60 rounded-lg">{icon}</div></div></div>;
 const Field = ({label,children}:{label:string;children:ReactNode}) => <label className="block text-sm text-slate-400"><span className="block mb-2">{label}</span>{children}</label>;

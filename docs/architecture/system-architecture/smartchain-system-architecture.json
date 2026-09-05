@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SmartChain System Architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1260,
+      560
+    ]
+  },
+  "components": [
+    {
+      "id": "people",
+      "type": "external",
+      "label": "Users / Roles",
+      "sublabel": "Admin · Plant Manager · QA Supervisor",
+      "pos": [
+        40,
+        35
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "React + TypeScript",
+      "sublabel": "Admin · Plant Manager · QA panels",
+      "pos": [
+        455,
+        35
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "access",
+      "type": "security",
+      "label": "Authentication / RBAC",
+      "sublabel": "Sanctum · roles · policies · role checks",
+      "pos": [
+        40,
+        175
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Laravel REST API",
+      "sublabel": "Controllers · validation · authorization",
+      "pos": [
+        455,
+        175
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "backend",
+      "label": "FastAPI service scaffold",
+      "sublabel": "GET / and /health only · no integration",
+      "tag": "PARTIAL",
+      "pos": [
+        870,
+        175
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "procurement",
+      "type": "backend",
+      "label": "Procurement",
+      "sublabel": "Requests · approvals · POs · suppliers",
+      "pos": [
+        40,
+        315
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "warehouse",
+      "type": "backend",
+      "label": "Receiving / QA / Inventory",
+      "sublabel": "Delivery · inspection · stock in · products",
+      "pos": [
+        455,
+        315
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "fulfillment",
+      "type": "backend",
+      "label": "Orders / Shipment / Reports",
+      "sublabel": "Stock check · stock out · logistics handoff",
+      "pos": [
+        870,
+        315
+      ],
+      "size": [
+        350,
+        85
+      ]
+    },
+    {
+      "id": "data",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Access · procurement · warehouse · orders",
+      "pos": [
+        455,
+        455
+      ],
+      "size": [
+        350,
+        85
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "people",
+      "to": "web"
+    },
+    {
+      "from": "web",
+      "to": "api",
+      "label": "HTTP / JSON + Bearer token",
+      "variant": "emphasis",
+      "labelDy": 35
+    },
+    {
+      "from": "access",
+      "to": "api",
+      "variant": "security"
+    },
+    {
+      "from": "api",
+      "to": "procurement",
+      "label": "Dispatch"
+    },
+    {
+      "from": "api",
+      "to": "warehouse",
+      "label": "Dispatch",
+      "labelDy": 35
+    },
+    {
+      "from": "api",
+      "to": "fulfillment",
+      "label": "Dispatch"
+    },
+    {
+      "from": "procurement",
+      "to": "data",
+      "label": "Eloquent / SQL"
+    },
+    {
+      "from": "warehouse",
+      "to": "data",
+      "label": "Eloquent / SQL",
+      "labelDy": 35
+    },
+    {
+      "from": "fulfillment",
+      "to": "data",
+      "label": "Eloquent / SQL"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Procurement + receiving",
+      "items": [
+        "Request → Approval → PO → Supplier → Receiving",
+        "Delivery → Receiving → QA → Passed → Stock In → Inventory",
+        "Rejected / partial quantities are tracked separately."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Order fulfillment",
+      "items": [
+        "Order → Inventory Check → Stock Out → Shipment",
+        "Implemented through forwarding to Admin Logistics.",
+        "Completed / delivered transition: planned, no write API."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "AI forecasting — integration in progress",
+      "items": [
+        "Implemented Service / Integration In Progress (scaffold only)",
+        "Planned: Historical Data → FastAPI → ML Model → Forecast → Replenishment Decision",
+        "No model, data pipeline or forecast API; forecast UI uses samples."
+      ]
+    }
+  ]
+}

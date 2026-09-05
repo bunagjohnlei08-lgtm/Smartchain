@@ -134,44 +134,44 @@ const logisticsOptions = ['All Logistics', 'Integrated Logistics System', 'Exter
 const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
  const config: Record<ShipmentStatus, { color: string; bg: string; dotColor: string }> = {
   'Pending Approval': {
-   color: 'text-amber-400',
-   bg: 'bg-amber-500/10 border-amber-500/20',
-   dotColor: 'bg-amber-400',
+   color: 'text-amber-400 not-dark:text-amber-600',
+   bg: 'not-dark:bg-transparent bg-amber-500/10 border-amber-500/20',
+   dotColor: 'bg-amber-400 not-dark:bg-amber-600',
   },
   Approved: {
-   color: 'text-blue-400',
-   bg: 'bg-blue-500/10 border-blue-500/20',
-   dotColor: 'bg-blue-400',
+   color: 'text-blue-400 not-dark:text-blue-600',
+   bg: 'not-dark:bg-transparent bg-blue-500/10 border-blue-500/20',
+   dotColor: 'bg-blue-400 not-dark:bg-blue-600',
   },
   Assigned: {
-   color: 'text-purple-400',
-   bg: 'bg-purple-500/10 border-purple-500/20',
-   dotColor: 'bg-purple-400',
+   color: 'text-purple-400 not-dark:text-purple-600',
+   bg: 'not-dark:bg-transparent bg-purple-500/10 border-purple-500/20',
+   dotColor: 'bg-purple-400 not-dark:bg-purple-600',
   },
   'Picked Up': {
-   color: 'text-cyan-400',
-   bg: 'bg-cyan-500/10 border-cyan-500/20',
-   dotColor: 'bg-cyan-400',
+   color: 'text-cyan-400 not-dark:text-cyan-600',
+   bg: 'not-dark:bg-transparent bg-cyan-500/10 border-cyan-500/20',
+   dotColor: 'bg-cyan-400 not-dark:bg-cyan-600',
   },
   'In Transit': {
-   color: 'text-sky-400',
-   bg: 'bg-sky-500/10 border-sky-500/20',
-   dotColor: 'bg-sky-400',
+   color: 'text-sky-400 not-dark:text-sky-600',
+   bg: 'not-dark:bg-transparent bg-sky-500/10 border-sky-500/20',
+   dotColor: 'bg-sky-400 not-dark:bg-sky-600',
   },
   Delivered: {
-   color: 'text-emerald-400',
-   bg: 'bg-emerald-500/10 border-emerald-500/20',
-   dotColor: 'bg-emerald-400',
+   color: 'text-emerald-400 not-dark:text-emerald-600',
+   bg: 'not-dark:bg-transparent bg-emerald-500/10 border-emerald-500/20',
+   dotColor: 'bg-emerald-400 not-dark:bg-emerald-600',
   },
   Cancelled: {
-   color: 'text-gray-400',
-   bg: 'bg-slate-500/10 border-slate-500/20',
-   dotColor: 'bg-slate-400',
+   color: 'text-gray-400 not-dark:text-gray-600',
+   bg: 'not-dark:bg-transparent bg-slate-500/10 border-slate-500/20',
+   dotColor: 'bg-slate-400 not-dark:bg-slate-600',
   },
  };
  const { color, bg, dotColor } = config[status];
  return (
-  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}>
+  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium not-dark:font-semibold border ${color} ${bg}`}>
    <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
    {status}
   </span>
@@ -499,12 +499,12 @@ const Logistics: React.FC = () => {
 
    {/* KPI Cards */}
    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-    <KPICard label="Waiting Approval" value={pendingApproval} icon={<Clock className="w-5 h-5 text-amber-400" />} />
-    <KPICard label="Approved" value={approved} icon={<CheckCircle className="w-5 h-5 text-blue-400" />} />
-    <KPICard label="Assigned" value={assigned} icon={<Truck className="w-5 h-5 text-purple-400" />} />
-    <KPICard label="In Transit" value={inTransit} icon={<Package className="w-5 h-5 text-sky-400" />} />
-    <KPICard label="Delivered" value={delivered} icon={<CheckCircle className="w-5 h-5 text-emerald-400" />} />
-    <KPICard label="Cancelled" value={cancelled} icon={<AlertCircle className="w-5 h-5 text-gray-400" />} />
+    <KPICard label="Waiting Approval" value={pendingApproval} icon={<Clock className="w-5 h-5 text-amber-400 not-dark:text-amber-600" />} />
+    <KPICard label="Approved" value={approved} icon={<CheckCircle className="w-5 h-5 text-blue-400 not-dark:text-blue-600" />} />
+    <KPICard label="Assigned" value={assigned} icon={<Truck className="w-5 h-5 text-purple-400 not-dark:text-purple-600" />} />
+    <KPICard label="In Transit" value={inTransit} icon={<Package className="w-5 h-5 text-sky-400 not-dark:text-sky-600" />} />
+    <KPICard label="Delivered" value={delivered} icon={<CheckCircle className="w-5 h-5 text-emerald-400 not-dark:text-emerald-600" />} />
+    <KPICard label="Cancelled" value={cancelled} icon={<AlertCircle className="w-5 h-5 text-gray-400 not-dark:text-gray-600" />} />
    </div>
 
    {/* Filter Bar */}
@@ -553,7 +553,7 @@ const Logistics: React.FC = () => {
           <div className="flex items-center justify-center gap-1">
            <button
             onClick={() => handleView(shipment)}
-            className="p-1.5 rounded-lg hover:bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-all"
+            className="p-1.5 rounded-lg hover:bg-gray-800 hover:bg-gray-700 text-gray-400 not-dark:text-slate-600 hover:text-white not-dark:hover:text-slate-900 transition-all"
             title="View Details"
            >
             <Eye className="w-4 h-4" />
@@ -562,14 +562,14 @@ const Logistics: React.FC = () => {
             <>
              <button
               onClick={() => handleApprove(shipment)}
-              className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-all"
+              className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-400 not-dark:text-green-600 hover:text-emerald-300 not-dark:hover:text-green-700 transition-all"
               title="Approve"
              >
               <Check className="w-4 h-4" />
              </button>
              <button
               onClick={() => handleAssign(shipment)}
-              className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 transition-all"
+              className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 not-dark:text-blue-600 hover:text-blue-300 not-dark:hover:text-blue-700 transition-all"
               title="Assign Logistics"
              >
               <Send className="w-4 h-4" />
@@ -579,7 +579,7 @@ const Logistics: React.FC = () => {
            {shipment.status === 'Approved' && (
             <button
              onClick={() => handleAssign(shipment)}
-             className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 transition-all"
+             className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 not-dark:text-blue-600 hover:text-blue-300 not-dark:hover:text-blue-700 transition-all"
              title="Assign Logistics"
             >
              <Send className="w-4 h-4" />

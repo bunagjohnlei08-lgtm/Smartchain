@@ -636,7 +636,7 @@ const StockIn: React.FC = () => {
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
               {isLoading && receivings.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
@@ -647,7 +647,7 @@ const StockIn: React.FC = () => {
               )}
               {filteredReceivings.map((rec) => (
                 <tr key={rec.id} className={`hover:bg-slate-800/20 transition-colors ${selectedReceiving?.id === rec.id ? 'bg-slate-800/20' : ''}`}>
-                  <td className="px-4 py-3 font-mono text-blue-400 hover:underline font-medium">{rec.receivingNo}</td>
+                  <td className="px-4 py-3 font-mono text-slate-900 dark:text-blue-400 hover:underline font-medium">{rec.receivingNo}</td>
                   <td className="px-4 py-3 text-slate-300">{rec.productSummary}</td>
                   <td className="px-4 py-3 text-slate-300">{rec.supplier}</td>
                   <td className="px-4 py-3 text-slate-300">{rec.receivingDate}</td>
@@ -661,12 +661,12 @@ const StockIn: React.FC = () => {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         onClick={() => handleSelect(rec.id)}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                      <button className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
@@ -714,7 +714,7 @@ const StockIn: React.FC = () => {
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
               {isLoadingRecent && recentlyStocked.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
@@ -742,7 +742,7 @@ const StockIn: React.FC = () => {
                   <td className="px-4 py-3"><ReceivingStatusBadge status={item.status} /></td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                       onClick={() => handleSelectStocked(item.id)}
                     >
                       <Eye className="w-4 h-4" />
@@ -793,7 +793,7 @@ const StockIn: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
               {isLoadingHistory && historyItems.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
@@ -804,13 +804,13 @@ const StockIn: React.FC = () => {
               )}
               {historyItems.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-800/20 transition-colors">
-                  <td className="px-4 py-3 font-mono text-blue-400">{item.receivingNo ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-slate-900 dark:text-blue-400">{item.receivingNo ?? '—'}</td>
                   <td className="px-4 py-3 text-white">{item.product}</td>
                   <td className="px-4 py-3 text-slate-300">{item.supplier ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-300">{formatDateOnly(item.receivingDate)}</td>
                   <td className="px-4 py-3 text-slate-300">{item.referenceNo ?? '—'}</td>
                   <td className="px-4 py-3 text-center text-white">{item.stockedQuantity}</td>
-                  <td className="px-4 py-3 font-mono text-cyan-300">{item.barcode ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-slate-900 dark:text-cyan-300">{item.barcode ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-300">{formatDateTime(item.stockInDate)}</td>
                   <td className="px-4 py-3"><ReceivingStatusBadge status={item.status} /></td>
                 </tr>
