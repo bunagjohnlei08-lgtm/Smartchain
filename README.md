@@ -28,7 +28,7 @@ The standalone Administrator Barcode Center currently uses local mock data. Oper
 
 | Module | Description | Status |
 | --- | --- | --- |
-| Product Catalog | Maintains product identity, SKU, pricing, categorization, and catalog metadata. | Implemented |
+| Product Catalog | Maintains product information, pricing, categorization, and catalog metadata based on the client's product records. | Implemented |
 | Inventory | Tracks warehouse stock, availability, reservations, backload, status, and barcode information. | Implemented |
 | Warehouse | Exposes warehouse details, capacity metrics, and administrator-managed main-location information. | Implemented |
 | Procurement | Supports plant-manager replenishment drafts/submission and administrator review decisions. | Implemented |
