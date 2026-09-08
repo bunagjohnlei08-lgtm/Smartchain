@@ -74,7 +74,7 @@ class AdminOrderController extends Controller
 
         return response()->json(Product::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'unit', 'cost_price']));
+            ->get(['id', 'name', 'category', 'unit', 'cost_price']));
     }
 
     public function show(Request $request, Order $order): JsonResponse
@@ -91,7 +91,7 @@ class AdminOrderController extends Controller
             'order_no' => ['nullable', 'string', 'max:50', 'unique:orders,order_no'],
             'reference_no' => ['nullable', 'string', 'max:100'],
             'customer_name' => ['required', 'string', 'max:255'],
-            'customer_address' => ['nullable', 'string'],
+            'customer_address' => ['required', 'string'],
             'customer_contact' => ['nullable', 'string', 'max:255'],
             'order_date' => ['required', 'date'],
             'required_delivery_date' => ['required', 'date', 'after_or_equal:order_date'],
@@ -106,10 +106,15 @@ class AdminOrderController extends Controller
         ]);
 
         $order = DB::transaction(function () use ($validated, $request) {
-            $items = collect($validated['items'])->map(function (array $item) {
+            $items = collect($validated['items'])->map(function (array $item, int $index) {
                 $product = Product::query()->findOrFail($item['product_id']);
                 $item['product_name'] = $product->name;
                 $item['unit'] = ($item['unit'] ?? null) ?: $product->unit;
+                if (!filled($item['unit'])) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}.unit" => 'Unit is required when the selected Product Catalog record has no unit.',
+                    ]);
+                }
                 $item['subtotal'] = round((float) $item['quantity'] * (float) $item['unit_price'], 2);
                 return $item;
             });

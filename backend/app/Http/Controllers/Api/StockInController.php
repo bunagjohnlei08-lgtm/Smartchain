@@ -10,6 +10,7 @@ use App\Models\ReceivingTimeline;
 use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -229,6 +230,24 @@ class StockInController extends Controller
                 // including the case where the product row does not exist yet.
                 $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($warehouse->id);
 
+                $incomingQuantity = (int) $eligibleItems->sum(
+                    fn (ReceivingItem $item) => $this->resolveStockableQuantity($item)
+                );
+                $utilizedCapacity = (int) Inventory::query()
+                    ->where('warehouse_id', $warehouse->id)
+                    ->sum(DB::raw('available_stock + reserved_stock'));
+                $availableCapacity = $warehouse->capacity === null
+                    ? null
+                    : max(0, (int) $warehouse->capacity - $utilizedCapacity);
+
+                if ($availableCapacity !== null && $incomingQuantity > $availableCapacity) {
+                    throw new HttpResponseException(response()->json([
+                        'message' => 'Cannot stock in: Quantity exceeds maximum warehouse capacity.',
+                        'available_capacity' => $availableCapacity,
+                        'requested_quantity' => $incomingQuantity,
+                    ], 422));
+                }
+
                 foreach ($eligibleItems as $item) {
                     $stockQuantity = $this->resolveStockableQuantity($item);
 
@@ -272,6 +291,10 @@ class StockInController extends Controller
         } catch (Throwable $e) {
             if ($e instanceof ModelNotFoundException) {
                 return response()->json(['message' => 'Receiving not found.'], 404);
+            }
+
+            if ($e instanceof HttpResponseException) {
+                return $e->getResponse();
             }
 
             if ($e instanceof HttpExceptionInterface) {

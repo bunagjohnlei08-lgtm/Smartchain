@@ -39,8 +39,13 @@ class QaQualityReportController extends Controller
         $completed = $inspections->count();
         $passed = $inspections->where('status', 'Passed')->count();
         $rejected = $inspections->where('status', 'Rejected')->count();
-        $comparisonTotal = $passed + $rejected;
-        $percentage = fn (int $count): float => $comparisonTotal > 0 ? round(($count / $comparisonTotal) * 100, 1) : 0.0;
+        $inspectionItems = $inspections->flatMap(fn (QaInspection $inspection) => $inspection->items);
+        $passedUnits = (int) $inspectionItems->sum('accepted_quantity');
+        $rejectedUnits = (int) $inspectionItems->sum('rejected_quantity');
+        $totalInspectedUnits = $passedUnits + $rejectedUnits;
+        $percentage = fn (int $quantity): float => $totalInspectedUnits > 0
+            ? round(($quantity / $totalInspectedUnits) * 100, 1)
+            : 0.0;
 
         $trendByDate = DB::table('qa_inspections')
             ->join('qa_inspection_items', 'qa_inspection_items.qa_inspection_id', '=', 'qa_inspections.id')
@@ -67,8 +72,6 @@ class QaQualityReportController extends Controller
             ];
         });
 
-        $inspectionItems = $inspections->flatMap(fn (QaInspection $inspection) => $inspection->items);
-        $rejectedQuantity = (int) $inspectionItems->sum('rejected_quantity');
         $topRejectedProducts = $inspectionItems
             ->filter(fn ($item) => $item->rejected_quantity > 0 && $item->receivingItem?->product_name)
             ->groupBy(fn ($item) => $item->receivingItem->product_name)
@@ -105,15 +108,20 @@ class QaQualityReportController extends Controller
                 'summary' => [
                     'completed_inspections' => $completed,
                     'passed_count' => $passed,
-                    'passed_rate' => $percentage($passed),
+                    'passed_rate' => $percentage($passedUnits),
                     'rejected_count' => $rejected,
-                    'rejected_rate' => $percentage($rejected),
-                    'rejected_quantity' => $rejectedQuantity,
+                    'rejected_rate' => $percentage($rejectedUnits),
+                    'passed_units' => $passedUnits,
+                    'rejected_units' => $rejectedUnits,
+                    'total_inspected_units' => $totalInspectedUnits,
+                    'passed_percentage' => $percentage($passedUnits),
+                    'rejected_percentage' => $percentage($rejectedUnits),
+                    'rejected_quantity' => $rejectedUnits,
                 ],
                 'trend' => $trend,
                 'distribution' => [
-                    ['name' => 'Passed', 'count' => $passed, 'percentage' => $percentage($passed)],
-                    ['name' => 'Rejected', 'count' => $rejected, 'percentage' => $percentage($rejected)],
+                    ['name' => 'Passed', 'count' => $passedUnits, 'percentage' => $percentage($passedUnits)],
+                    ['name' => 'Rejected', 'count' => $rejectedUnits, 'percentage' => $percentage($rejectedUnits)],
                 ],
                 'top_rejected_products' => $topRejectedProducts,
                 'supplier_quality' => $supplierQuality,

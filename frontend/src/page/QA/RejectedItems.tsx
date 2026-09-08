@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Ban, Download, Printer, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, Ban, Download, Grid, Printer, RefreshCw, Search, Table } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus';
 
@@ -31,6 +31,15 @@ interface RejectedRecord {
   inspector: string;
   inspectionDate: string;
 }
+
+type ViewMode = 'list' | 'grid';
+
+const ViewModeToggle: React.FC<{ value: ViewMode; onChange: (value: ViewMode) => void }> = ({ value, onChange }) => (
+  <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1" role="group" aria-label="Rejected items view">
+    <button type="button" onClick={() => onChange('list')} aria-label="Show rejected items as a list" aria-pressed={value === 'list'} title="List view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Table className="w-4 h-4" /></button>
+    <button type="button" onClick={() => onChange('grid')} aria-label="Show rejected items as a grid" aria-pressed={value === 'grid'} title="Grid view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Grid className="w-4 h-4" /></button>
+  </div>
+);
 
 const formatDate = (value: string): string => {
   const date = new Date(value);
@@ -80,6 +89,7 @@ const RejectedItems: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const itemsPerPage = 10;
 
   const fetchRejectedItems = useCallback(async () => {
@@ -209,13 +219,35 @@ const RejectedItems: React.FC = () => {
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div><label className="block text-xs font-medium text-slate-400 mb-1.5">Supplier</label><select value={supplier} onChange={(event) => setSupplier(event.target.value)} className="w-full bg-[#090d16] border border-gray-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 appearance-none">{supplierOptions.map((option) => <option key={option}>{option}</option>)}</select></div>
         <div><label className="block text-xs font-medium text-slate-400 mb-1.5">Search</label><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receiving, supplier, product, reason..." className="w-full bg-[#090d16] border border-gray-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500" /></div></div>
+        <div className="flex justify-end sm:col-span-2"><ViewModeToggle value={viewMode} onChange={setViewMode} /></div>
       </div>
 
       {error && <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-3 text-sm text-rose-300 flex items-center justify-between gap-3"><span>{error}</span><button onClick={fetchRejectedItems} className="px-3 py-1.5 rounded-lg border border-rose-400/30 hover:bg-rose-500/10 flex items-center gap-1.5"><RefreshCw className="w-4 h-4" /> Retry</button></div>}
 
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden shadow-sm">
+        {viewMode === 'list' ? (
         <div className="w-full overflow-x-auto"><table className="w-full min-w-[1000px]"><thead className="bg-[#090d16] border-b border-gray-800/50"><tr>{['Receiving No.', 'Inspection Date', 'Supplier', 'Product', 'Delivered Qty', 'Rejected Qty', 'Unit', 'Reason', 'Result'].map((heading) => <th key={heading} className={`px-4 py-3.5 text-xs font-medium uppercase tracking-wider text-slate-400 ${heading.includes('Qty') ? 'text-right' : 'text-left'}`}>{heading}</th>)}</tr></thead>
           <tbody>{loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">Loading rejected items...</td></tr> : currentItems.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">No rejected records found.</td></tr> : currentItems.map((item) => <tr key={item.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors"><td className="px-4 py-3.5 text-sm font-medium text-slate-200">{item.receivingNo}</td><td className="px-4 py-3.5 text-sm text-slate-300">{formatDate(item.inspectionDate)}</td><td className="px-4 py-3.5 text-sm text-slate-300">{item.supplier}</td><td className="px-4 py-3.5 text-sm text-slate-200">{item.product}</td><td className="px-4 py-3.5 text-right text-sm text-slate-300">{item.deliveredQty.toLocaleString()}</td><td className="px-4 py-3.5 text-right text-sm font-medium text-red-400">{item.rejectedQty.toLocaleString()}</td><td className="px-4 py-3.5 text-sm text-slate-300">{item.unit}</td><td className="px-4 py-3.5 text-sm text-slate-300">{item.reason}</td><td className="px-4 py-3.5"><ResultBadge result={item.inspectionResult} /></td></tr>)}</tbody></table></div>
+        ) : loading ? (
+          <div className="p-8 text-center text-slate-500 dark:text-slate-400">Loading rejected items...</div>
+        ) : currentItems.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 dark:text-slate-400">No rejected records found.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {currentItems.map((item) => (
+              <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-none dark:hover:border-slate-600">
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold text-slate-900 dark:text-white">{item.product}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{item.receivingNo}</p></div><ResultBadge result={item.inspectionResult} /></div>
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Supplier</dt><dd className="text-slate-900 dark:text-slate-200">{item.supplier}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Delivered</dt><dd className="text-slate-900 dark:text-slate-200">{item.deliveredQty.toLocaleString()} {item.unit}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Rejected</dt><dd className="font-semibold text-red-600 dark:text-red-400">{item.rejectedQty.toLocaleString()} {item.unit}</dd></div>
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Inspection date</dt><dd className="text-slate-900 dark:text-slate-200">{formatDate(item.inspectionDate)}</dd></div>
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Reason</dt><dd className="text-slate-900 dark:text-slate-200">{item.reason}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t border-gray-800/50 bg-[#090d16]/50"><div className="text-sm text-slate-400">Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {endIndex} of {filteredData.length} records</div><div className="flex items-center gap-3 mt-2 sm:mt-0"><button disabled={safePage === 1} onClick={() => setCurrentPage(Math.max(1, safePage - 1))} className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-700 text-slate-300 hover:bg-gray-800/50 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button><span className="text-sm text-slate-400">Page {safePage} / {totalPages}</span><button disabled={safePage === totalPages} onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))} className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-700 text-slate-300 hover:bg-gray-800/50 disabled:opacity-50 disabled:cursor-not-allowed">Next</button></div></div>
       </div>
     </div>

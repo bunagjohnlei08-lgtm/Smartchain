@@ -71,7 +71,11 @@ class InventoryController extends Controller
             });
         }
 
-        $items = $query->get()->map(fn(Inventory $inventory) => $this->present($inventory, $user));
+        $items = $query
+            ->orderByDesc('inventories.created_at')
+            ->orderByDesc('inventories.id')
+            ->get()
+            ->map(fn(Inventory $inventory) => $this->present($inventory, $user));
 
         return response()->json(['data' => $items]);
     }

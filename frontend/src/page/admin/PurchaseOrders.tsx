@@ -22,6 +22,8 @@ import {
   Package,
   Calendar,
   Building,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 
 // ============================================
@@ -90,6 +92,7 @@ const PurchaseOrders: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [newOrder, setNewOrder] = useState({
     replenishmentRequestId: null as number | null,
     requestNo: '', warehouseLocation: '', supplierName: '', expectedDeliveryDate: '',
@@ -346,6 +349,10 @@ const PurchaseOrders: React.FC = () => {
           <span>Date Range</span>
           <ChevronRightIcon className="w-4 h-4 text-gray-400" />
         </div>
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#1e293b] p-1" aria-label="Purchase order view">
+          <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+          <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+        </div>
         <button onClick={() => void loadOrders()} disabled={loading} className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -365,6 +372,7 @@ const PurchaseOrders: React.FC = () => {
 
       {/* Table */}
       <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl overflow-hidden">
+        {viewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full table-auto">
             <thead className="bg-[#1e293b]/50 border-b border-[#1f2937]">
@@ -435,6 +443,20 @@ const PurchaseOrders: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : filteredOrders.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {filteredOrders.map((order) => (
+              <article key={order.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{order.poNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.supplier}</p></div><StatusBadge status={order.status} /></div>
+                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Created</dt><dd className="text-slate-900 dark:text-white">{order.createdAt}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.expectedDeliveryDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items / Qty</dt><dd className="text-slate-900 dark:text-white">{order.items.length} / {order.items.reduce((sum, item) => sum + item.quantity, 0)}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Total</dt><dd className="font-semibold text-slate-900 dark:text-white">₱{order.totalAmount.toLocaleString()}</dd></div></dl>
+                <p className="mt-3 truncate text-xs text-slate-500 dark:text-slate-400" title={order.deliveryDetails}>{order.deliveryDetails}</p>
+                <div className="mt-auto flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => handleViewDetails(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button><button onClick={() => openPrintablePo(order, true)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="Download PO"><Download className="h-4 w-4" /></button><button onClick={() => openPrintablePo(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="Print PO"><Printer className="h-4 w-4" /></button></div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="px-5 py-8 text-center text-gray-400">No purchase orders found matching your criteria.</div>
+        )}
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-white dark:bg-[#0f172a]/30">
           <div className="text-sm text-gray-400">

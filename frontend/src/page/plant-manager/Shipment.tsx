@@ -12,10 +12,11 @@ import {
   Clipboard,
   ChevronLeft,
   Check,
-  Plus,
   Truck,
   AlertTriangle,
   Loader2,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 
 // ============================================
@@ -580,149 +581,6 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
 };
 
 // ============================================
-// CREATE SHIPMENT MODAL COMPONENT
-// ============================================
-
-interface CreateShipmentModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (data: {
-    orderNo: string;
-    customer: string;
-    warehouse: string;
-    preparedBy: string;
-    productSummary: string;
-    shipmentNo: string;
-  }) => void;
-  nextShipmentNo: string;
-}
-
-const CreateShipmentModal: React.FC<CreateShipmentModalProps> = ({ isOpen, onClose, onSave, nextShipmentNo }) => {
-  const [orderNo, setOrderNo] = useState('');
-  const [customer, setCustomer] = useState('');
-  const [warehouse, setWarehouse] = useState('');
-  const [productSummary, setProductSummary] = useState('');
-  const [preparedBy, setPreparedBy] = useState('');
-
-  if (!isOpen) return null;
-
-  const handleSubmit = () => {
-    if (!orderNo.trim() || !customer.trim() || !warehouse.trim() || !preparedBy.trim()) {
-      alert('Please fill in Order No, Customer, Warehouse, and Prepared By.');
-      return;
-    }
-    onSave({ orderNo, customer, warehouse, preparedBy, productSummary, shipmentNo: nextShipmentNo });
-    setOrderNo('');
-    setCustomer('');
-    setWarehouse('');
-    setProductSummary('');
-    setPreparedBy('');
-  };
-
-  const handleCancel = () => {
-    setOrderNo('');
-    setCustomer('');
-    setWarehouse('');
-    setProductSummary('');
-    setPreparedBy('');
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-white">Create Shipment</h2>
-            <p className="text-sm text-slate-400">Fill in the details to create a new shipment.</p>
-          </div>
-          <button onClick={handleCancel} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Shipment No.</label>
-            <input
-              type="text"
-              value={nextShipmentNo}
-              disabled
-              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-400 cursor-not-allowed"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Order No.</label>
-            <input
-              type="text"
-              value={orderNo}
-              onChange={(e) => setOrderNo(e.target.value)}
-              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              placeholder="e.g., PO-2860"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Customer Name</label>
-            <input
-              type="text"
-              value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
-              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              placeholder="e.g., Northwind Traders"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Warehouse</label>
-            <input
-              type="text"
-              value={warehouse}
-              onChange={(e) => setWarehouse(e.target.value)}
-              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              placeholder="e.g., Central Depot"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Product Summary</label>
-            <input
-              type="text"
-              value={productSummary}
-              onChange={(e) => setProductSummary(e.target.value)}
-              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              placeholder="e.g., Industrial LED Panel 40W x 12"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Prepared By</label>
-            <input
-              type="text"
-              value={preparedBy}
-              onChange={(e) => setPreparedBy(e.target.value)}
-              className="w-full bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              placeholder="e.g., M. Santos"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3 pt-4 mt-4 border-t border-slate-800">
-          <button
-            onClick={handleCancel}
-            className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-all"
-          >
-            Create Shipment
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -730,12 +588,12 @@ const Shipments: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const itemsPerPage = 6;
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [showPrepareModal, setShowPrepareModal] = useState(false);
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -852,75 +710,6 @@ const Shipments: React.FC = () => {
     }
   };
 
-  const handleCreateShipment = (data: {
-    orderNo: string;
-    customer: string;
-    warehouse: string;
-    preparedBy: string;
-    productSummary: string;
-    shipmentNo: string;
-  }) => {
-    const today = new Date().toISOString().split('T')[0];
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const newShipment: Shipment = {
-      id: Date.now().toString(),
-      shipmentNo: data.shipmentNo,
-      orderNo: data.orderNo,
-      customer: data.customer,
-      destination: '—',
-      warehouse: data.warehouse,
-      preparedBy: data.preparedBy,
-      preparedDate: today,
-      assignedDate: today,
-      targetDelivery: '—',
-      status: 'Preparing',
-      items: data.productSummary
-        ? [
-            {
-              id: `i-${Date.now()}`,
-              name: data.productSummary,
-              sku: '',
-              requestedQty: 0,
-              availableQty: 0,
-              barcode: '',
-              verified: false,
-            },
-          ]
-        : [],
-      totalItems: 0,
-      totalQuantity: 0,
-      totalWeight: 0,
-      weightUnit: 'kg',
-      packing: {
-        packageId: '',
-        boxes: 0,
-        weight: 0,
-        fragile: false,
-        notes: '',
-      },
-      checklist: {
-        correctProduct: false,
-        correctQty: false,
-        barcodeVerified: false,
-        packageCondition: false,
-        itemsComplete: false,
-      },
-      barcodeVerifiedAll: false,
-      timeline: [
-        { step: 'Shipment Created', completed: true, timestamp },
-        { step: 'Preparing', completed: false },
-      ],
-    };
-    setShipments(prev => [newShipment, ...prev]);
-    showToast('Shipment created successfully.', 'success');
-  };
-
-  const nextShipmentNo = `SHP-${shipments.reduce((max, s) => {
-    const num = parseInt(s.shipmentNo.replace('SHP-', ''), 10);
-    return num > max ? num : max;
-  }, 3305) + 1}`;
-
   const showToast = (message: string, type: 'success' | 'info' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
@@ -936,14 +725,9 @@ const Shipments: React.FC = () => {
       </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Shipments</h1>
-          <p className="text-sm text-slate-400">Prepare and pack orders for shipment to customers.</p>
-        </div>
-        <button onClick={() => setIsCreateModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
-          <Plus className="w-4 h-4" /> Create Shipment
-        </button>
+      <div>
+        <h1 className="text-2xl font-bold text-white">Shipments</h1>
+        <p className="text-sm text-slate-400">Prepare and pack orders for shipment to customers.</p>
       </div>
 
       {/* KPI Stats Cards */}
@@ -997,11 +781,13 @@ const Shipments: React.FC = () => {
             onChange={setSearch}
             placeholder="Search Shipment #, PO #, Customer..."
           />
+          <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/50 p-1" aria-label="Shipment view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
         </div>
       </div>
 
       {/* Shipment Table */}
       <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
+        {viewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px]">
             <thead className="bg-slate-50 dark:bg-[#0b0f19]/50 border-b border-slate-200 dark:border-slate-800">
@@ -1077,6 +863,11 @@ const Shipments: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : paginatedShipments.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedShipments.map((shipment) => <article key={shipment.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{shipment.orderNo}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{shipment.shipmentNo}</p></div><StatusBadge status={shipment.status} /></div><p className="mt-4 font-medium text-slate-900 dark:text-white">{shipment.customer}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{shipment.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{shipment.totalItems} / {shipment.totalQuantity} units</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target delivery</dt><dd className="text-slate-900 dark:text-white">{shipment.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => { setSelectedShipment(shipment); setIsViewDrawerOpen(true); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button>{(shipment.status === 'Preparing' || shipment.status === 'Packing') && <button onClick={() => handlePrepare(shipment)} className="p-2 text-cyan-600 dark:text-cyan-400" title="Prepare / Pack"><Clipboard className="h-4 w-4" /></button>}</div></article>)}</div>
+        ) : (
+          <div className="px-4 py-8 text-center text-slate-400">{isLoading ? 'Loading orders ready for shipment...' : loadError ?? 'No shipments found matching your criteria.'}</div>
+        )}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -1108,14 +899,6 @@ const Shipments: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Create Shipment Modal */}
-      <CreateShipmentModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSave={handleCreateShipment}
-        nextShipmentNo={nextShipmentNo}
-      />
 
       {/* Prepare Modal */}
       {selectedShipment && (

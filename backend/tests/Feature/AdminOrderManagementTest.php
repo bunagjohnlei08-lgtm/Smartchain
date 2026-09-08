@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\AdminOrderExampleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AdminOrderManagementTest extends TestCase
@@ -77,15 +78,78 @@ class AdminOrderManagementTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
+    public function test_admin_can_create_a_new_order_for_a_real_product_without_catalog_unit_or_inventory(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $product = Product::create(['name' => 'TOMAHAWK EC', 'category' => 'WOOD PRESERVATIVE PRODUCTS']);
+
+        $response = $this->actingAs($admin)->postJson('/api/admin/orders', [
+            'customer_name' => 'Test Customer',
+            'customer_address' => 'Test delivery destination',
+            'order_date' => '2026-09-07',
+            'required_delivery_date' => '2026-09-14',
+            'items' => [[
+                'product_id' => $product->id,
+                'quantity' => 3,
+                'unit' => 'drum',
+                'unit_price' => 125.50,
+            ]],
+        ])->assertCreated()
+            ->assertJsonPath('status', 'NEW')
+            ->assertJsonPath('assigned_to', null)
+            ->assertJsonPath('items.0.product_id', $product->id)
+            ->assertJsonPath('items.0.product_name', 'TOMAHAWK EC')
+            ->assertJsonPath('items.0.unit', 'drum')
+            ->assertJsonPath('items.0.subtotal', '376.50')
+            ->assertJsonPath('total_amount', '376.50');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $response->json('id'), 'status' => 'NEW', 'assigned_to' => null,
+        ]);
+        $this->assertDatabaseHas('order_items', [
+            'order_id' => $response->json('id'), 'product_id' => $product->id,
+            'product_name' => 'TOMAHAWK EC', 'quantity' => 3, 'unit' => 'drum',
+            'unit_price' => 125.50, 'subtotal' => 376.50,
+        ]);
+
+        foreach (['inventories', 'inventory_movements', 'purchase_orders', 'receivings',
+            'receiving_items', 'qa_inspections', 'stock_out_transactions', 'shipments'] as $table) {
+            if (Schema::hasTable($table)) {
+                $this->assertDatabaseCount($table, 0);
+            }
+        }
+    }
+
+    public function test_order_creation_requires_customer_destination_and_item_unit_without_partial_writes(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $payload = $this->payload();
+        $this->product->update(['unit' => null]);
+        unset($payload['customer_address']);
+
+        $this->actingAs($admin)->postJson('/api/admin/orders', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('customer_address');
+        $this->assertDatabaseCount('orders', 0);
+
+        $payload['customer_address'] = 'Test destination';
+        $this->actingAs($admin)->postJson('/api/admin/orders', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('items.0.unit');
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
+        $this->assertDatabaseCount('order_status_histories', 0);
+    }
+
     public function test_admin_product_selector_uses_existing_product_records(): void
     {
         $admin = $this->userWithRole('ADMIN');
-        Product::create(['name' => 'Industrial Valve DN50', 'unit' => 'pcs', 'cost_price' => 750]);
+        Product::create(['name' => 'Industrial Valve DN50', 'category' => 'INDUSTRIAL CHEMICALS', 'unit' => 'pcs', 'cost_price' => 750]);
 
         $this->actingAs($admin)->getJson('/api/admin/orders/products')
             ->assertOk()
             ->assertJsonFragment(['id' => $this->product->id, 'name' => 'Steel Pipe', 'unit' => 'pcs'])
-            ->assertJsonFragment(['name' => 'Industrial Valve DN50', 'unit' => 'pcs']);
+            ->assertJsonFragment(['name' => 'Industrial Valve DN50', 'category' => 'INDUSTRIAL CHEMICALS', 'unit' => 'pcs']);
     }
 
     public function test_multiple_products_are_derived_and_returned_in_the_order_list(): void

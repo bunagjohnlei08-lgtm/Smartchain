@@ -74,7 +74,8 @@ class ProductController extends Controller
                 'total_products' => $summaryRows->count(),
                 'low_stock_items' => $summaryRows->where('status', 'LOW STOCK')->count(),
                 'out_of_stock' => $summaryRows->where('status', 'OUT OF STOCK')->count(),
-                'total_inventory_value' => round($summaryRows->sum('inventory_value'), 2),
+                'total_inventory_value' => $summaryRows->contains(fn (array $row) => $row['inventory_value'] === null)
+                    ? null : round($summaryRows->sum('inventory_value'), 2),
             ],
             'filters' => [
                 'categories' => $allProducts->pluck('category')->filter()->unique()->sort()->values(),
@@ -95,7 +96,7 @@ class ProductController extends Controller
         );
 
         $perPage = min(max($request->integer('per_page', 100), 1), 100);
-        return response()->json(Product::query()->orderBy('name')->paginate($perPage, ['id', 'name']));
+        return response()->json(Product::query()->orderBy('name')->paginate($perPage, ['id', 'name', 'category']));
     }
 
     public function show(Request $request, Product $product): JsonResponse
@@ -148,18 +149,20 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255', Rule::unique('products', 'name')->ignore($product?->id)],
             'category' => ['nullable', 'string', 'max:255'],
             'brand' => ['nullable', 'string', 'max:255'],
-            'unit' => ['required', 'string', 'max:50'],
-            'cost_price' => ['required', 'numeric', 'min:0'],
-            'selling_price' => ['required', 'numeric', 'min:0'],
-            'reorder_level' => ['required', 'integer', 'min:0'],
+            'unit' => ['nullable', 'string', 'max:50'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'selling_price' => ['nullable', 'numeric', 'min:0'],
+            'reorder_level' => ['nullable', 'integer', 'min:0'],
         ]);
     }
 
     private function present(Product $product): array
     {
         $stock = (int) $product->inventories->sum('available_stock');
-        $reorderLevel = (int) $product->reorder_level;
-        $status = $stock === 0 ? 'OUT OF STOCK' : ($stock <= $reorderLevel ? 'LOW STOCK' : 'IN STOCK');
+        $reorderLevel = $product->reorder_level;
+        $costPrice = $product->cost_price === null ? null : (float) $product->cost_price;
+        $status = $stock === 0 ? 'OUT OF STOCK'
+            : ($reorderLevel === null ? null : ($stock <= $reorderLevel ? 'LOW STOCK' : 'IN STOCK'));
         $warehouses = $product->inventories->pluck('warehouse.name')->filter()->unique()->values();
 
         return [
@@ -171,11 +174,11 @@ class ProductController extends Controller
             'warehouses' => $warehouses,
             'current_stock' => $stock,
             'unit' => $product->unit,
-            'cost_price' => (float) $product->cost_price,
-            'selling_price' => (float) $product->selling_price,
+            'cost_price' => $costPrice,
+            'selling_price' => $product->selling_price === null ? null : (float) $product->selling_price,
             'reorder_level' => $reorderLevel,
             'status' => $status,
-            'inventory_value' => round($stock * (float) $product->cost_price, 2),
+            'inventory_value' => $stock === 0 ? 0 : ($costPrice === null ? null : round($stock * $costPrice, 2)),
             'created_at' => $product->created_at,
             'updated_at' => $product->updated_at,
         ];

@@ -18,6 +18,8 @@ import {
   MapPin,
   Circle,
   Check,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 
 // ============================================
@@ -66,6 +68,43 @@ interface Order {
   products: string[];
   hasInvalidProductReferences: boolean;
 }
+
+interface CatalogOrderProduct {
+  id: number;
+  name: string;
+  category: string;
+  unit: string | null;
+}
+
+interface CreateOrderForm {
+  referenceNo: string;
+  customerName: string;
+  customerAddress: string;
+  customerContact: string;
+  orderDate: string;
+  requiredDeliveryDate: string;
+  productId: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+}
+
+const dateInputValue = (date: Date) => {
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 10);
+};
+
+const emptyCreateOrderForm = (): CreateOrderForm => {
+  const today = new Date();
+  const requiredDelivery = new Date(today);
+  requiredDelivery.setDate(requiredDelivery.getDate() + 7);
+
+  return {
+    referenceNo: '', customerName: '', customerAddress: '', customerContact: '',
+    orderDate: dateInputValue(today), requiredDeliveryDate: dateInputValue(requiredDelivery),
+    productId: '', quantity: '', unit: '', unitPrice: '',
+  };
+};
 
 const statusLabels: Record<string, OrderStatus> = {
   NEW: 'New', ASSIGNED: 'Assigned', PREPARING: 'Preparing',
@@ -247,12 +286,20 @@ const OrderManagement: React.FC = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [plantManagers, setPlantManagers] = useState<Array<{ id: number; name: string; employee_id?: string }>>([]);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [managerId, setManagerId] = useState('');
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const [assignmentError, setAssignmentError] = useState('');
+  const [createOrderOpen, setCreateOrderOpen] = useState(false);
+  const [createOrderForm, setCreateOrderForm] = useState<CreateOrderForm>(emptyCreateOrderForm);
+  const [catalogProducts, setCatalogProducts] = useState<CatalogOrderProduct[]>([]);
+  const [selectedProductCategory, setSelectedProductCategory] = useState('');
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [createOrderBusy, setCreateOrderBusy] = useState(false);
+  const [createOrderError, setCreateOrderError] = useState('');
 
   const loadOrders = useCallback(async () => {
     const [ordersResponse, summaryResponse] = await Promise.all([
@@ -300,6 +347,88 @@ const OrderManagement: React.FC = () => {
     }
   };
 
+  const openCreateOrder = async () => {
+    setCreateOrderForm(emptyCreateOrderForm());
+    setSelectedProductCategory('');
+    setCreateOrderError('');
+    setCreateOrderOpen(true);
+    setProductsLoading(true);
+    try {
+      const response = await apiClient.get('/admin/orders/products');
+      setCatalogProducts((response.data ?? []).map((product: any) => ({
+        id: Number(product.id),
+        name: String(product.name),
+        category: String(product.category ?? ''),
+        unit: product.unit ? String(product.unit) : null,
+      })));
+    } catch (error: any) {
+      setCatalogProducts([]);
+      setCreateOrderError(error?.response?.data?.message || 'Product Catalog could not be loaded.');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const productCategories = Array.from(new Set(
+    catalogProducts.map((product) => product.category).filter(Boolean)
+  )).sort();
+  const filteredCatalogProducts = selectedProductCategory
+    ? catalogProducts.filter((product) => product.category === selectedProductCategory)
+    : [];
+
+  const selectProductCategory = (category: string) => {
+    setSelectedProductCategory(category);
+    setCreateOrderForm((current) => ({ ...current, productId: '', unit: '' }));
+  };
+
+  const selectCreateOrderProduct = (productId: string) => {
+    const product = catalogProducts.find((item) => String(item.id) === productId);
+    setCreateOrderForm((current) => ({
+      ...current,
+      productId,
+      unit: product?.unit ?? '',
+    }));
+  };
+
+  const submitCreateOrder = async () => {
+    setCreateOrderError('');
+    const product = catalogProducts.find((item) => String(item.id) === createOrderForm.productId);
+    if (!createOrderForm.customerName.trim() || !createOrderForm.customerAddress.trim()
+      || !createOrderForm.orderDate || !createOrderForm.requiredDeliveryDate || !product
+      || product.category !== selectedProductCategory
+      || Number(createOrderForm.quantity) <= 0 || !createOrderForm.unit.trim()
+      || createOrderForm.unitPrice === '' || Number(createOrderForm.unitPrice) < 0) {
+      setCreateOrderError('Complete all required fields with valid order values.');
+      return;
+    }
+
+    setCreateOrderBusy(true);
+    try {
+      await apiClient.post('/admin/orders', {
+        reference_no: createOrderForm.referenceNo.trim() || null,
+        customer_name: createOrderForm.customerName.trim(),
+        customer_address: createOrderForm.customerAddress.trim(),
+        customer_contact: createOrderForm.customerContact.trim() || null,
+        order_date: createOrderForm.orderDate,
+        required_delivery_date: createOrderForm.requiredDeliveryDate,
+        items: [{
+          product_id: product.id,
+          quantity: Number(createOrderForm.quantity),
+          unit: createOrderForm.unit.trim(),
+          unit_price: Number(createOrderForm.unitPrice),
+        }],
+      });
+      setCreateOrderOpen(false);
+      await loadOrders();
+    } catch (error: any) {
+      setCreateOrderError(error?.response?.data?.message
+        || Object.values(error?.response?.data?.errors || {}).flat()[0]
+        || 'Order could not be created.');
+    } finally {
+      setCreateOrderBusy(false);
+    }
+  };
+
 
   // KPI Data
   const kpis = [
@@ -332,9 +461,9 @@ const OrderManagement: React.FC = () => {
             <RotateCw className="w-4 h-4" />
             Refresh
           </button>
-          <button disabled title="External order import is not configured" className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors shadow-lg shadow-[#092635]/20">
+          <button onClick={() => void openCreateOrder()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-[#092635]/20 transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400">
             <Plus className="w-4 h-4" />
-            Import Orders
+            Create Order
           </button>
         </div>
       </div>
@@ -395,13 +524,19 @@ const OrderManagement: React.FC = () => {
             Filter
           </button>
 
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-colors ml-auto">
+          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1" aria-label="Order view">
+            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+          </div>
+
+          <button className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-colors">
             <Download className="w-4 h-4" />
             Export
           </button>
         </div>
 
         {/* Table */}
+        {viewMode === 'list' ? (
         <div className="w-full max-w-full overflow-x-auto overscroll-x-contain custom-scrollbar">
           <table className="table-auto w-full min-w-[1400px] border-collapse text-sm">
             <thead className="border-b border-slate-800/80">
@@ -461,6 +596,20 @@ const OrderManagement: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : orders.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {orders.map((order) => (
+              <article key={order.id} onClick={() => handleViewOrder(order)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600">
+                <div className="flex items-start justify-between gap-3"><div><h3 className="font-mono font-semibold text-slate-900 dark:text-blue-400">{order.orderNo}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{order.refNo}</p></div><StatusBadge status={order.status} /></div>
+                <p className="mt-4 font-medium text-slate-900 dark:text-white">{order.customer}</p><p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.address}</p>
+                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Required delivery</dt><dd className="text-slate-900 dark:text-white">{order.requiredDelivery}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.itemCount}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Total amount</dt><dd className="font-semibold text-slate-900 dark:text-white">₱{order.totalAmount.toLocaleString()}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned to</dt><dd className="text-slate-900 dark:text-white">{order.assignedTo || '—'}</dd></div></dl>
+                <div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); handleViewOrder(order); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button></div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-sm text-slate-400">No orders found matching your criteria.</div>
+        )}
       </div>
 
       {/* ============================================================
@@ -659,6 +808,30 @@ const OrderManagement: React.FC = () => {
           <label className="mt-5 block text-sm text-slate-300">Available Plant Manager<select value={managerId} onChange={event => setManagerId(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><option value="">Select a Plant Manager</option>{plantManagers.map(manager => <option key={manager.id} value={manager.id}>{manager.name}{manager.employee_id ? ` — ${manager.employee_id}` : ''}</option>)}</select></label>
           {!plantManagers.length && <p className="mt-2 text-sm text-amber-300">No active Plant Managers are available.</p>}
           <div className="mt-6 flex justify-end gap-3"><button onClick={() => setAssignmentOpen(false)} className="min-h-11 cursor-pointer rounded-lg border border-slate-700 px-4 text-slate-300 hover:bg-slate-800">Close</button><button onClick={() => void assignOrder()} disabled={!managerId || assignmentBusy} className="min-h-11 cursor-pointer rounded-lg bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{assignmentBusy ? 'Assigning…' : 'Save Assignment'}</button></div>
+        </div>
+      </div>}
+
+      {createOrderOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="create-order-title">
+        <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div><h2 id="create-order-title" className="text-xl font-semibold text-white">Create Order</h2><p className="mt-1 text-sm text-slate-400">Temporary manual entry for workflow testing. The order will start as New.</p></div>
+            <button onClick={() => setCreateOrderOpen(false)} aria-label="Close create order dialog" className="min-h-11 min-w-11 cursor-pointer rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="mx-auto h-5 w-5" /></button>
+          </div>
+          {createOrderError && <p role="alert" className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">{createOrderError}</p>}
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="text-sm text-slate-300">Customer name <span className="text-rose-400">*</span><input value={createOrderForm.customerName} onChange={event => setCreateOrderForm(current => ({ ...current, customerName: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300">Customer contact<input value={createOrderForm.customerContact} onChange={event => setCreateOrderForm(current => ({ ...current, customerContact: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300 sm:col-span-2">Customer address / destination <span className="text-rose-400">*</span><textarea value={createOrderForm.customerAddress} onChange={event => setCreateOrderForm(current => ({ ...current, customerAddress: event.target.value }))} rows={2} className="mt-1 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300">Order date <span className="text-rose-400">*</span><input type="date" value={createOrderForm.orderDate} onChange={event => setCreateOrderForm(current => ({ ...current, orderDate: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300">Required delivery date <span className="text-rose-400">*</span><input type="date" min={createOrderForm.orderDate} value={createOrderForm.requiredDeliveryDate} onChange={event => setCreateOrderForm(current => ({ ...current, requiredDeliveryDate: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300 sm:col-span-2">Reference number<input value={createOrderForm.referenceNo} onChange={event => setCreateOrderForm(current => ({ ...current, referenceNo: event.target.value }))} placeholder="Optional external reference" className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300 sm:col-span-2">Category <span className="text-rose-400">*</span><select value={selectedProductCategory} onChange={event => selectProductCategory(event.target.value)} disabled={productsLoading || catalogProducts.length === 0} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"><option value="">{productsLoading ? 'Loading Product Catalog…' : catalogProducts.length ? 'Select Category' : 'No catalog categories available'}</option>{productCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label className="text-sm text-slate-300 sm:col-span-2">Product <span className="text-rose-400">*</span><select value={createOrderForm.productId} onChange={event => selectCreateOrderProduct(event.target.value)} disabled={!selectedProductCategory || filteredCatalogProducts.length === 0} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"><option value="">{!selectedProductCategory ? 'Select a category first' : filteredCatalogProducts.length ? 'Select Product' : 'No products available in this category'}</option>{filteredCatalogProducts.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+            <label className="text-sm text-slate-300">Quantity <span className="text-rose-400">*</span><input type="number" min="0.001" step="0.001" value={createOrderForm.quantity} onChange={event => setCreateOrderForm(current => ({ ...current, quantity: event.target.value }))} placeholder="0" className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300">Unit <span className="text-rose-400">*</span><input value={createOrderForm.unit} maxLength={50} onChange={event => setCreateOrderForm(current => ({ ...current, unit: event.target.value }))} placeholder="Enter the customer order unit" className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300 sm:col-span-2">Unit price <span className="text-rose-400">*</span><input type="number" min="0" step="0.01" value={createOrderForm.unitPrice} onChange={event => setCreateOrderForm(current => ({ ...current, unitPrice: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+          </div>
+          <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t border-slate-800 pt-5 sm:flex-row"><button onClick={() => setCreateOrderOpen(false)} className="min-h-11 cursor-pointer rounded-lg border border-slate-700 px-4 text-slate-300 transition-colors hover:bg-slate-800">Cancel</button><button onClick={() => void submitCreateOrder()} disabled={createOrderBusy || productsLoading} className="min-h-11 cursor-pointer rounded-lg bg-slate-900 px-5 font-semibold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50">{createOrderBusy ? 'Creating…' : 'Create Order'}</button></div>
         </div>
       </div>}
 

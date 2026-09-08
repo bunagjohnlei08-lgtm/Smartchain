@@ -15,10 +15,12 @@ import {
   Download,
   Save,
   Send,
-  MessageSquare,
+  Grid,
+  Table,
 } from 'lucide-react';
 
 type InspectionStatus = 'Pending' | 'In Progress' | 'Passed' | 'Rejected' | 'Partial';
+type ViewMode = 'list' | 'grid';
 
 interface QaInspectionListRecord {
   id: number;
@@ -123,6 +125,24 @@ interface ReceivingDetail extends ReceivingItem {
 
 const statusOptions: Array<'All Status' | InspectionStatus> = ['All Status', 'Pending', 'In Progress', 'Passed', 'Rejected', 'Partial'];
 
+function resolveItemResult(deliveredQty: number, acceptedQty: number, rejectedQty: number): InspectionStatus {
+  const inspectedQty = acceptedQty + rejectedQty;
+
+  if (inspectedQty !== deliveredQty) return 'Pending';
+  if (acceptedQty === deliveredQty && rejectedQty === 0) return 'Passed';
+  if (acceptedQty === 0 && rejectedQty === deliveredQty) return 'Rejected';
+  if (acceptedQty > 0 && rejectedQty > 0) return 'Partial';
+
+  return 'Pending';
+}
+
+function parseQuantityInput(value: string): number {
+  const normalized = value.replace(/^0+(?=\d)/, '');
+  const quantity = Number(normalized);
+
+  return Number.isFinite(quantity) ? Math.max(0, Math.trunc(quantity)) : 0;
+}
+
 function formatDateOnly(dateString: string | null): string {
   if (!dateString) return '-';
   const date = new Date(dateString);
@@ -205,6 +225,13 @@ const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
   );
 };
 
+const ViewModeToggle: React.FC<{ value: ViewMode; onChange: (value: ViewMode) => void }> = ({ value, onChange }) => (
+  <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1" role="group" aria-label="Quality inspection view">
+    <button type="button" onClick={() => onChange('list')} aria-label="Show inspections as a list" aria-pressed={value === 'list'} title="List view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Table className="w-4 h-4" /></button>
+    <button type="button" onClick={() => onChange('grid')} aria-label="Show inspections as a grid" aria-pressed={value === 'grid'} title="Grid view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Grid className="w-4 h-4" /></button>
+  </div>
+);
+
 const KPICard: React.FC<{
   label: string;
   value: string | number;
@@ -238,18 +265,23 @@ const mapListItem = (record: QaInspectionListRecord): ReceivingItem => ({
 });
 
 const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
-  const products = detail.products.map((item) => ({
-    id: item.id,
-    receivingItemId: item.receiving_item_id,
-    product: item.product,
-    orderedQty: item.ordered_qty,
-    deliveredQty: item.delivered_qty,
-    acceptedQty: item.accepted_qty,
-    rejectedQty: item.rejected_qty,
-    unit: item.unit,
-    inspectionResult: (item.inspection_result === 'Pending' ? 'Pending' : item.inspection_result) as InspectionStatus,
-    remarks: item.remarks ?? '',
-  }));
+  const products = detail.products.map((item) => {
+    const acceptedQty = item.accepted_qty;
+    const rejectedQty = item.rejected_qty;
+
+    return {
+      id: item.id,
+      receivingItemId: item.receiving_item_id,
+      product: item.product,
+      orderedQty: item.ordered_qty,
+      deliveredQty: item.delivered_qty,
+      acceptedQty,
+      rejectedQty,
+      unit: item.unit,
+      inspectionResult: resolveItemResult(item.delivered_qty, acceptedQty, rejectedQty),
+      remarks: item.remarks ?? '',
+    };
+  });
 
   const summaryRemarks = products
     .map((item) => item.remarks.trim())
@@ -301,6 +333,7 @@ const QualityInspection: React.FC = () => {
   const [listError, setListError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const itemsPerPage = 7;
 
   const fetchList = useCallback(async () => {
@@ -399,10 +432,13 @@ const QualityInspection: React.FC = () => {
         if (product.id !== productId) return product;
 
         const next = { ...product, ...patch };
+        const acceptedQty = Math.max(0, Number.isFinite(next.acceptedQty) ? next.acceptedQty : 0);
+        const rejectedQty = Math.max(0, Number.isFinite(next.rejectedQty) ? next.rejectedQty : 0);
         return {
           ...next,
-          acceptedQty: Math.max(0, Number.isFinite(next.acceptedQty) ? next.acceptedQty : 0),
-          rejectedQty: Math.max(0, Number.isFinite(next.rejectedQty) ? next.rejectedQty : 0),
+          acceptedQty,
+          rejectedQty,
+          inspectionResult: resolveItemResult(product.deliveredQty, acceptedQty, rejectedQty),
         };
       });
 
@@ -413,16 +449,6 @@ const QualityInspection: React.FC = () => {
         totalRejected: products.reduce((sum, product) => sum + product.rejectedQty, 0),
       };
     });
-  };
-
-  const updateInspectionResult = (product: ReceivingProduct, result: InspectionStatus) => {
-    const quantityPatch = result === 'Passed'
-      ? { acceptedQty: product.deliveredQty, rejectedQty: 0 }
-      : result === 'Rejected'
-        ? { acceptedQty: 0, rejectedQty: product.deliveredQty }
-        : {};
-
-    updateProductField(product.id, { ...quantityPatch, inspectionResult: result });
   };
 
   const validateProducts = (submit: boolean): string | null => {
@@ -441,21 +467,6 @@ const QualityInspection: React.FC = () => {
         return `${product.product}: accepted and rejected quantities must equal delivered quantity before submission.`;
       }
 
-      if (product.inspectionResult === 'Passed' && (product.acceptedQty !== product.deliveredQty || product.rejectedQty !== 0)) {
-        return `${product.product}: Passed requires the full delivered quantity to be accepted.`;
-      }
-
-      if (product.inspectionResult === 'Rejected' && (product.acceptedQty !== 0 || product.rejectedQty !== product.deliveredQty)) {
-        return `${product.product}: Rejected requires the full delivered quantity to be rejected.`;
-      }
-
-      if (product.inspectionResult === 'Partial' && (product.acceptedQty === 0 || product.rejectedQty === 0)) {
-        return `${product.product}: Partial requires both an accepted and a rejected quantity.`;
-      }
-
-      if (product.inspectionResult === 'Pending' || product.inspectionResult === 'In Progress') {
-        return `${product.product}: select Passed, Partial, or Rejected before submission.`;
-      }
     }
 
     return null;
@@ -480,7 +491,7 @@ const QualityInspection: React.FC = () => {
           receiving_item_id: product.receivingItemId,
           accepted_quantity: product.acceptedQty,
           rejected_quantity: product.rejectedQty,
-          inspection_result: product.inspectionResult,
+          inspection_result: resolveItemResult(product.deliveredQty, product.acceptedQty, product.rejectedQty),
           remarks: product.remarks.trim() || null,
         })),
       };
@@ -610,6 +621,9 @@ const QualityInspection: React.FC = () => {
         <button className="px-3.5 py-2.5 border border-gray-700 rounded-xl text-slate-400 hover:text-white hover:bg-gray-800 transition-all flex items-center gap-1.5 text-sm">
           <Filter className="w-4 h-4" /> Filters
         </button>
+        <div className="ml-auto">
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
+        </div>
       </div>
 
       {listError && (
@@ -622,6 +636,7 @@ const QualityInspection: React.FC = () => {
       )}
 
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden">
+        {viewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px]">
             <thead className="bg-[#090d16]/50 border-b border-gray-800">
@@ -680,6 +695,33 @@ const QualityInspection: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : isLoadingList && records.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 dark:text-slate-400">Loading inspection records...</div>
+        ) : currentItems.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 dark:text-slate-400">{listError ? 'Unable to load inspection records.' : 'No inspection records found.'}</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {currentItems.map((receiving) => (
+              <article key={receiving.id} onClick={() => handleRowClick(receiving.id)} className={`flex cursor-pointer flex-col rounded-2xl border bg-white p-5 shadow-sm transition-colors dark:bg-slate-800 dark:shadow-none ${selectedReceivingId === receiving.id ? 'border-cyan-500' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><p className="font-semibold text-slate-900 dark:text-white">{receiving.receivingNo}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{receiving.product}</p></div>
+                  <StatusBadge status={receiving.inspectionStatus} />
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div><dt className="text-slate-500 dark:text-slate-400">PO number</dt><dd className="text-slate-900 dark:text-slate-200">{receiving.poNumber}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Delivery date</dt><dd className="text-slate-900 dark:text-slate-200">{receiving.deliveryDate}</dd></div>
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Supplier</dt><dd className="text-slate-900 dark:text-slate-200">{receiving.supplier}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-slate-200">{receiving.items}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Prepared by</dt><dd className="text-slate-900 dark:text-slate-200">{receiving.preparedBy}</dd></div>
+                </dl>
+                <div className="mt-auto flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+                  {renderActionButton(receiving)}
+                  <button type="button" onClick={(event) => event.stopPropagation()} aria-label={`More options for ${receiving.receivingNo}`} title="More options" className="p-2 rounded text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"><MoreHorizontal className="w-4 h-4" /></button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-800 bg-white dark:bg-[#090d16]/30">
           <div className="text-sm text-slate-400">Showing {totalItems > 0 ? startIndex + 1 : 0} to {endIndex} of {totalItems} records</div>
@@ -818,7 +860,6 @@ const QualityInspection: React.FC = () => {
                               <th className="px-2 py-2 font-medium text-center">Rejected Qty</th>
                               <th className="px-2 py-2 font-medium">Unit</th>
                               <th className="px-2 py-2 font-medium">Inspection Result</th>
-                              <th className="px-2 py-2 font-medium">Remarks</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -838,7 +879,8 @@ const QualityInspection: React.FC = () => {
                                       max={product.deliveredQty}
                                       disabled={readOnly}
                                       value={product.acceptedQty}
-                                      onChange={(event) => updateProductField(product.id, { acceptedQty: Number(event.target.value) })}
+                                      onFocus={(event) => { if (event.currentTarget.value === '0') event.currentTarget.select(); }}
+                                      onChange={(event) => updateProductField(product.id, { acceptedQty: parseQuantityInput(event.currentTarget.value) })}
                                       className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
                                     />
                                   </td>
@@ -849,36 +891,14 @@ const QualityInspection: React.FC = () => {
                                       max={product.deliveredQty}
                                       disabled={readOnly}
                                       value={product.rejectedQty}
-                                      onChange={(event) => updateProductField(product.id, { rejectedQty: Number(event.target.value) })}
+                                      onFocus={(event) => { if (event.currentTarget.value === '0') event.currentTarget.select(); }}
+                                      onChange={(event) => updateProductField(product.id, { rejectedQty: parseQuantityInput(event.currentTarget.value) })}
                                       className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
                                     />
                                   </td>
                                   <td className="px-2 py-2 text-slate-300">{product.unit}</td>
                                   <td className="px-2 py-2">
-                                    <select
-                                      disabled={readOnly}
-                                      value={product.inspectionResult}
-                                      onChange={(event) => updateInspectionResult(product, event.target.value as InspectionStatus)}
-                                      className="bg-[#090d16] border border-gray-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:opacity-60"
-                                    >
-                                      <option value="Pending">Pending</option>
-                                      <option value="Passed">Passed</option>
-                                      <option value="Rejected">Rejected</option>
-                                      <option value="Partial">Partial</option>
-                                    </select>
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <div className="flex items-center gap-2">
-                                      <MessageSquare className="w-4 h-4 text-slate-500" />
-                                      <input
-                                        type="text"
-                                        disabled={readOnly}
-                                        value={product.remarks}
-                                        onChange={(event) => updateProductField(product.id, { remarks: event.target.value })}
-                                        className="w-full bg-[#090d16] border border-gray-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 disabled:opacity-60"
-                                        placeholder="Add remarks"
-                                      />
-                                    </div>
+                                    <StatusBadge status={product.inspectionResult} />
                                   </td>
                                 </tr>
                               );
@@ -935,7 +955,7 @@ const QualityInspection: React.FC = () => {
                                 maxLength={1000}
                                 rows={3}
                                 placeholder="Enter QA inspection findings"
-                                className="w-full rounded-lg border border-gray-800 bg-[#090d16] p-3 text-white placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none disabled:opacity-60"
+                                className="w-full rounded-lg border border-gray-800 !bg-white p-3 !text-slate-900 placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none disabled:opacity-60 dark:!bg-slate-800 dark:!text-white"
                               />
                             </div>
                           ))}

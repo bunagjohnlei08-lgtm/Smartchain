@@ -14,15 +14,17 @@ class ProductOptionsTest extends TestCase
 
     public function test_plant_manager_can_load_product_catalog_options(): void
     {
-        Product::create(['name' => 'IPAD AIR', 'unit' => 'pcs', 'cost_price' => 100]);
-        Product::create(['name' => 'Steel Pipe', 'unit' => 'pcs', 'cost_price' => 50]);
+        Product::create(['name' => 'IPAD AIR', 'category' => 'INDUSTRIAL CHEMICALS', 'unit' => 'pcs', 'cost_price' => 100]);
+        Product::create(['name' => 'Steel Pipe', 'category' => 'CONSTRUCTION CHEMICALS', 'unit' => 'pcs', 'cost_price' => 50]);
         $role = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
         $user = User::factory()->create(['role_id' => $role->id, 'status' => 'ACTIVE']);
 
         $this->actingAs($user)->getJson('/api/products')
             ->assertOk()
             ->assertJsonPath('data.0.name', 'IPAD AIR')
+            ->assertJsonPath('data.0.category', 'INDUSTRIAL CHEMICALS')
             ->assertJsonPath('data.1.name', 'Steel Pipe')
+            ->assertJsonPath('data.1.category', 'CONSTRUCTION CHEMICALS')
             ->assertJsonMissingPath('data.0.cost_price');
     }
 

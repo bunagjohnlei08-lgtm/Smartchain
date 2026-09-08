@@ -123,7 +123,7 @@ const toFormData = (item: InventoryItem): InventoryFormData => ({
 // ============================================
 
 const statusOptions: InventoryStatus[] = ['Available', 'Low Stock', 'Out of Stock'];
-const sortOptions = ['Name A-Z', 'Name Z-A', 'Stock Low-High', 'Stock High-Low', 'Last Updated'];
+const sortOptions = ['Newest First', 'Name A-Z', 'Name Z-A', 'Stock Low-High', 'Stock High-Low', 'Last Updated'];
 
 // ============================================
 // HELPER FUNCTIONS
@@ -1024,7 +1024,7 @@ export const InventoryList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [brandFilter, setBrandFilter] = useState('All Brands');
-  const [sortBy, setSortBy] = useState('Name A-Z');
+  const [sortBy, setSortBy] = useState('Newest First');
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const itemsPerPage = 10;
@@ -1243,6 +1243,12 @@ export const InventoryList: React.FC = () => {
     });
 
     switch (sortBy) {
+      case 'Newest First':
+        list.sort((a, b) => {
+          const createdAtDifference = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          return createdAtDifference || b.id - a.id;
+        });
+        break;
       case 'Name A-Z':
         list.sort((a, b) => a.product.localeCompare(b.product));
         break;
@@ -1288,7 +1294,7 @@ export const InventoryList: React.FC = () => {
     setStatusFilter('All Status');
     setCategoryFilter('All Categories');
     setBrandFilter('All Brands');
-    setSortBy('Name A-Z');
+    setSortBy('Newest First');
     setCurrentPage(1);
   };
 

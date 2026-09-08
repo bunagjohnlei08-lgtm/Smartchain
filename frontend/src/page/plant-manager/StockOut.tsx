@@ -179,6 +179,7 @@ const StockOut: React.FC = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const [scannerError, setScannerError] = useState('');
   const [manualBarcode, setManualBarcode] = useState('');
+  const [manualQuantity, setManualQuantity] = useState('1');
   const [scanSuccess, setScanSuccess] = useState('');
   const [completionNotice, setCompletionNotice] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -247,7 +248,7 @@ const StockOut: React.FC = () => {
     setScanSuccess('');
   }, [stopCamera]);
 
-  const processScan = useCallback(async (barcode: string) => {
+  const processScan = useCallback(async (barcode: string, quantity = 1, resetManualEntry = false) => {
     if (!selectedOrder || scanBusyRef.current) return;
     scanBusyRef.current = true;
     setActionBusy(true);
@@ -255,9 +256,13 @@ const StockOut: React.FC = () => {
     try {
       const response = await apiClient.post(`/stock-out/orders/${selectedOrder.id}/release`, {
         barcode: barcode.trim(),
+        quantity,
       });
       setScanSuccess(response.data.message || 'One unit stocked out successfully.');
-      setManualBarcode('');
+      if (resetManualEntry) {
+        setManualBarcode('');
+        setManualQuantity('1');
+      }
 
       // The backend flips the order to READY_FOR_SHIPMENT as soon as every item is
       // released, which removes it from the Stock Out queue. Drop the selection instead
@@ -299,7 +304,7 @@ const StockOut: React.FC = () => {
         if (!value || scanBusyRef.current || (lastDetectionRef.current.value === value && now - lastDetectionRef.current.at <= 2500)) return;
         lastDetectionRef.current = { value, at: now };
         stopCamera();
-        void processScan(value);
+        void processScan(value, 1);
       };
       const startDecoder = (constraints: MediaStreamConstraints) => {
         const reader = new BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 150, delayBetweenScanSuccess: 1000 });
@@ -461,11 +466,20 @@ const StockOut: React.FC = () => {
           {scannerError && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{scannerError}</div>}
           {scanSuccess && <div role="status" className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4"><p className="flex items-center gap-2 font-semibold text-emerald-300"><CheckCircle2 className="h-5 w-5" /> {scanSuccess}</p></div>}
 
-          <form onSubmit={event => { event.preventDefault(); void processScan(manualBarcode); }} className="mt-5 rounded-xl border border-slate-800 bg-[#070a12] p-4">
+          <form onSubmit={event => {
+            event.preventDefault();
+            const quantity = Number(manualQuantity);
+            if (!manualBarcode.trim() || !Number.isInteger(quantity) || quantity < 1) {
+              setScannerError('Enter a valid barcode and a whole-number quantity of at least 1.');
+              return;
+            }
+            void processScan(manualBarcode, quantity, true);
+          }} className="mt-5 rounded-xl border border-slate-800 bg-[#070a12] p-4">
             <h3 className="text-sm font-semibold text-white">Enter Barcode Manually</h3><p className="mt-1 text-xs text-slate-400">Camera and manual entry use the same backend barcode validation.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end">
               <label className="text-sm text-slate-300">Barcode<input value={manualBarcode} onChange={event => setManualBarcode(event.target.value)} required maxLength={100} autoComplete="off" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
-              <button type="submit" disabled={actionBusy || !manualBarcode.trim()} className="min-h-11 cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{actionBusy ? 'Working…' : 'Submit'}</button>
+              <label className="text-sm text-slate-300">Quantity<input type="number" min={1} step={1} value={manualQuantity} onChange={event => setManualQuantity(event.target.value)} required inputMode="numeric" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+              <button type="submit" disabled={actionBusy || !manualBarcode.trim() || !Number.isInteger(Number(manualQuantity)) || Number(manualQuantity) < 1} className="min-h-11 cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{actionBusy ? 'Working…' : 'Submit'}</button>
             </div>
           </form>
         </div>

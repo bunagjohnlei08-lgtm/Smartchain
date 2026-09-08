@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ReplenishmentRequest;
 use App\Models\Inventory;
+use App\Models\Warehouse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -45,7 +46,17 @@ class PlantManagerProcurementController extends Controller
             ];
         })->values();
 
-        return response()->json(['data' => $items]);
+        $warehouse = $request->user()->warehouse_id
+            ? Warehouse::query()->find($request->user()->warehouse_id)
+            : Warehouse::query()
+                ->where(fn ($query) => $query->where('code', 'WH-MAIN')->orWhere('name', 'Main Warehouse'))
+                ->orderByRaw("CASE WHEN code = 'WH-MAIN' THEN 0 ELSE 1 END")
+                ->first();
+
+        return response()->json([
+            'data' => $items,
+            'warehouse' => $warehouse?->only(['id', 'name']),
+        ]);
     }
 
     public function index(Request $request): JsonResponse

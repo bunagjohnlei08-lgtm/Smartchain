@@ -91,6 +91,32 @@ class InventoryAuthorizationTest extends TestCase
             ->assertJsonPath('id', $this->otherInventory->id);
     }
 
+    public function test_inventory_index_is_newest_first_for_admin_and_plant_manager(): void
+    {
+        $product = $this->ownInventory->product;
+        $newestInventory = $this->inventory($product, $this->ownWarehouse, 'NEWEST-BARCODE');
+
+        $this->ownInventory->timestamps = false;
+        $this->ownInventory->created_at = now()->subDay();
+        $this->ownInventory->save();
+        $this->otherInventory->timestamps = false;
+        $this->otherInventory->created_at = now()->subHours(2);
+        $this->otherInventory->save();
+
+        $admin = $this->user($this->adminRole);
+        $this->actingAs($admin)->getJson('/api/inventory')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $newestInventory->id)
+            ->assertJsonPath('data.1.id', $this->otherInventory->id)
+            ->assertJsonPath('data.2.id', $this->ownInventory->id);
+
+        $manager = $this->user($this->plantManagerRole, $this->ownWarehouse);
+        $this->actingAs($manager)->getJson('/api/inventory')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $newestInventory->id)
+            ->assertJsonPath('data.1.id', $this->ownInventory->id);
+    }
+
     public function test_plant_manager_only_sees_assigned_warehouse_inventory(): void
     {
         $manager = $this->user($this->plantManagerRole, $this->ownWarehouse);

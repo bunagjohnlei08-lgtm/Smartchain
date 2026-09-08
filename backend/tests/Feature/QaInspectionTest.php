@@ -148,6 +148,7 @@ class QaInspectionTest extends TestCase
         ]);
         $this->assertDatabaseHas('qa_inspection_items', [
             'receiving_item_id' => $receiving->items[1]->id,
+            'inspection_result' => 'Partial',
             'remarks' => 'Two damaged pieces.',
         ]);
         $this->assertDatabaseHas('receiving_timelines', [
@@ -238,6 +239,33 @@ class QaInspectionTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonPath('message', 'Accepted and rejected quantities cannot exceed delivered quantity.');
+    }
+
+    public function test_draft_derives_pending_result_for_incomplete_quantities(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([
+            ['product' => 'Widget A', 'qty' => 20],
+        ]);
+
+        $response = $this->actingAs($qa)->postJson("/api/qa/inspections/{$receiving->id}", [
+            'submit' => false,
+            'items' => [[
+                'receiving_item_id' => $receiving->items[0]->id,
+                'accepted_quantity' => 10,
+                'rejected_quantity' => 0,
+                'inspection_result' => 'Passed',
+            ]],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('products.0.inspection_result', 'Pending');
+        $this->assertDatabaseHas('qa_inspection_items', [
+            'receiving_item_id' => $receiving->items[0]->id,
+            'accepted_quantity' => 10,
+            'rejected_quantity' => 0,
+            'inspection_result' => 'Pending',
+        ]);
     }
 
     public function test_non_qa_users_are_forbidden(): void

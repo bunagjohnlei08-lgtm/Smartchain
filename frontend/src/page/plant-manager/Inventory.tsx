@@ -7,6 +7,8 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 import type { ApiInventoryItem } from '../../types';
 import { apiClient } from '../../lib/api';
@@ -132,6 +134,7 @@ function formatLastUpdated(dateString: string): string {
 // ============================================
 
 const Inventory: React.FC = () => {
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   // State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -283,6 +286,7 @@ const Inventory: React.FC = () => {
             <button onClick={fetchInventory} className="p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/30 transition-colors text-slate-400 hover:text-slate-200">
               <RefreshCw className="w-4 h-4" />
             </button>
+            <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-[#101929] p-1" aria-label="Inventory view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
           </div>
         </div>
 
@@ -293,7 +297,7 @@ const Inventory: React.FC = () => {
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        {viewMode === 'list' ? <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
             <thead className="border-b border-slate-800/80">
               <tr>
@@ -373,7 +377,7 @@ const Inventory: React.FC = () => {
               )}
             </tbody>
           </table>
-        </div>
+        </div> : isLoading ? <div className="py-8 text-center text-slate-400">Loading inventory...</div> : filteredInventory.length > 0 ? <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{filteredInventory.map((item) => <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{item.product}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.warehouse}</p></div><StatusBadge status={item.status} /></div><div className="mt-3"><BarcodeDisplay value={item.barcode} /></div><dl className="mt-4 grid grid-cols-3 gap-2 text-center text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Available</dt><dd className="font-semibold text-slate-900 dark:text-white">{item.available_stock}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Reserved</dt><dd className="font-semibold text-cyan-600 dark:text-cyan-400">{item.reserved_stock}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Backload</dt><dd className={item.backload > 0 ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-500'}>{item.backload}</dd></div></dl><p className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">Updated {formatLastUpdated(item.updated_at)}</p></article>)}</div> : <div className="py-8 text-center text-slate-400">No inventory items found matching your filters.</div>}
 
         {/* Pagination (static) */}
         <div className="flex items-center justify-between px-2 py-3 border-t border-slate-800/60">

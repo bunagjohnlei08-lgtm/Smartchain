@@ -20,6 +20,8 @@ import {
   X,
   Loader2,
   RefreshCw,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 
 // ============================================
@@ -32,7 +34,7 @@ interface CreateReceivingItemInput {
   ordered_quantity: number;
   remaining_quantity: number;
   delivered_quantity: string;
-  unit: string;
+  unit: string | null;
 }
 
 interface CreateReceivingFormData {
@@ -48,7 +50,7 @@ interface ApprovedPurchaseOrder {
   po_number: string;
   supplier_name: string;
   status: string;
-  items: Array<{ id: number; product_name: string; ordered_quantity: number; received_quantity: number; remaining_quantity: number; unit: string }>;
+  items: Array<{ id: number; product_name: string; ordered_quantity: number; received_quantity: number; remaining_quantity: number; unit: string | null }>;
 }
 
 // ============================================
@@ -262,7 +264,7 @@ const CreateReceivingModal: React.FC<{
       return;
     }
     const invalidItem = formData.items.some(
-      (item) => !item.product || !item.unit || item.delivered_quantity === '' || Number(item.delivered_quantity) < 0 || Number(item.delivered_quantity) > item.remaining_quantity
+      (item) => !item.product || item.delivered_quantity === '' || Number(item.delivered_quantity) < 0 || Number(item.delivered_quantity) > item.remaining_quantity
     );
     if (invalidItem) {
       setFormError('Delivered quantities must be between 0 and the remaining PO quantity.');
@@ -359,7 +361,7 @@ const CreateReceivingModal: React.FC<{
             <div className="space-y-3">
               {formData.items.map((item, index) => (
                 <div key={item.purchase_order_item_id} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-5"><p className="text-sm text-slate-200">{item.product}</p><p className="text-xs text-slate-500">Ordered: {item.ordered_quantity} · Remaining: {item.remaining_quantity} {item.unit}</p></div>
+                  <div className="col-span-5"><p className="text-sm text-slate-200">{item.product}</p><p className="text-xs text-slate-500">Ordered: {item.ordered_quantity} · Remaining: {item.remaining_quantity} {item.unit ?? '—'}</p></div>
                   <input
                     type="number"
                     min="0"
@@ -369,7 +371,7 @@ const CreateReceivingModal: React.FC<{
                     className="col-span-4 bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     placeholder="Delivered qty"
                   />
-                  <span className="col-span-3 text-sm text-slate-400">{item.unit}</span>
+                  <span className="col-span-3 text-sm text-slate-400">{item.unit ?? '—'}</span>
                 </div>
               ))}
               {formData.items.length === 0 && <p className="text-sm text-slate-500 py-3">Select a purchase order to load its products.</p>}
@@ -419,6 +421,7 @@ const ReceivingManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [dateFilter, setDateFilter] = useState('All Dates');
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const itemsPerPage = 5;
 
   const [selectedReceivingId, setSelectedReceivingId] = useState<number | null>(null);
@@ -627,10 +630,12 @@ const ReceivingManagement: React.FC = () => {
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#0b1220] p-1" aria-label="Receiving view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
       </div>
 
       {/* Full-width Table */}
       <div className="bg-[#111827] border border-[#1f2937] rounded-2xl overflow-hidden">
+        {viewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
             <thead className="bg-[#0b1220]/50 border-b border-[#1f2937]">
@@ -735,6 +740,13 @@ const ReceivingManagement: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : loading ? (
+          <div className="px-4 py-8 text-center text-slate-400"><span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading receiving records…</span></div>
+        ) : paginatedReceivings.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedReceivings.map((record) => <article key={record.id} onClick={() => handleRowClick(record.id)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{record.receiving_no}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{record.purchase_order}</p></div><StatusBadge status={record.status} /></div><p className="mt-4 font-medium text-slate-900 dark:text-white">{record.product_summary}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{record.supplier}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Delivery date</dt><dd className="text-slate-900 dark:text-white">{formatDateOnly(record.delivery_date)}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{record.items_count}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Prepared by</dt><dd className="text-slate-900 dark:text-white">{record.prepared_by || '—'}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); handleRowClick(record.id); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button></div></article>)}</div>
+        ) : (
+          <div className="px-4 py-8 text-center text-slate-400">No receiving records found.</div>
+        )}
 
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-white dark:bg-[#0b1220]/30">
@@ -847,7 +859,7 @@ const ReceivingManagement: React.FC = () => {
                         <tr key={item.id} className="border-b border-[#1f2937] hover:bg-slate-800/30">
                           <td className="px-2 py-2 text-white">{item.product_name}</td>
                           <td className="px-2 py-2 text-center text-white">{item.delivered_quantity}</td>
-                          <td className="px-2 py-2 text-slate-300">{item.unit}</td>
+                          <td className="px-2 py-2 text-slate-300">{item.unit ?? '—'}</td>
                           <td className="px-2 py-2">
                             <StatusBadge status={item.inspection_status} />
                           </td>

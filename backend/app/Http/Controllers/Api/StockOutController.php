@@ -142,6 +142,7 @@ class StockOutController extends Controller
         $user = $this->plantManager($request);
         $validated = $request->validate([
             'barcode' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'quantity' => ['sometimes', 'required', 'integer', 'min:1'],
             'idempotency_key' => ['nullable', 'uuid'],
         ]);
 
@@ -182,7 +183,7 @@ class StockOutController extends Controller
                 trim($validated['barcode']),
                 true
             );
-            $quantity = 1;
+            $quantity = $validated['quantity'] ?? 1;
             if ($quantity > $remaining) {
                 throw ValidationException::withMessages(['quantity' => 'Requested quantity exceeds remaining order quantity.']);
             }

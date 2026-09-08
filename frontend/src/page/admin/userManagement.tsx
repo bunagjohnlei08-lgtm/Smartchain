@@ -16,6 +16,8 @@ import {
   X,
   Filter,
   Users,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 import type { ApiUser, ApiRole, ApiDepartment, ApiBranch, ApiWarehouse } from '../../types';
 import type { AxiosError } from 'axios';
@@ -350,6 +352,7 @@ const UserManagement: React.FC = () => {
     role: 'All Roles',
   });
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [itemsPerPage] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -565,6 +568,11 @@ const UserManagement: React.FC = () => {
             <Filter className="w-3.5 h-3.5" /> Reset
           </button>
 
+          <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/50 p-1" aria-label="User view">
+            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+          </div>
+
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800/50 border border-gray-700 text-xs font-medium text-white rounded-lg hover:bg-gray-800 transition"
           >
@@ -579,6 +587,7 @@ const UserManagement: React.FC = () => {
 
       {/* 4. TABLE CONTAINER */}
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden shadow-xl mt-6">
+        {viewMode === 'list' ? (
         <div className="overflow-x-auto w-full">
           <table className="w-full table-auto text-left text-xs text-gray-300 border-collapse">
             <thead className="bg-[#0b101d] border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -660,6 +669,25 @@ const UserManagement: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : isLoading ? (
+          <div className="px-4 py-8 text-center text-gray-400">Loading...</div>
+        ) : paginatedUsers.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+            {paginatedUsers.map((u) => {
+              const displayName = u.name || 'Unnamed';
+              const initials = displayName.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase();
+              return (
+                <article key={u.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-blue-600/20 text-xs font-bold text-blue-600 dark:text-blue-400">{initials}</div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</h3><p className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</p></div><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${u.status === 'ACTIVE' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : u.status === 'PENDING' ? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>{u.status}</span></div>
+                  <dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500 dark:text-slate-400">Employee ID</dt><dd className="font-mono text-slate-900 dark:text-white">{u.employee_id}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Role</dt><dd className="text-slate-900 dark:text-white">{u.role?.slug || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Department</dt><dd className="text-slate-900 dark:text-white">{u.department?.name || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{u.warehouse?.code || '—'}</dd></div></dl>
+                  <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 text-slate-500 dark:border-slate-700 dark:text-slate-400"><button onClick={() => setViewUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button><button onClick={() => setEditUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="Edit"><Edit className="h-4 w-4" /></button>{u.status === 'PENDING' && <button onClick={() => handleApprove(u)} className="p-1 hover:text-green-500" title="Approve"><Check className="h-4 w-4" /></button>}{u.status === 'ACTIVE' && <button onClick={() => handleSuspend(u)} className="p-1 hover:text-red-500" title="Suspend"><UserX className="h-4 w-4" /></button>}{u.status === 'SUSPENDED' && <button onClick={() => handleActivate(u)} className="p-1 hover:text-green-500" title="Activate"><UserCheck className="h-4 w-4" /></button>}</div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="px-4 py-8 text-center text-gray-400">No users found</div>
+        )}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}

@@ -139,7 +139,7 @@ class PurchaseOrderController extends Controller
                 'ordered_quantity' => $item->ordered_quantity,
                 'received_quantity' => $received,
                 'remaining_quantity' => max(0, $item->ordered_quantity - $received),
-                'unit' => Product::query()->where('name', $item->product_name)->value('unit') ?? 'pcs',
+                'unit' => Product::query()->where('name', $item->product_name)->value('unit'),
                 'unit_price' => (float) $item->unit_price,
                 'total_price' => (float) $item->total_price,
                 ];

@@ -180,6 +180,12 @@ class QaInspectionController extends Controller
 
     private function resolveItemResult(array $item, int $deliveredQuantity): string
     {
+        $total = $item['accepted_quantity'] + $item['rejected_quantity'];
+
+        if ($total !== $deliveredQuantity) {
+            return 'Pending';
+        }
+
         if ($item['accepted_quantity'] === $deliveredQuantity && $item['rejected_quantity'] === 0) {
             return 'Passed';
         }
@@ -244,6 +250,8 @@ class QaInspectionController extends Controller
 
                 $submittedItems = $submittedItems->map(function (array $itemPayload) use ($receiving, $shouldSubmit) {
                     $receivingItem = $receiving->items->firstWhere('id', $itemPayload['receiving_item_id']);
+                    $itemPayload['accepted_quantity'] = (int) $itemPayload['accepted_quantity'];
+                    $itemPayload['rejected_quantity'] = (int) $itemPayload['rejected_quantity'];
                     $total = $itemPayload['accepted_quantity'] + $itemPayload['rejected_quantity'];
 
                     if ($total > $receivingItem->delivered_quantity) {
@@ -254,12 +262,10 @@ class QaInspectionController extends Controller
                         abort(422, 'Accepted and rejected quantities must equal delivered quantity before submission.');
                     }
 
-                    if ($shouldSubmit) {
-                        $itemPayload['inspection_result'] = $this->resolveItemResult(
-                            $itemPayload,
-                            $receivingItem->delivered_quantity
-                        );
-                    }
+                    $itemPayload['inspection_result'] = $this->resolveItemResult(
+                        $itemPayload,
+                        $receivingItem->delivered_quantity
+                    );
 
                     return $itemPayload;
                 });

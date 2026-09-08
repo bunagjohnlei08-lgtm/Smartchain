@@ -29,12 +29,15 @@ import {
   Loader2,
   PanelRightClose,
   QrCode,
+  Grid,
+  Table,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 type QaStatus = 'Pending QA' | 'Passed' | 'Rejected' | 'Partial';
 type ReceivingStatus = 'Pending QA' | 'Ready for Stock In' | 'Completed' | 'Rejected';
 type DrawerMode = 'receiving' | 'stocked' | null;
+type ViewMode = 'list' | 'grid';
 
 interface ReceivingLineItem {
   id: number;
@@ -159,6 +162,13 @@ interface ApiStockInHistoryItem {
   barcode: string | null;
   stock_in_date: string | null;
   status: 'Completed';
+}
+
+interface WarehouseCapacity {
+  name: string;
+  capacity: number | null;
+  utilized: number;
+  available: number | null;
 }
 
 const mapReceiving = (record: ApiReceiving): ReceivingItem => ({
@@ -289,6 +299,35 @@ const ReceivingStatusBadge: React.FC<{ status: ReceivingStatus | 'Stocked In' }>
   );
 };
 
+const ViewModeToggle: React.FC<{
+  label: string;
+  value: ViewMode;
+  onChange: (value: ViewMode) => void;
+}> = ({ label, value, onChange }) => (
+  <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1" role="group" aria-label={`${label} view`}>
+    <button
+      type="button"
+      onClick={() => onChange('list')}
+      aria-label={`Show ${label} as a list`}
+      aria-pressed={value === 'list'}
+      title="List view"
+      className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+    >
+      <Table className="w-4 h-4" />
+    </button>
+    <button
+      type="button"
+      onClick={() => onChange('grid')}
+      aria-label={`Show ${label} as a grid`}
+      aria-pressed={value === 'grid'}
+      title="Grid view"
+      className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+    >
+      <Grid className="w-4 h-4" />
+    </button>
+  </div>
+);
+
 const BarcodeSVG: React.FC<{ value: string }> = ({ value }) => {
   const digits = value.split('').map(Number);
   const patterns = digits.map((digit) => {
@@ -334,6 +373,8 @@ const StockIn: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [recentError, setRecentError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [warehouseCapacity, setWarehouseCapacity] = useState<WarehouseCapacity | null>(null);
+  const [capacityError, setCapacityError] = useState<string | null>(null);
   const [isStockingIn, setIsStockingIn] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [search, setSearch] = useState('');
@@ -341,6 +382,9 @@ const StockIn: React.FC = () => {
   const [selectedStockedId, setSelectedStockedId] = useState<number | null>(null);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'items' | 'attachments' | 'history'>('info');
+  const [receivingsViewMode, setReceivingsViewMode] = useState<ViewMode>('list');
+  const [recentlyStockedViewMode, setRecentlyStockedViewMode] = useState<ViewMode>('list');
+  const [historyViewMode, setHistoryViewMode] = useState<ViewMode>('list');
 
   const fetchReceivings = useCallback(async () => {
     setIsLoading(true);
@@ -386,11 +430,23 @@ const StockIn: React.FC = () => {
     }
   }, []);
 
+  const fetchWarehouseCapacity = useCallback(async () => {
+    setCapacityError(null);
+    try {
+      const response = await apiClient.get<WarehouseCapacity>('/plant-manager/warehouse');
+      setWarehouseCapacity(response.data);
+    } catch (error) {
+      setWarehouseCapacity(null);
+      setCapacityError(getApiErrorMessage(error));
+    }
+  }, []);
+
   useEffect(() => {
     fetchReceivings();
     fetchRecentStocked();
     fetchHistory();
-  }, [fetchReceivings, fetchRecentStocked, fetchHistory]);
+    fetchWarehouseCapacity();
+  }, [fetchReceivings, fetchRecentStocked, fetchHistory, fetchWarehouseCapacity]);
 
   const selectedReceiving = receivings.find((record) => record.id === selectedId) ?? null;
   const selectedStocked = recentlyStocked.find((record) => record.id === selectedStockedId) ?? null;
@@ -417,7 +473,14 @@ const StockIn: React.FC = () => {
     { label: 'Total Received Value', value: `₱${totalValue.toLocaleString()}`, subtitle: 'Stock In view', trend: 'up' },
   ];
 
-  const canPerformStockIn = selectedReceiving !== null && selectedReceiving.eligibleQuantity > 0 && selectedReceiving.status !== 'Completed';
+  const exceedsAvailableCapacity = selectedReceiving !== null
+    && warehouseCapacity?.available !== null
+    && warehouseCapacity?.available !== undefined
+    && selectedReceiving.eligibleQuantity > warehouseCapacity.available;
+  const canPerformStockIn = selectedReceiving !== null
+    && selectedReceiving.eligibleQuantity > 0
+    && selectedReceiving.status !== 'Completed'
+    && !exceedsAvailableCapacity;
 
   const handleSelect = (id: number) => {
     setSelectedId(id);
@@ -437,7 +500,7 @@ const StockIn: React.FC = () => {
     try {
       await apiClient.post(`/stock-in/receivings/${selectedReceiving.id}/stock-in`);
       setActionMessage({ type: 'success', text: `${selectedReceiving.receivingNo} stocked in successfully. Inventory and barcode are now available.` });
-      await Promise.all([fetchReceivings(), fetchRecentStocked(), fetchHistory()]);
+      await Promise.all([fetchReceivings(), fetchRecentStocked(), fetchHistory(), fetchWarehouseCapacity()]);
       setSelectedId(selectedReceiving.id);
       setDrawerMode('receiving');
     } catch (error) {
@@ -448,7 +511,13 @@ const StockIn: React.FC = () => {
   };
 
   const handlePrimaryStockIn = () => {
-    const firstEligible = receivings.find((receiving) => receiving.eligibleQuantity > 0 && receiving.status !== 'Completed');
+    const firstEligible = receivings.find((receiving) =>
+      receiving.eligibleQuantity > 0
+      && receiving.status !== 'Completed'
+      && (warehouseCapacity?.available === null
+        || warehouseCapacity?.available === undefined
+        || receiving.eligibleQuantity <= warehouseCapacity.available)
+    );
     if (!firstEligible) {
       setActionMessage({ type: 'error', text: 'No QA-approved receiving is ready for Stock In right now.' });
       return;
@@ -518,6 +587,7 @@ const StockIn: React.FC = () => {
               fetchReceivings();
               fetchRecentStocked();
               fetchHistory();
+              fetchWarehouseCapacity();
             }}
             className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors"
           >
@@ -619,8 +689,12 @@ const StockIn: React.FC = () => {
           <button className="p-2 rounded-xl border border-slate-800 text-slate-400 hover:bg-slate-800/50 transition-colors">
             <Filter className="w-4 h-4" />
           </button>
+          <div className="ml-auto">
+            <ViewModeToggle label="receivings" value={receivingsViewMode} onChange={setReceivingsViewMode} />
+          </div>
         </div>
 
+        {receivingsViewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
@@ -683,15 +757,51 @@ const StockIn: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : isLoading && receivings.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 dark:text-slate-400">
+            <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+            Loading receivings...
+          </div>
+        ) : filteredReceivings.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 dark:text-slate-400">No receiving records found.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredReceivings.map((rec) => (
+              <article key={rec.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-none dark:hover:border-slate-600">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm font-semibold text-slate-900 dark:text-blue-400">{rec.receivingNo}</p>
+                    <p className="mt-1 truncate text-sm font-medium text-slate-900 dark:text-white" title={rec.productSummary}>{rec.productSummary}</p>
+                  </div>
+                  <ReceivingStatusBadge status={rec.status} />
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Supplier</dt><dd className="text-slate-900 dark:text-slate-200">{rec.supplier}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Receiving date</dt><dd className="text-slate-900 dark:text-slate-200">{rec.receivingDate}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Reference</dt><dd className="text-slate-900 dark:text-slate-200">{rec.refNo}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{rec.itemsCount} item{rec.itemsCount === 1 ? '' : 's'} · {rec.totalQuantity} units</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Received value</dt><dd className="font-medium text-slate-900 dark:text-white">₱{rec.receivedValue.toLocaleString()}</dd></div>
+                </dl>
+                <div className="mt-auto flex justify-end gap-1 border-t border-slate-200 pt-4 dark:border-slate-700">
+                  <button type="button" aria-label={`View ${rec.receivingNo}`} title="View receiving" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white" onClick={() => handleSelect(rec.id)}><Eye className="w-4 h-4" /></button>
+                  <button type="button" aria-label={`More options for ${rec.receivingNo}`} title="More options" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"><MoreVertical className="w-4 h-4" /></button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4 w-full">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <QrCode className="w-4 h-4 text-cyan-400" />
             Recently Stocked In
           </h3>
-          <span className="text-xs text-slate-400">Latest 5 records</span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-xs text-slate-400">Latest 5 records</span>
+            <ViewModeToggle label="recently stocked records" value={recentlyStockedViewMode} onChange={setRecentlyStockedViewMode} />
+          </div>
         </div>
 
         {recentError && (
@@ -701,6 +811,7 @@ const StockIn: React.FC = () => {
           </div>
         )}
 
+        {recentlyStockedViewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
@@ -760,15 +871,38 @@ const StockIn: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : isLoadingRecent && recentlyStocked.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 dark:text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Loading recently stocked records...</div>
+        ) : recentlyStocked.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 dark:text-slate-400">No stocked-in records yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {recentlyStocked.map((item) => (
+              <article key={item.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-none dark:hover:border-slate-600">
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm text-slate-500 dark:text-slate-400">{item.receivingNo ?? '—'}</p><h4 className="mt-1 font-semibold text-slate-900 dark:text-white">{item.product}</h4></div><ReceivingStatusBadge status={item.status} /></div>
+                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div><dt className="text-slate-500 dark:text-slate-400">Quantity</dt><dd className="font-medium text-slate-900 dark:text-white">{item.quantity}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-slate-200">{item.warehouse}</dd></div>
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Stock In date</dt><dd className="text-slate-900 dark:text-slate-200">{formatDateTime(item.stockInDate)}</dd></div>
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Barcode</dt><dd className="break-all font-mono text-slate-900 dark:text-cyan-300">{item.barcode ?? '—'}</dd></div>
+                </dl>
+                <div className="mt-auto flex justify-end border-t border-slate-200 pt-4 dark:border-slate-700"><button type="button" aria-label={`View ${item.product}`} title="View stocked item" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white" onClick={() => handleSelectStocked(item.id)}><Eye className="w-4 h-4" /></button></div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4 w-full">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <FileText className="w-4 h-4 text-cyan-400" />
             Stock In History
           </h3>
-          <span className="text-xs text-slate-400">Completed records</span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-xs text-slate-400">Completed records</span>
+            <ViewModeToggle label="stock in history" value={historyViewMode} onChange={setHistoryViewMode} />
+          </div>
         </div>
 
         {historyError && (
@@ -778,6 +912,7 @@ const StockIn: React.FC = () => {
           </div>
         )}
 
+        {historyViewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
@@ -825,6 +960,27 @@ const StockIn: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : isLoadingHistory && historyItems.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 dark:text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Loading history...</div>
+        ) : historyItems.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 dark:text-slate-400">No stock in history found.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {historyItems.map((item) => (
+              <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-none dark:hover:border-slate-600">
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-mono text-sm font-semibold text-slate-900 dark:text-blue-400">{item.receivingNo ?? '—'}</p><h4 className="mt-1 font-semibold text-slate-900 dark:text-white">{item.product}</h4></div><ReceivingStatusBadge status={item.status} /></div>
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Supplier</dt><dd className="text-slate-900 dark:text-slate-200">{item.supplier ?? '—'}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Receiving date</dt><dd className="text-slate-900 dark:text-slate-200">{formatDateOnly(item.receivingDate)}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Stock In date</dt><dd className="text-slate-900 dark:text-slate-200">{formatDateTime(item.stockInDate)}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Reference</dt><dd className="break-all text-slate-900 dark:text-slate-200">{item.referenceNo ?? '—'}</dd></div>
+                  <div><dt className="text-slate-500 dark:text-slate-400">Stocked quantity</dt><dd className="font-medium text-slate-900 dark:text-white">{item.stockedQuantity}</dd></div>
+                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Barcode</dt><dd className="break-all font-mono text-slate-900 dark:text-cyan-300">{item.barcode ?? '—'}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 items-stretch">
@@ -966,6 +1122,15 @@ const StockIn: React.FC = () => {
                   <div><span className="text-slate-400">Prepared By</span><p className="text-white">{selectedReceiving.preparedBy ?? '—'}</p></div>
                   <div><span className="text-slate-400">Product</span><p className="text-white">{selectedReceiving.productSummary}</p></div>
                   <div><span className="text-slate-400">Quantity</span><p className="text-white">{selectedReceiving.eligibleQuantity} units</p></div>
+                  <div>
+                    <span className="text-slate-400">Available Capacity</span>
+                    <p className="text-white">
+                      {warehouseCapacity?.available === null || warehouseCapacity?.available === undefined
+                        ? 'Not configured'
+                        : `${warehouseCapacity.available.toLocaleString()} units`}
+                    </p>
+                    {capacityError && <p className="mt-1 text-xs text-amber-400">Live capacity could not be loaded. The server will validate capacity on submission.</p>}
+                  </div>
                   <div><span className="text-slate-400">Status</span><div className="pt-1"><ReceivingStatusBadge status={selectedReceiving.status} /></div></div>
                   <div><span className="text-slate-400">Received Value</span><p className="text-white">₱{selectedReceiving.receivedValue.toLocaleString()}</p></div>
                 </div>
@@ -999,7 +1164,11 @@ const StockIn: React.FC = () => {
                     {isStockingIn ? 'Stocking In...' : 'Perform Stock In'}
                   </button>
                   {!canPerformStockIn && (
-                    <p className="text-xs text-amber-400 text-center">{selectedReceiving.eligibilityMessage}</p>
+                    <p className="text-xs text-amber-400 text-center">
+                      {exceedsAvailableCapacity && warehouseCapacity?.available !== null && warehouseCapacity?.available !== undefined
+                        ? `Only ${warehouseCapacity.available.toLocaleString()} units of warehouse capacity are available.`
+                        : selectedReceiving.eligibilityMessage}
+                    </p>
                   )}
                   <button
                     onClick={() => setDrawerMode(null)}

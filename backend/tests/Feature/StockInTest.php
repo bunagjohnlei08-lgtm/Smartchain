@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class StockInTest extends TestCase
@@ -82,6 +83,32 @@ class StockInTest extends TestCase
     {
         $role = Role::firstOrCreate(['slug' => 'PLANT_MANAGER'], ['name' => 'Plant Manager']);
         return User::factory()->create(['role_id' => $role->id]);
+    }
+
+    private function warehouseWithUtilization(int $capacity, int $utilized): Warehouse
+    {
+        $branch = Branch::create(['name' => 'Main Branch', 'code' => 'BR-'.uniqid()]);
+        $warehouse = Warehouse::create([
+            'name' => 'Main Warehouse',
+            'code' => 'WH-MAIN',
+            'branch_id' => $branch->id,
+            'capacity' => $capacity,
+            'status' => 'Active',
+        ]);
+
+        if ($utilized > 0) {
+            $product = Product::create(['name' => 'Existing Stock', 'unit' => 'pcs', 'cost_price' => 1]);
+            Inventory::create([
+                'barcode' => 'CAP-'.uniqid(),
+                'product_id' => $product->id,
+                'warehouse_id' => $warehouse->id,
+                'available_stock' => $utilized,
+                'reserved_stock' => 0,
+                'backload' => 0,
+            ]);
+        }
+
+        return $warehouse;
     }
 
     public function test_index_returns_200_and_no_received_at_error(): void
@@ -170,6 +197,90 @@ class StockInTest extends TestCase
         $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")->assertOk();
 
         $this->assertDatabaseHas('inventories', ['product_id' => $item->product_id, 'warehouse_id' => $warehouse->id, 'available_stock' => 15, 'reserved_stock' => 2, 'backload' => 1]);
+    }
+
+    public function test_stock_in_below_capacity_succeeds(): void
+    {
+        $user = $this->plantManager();
+        $warehouse = $this->warehouseWithUtilization(10000, 9000);
+        $receiving = $this->makeReceiving([['product' => 'Below Capacity', 'qty' => 500, 'inspection_status' => 'Passed']]);
+
+        $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")->assertOk();
+
+        $this->assertSame(9500, (int) Inventory::where('warehouse_id', $warehouse->id)->sum(DB::raw('available_stock + reserved_stock')));
+    }
+
+    public function test_stock_in_may_fill_warehouse_to_exact_capacity(): void
+    {
+        $user = $this->plantManager();
+        $warehouse = $this->warehouseWithUtilization(10000, 9500);
+        $receiving = $this->makeReceiving([['product' => 'Exact Capacity', 'qty' => 500, 'inspection_status' => 'Passed']]);
+
+        $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")->assertOk();
+
+        $this->assertSame(10000, (int) Inventory::where('warehouse_id', $warehouse->id)->sum(DB::raw('available_stock + reserved_stock')));
+    }
+
+    public function test_stock_in_exceeding_capacity_is_rejected_without_partial_changes(): void
+    {
+        $user = $this->plantManager();
+        $warehouse = $this->warehouseWithUtilization(10000, 9500);
+        $receiving = $this->makeReceiving([['product' => 'Exceeds Capacity', 'qty' => 501, 'inspection_status' => 'Passed']]);
+        $item = $receiving->items()->firstOrFail();
+
+        $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'Cannot stock in: Quantity exceeds maximum warehouse capacity.',
+                'available_capacity' => 500,
+                'requested_quantity' => 501,
+            ]);
+
+        $this->assertSame(9500, (int) Inventory::where('warehouse_id', $warehouse->id)->sum(DB::raw('available_stock + reserved_stock')));
+        $this->assertNull($item->fresh()->stocked_in_at);
+        $this->assertDatabaseMissing('receiving_timelines', ['receiving_id' => $receiving->id, 'status' => 'Stock In Completed']);
+    }
+
+    public function test_stock_in_is_rejected_when_warehouse_is_already_full(): void
+    {
+        $user = $this->plantManager();
+        $this->warehouseWithUtilization(10000, 10000);
+        $receiving = $this->makeReceiving([['product' => 'Full Warehouse', 'qty' => 1, 'inspection_status' => 'Passed']]);
+
+        $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")
+            ->assertStatus(422)
+            ->assertJsonPath('available_capacity', 0)
+            ->assertJsonPath('requested_quantity', 1);
+    }
+
+    public function test_stock_in_is_rejected_when_warehouse_is_already_over_capacity(): void
+    {
+        $user = $this->plantManager();
+        $this->warehouseWithUtilization(10000, 11544);
+        $receiving = $this->makeReceiving([['product' => 'Over Capacity Warehouse', 'qty' => 1, 'inspection_status' => 'Passed']]);
+
+        $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")
+            ->assertStatus(422)
+            ->assertJsonPath('available_capacity', 0)
+            ->assertJsonPath('requested_quantity', 1);
+    }
+
+    public function test_multi_item_stock_in_validates_total_incoming_quantity(): void
+    {
+        $user = $this->plantManager();
+        $warehouse = $this->warehouseWithUtilization(10000, 9900);
+        $receiving = $this->makeReceiving([
+            ['product' => 'Item A', 'qty' => 60, 'inspection_status' => 'Passed'],
+            ['product' => 'Item B', 'qty' => 60, 'inspection_status' => 'Passed'],
+        ]);
+
+        $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")
+            ->assertStatus(422)
+            ->assertJsonPath('available_capacity', 100)
+            ->assertJsonPath('requested_quantity', 120);
+
+        $this->assertSame(9900, (int) Inventory::where('warehouse_id', $warehouse->id)->sum(DB::raw('available_stock + reserved_stock')));
+        $this->assertSame(0, $receiving->items()->whereNotNull('stocked_in_at')->count());
     }
 
     public function test_non_plant_manager_cannot_perform_stock_in(): void

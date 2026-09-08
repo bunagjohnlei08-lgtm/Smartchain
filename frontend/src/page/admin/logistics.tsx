@@ -4,7 +4,6 @@ import { apiClient } from '../../lib/api';
 import {
   Truck,
   Search,
-  Plus,
   ChevronLeft,
   ChevronRight,
   Package,
@@ -17,6 +16,8 @@ import {
   AlertCircle,
   Filter,
   RefreshCw,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 
 // ============================================
@@ -307,6 +308,7 @@ const Logistics: React.FC = () => {
  const [warehouseFilter, setWarehouseFilter] = useState('All Warehouses');
  const [logisticsFilter, setLogisticsFilter] = useState('All Logistics');
  const [currentPage, setCurrentPage] = useState(1);
+ const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const itemsPerPage = 6;
 
   // Shipment data comes from the orders released by Stock Out (Plant Manager Shipment)
@@ -342,17 +344,7 @@ const Logistics: React.FC = () => {
   // Modal states
   const [showViewModal, setShowViewModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
-  const [createForm, setCreateForm] = useState({
-   poNumber: '',
-   customer: '',
-   warehouse: '',
-   destination: '',
-   assignedLogistics: '',
-   estimatedDeliveryDate: '',
-   estimatedDeliveryTime: '',
-  });
  const [assignForm, setAssignForm] = useState({
   logisticsPartner: '',
   pickupDate: '',
@@ -432,49 +424,6 @@ const Logistics: React.FC = () => {
    setTimeout(() => setToast(null), 5000);
   };
 
-  const handleCreateSubmit = () => {
-   if (!createForm.poNumber || !createForm.customer || !createForm.warehouse || !createForm.destination || !createForm.assignedLogistics) {
-    setToast({ message: 'Please fill in all required fields.', type: 'error' });
-    return;
-   }
-
-   const newShipment: Shipment = {
-    id: String(Date.now()),
-    shipmentNo: `SHP-${3307 + shipments.length}`,
-    poNumber: createForm.poNumber,
-    customer: createForm.customer,
-    warehouse: createForm.warehouse,
-    preparedBy: 'Current Admin',
-    destination: createForm.destination,
-    preparedDate: new Date().toISOString().split('T')[0],
-    assignedLogistics: createForm.assignedLogistics,
-    status: 'Pending Approval',
-    items: [],
-    totalItems: 0,
-    totalWeight: 0,
-    weightUnit: 'kg',
-    timeline: [{ step: 'Shipment Prepared', completed: true, timestamp: new Date().toLocaleString() }],
-    barcodeVerified: false,
-    expectedDelivery: createForm.estimatedDeliveryDate && createForm.estimatedDeliveryTime
-     ? `${createForm.estimatedDeliveryDate} ${createForm.estimatedDeliveryTime}`
-     : createForm.estimatedDeliveryDate,
-   };
-
-   setShipments([...shipments, newShipment]);
-   setCreateForm({
-    poNumber: '',
-    customer: '',
-    warehouse: '',
-    destination: '',
-    assignedLogistics: '',
-    estimatedDeliveryDate: '',
-    estimatedDeliveryTime: '',
-   });
-   setIsCreateModalOpen(false);
-   setToast({ message: 'Shipment created successfully with status Pending Approval.', type: 'success' });
-   setTimeout(() => setToast(null), 5000);
-  };
-
  return (
   <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-transparent text-white min-h-screen">
    {/* Breadcrumb */}
@@ -485,16 +434,11 @@ const Logistics: React.FC = () => {
    </div>
 
    {/* Header */}
-   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-    <div>
+   <div>
      <h1 className="text-2xl font-bold text-white">Logistics & Tracking (DTRS)</h1>
      <p className="text-sm text-gray-400">
       Manage delivery routes, fleet status, and shipment tracking across warehouses and branches.
      </p>
-    </div>
-     <button onClick={() => setIsCreateModalOpen(true)} className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors">
-      <Plus className="w-4 h-4" /> Create Shipment
-     </button>
    </div>
 
    {/* KPI Cards */}
@@ -516,6 +460,10 @@ const Logistics: React.FC = () => {
     <button className="px-3.5 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all flex items-center gap-1.5 text-sm">
      <Filter className="w-4 h-4" /> More Filters
     </button>
+    <div className="ml-auto flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/50 p-1" aria-label="Shipment view">
+     <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+     <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+    </div>
     <button className="p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all">
      <RefreshCw className="w-4 h-4" />
     </button>
@@ -523,6 +471,7 @@ const Logistics: React.FC = () => {
 
    {/* Table */}
    <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl overflow-hidden">
+    {viewMode === 'list' ? (
     <div className="overflow-x-auto">
      <table className="w-full min-w-[1000px]">
       <thead className="bg-gray-800/50 border-b border-gray-800 border-gray-800/50">
@@ -601,6 +550,19 @@ const Logistics: React.FC = () => {
       </tbody>
      </table>
     </div>
+    ) : paginatedShipments.length > 0 ? (
+     <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+      {paginatedShipments.map((shipment) => (
+       <article key={shipment.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{shipment.shipmentNo}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{shipment.poNumber} · {shipment.customer}</p></div><StatusBadge status={shipment.status} /></div>
+        <dl className="mt-4 space-y-2 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Assigned Logistics</dt><dd className="text-slate-900 dark:text-white">{shipment.assignedLogistics || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Destination</dt><dd className="text-slate-900 dark:text-white">{shipment.destination}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{shipment.warehouse}</dd></div></dl>
+        <div className="mt-4 flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => handleView(shipment)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button>{shipment.status === 'Pending Approval' && <button onClick={() => handleApprove(shipment)} className="p-2 text-emerald-600 dark:text-emerald-400" title="Approve"><Check className="h-4 w-4" /></button>}{(shipment.status === 'Pending Approval' || shipment.status === 'Approved') && <button onClick={() => handleAssign(shipment)} className="p-2 text-blue-600 dark:text-blue-400" title="Assign Logistics"><Send className="h-4 w-4" /></button>}</div>
+       </article>
+      ))}
+     </div>
+    ) : (
+     <div className="px-4 py-8 text-center text-gray-400">{isLoading ? 'Loading shipments...' : loadError ?? 'No shipments found matching your criteria.'}</div>
+    )}
     <Pagination
      currentPage={currentPage}
      totalPages={totalPages}
@@ -819,140 +781,6 @@ const Logistics: React.FC = () => {
     </div>
    )}
 
-     {/* ============================================ */}
-     {/* CREATE SHIPMENT MODAL */}
-     {/* ============================================ */}
-     {isCreateModalOpen && (
-      <div
-       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-       onClick={() => setIsCreateModalOpen(false)}
-      >
-       <div
-        className="max-w-2xl w-full max-h-[90vh] flex flex-col rounded-xl bg-[#0d1527] border border-gray-800 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-       >
-        <div className="flex items-center justify-between p-6 pb-4 shrink-0">
-         <div>
-          <h2 className="text-xl font-bold text-white">Create New Shipment</h2>
-          <p className="text-sm text-gray-400">Fill in the details to create a new shipment record.</p>
-         </div>
-         <button
-          onClick={() => setIsCreateModalOpen(false)}
-          className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-all"
-         >
-          <X className="w-5 h-5" />
-         </button>
-        </div>
-
-        <form onSubmit={(e) => e.preventDefault()} className="overflow-y-auto p-6 pt-0 space-y-4 custom-scrollbar">
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-           <label className="block text-sm font-medium mb-1.5 text-gray-300">Order Number / Reference *</label>
-           <input
-            type="text"
-            value={createForm.poNumber}
-            onChange={(e) => setCreateForm({ ...createForm, poNumber: e.target.value })}
-            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-            placeholder="e.g. PO-2861"
-            required
-           />
-          </div>
-
-          <div>
-           <label className="block text-sm font-medium mb-1.5 text-gray-300">Customer Name *</label>
-           <input
-            type="text"
-            value={createForm.customer}
-            onChange={(e) => setCreateForm({ ...createForm, customer: e.target.value })}
-            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-            placeholder="Enter customer name"
-            required
-           />
-          </div>
-
-           <div>
-            <label className="block text-sm font-medium mb-1.5 text-gray-300">Origin Warehouse *</label>
-            <select
-             value={createForm.warehouse}
-             onChange={(e) => setCreateForm({ ...createForm, warehouse: e.target.value })}
-             className="w-full bg-[#111827] text-slate-100 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
-             required
-            >
-             <option value="" className="bg-[#0f172a] text-slate-100 py-2">Select Warehouse</option>
-             {warehouseOptions.filter(o => o !== 'All Warehouses').map((opt) => (
-              <option key={opt} value={opt} className="bg-[#0f172a] text-slate-100 py-2">{opt}</option>
-             ))}
-            </select>
-           </div>
-
-           <div>
-            <label className="block text-sm font-medium mb-1.5 text-gray-300">Assigned Logistics Provider / Fleet *</label>
-            <select
-             value={createForm.assignedLogistics}
-             onChange={(e) => setCreateForm({ ...createForm, assignedLogistics: e.target.value })}
-             className="w-full bg-[#111827] text-slate-100 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
-             required
-            >
-             <option value="" className="bg-[#0f172a] text-slate-100 py-2">Select Logistics Provider</option>
-             <option value="Integrated Logistics System" className="bg-[#0f172a] text-slate-100 py-2">Integrated Logistics System</option>
-             <option value="External Delivery Group" className="bg-[#0f172a] text-slate-100 py-2">External Delivery Group</option>
-             <option value="Internal Fleet" className="bg-[#0f172a] text-slate-100 py-2">Internal Fleet</option>
-            </select>
-           </div>
-
-          <div>
-           <label className="block text-sm font-medium mb-1.5 text-gray-300">Estimated Delivery Date</label>
-           <input
-            type="date"
-            value={createForm.estimatedDeliveryDate}
-            onChange={(e) => setCreateForm({ ...createForm, estimatedDeliveryDate: e.target.value })}
-            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-           />
-          </div>
-
-          <div>
-           <label className="block text-sm font-medium mb-1.5 text-gray-300">Estimated Delivery Time</label>
-           <input
-            type="time"
-            value={createForm.estimatedDeliveryTime}
-            onChange={(e) => setCreateForm({ ...createForm, estimatedDeliveryTime: e.target.value })}
-            className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-           />
-          </div>
-         </div>
-
-         <div className="col-span-1 md:col-span-2">
-          <label className="block text-sm font-medium mb-1.5 text-gray-300">Destination / Delivery Address *</label>
-          <textarea
-           rows={2}
-           value={createForm.destination}
-           onChange={(e) => setCreateForm({ ...createForm, destination: e.target.value })}
-           className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-           placeholder="Enter delivery address"
-           required
-          />
-         </div>
-        </form>
-
-        <div className="flex items-center justify-end gap-3 p-6 pt-4 border-t border-gray-800 shrink-0">
-         <button
-          type="button"
-          onClick={() => setIsCreateModalOpen(false)}
-          className="px-5 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
-         >
-          Cancel
-         </button>
-         <button
-          type="button"
-          onClick={handleCreateSubmit}
-          className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
-         >
-          <Check className="w-4 h-4" /> Create Shipment
-         </button>
-        </div>
-       </div>
-      </div>
-     )}
    {toast && (
     <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm text-white flex items-center gap-2 ${
      toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'

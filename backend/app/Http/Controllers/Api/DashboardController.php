@@ -9,6 +9,7 @@ use App\Models\PurchaseOrder;
 use App\Models\ReceivingItem;
 use App\Models\StockOutTransaction;
 use App\Models\Supplier;
+use App\Models\Warehouse;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -97,10 +98,20 @@ class DashboardController extends Controller
             'source' => 'placeholder_5_percent_trend',
         ]);
 
+        $warehouse = Warehouse::query()->where('code', 'WH-MAIN')->first()
+            ?? Warehouse::query()->orderBy('id')->first();
+        $warehouseUtilized = $warehouse === null ? null : (int) $warehouse->inventories()
+            ->selectRaw('COALESCE(SUM(available_stock + reserved_stock), 0) AS aggregate')
+            ->value('aggregate');
+        $warehouseUtilization = $warehouse?->capacity && $warehouse->capacity > 0
+            ? round(min(100, $warehouseUtilized / $warehouse->capacity * 100), 1)
+            : null;
+
         return response()->json([
             'data' => [
                 'metrics' => [
-                    'warehouse_utilization' => 68,
+                    'warehouse_utilization' => $warehouseUtilization,
+                    'warehouse_name' => $warehouse?->name,
                     'open_purchase_orders' => PurchaseOrder::query()->whereNotIn('status', ['Completed', 'Cancelled'])->count(),
                     'shipments_in_transit' => Order::query()->where('status', 'IN_TRANSIT')->count(),
                     'low_stock_items' => Inventory::query()->where('available_stock', '<=', self::LOW_STOCK_THRESHOLD)->count(),

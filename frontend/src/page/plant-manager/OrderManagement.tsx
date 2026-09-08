@@ -19,6 +19,8 @@ import {
   ListTodo,
   Check,
   Box,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 
 // ============================================
@@ -196,6 +198,7 @@ const OrderManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'All'>('All');
   const [warehouseFilter, setWarehouseFilter] = useState<string>('All');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -389,7 +392,9 @@ const OrderManagement: React.FC = () => {
             <Calendar className="w-4 h-4" />
           </button>
 
-          <button className="ml-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1" aria-label="Order view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+
+          <button className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Export Pick List
           </button>
@@ -398,6 +403,7 @@ const OrderManagement: React.FC = () => {
 
       {/* ORDER TABLE */}
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden">
+        {viewMode === 'list' ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
@@ -458,6 +464,11 @@ const OrderManagement: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : filteredOrders.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{filteredOrders.map((order) => <article key={order.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-mono font-semibold text-slate-900 dark:text-white">{order.orderNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.customer}</p></div><StatusBadge status={order.status} /></div><p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Products</dt><dd className="text-slate-900 dark:text-white">{order.items[0]?.productName || 'No products'}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.totalItems}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned</dt><dd className="text-slate-900 dark:text-white">{order.assignedDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => void handleViewOrder(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View / Process Order"><Eye className="h-4 w-4" /></button></div></article>)}</div>
+        ) : (
+          <div className="px-4 py-8 text-center text-slate-400">No orders match your filters.</div>
+        )}
       </div>
 
       {/* BOTTOM ANALYTICS & TIMELINE */}

@@ -203,14 +203,50 @@ class StockOutManagementTest extends TestCase
         $this->assertDatabaseCount('stock_out_transactions', 0);
     }
 
-    public function test_each_scan_releases_exactly_one_unit(): void
+    public function test_camera_style_scan_without_quantity_releases_exactly_one_unit(): void
     {
         $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 2);
         $inventory = $this->inventory($this->product, $this->warehouse, '2000000000004', 2);
 
-        $this->scan($order, $inventory->barcode, 999)->assertOk()->assertJsonPath('quantity_released', 1);
+        $this->actingAs($this->manager)->postJson("/api/stock-out/orders/{$order->id}/release", [
+            'barcode' => $inventory->barcode,
+        ])->assertOk()->assertJsonPath('quantity_released', 1);
         $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 1]);
         $this->assertDatabaseCount('stock_out_transactions', 1);
+    }
+
+    public function test_manual_release_accepts_a_positive_whole_number_quantity_as_one_transaction(): void
+    {
+        $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 20);
+        $inventory = $this->inventory($this->product, $this->warehouse, 'manual-bulk', 25);
+
+        $this->scan($order, $inventory->barcode, 20)->assertOk()
+            ->assertJsonPath('quantity_released', 20)
+            ->assertJsonPath('inventory_remaining_quantity', 5)
+            ->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
+
+        $this->assertDatabaseHas('stock_out_transactions', [
+            'order_id' => $order->id,
+            'barcode' => $inventory->barcode,
+            'quantity' => 20,
+        ]);
+        $this->assertDatabaseCount('stock_out_transactions', 1);
+    }
+
+    public function test_manual_release_rejects_invalid_quantities(): void
+    {
+        $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 3);
+        $inventory = $this->inventory($this->product, $this->warehouse, 'manual-invalid', 3);
+
+        foreach ([0, -5, 1.5, '', null, 'invalid'] as $quantity) {
+            $this->actingAs($this->manager)->postJson("/api/stock-out/orders/{$order->id}/release", [
+                'barcode' => $inventory->barcode,
+                'quantity' => $quantity,
+            ])->assertUnprocessable()->assertJsonValidationErrors('quantity');
+        }
+
+        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 3]);
+        $this->assertDatabaseCount('stock_out_transactions', 0);
     }
 
     public function test_idempotent_retry_does_not_double_deduct(): void

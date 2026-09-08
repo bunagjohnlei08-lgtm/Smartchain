@@ -17,6 +17,8 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 
 // ============================================
@@ -42,6 +44,12 @@ interface Product {
 }
 
 interface CatalogProduct {
+  id: number;
+  name: string;
+  category: string;
+}
+
+interface ProcurementWarehouse {
   id: number;
   name: string;
 }
@@ -241,6 +249,8 @@ const Pagination: React.FC<{
 const ReplenishmentPlanning: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [procurementWarehouse, setProcurementWarehouse] = useState<ProcurementWarehouse | null>(null);
   const [history, setHistory] = useState<RequestHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -250,6 +260,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [priorityFilter, setPriorityFilter] = useState('All Priorities');
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const itemsPerPage = 10;
 
   // Modal states
@@ -292,6 +303,8 @@ const ReplenishmentPlanning: React.FC = () => {
         priority: request.priority as Priority,
       })));
       setProducts(optionsResponse.data?.data ?? []);
+      const warehouse = optionsResponse.data?.warehouse;
+      setProcurementWarehouse(warehouse ? { id: Number(warehouse.id), name: String(warehouse.name) } : null);
     } catch (error: any) {
       setToast({ message: error?.response?.data?.message || 'Unable to load procurement data.', type: 'error' });
     } finally {
@@ -306,19 +319,31 @@ const ReplenishmentPlanning: React.FC = () => {
   useEffect(() => {
     if (!showNewRequestModal) return;
 
-    setNewRequest((current) => ({ ...current, warehouse: 'Main Warehouse' }));
+    setNewRequest((current) => ({ ...current, warehouse: procurementWarehouse?.name ?? '' }));
     apiClient.get('/products')
       .then((response) => {
         const records = response.data?.data ?? response.data ?? [];
         setCatalogProducts(records.map((product: any) => ({
           id: Number(product.id),
           name: String(product.name),
+          category: String(product.category ?? ''),
         })));
       })
       .catch((error: any) => {
         showToast(error?.response?.data?.message || 'Unable to load Product Catalog.', 'error');
       });
-  }, [showNewRequestModal]);
+  }, [showNewRequestModal, procurementWarehouse]);
+
+  const catalogCategories = useMemo(
+    () => Array.from(new Set(catalogProducts.map((product) => product.category).filter(Boolean))).sort(),
+    [catalogProducts]
+  );
+  const categoryProducts = useMemo(
+    () => selectedCategory
+      ? catalogProducts.filter((product) => product.category === selectedCategory)
+      : [],
+    [catalogProducts, selectedCategory]
+  );
 
   // Filtered products
   const filteredRequests = useMemo(() => {
@@ -384,30 +409,41 @@ const ReplenishmentPlanning: React.FC = () => {
     }
   };
 
+  const handleOpenNewRequest = () => {
+    setSelectedCategory('');
+    setNewRequest((current) => ({ ...current, product: '' }));
+    setShowNewRequestModal(true);
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setNewRequest((current) => ({ ...current, product: '' }));
+  };
+
   const handleNewRequestSubmit = async () => {
-    if (!newRequest.product || !newRequest.warehouse || !newRequest.quantity || Number(newRequest.quantity) <= 0) {
+    if (!selectedCategory || !newRequest.product || !newRequest.warehouse || !newRequest.quantity || Number(newRequest.quantity) <= 0) {
       showToast('Please fill in all required fields.', 'error');
       return;
     }
 
     const product = catalogProducts.find((item) => String(item.id) === newRequest.product);
-    const mainWarehouse = products.find((item) => item.warehouse === 'Main Warehouse');
-    if (!product || !mainWarehouse) {
-      showToast('Select a valid catalog product for Main Warehouse.', 'error');
+    if (!product || product.category !== selectedCategory || !procurementWarehouse) {
+      showToast('Select a valid catalog product and warehouse.', 'error');
       return;
     }
     setSubmitting(true);
     try {
       await apiClient.post('/plant-manager/procurement/requests', {
         product_id: product.id,
-        warehouse_id: mainWarehouse.warehouseId,
+        warehouse_id: procurementWarehouse.id,
         requested_qty: Number(newRequest.quantity),
         priority: newRequest.priority,
         status: 'pending',
       });
       await loadProcurement();
       setShowNewRequestModal(false);
-      setNewRequest({ requestNo: '', product: '', warehouse: 'Main Warehouse', quantity: '', priority: 'Medium', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
+      setSelectedCategory('');
+      setNewRequest({ requestNo: '', product: '', warehouse: procurementWarehouse.name, quantity: '', priority: 'Medium', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
       showToast('Request created successfully!', 'success');
     } catch (error: any) {
       showToast(error?.response?.data?.message || 'Request could not be created.', 'error');
@@ -441,7 +477,7 @@ const ReplenishmentPlanning: React.FC = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
           <button
-            onClick={() => setShowNewRequestModal(true)}
+            onClick={handleOpenNewRequest}
             className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
           >
             <Plus className="w-4 h-4" /> New Request
@@ -498,10 +534,12 @@ const ReplenishmentPlanning: React.FC = () => {
         >
           Reset
         </button>
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-1" aria-label="Request view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutGrid className="h-4 w-4" /></button></div>
       </div>
 
       {/* Main Table */}
       <div className="w-full max-w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
+        {viewMode === 'list' ? (
         <div className="w-full overflow-x-auto">
           <table className="w-full min-w-[900px]">
             <thead className="bg-[var(--bg-surface-alt)] border-b border-[var(--border-color)]">
@@ -551,6 +589,11 @@ const ReplenishmentPlanning: React.FC = () => {
             </tbody>
           </table>
         </div>
+        ) : paginatedRequests.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedRequests.map((req) => <article key={req.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{req.requestNo}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{req.product}</p></div><StatusBadge status={req.status} /></div><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Requested by</dt><dd className="text-slate-900 dark:text-white">{req.requestedBy}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{req.warehouse}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Quantity</dt><dd className="text-slate-900 dark:text-white">{req.requestedQty.toLocaleString()}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Date</dt><dd className="text-slate-900 dark:text-white">{req.submittedDate}</dd></div></dl><div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700"><PriorityBadge priority={req.priority} /><button onClick={() => handleViewDetails(req)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button></div></article>)}</div>
+        ) : (
+          <div className="px-4 py-8 text-center text-[var(--text-muted)]">No requests found matching your criteria.</div>
+        )}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -721,21 +764,41 @@ const ReplenishmentPlanning: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
+                    <label htmlFor="procurement-category" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Category <span className="text-red-400">*</span></label>
                     <select
+                      id="procurement-category"
+                      value={selectedCategory}
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      className="w-full cursor-pointer bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    >
+                      <option value="">Select Category</option>
+                      {catalogCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="procurement-product" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
+                    <select
+                      id="procurement-product"
                       value={newRequest.product}
                       onChange={(e) => setNewRequest({ ...newRequest, product: e.target.value })}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                      disabled={!selectedCategory || categoryProducts.length === 0}
+                      className="w-full cursor-pointer bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <option value="">Select a product</option>
-                      {catalogProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                      <option value="">
+                        {!selectedCategory
+                          ? 'Select a category first'
+                          : categoryProducts.length === 0
+                            ? 'No products available in this category'
+                            : 'Select Product'}
+                      </option>
+                      {categoryProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Warehouse <span className="text-red-400">*</span></label>
                     <input
                       type="text"
-                      value="Main Warehouse"
+                      value={procurementWarehouse?.name ?? ''}
                       readOnly
                       disabled
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] opacity-80 cursor-not-allowed"
