@@ -29,11 +29,22 @@ use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AdminWarehouseLocationController;
 use App\Http\Controllers\Api\PlantManagerWarehouseController;
 use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\NotificationController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
+    Route::delete('/profile/photo', [ProfileController::class, 'removePhoto']);
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/recent', [NotificationController::class, 'recent']);
+    Route::put('/notifications/read-all', [NotificationController::class, 'readAll']);
+    Route::put('/notifications/{id}/read', [NotificationController::class, 'read'])->whereUuid('id');
     Route::get('/admin/dashboard', [DashboardController::class, 'index']);
     Route::get('/admin/reports/dashboard', [AdminReportController::class, 'dashboard']);
     Route::get('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'show']);

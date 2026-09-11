@@ -622,7 +622,7 @@ const StockIn: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {kpiData.map((kpi, idx) => {
           const trendIcon = kpi.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />;
           const trendColor = kpi.trend === 'up' ? 'text-emerald-400' : 'text-rose-400';

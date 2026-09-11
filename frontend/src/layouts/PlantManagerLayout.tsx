@@ -1,7 +1,6 @@
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
-  Bell,
   ChevronDown,
   Moon,
   Sun,
@@ -10,28 +9,26 @@ import {
 } from 'lucide-react';
 import PlantManagerSidebar from '../components/layout/PlantManagerSidebar';
 import { useTheme } from '../context/ThemeContext';
+import { readStoredUser, subscribeToStoredUser, type AuthUser } from '../lib/authUser';
+import NotificationBell from '../components/NotificationBell';
+import UserAvatar from '../components/UserAvatar';
 
 const PlantManagerLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [userName, setUserName] = React.useState('User');
-  const [userInitial, setUserInitial] = React.useState('U');
+  const [profilePhotoUrl, setProfilePhotoUrl] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
   React.useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('user');
-      if (raw) {
-        const user: { name?: string } = JSON.parse(raw);
-        const fullName = user.name?.trim() || '';
-        if (fullName) {
-          setUserName(fullName);
-          setUserInitial(fullName.charAt(0).toUpperCase() || 'U');
-        }
-      }
-    } catch {
-      // ignore parse errors; fallback initials remain
-    }
+    const applyUser = (user: AuthUser | null) => {
+      const fullName = user?.name?.trim();
+      if (!fullName) return;
+      setUserName(fullName);
+      setProfilePhotoUrl(user?.profile_photo_url ?? null);
+    };
+    applyUser(readStoredUser());
+    return subscribeToStoredUser(applyUser);
   }, []);
 
   const handleLogout = () => {
@@ -95,16 +92,11 @@ const PlantManagerLayout: React.FC = () => {
             </button>
 
             {/* Notifications */}
-            <button className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all relative">
-              <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationBell viewAllPath="/plant-manager/notifications" />
 
             {/* User Profile Dropdown */}
             <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-slate-800 rounded-xl px-2 py-1 transition-all h-full">
-              <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center text-sm font-semibold">
-                {userInitial}
-              </div>
+              <UserAvatar name={userName} photoUrl={profilePhotoUrl} className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600/20 text-sm font-semibold text-blue-400" />
               <span className="hidden sm:inline text-sm text-slate-300">{userName}</span>
               <ChevronDown size={16} className="text-slate-400" />
             </div>

@@ -12,8 +12,10 @@ use App\Models\ReceivingItem;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class StockInTest extends TestCase
@@ -129,7 +131,12 @@ class StockInTest extends TestCase
 
     public function test_perform_stock_in_updates_inventory_and_marks_items(): void
     {
+        Notification::fake();
         $user = $this->plantManager();
+        $adminRole = Role::firstOrCreate(['slug' => 'ADMIN'], ['name' => 'Admin']);
+        $qaRole = Role::firstOrCreate(['slug' => 'QA_SUPERVISOR'], ['name' => 'QA Supervisor']);
+        $admin = User::factory()->create(['role_id' => $adminRole->id, 'status' => 'ACTIVE']);
+        $qa = User::factory()->create(['role_id' => $qaRole->id, 'status' => 'ACTIVE']);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'BR-MAIN']);
         Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id]);
 
@@ -156,6 +163,14 @@ class StockInTest extends TestCase
             'status' => 'Stock In Completed',
             'performed_by' => $user->name,
         ]);
+        Notification::assertSentTo($admin, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'Stock In Completed'
+            && $notification->message === "Plant Manager successfully added inventory for Receiving #{$receiving->receiving_no}."
+            && $notification->type === 'success'
+            && $notification->referenceId === $receiving->receiving_no);
+        Notification::assertSentToTimes($admin, WorkflowNotification::class, 1);
+        Notification::assertNotSentTo($user, WorkflowNotification::class);
+        Notification::assertNotSentTo($qa, WorkflowNotification::class);
 
         $rejectedItem = $receiving->items()->where('product_name', 'Widget B')->first();
         $this->assertNull($rejectedItem->stocked_in_at);
@@ -163,6 +178,7 @@ class StockInTest extends TestCase
         // Calling again must not double-stock the already-completed item.
         $second = $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in");
         $second->assertStatus(422);
+        Notification::assertSentToTimes($admin, WorkflowNotification::class, 1);
 
         $this->assertDatabaseHas('inventories', [
             'product_id' => $passedItem->product_id,
@@ -223,7 +239,10 @@ class StockInTest extends TestCase
 
     public function test_stock_in_exceeding_capacity_is_rejected_without_partial_changes(): void
     {
+        Notification::fake();
         $user = $this->plantManager();
+        $adminRole = Role::firstOrCreate(['slug' => 'ADMIN'], ['name' => 'Admin']);
+        $admin = User::factory()->create(['role_id' => $adminRole->id, 'status' => 'ACTIVE']);
         $warehouse = $this->warehouseWithUtilization(10000, 9500);
         $receiving = $this->makeReceiving([['product' => 'Exceeds Capacity', 'qty' => 501, 'inspection_status' => 'Passed']]);
         $item = $receiving->items()->firstOrFail();
@@ -239,6 +258,7 @@ class StockInTest extends TestCase
         $this->assertSame(9500, (int) Inventory::where('warehouse_id', $warehouse->id)->sum(DB::raw('available_stock + reserved_stock')));
         $this->assertNull($item->fresh()->stocked_in_at);
         $this->assertDatabaseMissing('receiving_timelines', ['receiving_id' => $receiving->id, 'status' => 'Stock In Completed']);
+        Notification::assertNotSentTo($admin, WorkflowNotification::class);
     }
 
     public function test_stock_in_is_rejected_when_warehouse_is_already_full(): void

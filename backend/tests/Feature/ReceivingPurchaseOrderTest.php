@@ -6,7 +6,9 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Role;
 use App\Models\User;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class ReceivingPurchaseOrderTest extends TestCase
@@ -53,6 +55,10 @@ class ReceivingPurchaseOrderTest extends TestCase
 
     public function test_receiving_data_is_mapped_from_the_purchase_order_and_completion_updates_status(): void
     {
+        Notification::fake();
+        $qa = $this->user('QA_SUPERVISOR');
+        $inactiveQa = $this->user('QA_SUPERVISOR');
+        $inactiveQa->update(['status' => 'SUSPENDED']);
         $item = $this->purchaseOrder->items()->firstOrFail();
         $response = $this->actingAs($this->plantManager)->postJson('/api/receivings', [
             'purchase_order_id' => $this->purchaseOrder->id,
@@ -65,6 +71,13 @@ class ReceivingPurchaseOrderTest extends TestCase
 
         $this->assertDatabaseHas('receivings', ['id' => $response->json('id'), 'purchase_order_id' => $this->purchaseOrder->id]);
         $this->assertDatabaseHas('purchase_orders', ['id' => $this->purchaseOrder->id, 'status' => 'Completed']);
+        $receivingNumber = $response->json('receiving_no');
+        Notification::assertSentTo($qa, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'Pending QA Inspection'
+            && $notification->message === "Receiving #{$receivingNumber} is ready for QA."
+            && $notification->type === 'info'
+            && $notification->referenceId === $receivingNumber);
+        Notification::assertNotSentTo($inactiveQa, WorkflowNotification::class);
     }
 
     public function test_receiving_rejects_items_from_another_po_and_over_delivery(): void
@@ -114,6 +127,7 @@ class ReceivingPurchaseOrderTest extends TestCase
 
     public function test_receiving_failure_rolls_back_header_and_items(): void
     {
+        Notification::fake();
         Product::query()->where('name', 'IPAD AIR')->delete();
         $item = $this->purchaseOrder->items()->firstOrFail();
 
@@ -125,5 +139,6 @@ class ReceivingPurchaseOrderTest extends TestCase
         $this->assertDatabaseCount('receivings', 0);
         $this->assertDatabaseCount('receiving_items', 0);
         $this->assertDatabaseHas('purchase_orders', ['id' => $this->purchaseOrder->id, 'status' => 'Approved']);
+        Notification::assertNothingSent();
     }
 }

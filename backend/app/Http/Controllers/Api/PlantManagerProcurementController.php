@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\ReplenishmentRequest;
 use App\Models\Inventory;
 use App\Models\Warehouse;
+use App\Models\User;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -94,6 +97,10 @@ class PlantManagerProcurementController extends Controller
         ]);
         $replenishmentRequest->load(['product:id,name', 'warehouse:id,name', 'requester:id,name']);
 
+        if ($status === self::STATUS_PENDING) {
+            $this->notifyAdmins($replenishmentRequest);
+        }
+
         return response()->json($this->requestData($replenishmentRequest), 201);
     }
 
@@ -112,8 +119,25 @@ class PlantManagerProcurementController extends Controller
             'submitted_at' => now(),
         ]);
         $replenishmentRequest->load(['product:id,name', 'warehouse:id,name', 'requester:id,name']);
+        $this->notifyAdmins($replenishmentRequest);
 
         return response()->json($this->requestData($replenishmentRequest));
+    }
+
+    private function notifyAdmins(ReplenishmentRequest $replenishmentRequest): void
+    {
+        $admins = User::query()
+            ->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($query) => $query->where('slug', 'ADMIN'))
+            ->get();
+
+        WorkflowNotificationSender::send($admins, new WorkflowNotification(
+            'New Replenishment Request',
+            "Request #{$replenishmentRequest->request_no} requires your approval.",
+            'info',
+            $replenishmentRequest->request_no,
+            'Procurement',
+        ));
     }
 
     private function requestData(ReplenishmentRequest $request): array

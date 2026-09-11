@@ -442,7 +442,7 @@ const Logistics: React.FC = () => {
    </div>
 
    {/* KPI Cards */}
-   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+   <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
     <KPICard label="Waiting Approval" value={pendingApproval} icon={<Clock className="w-5 h-5 text-amber-400 not-dark:text-amber-600" />} />
     <KPICard label="Approved" value={approved} icon={<CheckCircle className="w-5 h-5 text-blue-400 not-dark:text-blue-600" />} />
     <KPICard label="Assigned" value={assigned} icon={<Truck className="w-5 h-5 text-purple-400 not-dark:text-purple-600" />} />

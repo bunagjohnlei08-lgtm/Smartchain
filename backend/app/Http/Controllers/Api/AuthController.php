@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -80,6 +81,9 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'status' => $user->status,
+                'profile_photo_url' => $user->profile_photo_path
+                    ? Storage::disk('public')->url($user->profile_photo_path)
+                    : null,
                 'role' => $user->role ? [
                     'name' => $user->role->name,
                     'slug' => $user->role->slug,

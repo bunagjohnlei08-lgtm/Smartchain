@@ -164,11 +164,12 @@ const KPICard: React.FC<{
   value: number;
   icon: React.ReactNode;
   colorClass: string;
-}> = ({ label, value, icon, colorClass }) => {
+  onClick: () => void;
+}> = ({ label, value, icon, colorClass, onClick }) => {
   const borderClass = colorClass.replace('text-', 'border-') + '/30';
   const bgClass = colorClass.replace('text-', 'bg-') + '/10';
   return (
-    <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col hover:border-slate-700 transition-colors">
+    <button type="button" onClick={onClick} className="w-full cursor-pointer bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col text-left hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-colors">
       <div className="flex items-center gap-3 w-full mb-3">
         <div className={`border ${borderClass} ${bgClass} p-2 rounded-lg shrink-0`}>
           <span className={colorClass}>{icon}</span>
@@ -181,10 +182,7 @@ const KPICard: React.FC<{
         <span className="text-2xl font-bold text-white">{value}</span>
         <span className="text-xs font-medium text-slate-400">orders</span>
       </div>
-      <div className="mt-2">
-        <span className="text-xs text-cyan-400 hover:underline cursor-pointer">View all</span>
-      </div>
-    </div>
+    </button>
   );
 };
 
@@ -245,12 +243,12 @@ const OrderManagement: React.FC = () => {
 
   // KPI data
   const kpiData = [
-    { label: 'Assigned to Me', value: assignedCount, icon: <UserCheck className="w-5 h-5" />, colorClass: 'text-orange-500' },
-    { label: 'Preparing', value: preparingCount, icon: <Package className="w-5 h-5" />, colorClass: 'text-purple-500' },
-    { label: 'Ready for Stock Out', value: readyCount, icon: <Truck className="w-5 h-5" />, colorClass: 'text-green-500' },
-    { label: 'In Transit', value: inTransitCount, icon: <Truck className="w-5 h-5" />, colorClass: 'text-blue-500' },
-    { label: 'Delivered', value: deliveredCount, icon: <CheckCircle2 className="w-5 h-5" />, colorClass: 'text-emerald-500' },
-    { label: 'Cancelled', value: cancelledCount, icon: <XCircle className="w-5 h-5" />, colorClass: 'text-red-500' },
+    { label: 'Assigned to Me', status: 'Assigned' as OrderStatus, value: assignedCount, icon: <UserCheck className="w-5 h-5" />, colorClass: 'text-orange-500' },
+    { label: 'Preparing', status: 'Preparing' as OrderStatus, value: preparingCount, icon: <Package className="w-5 h-5" />, colorClass: 'text-purple-500' },
+    { label: 'Ready for Stock Out', status: 'Ready for Stock Out' as OrderStatus, value: readyCount, icon: <Truck className="w-5 h-5" />, colorClass: 'text-green-500' },
+    { label: 'In Transit', status: 'In Transit' as OrderStatus, value: inTransitCount, icon: <Truck className="w-5 h-5" />, colorClass: 'text-blue-500' },
+    { label: 'Delivered', status: 'Delivered' as OrderStatus, value: deliveredCount, icon: <CheckCircle2 className="w-5 h-5" />, colorClass: 'text-emerald-500' },
+    { label: 'Cancelled', status: 'Cancelled' as OrderStatus, value: cancelledCount, icon: <XCircle className="w-5 h-5" />, colorClass: 'text-red-500' },
   ];
 
   // Handlers
@@ -324,7 +322,7 @@ const OrderManagement: React.FC = () => {
       </div>
 
       {/* KPI CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {kpiData.map((kpi, idx) => (
           <KPICard
             key={idx}
@@ -332,6 +330,7 @@ const OrderManagement: React.FC = () => {
             value={kpi.value}
             icon={kpi.icon}
             colorClass={kpi.colorClass}
+            onClick={() => setStatusFilter(kpi.status)}
           />
         ))}
       </div>

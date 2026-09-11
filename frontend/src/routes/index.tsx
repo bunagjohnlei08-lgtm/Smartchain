@@ -20,6 +20,8 @@ import AdminReports from '../page/admin/Reports';
 import AdminAIDemandForecasting from '../page/admin/AIDemandForecast';
 import AdminUserManagement from '../page/admin/userManagement';
 import AdminOrderManagement from '../page/admin/orderManagement';
+import AdminProfile from '../page/admin/Profile';
+import AdminNotifications from '../page/admin/Notifications';
 
 import PlantManagerDashboard from '../page/plant-manager/Dashboard';
 import PlantManagerProcurement from '../page/plant-manager/Procurement';
@@ -41,6 +43,8 @@ import QAInspection from '../page/QA/QualityInspection';
 import QARejectedItems from '../page/QA/RejectedItems';
 import QAInspectionHistory from '../page/QA/InspectionHistory';
 import QAQualityReports from '../page/QA/QualityReports';
+import QAProfile from '../page/QA/Profile';
+import QANotifications from '../page/QA/Notifications';
 
 const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/login" replace /> },
@@ -67,6 +71,8 @@ const router = createBrowserRouter([
       { path: 'reports', element: <AdminReports /> },
       { path: 'users', element: <AdminUserManagement /> },
       { path: 'order-management', element: <AdminOrderManagement /> },
+      { path: 'notifications', element: <AdminNotifications /> },
+      { path: 'profile', element: <AdminProfile /> },
     ],
   },
   {
@@ -101,6 +107,8 @@ const router = createBrowserRouter([
       { path: 'rejected-items', element: <QARejectedItems /> },
       { path: 'history', element: <QAInspectionHistory /> },
       { path: 'reports', element: <QAQualityReports /> },
+      { path: 'notifications', element: <QANotifications /> },
+      { path: 'profile', element: <QAProfile /> },
     ],
   },
   { path: '*', element: <Navigate to="/login" replace /> },

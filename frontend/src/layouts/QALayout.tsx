@@ -1,7 +1,6 @@
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
-  Bell,
   Moon,
   Sun,
   Menu,
@@ -11,31 +10,26 @@ import {
 } from 'lucide-react';
 import QASidebar from '../components/layout/QASidebar';
 import { useTheme } from '../context/ThemeContext';
+import { readStoredUser, subscribeToStoredUser, type AuthUser } from '../lib/authUser';
+import NotificationBell from '../components/NotificationBell';
+import UserAvatar from '../components/UserAvatar';
 
 const QALayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [userName, setUserName] = React.useState('User');
-  const [userInitials, setUserInitials] = React.useState('U');
+  const [profilePhotoUrl, setProfilePhotoUrl] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
   React.useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('user');
-      if (raw) {
-        const user: { name?: string } = JSON.parse(raw);
-        const fullName = user.name?.trim() || '';
-        if (fullName) {
-          setUserName(fullName);
-          const parts = fullName.split(/\s+/);
-          const first = parts[0]?.[0] ?? '';
-          const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
-          setUserInitials((first + last).toUpperCase() || 'U');
-        }
-      }
-    } catch {
-      // ignore parse errors; fallback initials remain
-    }
+    const applyUser = (user: AuthUser | null) => {
+      const fullName = user?.name?.trim();
+      if (!fullName) return;
+      setUserName(fullName);
+      setProfilePhotoUrl(user?.profile_photo_url ?? null);
+    };
+    applyUser(readStoredUser());
+    return subscribeToStoredUser(applyUser);
   }, []);
 
   const handleLogout = () => {
@@ -81,7 +75,7 @@ const QALayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#090d16]">
         {/* Top Bar */}
-        <header className="sticky top-0 z-40 flex h-16 min-h-16 max-h-16 flex-shrink-0 items-center overflow-hidden border-b border-slate-800/80 bg-[#090d16] px-4 md:px-6">
+        <header className="sticky top-0 z-40 flex h-16 min-h-16 max-h-16 flex-shrink-0 items-center border-b border-slate-800/80 bg-[#090d16] px-4 md:px-6">
           <div className="flex min-w-0 flex-1 items-center">
             <div className="w-10 flex-shrink-0 xl:hidden" />
             <div className="hidden min-w-0 md:block">
@@ -101,16 +95,11 @@ const QALayout: React.FC = () => {
             </button>
 
             {/* Notifications */}
-            <button className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all relative">
-              <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationBell viewAllPath="/qa/notifications" />
 
             {/* User Profile Badge */}
             <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-slate-800 rounded-xl px-2 py-1 transition-all h-full">
-              <div className="w-8 h-8 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-sm font-semibold">
-                {userInitials}
-              </div>
+              <UserAvatar name={userName} photoUrl={profilePhotoUrl} className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-600/20 text-sm font-semibold text-cyan-400" />
               <div className="hidden sm:flex flex-col">
                 <span className="text-sm text-slate-300 leading-none">{userName}</span>
                 <span className="text-[10px] text-slate-500 leading-none mt-0.5">QA/QC Supervisor</span>

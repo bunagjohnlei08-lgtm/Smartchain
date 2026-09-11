@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
 type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order';
+type ViewMode = 'list' | 'grid';
 
 /**
  * A replenishment request raised by the Plant Manager. Admin Procurement only
@@ -189,6 +190,7 @@ const Procurement: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const loadProcurement = useCallback(async () => {
     setLoading(true);
@@ -354,7 +356,7 @@ const Procurement: React.FC = () => {
             <h2 className="text-base font-semibold text-[var(--text-primary)]">Replenishment Requests</h2>
             <p className="text-xs text-[var(--text-muted)]">Review and track requests submitted by Plant Managers.</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
             <label className="relative min-w-64">
               <span className="sr-only">Search replenishment requests</span>
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -380,31 +382,65 @@ const Procurement: React.FC = () => {
                 <option value="for_purchase_order">For Purchase Order</option>
               </select>
             </label>
+            <div
+              className="flex self-start rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-1 sm:self-auto"
+              aria-label="Replenishment request view"
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`flex min-h-9 min-w-9 items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-600/50 ${
+                  viewMode === 'list'
+                    ? 'bg-[#092635] text-white shadow-sm'
+                    : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                }`}
+                title="List view"
+                aria-label="Show requests in list view"
+                aria-pressed={viewMode === 'list'}
+              >
+                <Rows3 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`flex min-h-9 min-w-9 items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-600/50 ${
+                  viewMode === 'grid'
+                    ? 'bg-[#092635] text-white shadow-sm'
+                    : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                }`}
+                title="Grid view"
+                aria-label="Show requests in grid view"
+                aria-pressed={viewMode === 'grid'}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[1000px]">
+        {viewMode === 'list' ? (
+        <div className="overflow-x-auto w-full custom-scrollbar">
+          <table className="w-full min-w-[900px]">
             <thead className="border-b border-[var(--border-color)]">
               <tr>
                 {['Request No.', 'Requested By', 'Warehouse', 'Product', 'Requested Qty', 'Priority', 'Status', 'Date'].map((heading) => (
-                  <th key={heading} className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{heading}</th>
+                  <th key={heading} className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap text-[var(--text-muted)]">{heading}</th>
                 ))}
-                <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Actions</th>
+                <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider whitespace-nowrap text-[var(--text-muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredRequests.map((request) => (
                 <tr key={request.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-colors">
-                  <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">{request.request_no}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{request.requested_by ?? '—'}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{request.warehouse_name}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{request.product_name}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{request.requested_qty.toLocaleString()}</td>
-                  <td className="px-4 py-3"><PriorityBadge priority={request.priority} /></td>
-                  <td className="px-4 py-3"><StatusBadge status={request.status} /></td>
-                  <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{request.submitted_date ?? '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-sm font-medium whitespace-nowrap text-[var(--text-primary)]">{request.request_no}</td>
+                  <td className="px-4 py-3 text-sm whitespace-nowrap text-[var(--text-secondary)]">{request.requested_by ?? '—'}</td>
+                  <td className="px-4 py-3 text-sm whitespace-nowrap text-[var(--text-secondary)]">{request.warehouse_name}</td>
+                  <td className="px-4 py-3 text-sm whitespace-nowrap text-[var(--text-secondary)]">{request.product_name}</td>
+                  <td className="px-4 py-3 text-sm whitespace-nowrap text-[var(--text-secondary)]">{request.requested_qty.toLocaleString()}</td>
+                  <td className="px-4 py-3 whitespace-nowrap"><PriorityBadge priority={request.priority} /></td>
+                  <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={request.status} /></td>
+                  <td className="px-4 py-3 text-sm whitespace-nowrap text-[var(--text-secondary)]">{request.submitted_date ?? '—'}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center justify-center gap-2">
                       <button onClick={() => setSelectedRequest(request)} className="min-h-9 rounded-lg border border-[var(--border-color)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors">View</button>
                       {request.status === 'pending' && (
@@ -421,11 +457,90 @@ const Procurement: React.FC = () => {
                 </tr>
               ))}
               {!loading && filteredRequests.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">No replenishment requests match the current filters.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-sm whitespace-nowrap text-[var(--text-muted)]">No replenishment requests match the current filters.</td></tr>
               )}
             </tbody>
           </table>
         </div>
+        ) : loading ? (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">
+            Loading replenishment requests...
+          </p>
+        ) : filteredRequests.length === 0 ? (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">
+            No replenishment requests match the current filters.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filteredRequests.map((request) => (
+              <article
+                key={request.id}
+                className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Request No.
+                    </p>
+                    <h3 className="mt-1 break-words text-base font-semibold text-slate-900 dark:text-white">
+                      {request.request_no}
+                    </h3>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <PriorityBadge priority={request.priority} />
+                    <StatusBadge status={request.status} />
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Product
+                  </p>
+                  <p className="mt-1 break-words text-sm font-medium text-slate-900 dark:text-white">
+                    {request.product_name}
+                  </p>
+                </div>
+
+                <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-5">
+                  <div>
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">Requested Qty</dt>
+                    <dd className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
+                      {request.requested_qty.toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">Warehouse</dt>
+                    <dd className="mt-1 break-words text-sm text-slate-700 dark:text-slate-300">
+                      {request.warehouse_name}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">Requested By</dt>
+                    <dd className="mt-1 break-words text-sm text-slate-700 dark:text-slate-300">
+                      {request.requested_by ?? '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">Date</dt>
+                    <dd className="mt-1 break-words text-sm text-slate-700 dark:text-slate-300">
+                      {request.submitted_date ?? '—'}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="mt-auto flex justify-end border-t border-slate-200 pt-5 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRequest(request)}
+                    className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                  >
+                    View
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Main Section */}

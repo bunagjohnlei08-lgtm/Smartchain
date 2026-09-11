@@ -1,377 +1,117 @@
-// src/pages/admin/BarcodeCenter.tsx
-import React, { useState, useMemo } from 'react';
-import {
-  ChevronRight,
-  Search,
-  Printer,
-  FileText,
-  Barcode,
-  Download,
-  X,
-  CheckCircle,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Barcode, CheckCircle, ChevronRight, Download, FileText, LoaderCircle, Printer, Search, X } from 'lucide-react';
+import { apiClient } from '../../lib/api';
 
-// ============================================
-// TYPES
-// ============================================
+interface InventoryBarcodeApiItem { id: number | string; barcode: string | null; product?: string | null; category?: string | null; warehouse?: string | null; available_stock?: number | null; }
+interface BarcodeItem { id: string; productName: string; category: string | null; warehouse: string | null; availableStock: number | null; barcode: string; }
+interface BarcodeBars { bars: Array<{ x: number; width: number }>; width: number; }
 
-interface BarcodeItem {
-  id: string;
-  productName: string;
-  sku: string;
-  category: string;
-  barcode: string;
-  format: string;
-}
+const ALL_CATEGORIES = 'All categories';
+const CODE128_PATTERNS = [
+  '212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112',
+] as const;
 
-// ============================================
-// MOCK DATA
-// ============================================
-
-const mockBarcodes: BarcodeItem[] = [
-  {
-    id: '1',
-    productName: 'Industrial LED Panel 40W',
-    sku: 'ELC-LED-040',
-    category: 'Electronics',
-    barcode: '8801234500011',
-    format: 'EAN-13',
-  },
-  {
-    id: '2',
-    productName: 'Corrugated Box 60x40x40',
-    sku: 'PKG-BOX-604',
-    category: 'Packaging',
-    barcode: '8801234500028',
-    format: 'EAN-13',
-  },
-  {
-    id: '3',
-    productName: 'Stainless Steel Sheet 2mm',
-    sku: 'RAW-SST-002',
-    category: 'Raw Materials',
-    barcode: '8801234500035',
-    format: 'EAN-13',
-  },
-  {
-    id: '4',
-    productName: 'Cordless Impact Driver',
-    sku: 'TLS-IMP-018',
-    category: 'Tools & Hardware',
-    barcode: '8801234500042',
-    format: 'EAN-13',
-  },
-  {
-    id: '5',
-    productName: 'Safety Helmet Class E',
-    sku: 'SAF-HLM-001',
-    category: 'Safety Equipment',
-    barcode: '8801234500059',
-    format: 'EAN-13',
-  },
-  {
-    id: '6',
-    productName: 'Thermal Label Roll 4x6',
-    sku: 'PKG-LBL-046',
-    category: 'Packaging',
-    barcode: '8801234500066',
-    format: 'EAN-13',
-  },
-  {
-    id: '7',
-    productName: 'Servo Motor 400W',
-    sku: 'ELC-SRV-400',
-    category: 'Electronics',
-    barcode: '8801234500073',
-    format: 'EAN-13',
-  },
-  {
-    id: '8',
-    productName: 'Nitrile Gloves (Box 100)',
-    sku: 'SAF-GLV-100',
-    category: 'Safety Equipment',
-    barcode: '8801234500080',
-    format: 'EAN-13',
-  },
-  {
-    id: '9',
-    productName: 'Aluminium Profile 6m',
-    sku: 'RAW-ALU-006',
-    category: 'Raw Materials',
-    barcode: '8801234500097',
-    format: 'EAN-13',
-  },
-];
-
-// ============================================
-// CONSTANTS
-// ============================================
-
-const categories = [
-  'All categories',
-  'Electronics',
-  'Packaging',
-  'Raw Materials',
-  'Tools & Hardware',
-  'Safety Equipment',
-];
-
-// ============================================
-// HELPER COMPONENTS
-// ============================================
-
-const SearchInput: React.FC<{
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  className?: string;
-}> = ({ value, onChange, placeholder = 'Search...', className = '' }) => (
-  <div className={`relative flex-1 min-w-[200px] ${className}`}>
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-[#0d1322] border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
-    />
-  </div>
-);
-
-const FilterSelect: React.FC<{
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  className?: string;
-}> = ({ value, onChange, options, className = '' }) => (
-  <div className={`min-w-[140px] ${className}`}>
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#0d1322] border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-        </option>
-      ))}
-    </select>
-  </div>
-);
-
-// Barcode SVG Generator
-const BarcodeSVG: React.FC<{ value: string }> = ({ value }) => {
-  const digits = value.split('').map(Number);
-
-  // Generate patterns for each digit
-  const patterns = digits.map((d) => {
-    const pattern = [];
-    for (let i = 0; i < 5; i++) {
-      const thickness = (d % 3 === 0) ? 2 : 1;
-      pattern.push(thickness);
-    }
-    return pattern;
-  }).flat();
-
-  const barWidth = 2;
-  const barSpacing = 1;
-  const height = 50;
-
-  return (
-    <svg
-      viewBox={`0 0 ${patterns.length * (barWidth + barSpacing)} ${height}`}
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-full h-auto max-h-14"
-    >
-      {patterns.map((thick, index) => (
-        <rect
-          key={index}
-          x={index * (barWidth + barSpacing)}
-          y={0}
-          width={thick === 2 ? barWidth * 2 : barWidth}
-          height={height}
-          fill="currentColor"
-          className="text-slate-200"
-        />
-      ))}
-    </svg>
-  );
+const buildCode128Bars = (value: string): BarcodeBars | null => {
+  const values = Array.from(value, (character) => character.charCodeAt(0) - 32);
+  if (!value || values.some((code) => code < 0 || code > 94)) return null;
+  const startCode = 104;
+  const checksum = (startCode + values.reduce((sum, code, index) => sum + code * (index + 1), 0)) % 103;
+  const bars: BarcodeBars['bars'] = [];
+  let x = 10;
+  [startCode, ...values, checksum, 106].forEach((symbol) => {
+    CODE128_PATTERNS[symbol].split('').forEach((moduleWidth, index) => {
+      const width = Number(moduleWidth);
+      if (index % 2 === 0) bars.push({ x, width });
+      x += width;
+    });
+  });
+  return { bars, width: x + 10 };
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+const BarcodeSVG: React.FC<{ value: string }> = ({ value }) => {
+  const encoded = useMemo(() => buildCode128Bars(value), [value]);
+  if (!encoded) return <p className="text-xs text-rose-400">Barcode cannot be rendered.</p>;
+  return <svg viewBox={`0 0 ${encoded.width} 64`} xmlns="http://www.w3.org/2000/svg" className="h-14 w-full text-slate-200" role="img" aria-label={`Barcode ${value}`} shapeRendering="crispEdges">
+    {encoded.bars.map((bar, index) => <rect key={`${bar.x}-${index}`} x={bar.x} y="2" width={bar.width} height="60" fill="currentColor" />)}
+  </svg>;
+};
+
+const escapeHtml = (value: string | number | null | undefined): string => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+const barcodeSvgMarkup = (value: string): string => {
+  const encoded = buildCode128Bars(value);
+  if (!encoded) return '<p class="render-error">Barcode cannot be rendered.</p>';
+  const bars = encoded.bars.map((bar) => `<rect x="${bar.x}" y="2" width="${bar.width}" height="60" fill="#111827"/>`).join('');
+  return `<svg viewBox="0 0 ${encoded.width} 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Barcode ${escapeHtml(value)}" shape-rendering="crispEdges">${bars}</svg>`;
+};
+const labelMarkup = (item: BarcodeItem): string => `<article class="label"><h2>${escapeHtml(item.productName)}</h2><div class="barcode">${barcodeSvgMarkup(item.barcode)}</div><p class="number">${escapeHtml(item.barcode)}</p><p class="meta">${escapeHtml(item.category || '—')}${item.warehouse ? ` · ${escapeHtml(item.warehouse)}` : ''}</p></article>`;
+
+const openPrintDocument = (items: BarcodeItem[], title: string, saveAsPdf: boolean): boolean => {
+  const popup = window.open('', '_blank', 'width=900,height=700');
+  if (!popup) return false;
+  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
+    @page{margin:10mm}*{box-sizing:border-box}body{margin:0;padding:12px;color:#111827;background:#fff;font-family:Arial,sans-serif}.notice{margin:0 0 12px;color:#475569;font-size:12px}.sheet{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10mm}.label{min-width:0;break-inside:avoid;border:1px solid #cbd5e1;border-radius:8px;padding:10mm;text-align:center}h2{margin:0 0 8px;font-size:15px;overflow-wrap:anywhere}.barcode{width:100%;height:64px}.barcode svg{display:block;width:100%;height:64px}.number{margin:6px 0 0;font:13px 'Courier New',monospace;letter-spacing:1px;overflow-wrap:anywhere}.meta{margin:6px 0 0;color:#475569;font-size:11px;overflow-wrap:anywhere}.render-error{color:#b91c1c;font-size:11px}@media print{body{padding:0}.notice{display:none}}@media(max-width:600px){.sheet{grid-template-columns:1fr}}
+  </style></head><body>${saveAsPdf ? '<p class="notice">Choose “Save as PDF” in the print dialog.</p>' : ''}<main class="sheet">${items.map(labelMarkup).join('')}</main><script>window.onload=()=>{window.focus();window.print();};</script></body></html>`);
+  popup.document.close();
+  return true;
+};
 
 const BarcodeCenter: React.FC = () => {
-  // State
+  const [barcodes, setBarcodes] = useState<BarcodeItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('All categories');
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
-  // Filter barcodes
+  useEffect(() => {
+    let active = true;
+    const loadBarcodes = async () => {
+      setLoading(true); setError('');
+      try {
+        const response = await apiClient.get<{ data?: InventoryBarcodeApiItem[] }>('/inventory');
+        if (!active) return;
+        const records = Array.isArray(response.data?.data) ? response.data.data : [];
+        setBarcodes(records.filter((item) => typeof item.barcode === 'string' && item.barcode.trim() !== '').map((item) => ({
+          id: String(item.id), barcode: item.barcode!.trim(), productName: item.product?.trim() || 'Unknown Product', category: item.category?.trim() || null, warehouse: item.warehouse?.trim() || null, availableStock: typeof item.available_stock === 'number' ? item.available_stock : null,
+        })));
+      } catch {
+        if (!active) return;
+        setBarcodes([]); setError('Unable to load barcode records. Please try again.');
+      } finally { if (active) setLoading(false); }
+    };
+    void loadBarcodes();
+    return () => { active = false; };
+  }, []);
+
+  const categories = useMemo(() => [ALL_CATEGORIES, ...Array.from(new Set(barcodes.map((item) => item.category).filter((category): category is string => Boolean(category)))).sort((a, b) => a.localeCompare(b))], [barcodes]);
   const filteredBarcodes = useMemo(() => {
-    return mockBarcodes.filter((item) => {
-      const matchSearch =
-        item.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.barcode.includes(searchQuery);
-      const matchCategory =
-        categoryFilter === 'All categories' || item.category === categoryFilter;
-      return matchSearch && matchCategory;
+    const query = searchQuery.trim().toLocaleLowerCase();
+    return barcodes.filter((item) => {
+      const matchesSearch = !query || [item.productName, item.barcode, item.category || ''].some((value) => value.toLocaleLowerCase().includes(query));
+      return matchesSearch && (categoryFilter === ALL_CATEGORIES || item.category === categoryFilter);
     });
-  }, [searchQuery, categoryFilter]);
+  }, [barcodes, searchQuery, categoryFilter]);
 
-  // Toast notification
-  const showNotification = (message: string) => {
-    setToastMessage(message);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+  const showNotification = (message: string) => { setToastMessage(message); setShowToast(true); window.setTimeout(() => setShowToast(false), 3000); };
+  const printRecords = (items: BarcodeItem[], saveAsPdf: boolean) => {
+    if (items.length === 0) { showNotification('There are no displayed barcode records to export.'); return; }
+    const opened = openPrintDocument(items, saveAsPdf ? 'SmartChain Barcode Labels PDF' : 'SmartChain Barcode Labels', saveAsPdf);
+    showNotification(opened ? (saveAsPdf ? 'Choose “Save as PDF” in the print dialog.' : `Prepared ${items.length} barcode label${items.length === 1 ? '' : 's'} for printing.`) : 'The print window was blocked. Please allow pop-ups and try again.');
   };
 
-  // Handle actions
-  const handlePrint = (productName: string) => {
-    showNotification(`Printing barcode for ${productName}...`);
-  };
-
-  const handlePDF = (productName: string) => {
-    showNotification(`Generating PDF for ${productName}...`);
-  };
-
-  const handlePrintSheet = () => {
-    showNotification('Printing sheet...');
-  };
-
-  const handleDownloadPDF = () => {
-    showNotification('Downloading PDF...');
-  };
-
-  return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-400">
-        <span>Admin</span>
-        <ChevronRight className="w-4 h-4" />
-        <span className="text-slate-100">Barcode Center</span>
-      </div>
-
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Barcode Center</h1>
-          <p className="text-sm text-gray-400">
-            {mockBarcodes.length} generated barcodes · EAN-13 format
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handlePrintSheet}
-            className="bg-[#0d1322] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
-          >
-            <Printer className="w-4 h-4" /> Print sheet
-          </button>
-          <button
-            onClick={handleDownloadPDF}
-            className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download PDF
-          </button>
-        </div>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-4 md:p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <SearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search product, SKU or barcode..."
-            className="min-w-[280px]"
-          />
-          <div className="ml-auto w-full sm:w-auto">
-            <FilterSelect
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              options={categories}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Barcode Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredBarcodes.map((item) => (
-          <div
-            key={item.id}
-            className="bg-[#0f172a]/80 border border-slate-800/90 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-md hover:border-slate-700 transition-all"
-          >
-            {/* Card Header */}
-            <div>
-              <div className="flex items-start justify-between mb-1">
-                <h3 className="text-sm font-semibold text-white">
-                  {item.productName}
-                </h3>
-                <span className="bg-[#0d1322] text-gray-400 text-[10px] px-2 py-0.5 rounded-full border border-slate-800 whitespace-nowrap ml-2">
-                  {item.format}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400">
-                {item.sku} · {item.category}
-              </p>
-            </div>
-
-            {/* Barcode Visual */}
-            <div className="bg-[#0d1322] border border-slate-800/90 rounded-xl p-4 flex flex-col items-center justify-center space-y-2">
-              <div className="w-full overflow-hidden">
-                <BarcodeSVG value={item.barcode} />
-              </div>
-              <p className="text-xs font-mono text-gray-400 tracking-widest">
-                {item.barcode.split('').join(' ')}
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handlePrint(item.productName)}
-                className="bg-[#0d1322] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Printer className="w-4 h-4" /> Print
-              </button>
-              <button
-                onClick={() => handlePDF(item.productName)}
-                className="bg-[#0d1322] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <FileText className="w-4 h-4" /> PDF
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Empty State */}
-      {filteredBarcodes.length === 0 && (
-        <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-8 text-center">
-          <Barcode className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-400">No barcodes found matching your search.</p>
-        </div>
-      )}
-
-      {/* Toast Notification */}
-      {showToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-300">
-          <CheckCircle className="w-5 h-5 text-emerald-400" />
-          <span className="text-sm">{toastMessage}</span>
-          <button
-            onClick={() => setShowToast(false)}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  return <div className="mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#090d16] p-4 text-slate-100 md:p-6">
+    <div className="flex items-center gap-2 text-sm text-gray-400"><span>Admin</span><ChevronRight className="h-4 w-4"/><span className="text-slate-100">Barcode Center</span></div>
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-bold text-white">Barcode Center</h1><p className="text-sm text-gray-400">{loading ? 'Loading barcode records…' : `${barcodes.length} inventory barcode${barcodes.length === 1 ? '' : 's'}`}</p></div><div className="flex items-center gap-3">
+      <button onClick={() => printRecords(filteredBarcodes, false)} disabled={loading || filteredBarcodes.length === 0} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-700/60 bg-[#0d1322] px-4 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-[#18253d] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50"><Printer className="h-4 w-4"/> Print sheet</button>
+      <button onClick={() => printRecords(filteredBarcodes, true)} disabled={loading || filteredBarcodes.length === 0} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"><Download className="h-4 w-4"/> Download PDF</button>
+    </div></div>
+    <div className="rounded-2xl border border-slate-800/80 bg-[#0f172a]/60 p-4 md:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="relative min-w-[200px] flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"/><input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search product, category or barcode..." aria-label="Search barcodes" className="w-full rounded-xl border border-slate-800 bg-[#0d1322] py-2.5 pl-9 pr-4 text-sm text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"/></div><div className="ml-auto w-full sm:w-auto sm:min-w-[180px]"><label htmlFor="barcode-category" className="sr-only">Filter by category</label><select id="barcode-category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-h-11 w-full cursor-pointer appearance-none rounded-xl border border-slate-800 bg-[#0d1322] px-3 py-2.5 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select></div></div></div>
+    {error && <div role="alert" className="flex items-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300"><AlertCircle className="h-5 w-5 shrink-0"/>{error}</div>}
+    {loading ? <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-800/80 bg-[#0f172a]/60 p-8 text-gray-400"><LoaderCircle className="h-5 w-5 animate-spin"/>Loading real inventory barcodes…</div> : <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">{filteredBarcodes.map((item) => <article key={item.id} className="flex flex-col justify-between space-y-4 rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 shadow-md transition-colors hover:border-slate-700"><div><h2 className="text-sm font-semibold text-white">{item.productName}</h2><p className="mt-1 text-xs text-gray-400">{item.category || '—'}{item.warehouse ? ` · ${item.warehouse}` : ''}</p>{item.availableStock !== null && <p className="mt-1 text-xs text-gray-400">Available stock: {item.availableStock}</p>}</div><div className="flex flex-col items-center justify-center space-y-2 rounded-xl border border-slate-800/90 bg-[#0d1322] p-4"><div className="w-full overflow-hidden"><BarcodeSVG value={item.barcode}/></div><p className="break-all text-center font-mono text-xs tracking-widest text-gray-400">{item.barcode}</p></div><div className="grid grid-cols-2 gap-3"><button onClick={() => printRecords([item], false)} className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#0d1322] py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-[#18253d] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"><Printer className="h-4 w-4"/> Print</button><button onClick={() => printRecords([item], true)} className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#0d1322] py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-[#18253d] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"><FileText className="h-4 w-4"/> PDF</button></div></article>)}</div>}
+    {!loading && !error && filteredBarcodes.length === 0 && <div className="rounded-2xl border border-slate-800/80 bg-[#0f172a]/60 p-8 text-center"><Barcode className="mx-auto mb-3 h-12 w-12 text-gray-400"/><p className="text-gray-400">{barcodes.length === 0 ? 'No inventory records with barcodes are available.' : 'No barcodes match the active search and category filter.'}</p></div>}
+    {showToast && <div role="status" className="fixed bottom-6 right-6 z-50 flex max-w-sm items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-white shadow-lg"><CheckCircle className="h-5 w-5 shrink-0 text-emerald-400"/><span className="text-sm">{toastMessage}</span><button type="button" onClick={() => setShowToast(false)} aria-label="Dismiss notification" className="min-h-11 min-w-11 cursor-pointer text-gray-400 transition-colors hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"><X className="mx-auto h-4 w-4"/></button></div>}
+  </div>;
 };
 
 export default BarcodeCenter;

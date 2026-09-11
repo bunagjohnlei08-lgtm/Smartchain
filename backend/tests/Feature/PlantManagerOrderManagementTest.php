@@ -9,7 +9,9 @@ use App\Models\Inventory;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class PlantManagerOrderManagementTest extends TestCase
@@ -55,6 +57,26 @@ class PlantManagerOrderManagementTest extends TestCase
             'unit_price' => 500, 'subtotal' => 1000,
         ]);
         return $order;
+    }
+
+    public function test_logistics_handoff_notifies_admin_once_after_the_transition(): void
+    {
+        Notification::fake();
+        $order = $this->order($this->manager, Order::SHIPMENT_STATUS);
+
+        $this->actingAs($this->manager)
+            ->postJson("/api/plant-manager/shipments/{$order->id}/forward-to-logistics")
+            ->assertOk()->assertJsonPath('status', Order::LOGISTICS_STATUS);
+
+        Notification::assertSentTo($this->admin, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'Order Ready for Logistics'
+            && $notification->type === 'success'
+            && $notification->referenceId === $order->order_no);
+
+        $this->actingAs($this->manager)
+            ->postJson("/api/plant-manager/shipments/{$order->id}/forward-to-logistics")
+            ->assertNotFound();
+        Notification::assertSentToTimes($this->admin, WorkflowNotification::class, 1);
     }
 
     public function test_manager_lists_only_owned_orders_with_search_and_filters(): void

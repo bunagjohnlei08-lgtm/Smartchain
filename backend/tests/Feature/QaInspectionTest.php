@@ -11,7 +11,9 @@ use App\Models\ReceivingItem;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class QaInspectionTest extends TestCase
@@ -94,11 +96,18 @@ class QaInspectionTest extends TestCase
 
     public function test_submiting_inspection_updates_qa_and_receiving_statuses(): void
     {
+        Notification::fake();
         $qa = $this->qaUser();
+        $adminRole = Role::create(['name' => 'Admin', 'slug' => 'ADMIN']);
+        $plantRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
+        $admin = User::factory()->create(['role_id' => $adminRole->id, 'status' => 'ACTIVE']);
+        $plantManager = User::factory()->create(['role_id' => $plantRole->id, 'status' => 'ACTIVE']);
+        $otherPlantManager = User::factory()->create(['role_id' => $plantRole->id, 'status' => 'ACTIVE']);
         $receiving = $this->makeReceiving([
             ['product' => 'Widget A', 'qty' => 10],
             ['product' => 'Widget B', 'qty' => 5],
         ]);
+        $receiving->update(['prepared_by_id' => $plantManager->id]);
 
         $payload = [
             'items' => [
@@ -160,6 +169,15 @@ class QaInspectionTest extends TestCase
             ->getJson('/api/qa/inspections')
             ->assertOk()
             ->assertJsonMissing(['receiving_no' => $receiving->receiving_no]);
+        Notification::assertSentTo($plantManager, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'QA Inspection Completed'
+            && $notification->message === "Receiving #{$receiving->receiving_no} was marked as Partial."
+            && $notification->type === 'warning'
+            && $notification->referenceId === $receiving->receiving_no);
+        Notification::assertSentToTimes($plantManager, WorkflowNotification::class, 1);
+        Notification::assertNotSentTo($admin, WorkflowNotification::class);
+        Notification::assertNotSentTo($otherPlantManager, WorkflowNotification::class);
+        Notification::assertNotSentTo($qa, WorkflowNotification::class);
     }
 
     public function test_partial_inspection_moves_only_accepted_quantity_to_stock_in(): void

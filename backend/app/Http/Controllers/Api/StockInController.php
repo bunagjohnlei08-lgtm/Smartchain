@@ -7,7 +7,10 @@ use App\Models\Inventory;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\ReceivingTimeline;
+use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -305,6 +308,18 @@ class StockInController extends Controller
 
             return response()->json(['message' => 'Stock In failed due to a server error. Please try again.'], 500);
         }
+
+        $admins = User::query()
+            ->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($query) => $query->where('slug', 'ADMIN'))
+            ->get();
+        WorkflowNotificationSender::send($admins, new WorkflowNotification(
+            'Stock In Completed',
+            "Plant Manager successfully added inventory for Receiving #{$receiving->receiving_no}.",
+            'success',
+            $receiving->receiving_no,
+            'Stock In',
+        ));
 
         return response()->json($this->present($receiving));
     }

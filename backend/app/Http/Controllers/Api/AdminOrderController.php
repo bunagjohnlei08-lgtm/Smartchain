@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -146,6 +148,7 @@ class AdminOrderController extends Controller
         if (!in_array($order->status, ['NEW', 'ASSIGNED'], true)) {
             throw ValidationException::withMessages(['status' => 'Only NEW or ASSIGNED orders can be assigned.']);
         }
+        $previousAssignee = $order->assigned_to;
         DB::transaction(function () use ($order, $manager, $request) {
             $previousAssignee = $order->assigned_to;
             $previousStatus = $order->status;
@@ -155,6 +158,16 @@ class AdminOrderController extends Controller
                 'action' => $previousAssignee ? 'ORDER_REASSIGNED' : 'ORDER_ASSIGNED', 'performed_by' => $request->user()->id,
             ]);
         });
+
+        if ($previousAssignee !== $manager->id) {
+            WorkflowNotificationSender::send($manager, new WorkflowNotification(
+                'New Order Assigned',
+                "Order #{$order->order_no} assigned for preparation.",
+                'info',
+                $order->order_no,
+                'Order',
+            ));
+        }
 
         return response()->json($this->detailData($order->fresh()->load(['items.product', 'assignee', 'histories.performer'])));
     }

@@ -8,6 +8,9 @@ use App\Models\PurchaseOrder;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\ReceivingTimeline;
+use App\Models\User;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -200,6 +203,18 @@ class ReceivingController extends Controller
 
                 return $receiving;
             });
+
+        $qaSupervisors = User::query()
+            ->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($query) => $query->where('slug', 'QA_SUPERVISOR'))
+            ->get();
+        WorkflowNotificationSender::send($qaSupervisors, new WorkflowNotification(
+            'Pending QA Inspection',
+            "Receiving #{$receiving->receiving_no} is ready for QA.",
+            'info',
+            $receiving->receiving_no,
+            'Quality Inspection',
+        ));
 
         return response()->json($this->present($receiving), 201);
     }

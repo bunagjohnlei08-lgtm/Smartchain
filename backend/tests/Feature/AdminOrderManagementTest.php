@@ -8,6 +8,8 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\AdminOrderExampleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -186,6 +188,7 @@ class AdminOrderManagementTest extends TestCase
 
     public function test_assignment_requires_an_active_plant_manager_and_records_history(): void
     {
+        Notification::fake();
         $admin = $this->userWithRole('ADMIN');
         $manager = $this->userWithRole('PLANT_MANAGER');
         $other = $this->userWithRole('QA_SUPERVISOR');
@@ -196,9 +199,20 @@ class AdminOrderManagementTest extends TestCase
 
         $this->actingAs($admin)->patchJson("/api/admin/orders/{$id}/assign", ['assigned_to' => $manager->id])
             ->assertOk()->assertJsonPath('status', 'ASSIGNED')->assertJsonPath('assigned_to.id', $manager->id);
+        $orderNumber = Order::query()->findOrFail($id)->order_no;
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $id, 'previous_status' => 'NEW', 'new_status' => 'ASSIGNED', 'action' => 'ORDER_ASSIGNED',
         ]);
+        Notification::assertSentTo($manager, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'New Order Assigned'
+            && $notification->message === "Order #{$orderNumber} assigned for preparation."
+            && $notification->type === 'info'
+            && $notification->referenceId === $orderNumber);
+
+        $this->actingAs($admin)->patchJson("/api/admin/orders/{$id}/assign", ['assigned_to' => $manager->id])
+            ->assertOk();
+        Notification::assertSentToTimes($manager, WorkflowNotification::class, 1);
+        Notification::assertNotSentTo($other, WorkflowNotification::class);
     }
 
     public function test_existing_order_assignment_updates_the_same_record(): void

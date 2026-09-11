@@ -372,7 +372,7 @@ const StockOut: React.FC = () => {
 
       {pageError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300"><AlertCircle className="h-4 w-4" />{pageError}</div>}
 
-      <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+      <section className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {cards.map(card => <div key={card.label} className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-4">
           <div className="flex items-center gap-2"><card.icon className={`h-5 w-5 ${card.color}`} /><span className="text-xs font-semibold uppercase tracking-wider text-slate-400">{card.label}</span></div>
           <p className="mt-3 text-2xl font-bold text-white">{card.value}</p>

@@ -7,6 +7,8 @@ import {
   Ban,
   History,
   BarChart3,
+  User,
+  Bell,
 } from 'lucide-react';
 
 const navGroups = [
@@ -18,6 +20,13 @@ const navGroups = [
       { id: 'rejected-items', icon: Ban, label: 'Rejected Items', path: '/qa/rejected-items' },
       { id: 'history', icon: History, label: 'Inspection History', path: '/qa/history' },
       { id: 'reports', icon: BarChart3, label: 'Quality Reports', path: '/qa/reports' },
+    ],
+  },
+  {
+    title: 'ACCOUNT',
+    items: [
+      { id: 'notifications', icon: Bell, label: 'Notifications', path: '/qa/notifications' },
+      { id: 'profile', icon: User, label: 'Profile', path: '/qa/profile' },
     ],
   },
 ];

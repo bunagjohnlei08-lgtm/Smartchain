@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ReplenishmentRequest;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -81,10 +83,7 @@ class AdminProcurementController extends Controller
             'rejected' => $byStatus[self::STATUS_REJECTED],
             'po_created' => $byStatus[self::STATUS_FOR_PURCHASE_ORDER],
             'draft' => $byStatus[self::STATUS_DRAFT],
-            // Approved requests still waiting to be turned into a Purchase Order.
-            'for_purchase_order' => ReplenishmentRequest::query()
-                ->where('status', self::STATUS_APPROVED)
-                ->count(),
+            'for_purchase_order' => $byStatus[self::STATUS_FOR_PURCHASE_ORDER],
         ]);
     }
 
@@ -136,6 +135,17 @@ class AdminProcurementController extends Controller
         ])->save();
 
         $replenishmentRequest->load(['requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name']);
+
+        if ($replenishmentRequest->requester) {
+            $label = $status === self::STATUS_APPROVED ? 'Approved' : 'Rejected';
+            WorkflowNotificationSender::send($replenishmentRequest->requester, new WorkflowNotification(
+                "Request {$label}",
+                "Your request #{$replenishmentRequest->request_no} has been {$label}.",
+                $status === self::STATUS_APPROVED ? 'success' : 'warning',
+                $replenishmentRequest->request_no,
+                'Procurement',
+            ));
+        }
 
         return response()->json($this->requestData($replenishmentRequest));
     }

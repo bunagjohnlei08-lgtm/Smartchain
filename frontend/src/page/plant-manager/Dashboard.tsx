@@ -1,6 +1,7 @@
 // src/page/plant-manager/Dashboard.tsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '../../lib/api';
+import { useTheme } from '../../context/ThemeContext';
 import {
   Package,
   Layers,
@@ -28,7 +29,6 @@ import {
 import {
   AreaChart,
   Area,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -36,6 +36,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  BarStack,
   Legend,
 } from 'recharts';
 
@@ -138,6 +139,7 @@ const LowStockBadge: React.FC<{ status: string }> = ({ status }) => {
 // ============================================
 
 const Dashboard: React.FC = () => {
+  const { theme } = useTheme();
   const [date] = useState(new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
   const [location] = useState('Central Distribution Center');
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
@@ -170,6 +172,19 @@ const Dashboard: React.FC = () => {
     { label: "Today's Stock Out", value: loading ? '—' : dashboard.metrics.todays_stock_out.toLocaleString(), change: 'Today', icon: <ArrowUpCircle className="w-5 h-5" />, trend: 'down' },
   ];
   const inventoryTrendData = dashboard.inventory_trend;
+  const isDark = theme === 'dark';
+  const chartGridColor = isDark ? '#334155' : '#E2E8F0';
+  const chartAxisColor = isDark ? '#CBD5E1' : '#64748B';
+  const chartCardColor = isDark ? '#0d1322' : '#FFFFFF';
+  const stockColor = isDark ? '#60A5FA' : '#3B82F6';
+  const valuationColor = isDark ? '#34D399' : '#22C55E';
+  const tooltipStyle = {
+    backgroundColor: isDark ? '#111827' : '#FFFFFF',
+    borderColor: isDark ? '#475569' : '#CBD5E1',
+    color: isDark ? '#F8FAFC' : '#0F172A',
+    borderRadius: '0.75rem',
+    boxShadow: isDark ? '0 12px 30px rgb(0 0 0 / 0.35)' : '0 4px 12px rgb(15 23 42 / 0.08)',
+  };
   const stockMovementData = dashboard.stock_movement;
   const monthlyActivityData = dashboard.monthly_inventory_activity;
   const lowStockItems = dashboard.low_stock_summary;
@@ -266,37 +281,61 @@ const Dashboard: React.FC = () => {
               <MoreVertical className="w-4 h-4" />
             </button>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={inventoryTrendData}>
-              <defs>
-                <linearGradient id="gradientStock" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="month" stroke="#64748b" tick={{ fill: '#64748b' }} />
-              <YAxis yAxisId="left" stroke="#64748b" tick={{ fill: '#64748b' }} />
-              <YAxis yAxisId="right" orientation="right" stroke="#64748b" tick={{ fill: '#64748b' }} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff' }}
-              />
-              <Legend />
-              <Area
-                yAxisId="left"
-                type="monotone"
-                dataKey="stock"
-                stroke="#3B82F6"
-                fill="url(#gradientStock)"
-                name="Stock Units"
-                isAnimationActive={true}
-                animationDuration={1500}
-                animationEasing="ease-in-out"
-                animationBegin={100}
-              />
-              <Line type="monotone" yAxisId="right" dataKey="value" stroke="#22C55E" strokeWidth={2} name="Valuation ($M)" dot={{ fill: '#22C55E', r: 4 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={100} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="flex h-[300px] w-full flex-col">
+            <div className="min-h-0 flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={inventoryTrendData} margin={{ left: -20, right: 10, bottom: 0, top: 10 }}>
+                  <defs>
+                    <linearGradient id="gradientStock" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={stockColor} stopOpacity={isDark ? 0.32 : 0.3} />
+                      <stop offset="95%" stopColor={stockColor} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradientValuation" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={valuationColor} stopOpacity={isDark ? 0.28 : 0.3} />
+                      <stop offset="95%" stopColor={valuationColor} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" strokeOpacity={isDark ? 0.7 : 1} vertical={false} />
+                  <XAxis dataKey="month" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} allowDecimals={false} />
+                  <YAxis yAxisId="right" orientation="right" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} tickFormatter={(value: number) => `$${value}M`} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: isDark ? '#F8FAFC' : '#0F172A', fontWeight: 600 }}
+                    itemStyle={{ color: isDark ? '#E2E8F0' : '#334155' }}
+                    cursor={{ stroke: chartAxisColor, strokeOpacity: 0.35 }}
+                    formatter={(value, name, item) => [typeof value === 'number' ? item.dataKey === 'value' ? `$${value.toFixed(2)}M` : value.toLocaleString('en-US') : value, name]}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="stock"
+                    stroke={stockColor}
+                    strokeWidth={3}
+                    fill="url(#gradientStock)"
+                    name="Stock Units"
+                    dot={{ r: 3, fill: stockColor, stroke: chartCardColor, strokeWidth: 2 }}
+                    activeDot={{ r: 5, stroke: chartCardColor, strokeWidth: 2 }}
+                    isAnimationActive={true}
+                    animationDuration={1500}
+                    animationEasing="ease-in-out"
+                    animationBegin={100}
+                  />
+                  <Area type="monotone" yAxisId="right" dataKey="value" stroke={valuationColor} strokeWidth={3} fill="url(#gradientValuation)" name="Valuation ($M)" dot={{ r: 3, fill: valuationColor, stroke: chartCardColor, strokeWidth: 2 }} activeDot={{ r: 5, stroke: chartCardColor, strokeWidth: 2 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={100} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 flex shrink-0 flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: stockColor }} />
+                <span className="text-slate-600 dark:text-slate-300">Stock Units</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: valuationColor }} />
+                <span className="text-slate-600 dark:text-slate-300">Valuation ($M)</span>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -317,14 +356,17 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={stockMovementData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="day" stroke="#64748b" tick={{ fill: '#64748b' }} />
-              <YAxis stroke="#64748b" tick={{ fill: '#64748b' }} />
+            <BarChart data={stockMovementData} margin={{ left: -20, right: 10, bottom: 0, top: 10 }} barCategoryGap="20%" barGap={4} maxBarSize={32}>
+              <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" strokeOpacity={isDark ? 0.7 : 1} vertical={false} />
+              <XAxis dataKey="day" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} allowDecimals={false} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff' }}
+                contentStyle={tooltipStyle}
+                labelStyle={{ color: isDark ? '#F8FAFC' : '#0F172A', fontWeight: 600 }}
+                itemStyle={{ color: isDark ? '#E2E8F0' : '#334155' }}
+                cursor={{ fill: chartGridColor, fillOpacity: 0.2 }}
               />
-              <Legend />
+              <Legend iconType="circle" iconSize={10} wrapperStyle={{ paddingTop: 12, fontSize: 12 }} formatter={(value) => <span style={{ color: chartAxisColor }}>{value}</span>} />
               <Bar dataKey="in" fill="#3B82F6" name="Stock In" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" animationBegin={300} />
               <Bar dataKey="out" fill="#EF4444" name="Stock Out" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" animationBegin={300} />
             </BarChart>
@@ -343,17 +385,22 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyActivityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="month" stroke="#64748b" tick={{ fill: '#64748b' }} />
-              <YAxis stroke="#64748b" tick={{ fill: '#64748b' }} />
+            <BarChart data={monthlyActivityData} margin={{ left: -20, right: 10, bottom: 0, top: 10 }} barCategoryGap="20%" maxBarSize={40}>
+              <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" strokeOpacity={isDark ? 0.7 : 1} vertical={false} />
+              <XAxis dataKey="month" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} allowDecimals={false} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff' }}
+                contentStyle={tooltipStyle}
+                labelStyle={{ color: isDark ? '#F8FAFC' : '#0F172A', fontWeight: 600 }}
+                itemStyle={{ color: isDark ? '#E2E8F0' : '#334155' }}
+                cursor={{ fill: chartGridColor, fillOpacity: 0.2 }}
               />
-              <Legend />
-              <Bar dataKey="receiving" stackId="a" fill="#3B82F6" name="Receiving" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
-              <Bar dataKey="release" stackId="a" fill="#22C55E" name="Release" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
-              <Bar dataKey="transfers" stackId="a" fill="#F59E0B" name="Transfers" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
+              <Legend iconType="circle" iconSize={10} wrapperStyle={{ paddingTop: 12, fontSize: 12 }} formatter={(value) => <span style={{ color: chartAxisColor }}>{value}</span>} />
+              <BarStack stackId="a" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="receiving" stackId="a" fill="#3B82F6" name="Receiving" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
+                <Bar dataKey="release" stackId="a" fill="#22C55E" name="Release" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
+                <Bar dataKey="transfers" stackId="a" fill="#F59E0B" name="Transfers" radius={[0, 0, 0, 0]} isAnimationActive={true} animationDuration={1300} animationEasing="ease-in-out" animationBegin={400} />
+              </BarStack>
             </BarChart>
           </ResponsiveContainer>
         </div>

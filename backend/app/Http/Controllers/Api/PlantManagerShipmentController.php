@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\User;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,6 +80,18 @@ class PlantManagerShipmentController extends Controller
 
             return $record;
         });
+
+        $admins = User::query()
+            ->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($query) => $query->where('slug', 'ADMIN'))
+            ->get();
+        WorkflowNotificationSender::send($admins, new WorkflowNotification(
+            'Order Ready for Logistics',
+            "Order #{$record->order_no} has been prepared by Plant Manager.",
+            'success',
+            $record->order_no,
+            'Logistics',
+        ));
 
         return response()->json(['id' => $record->id, 'status' => $record->status]);
     }

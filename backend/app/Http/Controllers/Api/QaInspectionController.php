@@ -8,6 +8,8 @@ use App\Models\QaInspectionItem;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\ReceivingTimeline;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -354,6 +356,26 @@ class QaInspectionController extends Controller
             report($e);
 
             return response()->json(['message' => 'Failed to save QA inspection.'], 500);
+        }
+
+        if ($shouldSubmit) {
+            $result = $receiving->status;
+            $type = match ($result) {
+                'Passed' => 'success',
+                'Rejected' => 'error',
+                default => 'warning',
+            };
+            $notification = fn () => new WorkflowNotification(
+                'QA Inspection Completed',
+                "Receiving #{$receiving->receiving_no} was marked as {$result}.",
+                $type,
+                $receiving->receiving_no,
+                'Quality Inspection',
+            );
+            $plantManager = $receiving->preparedBy;
+            if ($plantManager?->status === 'ACTIVE' && $plantManager->isPlantManager()) {
+                WorkflowNotificationSender::send($plantManager, $notification());
+            }
         }
 
         return response()->json($this->presentDetail($receiving));

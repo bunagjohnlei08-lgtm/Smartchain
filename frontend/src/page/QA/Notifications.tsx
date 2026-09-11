@@ -1,5 +1,5 @@
 import NotificationCenter from '../../components/NotificationCenter';
 
 export default function Notifications() {
-  return <NotificationCenter breadcrumbLabel="Plant Manager" />;
+  return <NotificationCenter breadcrumbLabel="QA" />;
 }

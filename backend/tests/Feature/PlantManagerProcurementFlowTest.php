@@ -7,7 +7,9 @@ use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -35,6 +37,9 @@ class PlantManagerProcurementFlowTest extends TestCase
 
     public function test_catalog_product_without_inventory_can_be_requested_for_a_valid_warehouse(): void
     {
+        Notification::fake();
+        $adminRole = Role::create(['name' => 'Admin', 'slug' => 'ADMIN']);
+        $admin = User::factory()->create(['role_id' => $adminRole->id, 'status' => 'ACTIVE']);
         $this->assertDatabaseCount('inventories', 0);
 
         $this->actingAs($this->manager)->getJson('/api/plant-manager/procurement/options')
@@ -68,6 +73,10 @@ class PlantManagerProcurementFlowTest extends TestCase
         }
         $this->assertDatabaseCount('products', 1);
         $this->assertDatabaseCount('warehouses', 1);
+        Notification::assertSentTo($admin, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'New Replenishment Request'
+            && $notification->type === 'info'
+            && $notification->referenceId === $response->json('request_no'));
     }
 
     public function test_invalid_product_is_rejected(): void

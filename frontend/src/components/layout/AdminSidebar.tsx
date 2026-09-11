@@ -14,6 +14,8 @@ import {
   BarChart3,
   QrCode,
   ClipboardList,
+  User,
+  Bell,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
@@ -67,6 +69,13 @@ const navGroups: NavGroup[] = [
       { id: 'ai-demand-forecast', icon: Brain, label: 'AI Demand Forecasting', path: '/admin/ai-demand-forecasting' },
       { id: 'reports', icon: BarChart3, label: 'Reports', path: '/admin/reports' },
       { id: 'users', icon: Users, label: 'Users', path: '/admin/users' },
+    ],
+  },
+  {
+    title: 'ACCOUNT',
+    items: [
+      { id: 'notifications', icon: Bell, label: 'Notifications', path: '/admin/notifications' },
+      { id: 'profile', icon: User, label: 'Profile', path: '/admin/profile' },
     ],
   },
 ];

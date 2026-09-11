@@ -544,7 +544,7 @@ const ReceivingManagement: React.FC = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <KPICard
           label="Total Deliveries"
           value={totalDeliveries}

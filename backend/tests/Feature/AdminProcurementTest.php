@@ -8,7 +8,9 @@ use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class AdminProcurementTest extends TestCase
@@ -71,6 +73,8 @@ class AdminProcurementTest extends TestCase
 
     public function test_approving_keeps_the_request_number_and_persists_the_decision(): void
     {
+        Notification::fake();
+        $unrelatedManager = $this->userWithRole('PLANT_MANAGER');
         $replenishmentRequest = $this->replenishmentRequest();
 
         $response = $this->actingAs($this->userWithRole('ADMIN'))
@@ -85,10 +89,18 @@ class AdminProcurementTest extends TestCase
             'request_no' => 'RR-1001',
             'status' => 'Approved',
         ]);
+        Notification::assertSentTo($this->requester, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'Request Approved'
+            && $notification->message === 'Your request #RR-1001 has been Approved.'
+            && $notification->type === 'success'
+            && $notification->referenceId === 'RR-1001');
+        Notification::assertNotSentTo($unrelatedManager, WorkflowNotification::class);
     }
 
     public function test_declining_rejects_the_request_but_keeps_it_in_history(): void
     {
+        Notification::fake();
+        $unrelatedManager = $this->userWithRole('PLANT_MANAGER');
         $replenishmentRequest = $this->replenishmentRequest();
 
         $this->actingAs($this->userWithRole('ADMIN'))
@@ -98,6 +110,12 @@ class AdminProcurementTest extends TestCase
             ->assertJsonPath('admin_decision', 'Insufficient budget');
 
         $this->assertDatabaseHas('replenishment_requests', ['request_no' => 'RR-1001', 'status' => 'Rejected']);
+        Notification::assertSentTo($this->requester, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'Request Rejected'
+            && $notification->message === 'Your request #RR-1001 has been Rejected.'
+            && $notification->type === 'warning'
+            && $notification->referenceId === 'RR-1001');
+        Notification::assertNotSentTo($unrelatedManager, WorkflowNotification::class);
     }
 
     public function test_an_already_decided_request_cannot_be_reviewed_again(): void

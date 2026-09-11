@@ -76,6 +76,8 @@ interface CatalogOrderProduct {
   unit: string | null;
 }
 
+type OrderSummary = Record<string, number>;
+
 interface CreateOrderForm {
   referenceNo: string;
   customerName: string;
@@ -287,7 +289,7 @@ const OrderManagement: React.FC = () => {
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [summary, setSummary] = useState<OrderSummary>({});
   const [plantManagers, setPlantManagers] = useState<Array<{ id: number; name: string; employee_id?: string }>>([]);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [managerId, setManagerId] = useState('');
@@ -431,14 +433,18 @@ const OrderManagement: React.FC = () => {
 
 
   // KPI Data
+  const summaryCount = (...statuses: string[]) => statuses.reduce(
+    (total, orderStatus) => total + (Number(summary[orderStatus]) || 0),
+    0
+  );
   const kpis = [
-    { label: 'NEW ORDERS', count: summary.NEW || 0, subtitle: 'Awaiting Review', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'ASSIGNED', count: summary.ASSIGNED || 0, subtitle: 'To Plant Managers', color: 'text-orange-400', bg: 'bg-orange-500/10' },
-    { label: 'PREPARING', count: summary.PREPARING || 0, subtitle: 'In Progress', color: 'text-purple-400', bg: 'bg-purple-500/10' },
-    { label: 'READY FOR SHIPMENT', count: summary.READY_FOR_SHIPMENT || 0, subtitle: 'Ready to Pickup', color: 'text-green-400', bg: 'bg-green-500/10' },
-    { label: 'IN TRANSIT', count: summary.IN_TRANSIT || 0, subtitle: 'With Logistics', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-    { label: 'DELIVERED', count: summary.DELIVERED || 0, subtitle: 'Completed', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { label: 'CANCELLED', count: summary.CANCELLED || 0, subtitle: 'Cancelled', color: 'text-red-400', bg: 'bg-red-500/10' },
+    { label: 'NEW ORDERS', count: summaryCount('NEW'), subtitle: 'Awaiting Review', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+    { label: 'ASSIGNED', count: summaryCount('ASSIGNED'), subtitle: 'To Plant Managers', color: 'text-orange-400', bg: 'bg-orange-500/10' },
+    { label: 'PREPARING', count: summaryCount('PREPARING'), subtitle: 'In Progress', color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { label: 'READY FOR SHIPMENT', count: summaryCount('READY_FOR_SHIPMENT'), subtitle: 'Ready to Pickup', color: 'text-green-400', bg: 'bg-green-500/10' },
+    { label: 'IN TRANSIT', count: summaryCount('FORWARDED_TO_LOGISTICS', 'IN_TRANSIT'), subtitle: 'With Logistics', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    { label: 'DELIVERED', count: summaryCount('DELIVERED'), subtitle: 'Completed', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { label: 'CANCELLED', count: summaryCount('CANCELLED'), subtitle: 'Cancelled', color: 'text-red-400', bg: 'bg-red-500/10' },
   ];
 
   // Lifecycle steps for timeline
@@ -471,7 +477,7 @@ const OrderManagement: React.FC = () => {
       {/* ============================================================
       KPI CARDS
       ============================================================ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {kpis.map((kpi, idx) => (
           <KpiCard key={idx} {...kpi} />
         ))}
