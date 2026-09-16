@@ -48,7 +48,7 @@ class PurchaseOrderController extends Controller
             $replenishmentRequest = null;
             if (!empty($validated['replenishment_request_id'])) {
                 $replenishmentRequest = ReplenishmentRequest::query()->lockForUpdate()->findOrFail($validated['replenishment_request_id']);
-                abort_unless($replenishmentRequest->status === 'approved', 422, 'Only approved replenishment requests can generate a Purchase Order.');
+                abort_unless($replenishmentRequest->isAvailableForPurchaseOrder(), 422, 'Only approved replenishment requests can generate a Purchase Order.');
             }
             $items = collect($validated['items'])->map(function (array $item) {
                 $product = Product::query()->where('name', $item['product_name'])->firstOrFail();
@@ -73,7 +73,7 @@ class PurchaseOrderController extends Controller
             ]);
             $order->items()->createMany($items->all());
             if ($replenishmentRequest) {
-                $replenishmentRequest->update(['status' => 'for_purchase_order']);
+                $replenishmentRequest->update(['status' => ReplenishmentRequest::STATUS_PO_CREATED]);
             }
             return $order->load(['items', 'approver:id,name']);
         });

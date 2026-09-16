@@ -331,7 +331,7 @@ const Shipments: React.FC = () => {
                 onClick={() => setStatusFilter(status)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   statusFilter === status
-                    ? 'bg-cyan-500 text-slate-950'
+                    ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                     : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
@@ -356,8 +356,8 @@ const Shipments: React.FC = () => {
 
       {/* Shipment Table */}
       <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px]">
+        <div className="admin-table-scroll">
+          <table className="admin-responsive-table admin-cols-8 admin-sticky-1 w-full min-w-[1000px]">
             <thead className="bg-slate-800/30 border-b border-slate-800/60">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -464,7 +464,7 @@ const Shipments: React.FC = () => {
             <button className="p-1.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
+            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950">
               1
             </button>
             <button className="p-1.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">

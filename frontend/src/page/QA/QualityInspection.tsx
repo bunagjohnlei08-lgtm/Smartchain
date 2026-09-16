@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
 import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus';
 import {
@@ -72,6 +73,7 @@ interface QaInspectionDetailApi {
     occurred_at: string;
   }[];
   inspection: {
+    attachment_path: string | null;
     started_at: string | null;
     completed_at: string | null;
     inspected_by: string | null;
@@ -106,6 +108,7 @@ interface ReceivingItem {
 }
 
 interface ReceivingDetail extends ReceivingItem {
+  attachmentPath: string | null;
   referenceNo: string;
   products: ReceivingProduct[];
   timeline: {
@@ -124,6 +127,14 @@ interface ReceivingDetail extends ReceivingItem {
 }
 
 const statusOptions: Array<'All Status' | InspectionStatus> = ['All Status', 'Pending', 'In Progress', 'Passed', 'Rejected', 'Partial'];
+
+function validateAttachment(file: File): string | null {
+  if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type) || !/\.(jpe?g|png|pdf)$/i.test(file.name)) {
+    return 'Only JPG, PNG, or PDF files are allowed.';
+  }
+  if (file.size > 5 * 1024 * 1024) return 'Attachment must not exceed 5 MB.';
+  return null;
+}
 
 function resolveItemResult(deliveredQty: number, acceptedQty: number, rejectedQty: number): InspectionStatus {
   const inspectedQty = acceptedQty + rejectedQty;
@@ -169,6 +180,8 @@ function getApiErrorMessage(error: unknown): string {
   const status = axiosError.response?.status;
   if (status === 401) return 'Session expired. Please log in again.';
   if (status === 403) return 'You do not have permission to access QA inspection.';
+  if (status === 413) return 'Attachment must not exceed 5 MB.';
+  if (!status || status >= 500) return 'Unable to complete the request. Please try again.';
   if (status === 422 && axiosError.response?.data?.errors) {
     const firstError = Object.values(axiosError.response.data.errors)[0];
     return Array.isArray(firstError) ? firstError[0] : String(firstError);
@@ -218,7 +231,7 @@ const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
   const label = normalizedStatus ?? formatStatusLabel(status);
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeConfig.color} ${badgeConfig.bg}`}>
+    <span className={`qa-badge ${normalizedStatus === 'Partial' ? 'qa-badge-attention' : ''} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeConfig.color} ${badgeConfig.bg}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${badgeConfig.dotColor}`} />
       {label}
     </span>
@@ -227,8 +240,8 @@ const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
 
 const ViewModeToggle: React.FC<{ value: ViewMode; onChange: (value: ViewMode) => void }> = ({ value, onChange }) => (
   <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1" role="group" aria-label="Quality inspection view">
-    <button type="button" onClick={() => onChange('list')} aria-label="Show inspections as a list" aria-pressed={value === 'list'} title="List view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Table className="w-4 h-4" /></button>
-    <button type="button" onClick={() => onChange('grid')} aria-label="Show inspections as a grid" aria-pressed={value === 'grid'} title="Grid view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Grid className="w-4 h-4" /></button>
+    <button type="button" onClick={() => onChange('list')} aria-label="Show inspections as a list" aria-pressed={value === 'list'} title="List view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Table className="w-4 h-4" /></button>
+    <button type="button" onClick={() => onChange('grid')} aria-label="Show inspections as a grid" aria-pressed={value === 'grid'} title="Grid view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Grid className="w-4 h-4" /></button>
   </div>
 );
 
@@ -242,9 +255,9 @@ const KPICard: React.FC<{
   <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-gray-700 transition-all duration-200">
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-        <p className="text-slate-500 text-xs mt-1">{subtitle}</p>
+        <p className="mobile-kpi-title text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
+        <p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{value}</p>
+        <p className="mobile-kpi-helper text-slate-500 text-xs mt-1">{subtitle}</p>
       </div>
       <div className={`p-2.5 bg-[#090d16] rounded-lg ${color}`}>{icon}</div>
     </div>
@@ -300,6 +313,7 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
     inspectionStatus: detail.inspection_status,
     action: detail.action,
     referenceNo: detail.reference_no ?? '-',
+    attachmentPath: detail.inspection.attachment_path ?? null,
     products,
     timeline: detail.timeline.map((event) => ({
       status: event.status,
@@ -318,6 +332,12 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
 };
 
 const QualityInspection: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedReceivingId = Number(searchParams.get('receiving')) || null;
+  const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const detailRequestId = useRef(0);
   const [records, setRecords] = useState<ReceivingItem[]>([]);
   const [selectedReceivingId, setSelectedReceivingId] = useState<number | null>(null);
   const [selectedReceiving, setSelectedReceiving] = useState<ReceivingDetail | null>(null);
@@ -344,6 +364,7 @@ const QualityInspection: React.FC = () => {
       const mapped = (response.data.data ?? []).map(mapListItem);
       setRecords(mapped);
       setSelectedReceivingId((previous) => {
+        if (requestedReceivingId !== null) return requestedReceivingId;
         if (previous !== null && mapped.some((item) => item.id === previous)) {
           return previous;
         }
@@ -356,19 +377,22 @@ const QualityInspection: React.FC = () => {
     } finally {
       setIsLoadingList(false);
     }
-  }, []);
+  }, [requestedReceivingId]);
 
   const fetchDetail = useCallback(async (receivingId: number) => {
+    const requestId = ++detailRequestId.current;
     setIsLoadingDetail(true);
     setDetailError(null);
     try {
       const response = await apiClient.get<QaInspectionDetailApi>(`/qa/inspections/${receivingId}`);
+      if (requestId !== detailRequestId.current) return;
       setSelectedReceiving(mapDetail(response.data));
     } catch (error) {
+      if (requestId !== detailRequestId.current) return;
       setDetailError(getApiErrorMessage(error));
       setSelectedReceiving(null);
     } finally {
-      setIsLoadingDetail(false);
+      if (requestId === detailRequestId.current) setIsLoadingDetail(false);
     }
   }, []);
 
@@ -377,12 +401,16 @@ const QualityInspection: React.FC = () => {
   }, [fetchList]);
 
   useEffect(() => {
+    setSelectedAttachment(null);
+    setAttachmentError(null);
+    setSelectedReceiving(null);
     if (selectedReceivingId === null) {
       setSelectedReceiving(null);
       return;
     }
 
     fetchDetail(selectedReceivingId);
+    return () => { detailRequestId.current += 1; };
   }, [fetchDetail, selectedReceivingId]);
 
   const supplierOptions = useMemo(() => {
@@ -420,6 +448,14 @@ const QualityInspection: React.FC = () => {
   const partial = records.filter((record) => record.inspectionStatus === 'Partial').length;
 
   const handleRowClick = (id: number) => {
+    if (isSaving) return;
+    if (id !== selectedReceivingId) {
+      detailRequestId.current += 1;
+      setSelectedReceiving(null);
+      setSelectedAttachment(null);
+      setAttachmentError(null);
+    }
+    setSearchParams({ receiving: String(id) });
     setSelectedReceivingId(id);
     setActionMessage(null);
   };
@@ -473,11 +509,22 @@ const QualityInspection: React.FC = () => {
   };
 
   const saveInspection = async (submit: boolean) => {
-    if (!selectedReceiving) return;
+    if (!selectedReceiving || isSaving) return;
 
     const validationError = validateProducts(submit);
     if (validationError) {
       setActionMessage({ type: 'error', text: validationError });
+      return;
+    }
+
+    const fileError = selectedAttachment ? validateAttachment(selectedAttachment) : null;
+    const proofError = submit && selectedReceiving.products.some((product) => product.rejectedQty > 0)
+      && !selectedAttachment && !selectedReceiving.attachmentPath
+      ? 'Proof of rejection is required. Please upload an attachment.' : null;
+    if (fileError || proofError) {
+      setAttachmentError(fileError || proofError);
+      setActionMessage({ type: 'error', text: (fileError || proofError)! });
+      setActiveTab('attachments');
       return;
     }
 
@@ -497,11 +544,24 @@ const QualityInspection: React.FC = () => {
       };
 
       const method = selectedReceiving.action === 'Start Inspection' ? 'post' : 'put';
-      await apiClient[method](`/qa/inspections/${selectedReceiving.id}`, payload);
+      const formData = new FormData();
+      formData.append('submit', submit ? '1' : '0');
+      payload.items.forEach((item, index) => {
+        Object.entries(item).forEach(([key, value]) => {
+          formData.append(`items[${index}][${key}]`, value === null ? '' : String(value));
+        });
+      });
+      if (selectedAttachment) formData.append('attachment', selectedAttachment);
+      // PHP parses multipart POST; Laravel routes _method=PUT to the existing update action.
+      if (method === 'put') formData.append('_method', 'PUT');
+      const response = await apiClient.post<QaInspectionDetailApi>(`/qa/inspections/${selectedReceiving.id}`, formData);
+      setSelectedAttachment(null);
+      setAttachmentError(null);
       if (submit) {
-        setSelectedReceivingId(null);
-        setSelectedReceiving(null);
+        setSearchParams({ receiving: String(selectedReceiving.id) });
+        setSelectedReceiving(mapDetail(response.data));
         await fetchList();
+        setSelectedReceivingId(selectedReceiving.id);
       } else {
         await fetchList();
         await fetchDetail(selectedReceiving.id);
@@ -511,9 +571,33 @@ const QualityInspection: React.FC = () => {
         text: submit ? 'Inspection submitted successfully.' : 'Inspection draft saved.',
       });
     } catch (error) {
+      const validation = (error as AxiosError<{ errors?: { attachment?: string[] } }>).response;
+      if (validation?.status === 422 && validation.data.errors?.attachment?.[0]) {
+        setAttachmentError(validation.data.errors.attachment[0]);
+        setActiveTab('attachments');
+      }
       setActionMessage({ type: 'error', text: getApiErrorMessage(error) });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const downloadAttachment = async () => {
+    if (!selectedReceiving?.attachmentPath || isDownloading) return;
+    setIsDownloading(true);
+    setAttachmentError(null);
+    try {
+      const response = await apiClient.get(`/qa/inspections/${selectedReceiving.id}/attachment`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = selectedReceiving.attachmentPath.split('/').pop() || 'qa-attachment';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setAttachmentError('Unable to download attachment. Please try again.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -637,8 +721,19 @@ const QualityInspection: React.FC = () => {
 
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px]">
+        <div className="qa-table-scroll">
+          <table className="qa-responsive-table qa-inspection-list-table qa-sticky-1 w-full min-w-[1100px]">
+            <colgroup>
+              <col className="qa-inspection-col-receiving" />
+              <col className="qa-inspection-col-po" />
+              <col className="qa-inspection-col-product" />
+              <col className="qa-inspection-col-supplier" />
+              <col className="qa-inspection-col-date" />
+              <col className="qa-inspection-col-items" />
+              <col className="qa-inspection-col-prepared" />
+              <col className="qa-inspection-col-status" />
+              <col className="qa-inspection-col-actions" />
+            </colgroup>
             <thead className="bg-[#090d16]/50 border-b border-gray-800">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
@@ -671,12 +766,15 @@ const QualityInspection: React.FC = () => {
                   <td className="px-4 py-3.5 text-sm text-slate-300">{receiving.deliveryDate}</td>
                   <td className="px-4 py-3.5 text-center text-sm text-slate-300">{receiving.items} Items</td>
                   <td className="px-4 py-3.5 text-sm text-slate-300">{receiving.preparedBy}</td>
-                  <td className="px-4 py-3.5"><StatusBadge status={receiving.inspectionStatus} /></td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center justify-center gap-2">
+                  <td className="qa-inspection-status-cell px-4 py-3.5"><StatusBadge status={receiving.inspectionStatus} /></td>
+                  <td className="qa-inspection-actions-cell px-4 py-3.5">
+                    <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                       {renderActionButton(receiving)}
                       <button
+                        type="button"
                         onClick={(event) => event.stopPropagation()}
+                        aria-label={`More options for ${receiving.receivingNo}`}
+                        title="More options"
                         className="p-1.5 rounded hover:bg-gray-700 text-slate-400 hover:text-white transition-all"
                       >
                         <MoreHorizontal className="w-4 h-4" />
@@ -739,7 +837,7 @@ const QualityInspection: React.FC = () => {
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${currentPage === page ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white hover:bg-gray-800'}`}
+                  className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${currentPage === page ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950' : 'text-slate-400 hover:text-white hover:bg-gray-800'}`}
                 >
                   {page}
                 </button>
@@ -838,7 +936,7 @@ const QualityInspection: React.FC = () => {
                         <button
                           key={tab}
                           onClick={() => setActiveTab(tab as typeof activeTab)}
-                          className={`py-3 px-4 text-sm font-medium transition-all border-b-2 whitespace-nowrap ${activeTab === tab ? 'border-cyan-500 text-white' : 'border-transparent text-slate-400 hover:text-white'}`}
+                          className={`flex-none whitespace-nowrap border-b-2 bg-transparent px-4 py-3 text-sm font-medium transition-all ${activeTab === tab ? 'border-cyan-500 text-slate-900 dark:text-white' : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
                         >
                           {tab.charAt(0).toUpperCase() + tab.slice(1)}
                           {tab === 'products' && ` (${selectedReceiving.products.length})`}
@@ -849,8 +947,8 @@ const QualityInspection: React.FC = () => {
 
                   <div className="p-5">
                     {activeTab === 'products' && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                      <div className="qa-table-scroll">
+                        <table className="qa-responsive-table qa-cols-7 qa-sticky-1 w-full min-w-[688px] text-sm">
                           <thead className="border-b border-gray-800">
                             <tr className="text-left text-slate-400">
                               <th className="px-2 py-2 font-medium">Product</th>
@@ -964,8 +1062,43 @@ const QualityInspection: React.FC = () => {
                     )}
 
                     {activeTab === 'attachments' && (
-                      <div className="space-y-3 text-sm">
-                        <p className="text-slate-400">No attachments uploaded.</p>
+                      <div className="space-y-3 rounded-lg border border-(--border-color-strong) bg-(--bg-surface-alt) p-4 text-sm text-(--text-primary)">
+                        <p id="attachment-help" className="text-(--text-secondary)">
+                          JPG, PNG, or PDF, up to 5 MB. One attachment per inspection.
+                          {selectedReceiving.totalRejected > 0 ? ' Proof of rejection is required before submission.' : ' Attachment is optional when no quantity is rejected.'}
+                        </p>
+                        {selectedReceiving.attachmentPath && (
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="min-w-0 break-all">Saved attachment: {selectedReceiving.attachmentPath.split('/').pop()}</p>
+                            <button type="button" onClick={downloadAttachment} disabled={isDownloading} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-60">
+                              {isDownloading ? 'Downloading...' : 'Download attachment'}
+                            </button>
+                          </div>
+                        )}
+                        {!inspectionIsFinal && (
+                          <>
+                            <label htmlFor="qa-attachment" className="block font-medium">{selectedAttachment || selectedReceiving.attachmentPath ? 'Change attachment' : 'Select attachment'}</label>
+                            <input id="qa-attachment" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" disabled={isSaving} aria-describedby={`attachment-help${attachmentError ? ' attachment-error' : ''}`} aria-invalid={!!attachmentError}
+                              onChange={(event) => {
+                                const file = event.currentTarget.files?.[0];
+                                event.currentTarget.value = '';
+                                if (!file) return;
+                                const error = validateAttachment(file);
+                                setAttachmentError(error);
+                                if (!error) setSelectedAttachment(file);
+                              }}
+                              className="block min-h-11 w-full min-w-0 cursor-pointer rounded-lg border border-(--border-color-strong) bg-(--bg-input) p-2 text-(--text-primary) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-60"
+                            />
+                          </>
+                        )}
+                        {selectedAttachment && (
+                          <div className="flex flex-wrap items-center justify-between gap-3" aria-live="polite">
+                            <div className="min-w-0"><p className="break-all font-medium">{selectedAttachment.name}</p><p className="text-(--text-secondary)">{selectedAttachment.type} · {(selectedAttachment.size / 1024 / 1024).toFixed(2)} MB · Ready to upload on save or submit</p></div>
+                            <button type="button" disabled={isSaving} onClick={() => { setSelectedAttachment(null); setAttachmentError(null); }} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-60">Remove selected file</button>
+                          </div>
+                        )}
+                        {inspectionIsFinal && !selectedReceiving.attachmentPath && <p>No attachment was uploaded.</p>}
+                        {attachmentError && <p id="attachment-error" role="alert" className="text-red-700 dark:text-red-300">{attachmentError}</p>}
                       </div>
                     )}
 

@@ -16,6 +16,7 @@ import {
   ClipboardList,
   User,
   Bell,
+  X,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
@@ -80,7 +81,7 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-const AdminSidebar = () => {
+const AdminSidebar = ({ onMobileClose }: { onMobileClose?: () => void }) => {
   const location = useLocation();
 
   const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
@@ -90,14 +91,14 @@ const AdminSidebar = () => {
   const isPathActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   const linkClass = (active: boolean) =>
-    `flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all text-sm border-l-2 ${
+    `admin-sidebar-main-item flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all text-sm border-l-2 ${
       active
         ? 'bg-cyan-500/10 text-cyan-400 border-l-cyan-400 font-semibold'
         : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 border-l-transparent'
     }`;
 
   const subLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `block rounded-lg border-l-2 px-3 py-2 text-xs font-medium transition-all ${
+    `admin-sidebar-sub-item block rounded-lg border-l-2 px-3 py-2 text-xs font-medium transition-all ${
       isActive
         ? 'bg-cyan-500/10 text-cyan-400 border-l-cyan-400 font-semibold'
         : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40 border-l-transparent'
@@ -114,13 +115,16 @@ const AdminSidebar = () => {
           <span className="text-sm font-bold text-white truncate">Archon Nell</span>
           <span className="text-[10px] font-medium tracking-wider text-slate-400 uppercase">ADMINISTRATOR</span>
         </div>
+        <button type="button" onClick={onMobileClose} className="ml-auto flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 xl:hidden" aria-label="Close navigation menu">
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       {/* NAVIGATION */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-4 [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav className="admin-sidebar-nav flex-1 overflow-y-auto p-4 space-y-4 [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {navGroups.map((group) => (
           <div key={group.title}>
-            <h3 className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase px-3 mt-5 mb-2">
+            <h3 className="admin-sidebar-section-label text-[10px] font-semibold tracking-wider text-slate-500 uppercase px-3 mt-5 mb-2">
               {group.title}
             </h3>
             <div className="space-y-1">
@@ -138,7 +142,7 @@ const AdminSidebar = () => {
                       <button
                         type="button"
                         onClick={() => setIsOpen(!isOpen)}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all border-l-2 ${
+                        className={`admin-sidebar-main-item w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all border-l-2 ${
                           isParentActive
                             ? 'bg-cyan-500/10 text-cyan-400 border-l-cyan-400 font-semibold'
                             : 'text-slate-400 hover:text-slate-100 border-l-transparent hover:bg-slate-800/40'
@@ -153,8 +157,8 @@ const AdminSidebar = () => {
 
                       {isOpen && (
                         <div className="pl-9 pr-2 py-1 space-y-1 border-l border-gray-700 ml-5 my-1">
-                          <NavLink className={subLinkClass} to="/admin/inventory">Inventory</NavLink>
-                          <NavLink className={subLinkClass} to="/admin/manage-locations">Manage Locations</NavLink>
+                          <NavLink className={subLinkClass} to="/admin/inventory" onClick={onMobileClose}>Inventory</NavLink>
+                          <NavLink className={subLinkClass} to="/admin/manage-locations" onClick={onMobileClose}>Manage Locations</NavLink>
                         </div>
                       )}
                     </div>
@@ -162,7 +166,7 @@ const AdminSidebar = () => {
                 }
 
                 return (
-                  <NavLink key={item.id} to={item.path} className={linkClass(active)}>
+                  <NavLink key={item.id} to={item.path} onClick={onMobileClose} className={linkClass(active)}>
                     <Icon className={`w-5 h-5 ${active ? 'drop-shadow-[0_0_6px_rgba(0,163,196,0.6)]' : ''}`} />
                     <span>{item.label}</span>
                   </NavLink>

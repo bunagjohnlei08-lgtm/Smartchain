@@ -18,11 +18,11 @@ use Illuminate\Validation\ValidationException;
  */
 class AdminProcurementController extends Controller
 {
-    private const STATUS_DRAFT = 'draft';
-    private const STATUS_PENDING = 'pending';
-    private const STATUS_APPROVED = 'approved';
-    private const STATUS_REJECTED = 'rejected';
-    private const STATUS_FOR_PURCHASE_ORDER = 'for_purchase_order';
+    private const STATUS_DRAFT = ReplenishmentRequest::STATUS_DRAFT;
+    private const STATUS_PENDING = ReplenishmentRequest::STATUS_PENDING;
+    private const STATUS_APPROVED = ReplenishmentRequest::STATUS_APPROVED;
+    private const STATUS_REJECTED = ReplenishmentRequest::STATUS_REJECTED;
+    private const STATUS_FOR_PURCHASE_ORDER = ReplenishmentRequest::STATUS_PO_CREATED;
     private const STATUSES = [self::STATUS_DRAFT, self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_REJECTED, self::STATUS_FOR_PURCHASE_ORDER];
 
     public function index(Request $request): JsonResponse

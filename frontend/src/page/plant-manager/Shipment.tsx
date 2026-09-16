@@ -1,6 +1,7 @@
 // src/page/plant-manager/Shipments.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { apiClient } from '../../lib/api';
+import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
 import {
   Search,
   ChevronRight,
@@ -176,7 +177,7 @@ const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
   const { color, bg, dotColor } = config[status];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
+      className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {status}
@@ -193,9 +194,9 @@ const KPICard: React.FC<{
   <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-slate-600 transition-all duration-200 h-full flex flex-col">
     <div className="flex items-start justify-between flex-1">
       <div>
-        <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-        {subtitle && <p className="text-slate-500 text-xs mt-1">{subtitle}</p>}
+        <p className="mobile-kpi-title text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
+        <p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{value}</p>
+        {subtitle && <p className="mobile-kpi-helper text-slate-500 text-xs mt-1">{subtitle}</p>}
       </div>
       <div className="p-2.5 bg-slate-800/60 rounded-lg shrink-0">{icon}</div>
     </div>
@@ -284,7 +285,7 @@ const Pagination: React.FC<{
             onClick={() => onPageChange(page)}
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
-                ? 'bg-cyan-500 text-slate-950'
+                ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
@@ -407,7 +408,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
 
         <div className="space-y-6">
           {/* Order Details */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
             <div>
               <p className="text-slate-400">Order No.</p>
               <p className="text-white">{shipment.orderNo}</p>
@@ -498,7 +499,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
           {/* Packing Information */}
           <div>
             <h3 className="text-sm font-medium text-slate-300 mb-2">Packing Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Package ID</label>
                 <input
@@ -593,6 +594,7 @@ const Shipments: React.FC = () => {
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [showPrepareModal, setShowPrepareModal] = useState(false);
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
+  usePlantManagerDetailOverlay(isViewDrawerOpen && selectedShipment !== null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -733,28 +735,28 @@ const Shipments: React.FC = () => {
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Ready for Picking</p>
-          <p className="text-2xl font-bold text-white mt-1">{readyForPicking}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Ready for Picking</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{readyForPicking}</p>
         </div>
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Being Packed</p>
-          <p className="text-2xl font-bold text-white mt-1">{beingPacked}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Being Packed</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{beingPacked}</p>
         </div>
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Ready for Shipment</p>
-          <p className="text-2xl font-bold text-white mt-1">{readyForShipment}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Ready for Shipment</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{readyForShipment}</p>
         </div>
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Picked Today</p>
-          <p className="text-2xl font-bold text-white mt-1">{pickedToday}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Picked Today</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{pickedToday}</p>
         </div>
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Packed Today</p>
-          <p className="text-2xl font-bold text-white mt-1">{packedToday}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Packed Today</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{packedToday}</p>
         </div>
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Pending Pickup</p>
-          <p className="text-2xl font-bold text-white mt-1">{pendingPickup}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Pending Pickup</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{pendingPickup}</p>
         </div>
       </div>
 
@@ -767,7 +769,7 @@ const Shipments: React.FC = () => {
               onClick={() => setStatusFilter(status)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 statusFilter === status
-                  ? 'bg-cyan-500 text-slate-950'
+                  ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                   : 'text-slate-400 hover:text-slate-100'
               }`}
             >
@@ -781,15 +783,15 @@ const Shipments: React.FC = () => {
             onChange={setSearch}
             placeholder="Search Shipment #, PO #, Customer..."
           />
-          <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/50 p-1" aria-label="Shipment view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+          <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/50 p-1" aria-label="Shipment view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
         </div>
       </div>
 
       {/* Shipment Table */}
       <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px]">
+        <div className="pm-table-scroll">
+          <table className="pm-status-table pm-shipment-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1000px]">
             <thead className="bg-slate-50 dark:bg-[#0b0f19]/50 border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Order No.</th>
@@ -919,42 +921,45 @@ const Shipments: React.FC = () => {
             onClick={() => setIsViewDrawerOpen(false)}
           />
           {/* Drawer Panel */}
-          <div className="relative w-full max-w-md bg-[#0d1322] border-l border-slate-800 shadow-2xl h-full overflow-y-auto">
+          <div className="relative h-full w-[96vw] shrink-0 overflow-x-hidden overflow-y-auto overscroll-y-contain border-l border-slate-800 bg-[#0d1322] shadow-2xl min-[400px]:w-[92vw] sm:w-full sm:max-w-md">
             {/* Header */}
-            <div className="sticky top-0 bg-[#0d1322] border-b border-slate-800 p-4 flex items-center justify-between z-10">
-              <div>
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-slate-800 bg-[#0d1322] p-3 sm:items-center sm:p-4">
+              <div className="min-w-0">
                 <h2 className="text-lg font-bold text-white">{selectedShipment.shipmentNo}</h2>
                 <p className="text-xs text-slate-400">Order No. {selectedShipment.orderNo}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={selectedShipment.status} />
+              <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                <div className="shrink-0 whitespace-nowrap">
+                  <StatusBadge status={selectedShipment.status} />
+                </div>
                 <button
                   onClick={() => setIsViewDrawerOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                  aria-label="Close shipment details"
+                  className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:min-h-0 sm:min-w-0 sm:p-1.5"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            <div className="p-4 space-y-5">
+            <div className="space-y-4 p-3 sm:space-y-5 sm:p-4">
               {/* Customer & Warehouse Details Card */}
-              <div className="bg-[#0b0f19] border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-[#0b0f19]">
                 <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Customer Name</p>
-                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.customer}</p>
+                  <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Customer Name</p>
+                  <p className="mt-0.5 break-words text-sm font-medium text-slate-900 dark:text-white">{selectedShipment.customer}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Order No.</p>
-                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.orderNo}</p>
+                  <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Order No.</p>
+                  <p className="mt-0.5 break-words text-sm font-medium text-slate-900 dark:text-white">{selectedShipment.orderNo}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Warehouse</p>
-                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.warehouse}</p>
+                  <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Warehouse</p>
+                  <p className="mt-0.5 break-words text-sm font-medium text-slate-900 dark:text-white">{selectedShipment.warehouse}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Prepared By</p>
-                  <p className="text-sm text-white font-medium mt-0.5">{selectedShipment.preparedBy}</p>
+                  <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Prepared By</p>
+                  <p className="mt-0.5 break-words text-sm font-medium text-slate-900 dark:text-white">{selectedShipment.preparedBy}</p>
                 </div>
               </div>
 
@@ -972,7 +977,7 @@ const Shipments: React.FC = () => {
                         <div className="flex items-center justify-between mb-1">
                           <p className="text-sm text-white font-medium">{item.name}</p>
                           <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${
+                            className={`plant-manager-badge text-xs px-2 py-0.5 rounded-full ${
                               isAllocated
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                 : 'bg-red-500/10 text-red-400 border border-red-500/20'

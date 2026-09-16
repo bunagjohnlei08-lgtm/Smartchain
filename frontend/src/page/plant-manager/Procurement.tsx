@@ -1,6 +1,7 @@
 // src/page/plant-manager/ReplenishmentPlanning.tsx
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { apiClient } from '../../lib/api';
+import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
 import {
   Search,
   Eye,
@@ -82,7 +83,7 @@ const StatusBadge: React.FC<{ status: RequestStatus | string }> = ({ status }) =
   const labels: Record<string, string> = { draft: 'Draft', pending: 'Pending Approval', approved: 'Approved', rejected: 'Rejected', for_purchase_order: 'For Purchase Order' };
   const { color, icon: Icon } = config[status] || config.draft;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
+    <span className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
       <Icon className="w-3 h-3" />
       {labels[status] || status}
     </span>
@@ -97,7 +98,7 @@ const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
     'Critical': 'text-red-400 bg-red-500/10 border-red-500/20',
   };
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${config[priority]}`}>
+    <span className={`plant-manager-badge px-2.5 py-1 rounded-full text-xs font-medium border ${config[priority]}`}>
       {priority}
     </span>
   );
@@ -124,10 +125,10 @@ const KPICard: React.FC<{ label: string; value: string | number; icon: React.Rea
     <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm hover:border-[var(--border-color)] transition-all">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1.5">{value}</p>
+          <p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-[var(--text-primary)] mt-1.5">{value}</p>
           {trend && (
-            <p className={`text-xs mt-1 flex items-center gap-1 ${trendColor}`}>
+            <p className={`mobile-kpi-helper text-xs mt-1 flex items-center gap-1 ${trendColor}`}>
               <TrendIcon className="w-3 h-3" />
               {trend}
             </p>
@@ -223,7 +224,7 @@ const Pagination: React.FC<{
             onClick={() => onPageChange(page)}
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
-                ? 'bg-cyan-500 text-slate-950'
+                ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]'
             }`}
           >
@@ -269,6 +270,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showNewRequestModal, setShowNewRequestModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<RequestHistory | null>(null);
+  usePlantManagerDetailOverlay(showViewModal && selectedRequest !== null);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -486,7 +488,7 @@ const ReplenishmentPlanning: React.FC = () => {
       </div>
 
       {/* FIX: Responsive metric cards grid to prevent overflow on narrow screens */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
+      <div className="grid grid-cols-1 gap-4 w-full sm:grid-cols-2 lg:grid-cols-3">
         <KPICard
           label="Needing Replenishment"
           value={needingReplenishment}
@@ -534,14 +536,14 @@ const ReplenishmentPlanning: React.FC = () => {
         >
           Reset
         </button>
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-1" aria-label="Request view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-1" aria-label="Request view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutGrid className="h-4 w-4" /></button></div>
       </div>
 
       {/* Main Table */}
       <div className="w-full max-w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+        <div className="pm-table-scroll w-full">
+          <table className="pm-status-table pm-procurement-status-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full min-w-[900px]">
             <thead className="bg-[var(--bg-surface-alt)] border-b border-[var(--border-color)]">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
@@ -612,8 +614,8 @@ const ReplenishmentPlanning: React.FC = () => {
           </div>
           <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">View all</button>
         </div>
-        <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+        <div className="pm-table-scroll w-full">
+          <table className="pm-status-table pm-procurement-status-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full min-w-[900px]">
             <thead className="border-b border-[var(--border-color)]">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
@@ -743,7 +745,7 @@ const ReplenishmentPlanning: React.FC = () => {
               </button>
             </div>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Request No.</label>
                     <input
@@ -873,7 +875,7 @@ const ReplenishmentPlanning: React.FC = () => {
               </button>
             </div>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <p className="text-xs text-[var(--text-muted)]">Product</p>
                     <p className="text-[var(--text-primary)] font-medium">{selectedProduct.name}</p>
@@ -958,7 +960,7 @@ const ReplenishmentPlanning: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-[var(--text-muted)]">Request No.</p>
                 <p className="text-[var(--text-primary)] font-medium">{selectedRequest.requestNo}</p>

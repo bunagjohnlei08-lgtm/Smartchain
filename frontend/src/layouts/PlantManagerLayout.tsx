@@ -1,20 +1,21 @@
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
-  ChevronDown,
   Moon,
   Sun,
   Menu,
-  LogOut,
 } from 'lucide-react';
 import PlantManagerSidebar from '../components/layout/PlantManagerSidebar';
 import { useTheme } from '../context/ThemeContext';
 import { readStoredUser, subscribeToStoredUser, type AuthUser } from '../lib/authUser';
 import NotificationBell from '../components/NotificationBell';
 import UserAvatar from '../components/UserAvatar';
+import ProfileLogoutMenu from '../components/ProfileLogoutMenu';
+import { PlantManagerDetailOverlayContext } from '../components/layout/PlantManagerDetailOverlayContext';
 
 const PlantManagerLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isDetailOverlayOpen, setIsDetailOverlayOpen] = React.useState(false);
   const [userName, setUserName] = React.useState('User');
   const [profilePhotoUrl, setProfilePhotoUrl] = React.useState<string | null>(null);
   const navigate = useNavigate();
@@ -31,6 +32,10 @@ const PlantManagerLayout: React.FC = () => {
     return subscribeToStoredUser(applyUser);
   }, []);
 
+  React.useEffect(() => {
+    if (isDetailOverlayOpen) setIsMobileMenuOpen(false);
+  }, [isDetailOverlayOpen]);
+
   const handleLogout = () => {
     sessionStorage.removeItem('isAuthenticated');
     sessionStorage.removeItem('userRole');
@@ -40,12 +45,13 @@ const PlantManagerLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#090d16]">
+    <PlantManagerDetailOverlayContext.Provider value={setIsDetailOverlayOpen}>
+    <div className="operations-shell plant-manager-shell flex h-screen overflow-hidden bg-[#090d16]">
       {/* Mobile Hamburger */}
-      {!isMobileMenuOpen && (
+      {!isMobileMenuOpen && !isDetailOverlayOpen && (
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="xl:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-slate-900 text-white shadow-lg"
+          className="operations-mobile-menu-button xl:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white text-slate-900 shadow-lg dark:bg-slate-900 dark:text-white"
           aria-label="Open navigation menu"
           aria-expanded="false"
           aria-controls="plant-manager-sidebar"
@@ -76,16 +82,16 @@ const PlantManagerLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#090d16]">
         {/* Top Bar */}
-        <header className="flex items-center h-16 px-4 md:px-6 border-b border-slate-800/80 bg-[#090d16] sticky top-0 z-40 flex-shrink-0">
+        <header className="operations-topbar flex items-center h-16 px-4 md:px-6 border-b border-slate-800/80 bg-[#090d16] sticky top-0 z-40 flex-shrink-0">
           <div className="flex items-center flex-1 min-w-0">
-            <div className="xl:hidden w-10" />
+            <div className="operations-mobile-menu-spacer xl:hidden w-10" />
           </div>
 
-          <div className="flex items-center gap-3 h-full flex-shrink-0">
+          <div className="operations-header-actions flex items-center gap-3 h-full flex-shrink-0">
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all"
+              className="operations-header-icon-button p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all"
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
@@ -95,28 +101,24 @@ const PlantManagerLayout: React.FC = () => {
             <NotificationBell viewAllPath="/plant-manager/notifications" />
 
             {/* User Profile Dropdown */}
-            <div className="flex items-center gap-2 ml-2 cursor-pointer hover:bg-slate-800 rounded-xl px-2 py-1 transition-all h-full">
+            <ProfileLogoutMenu
+              profilePath="/plant-manager/profile"
+              triggerLabel="Open Plant Manager profile menu"
+              onConfirmLogout={handleLogout}
+            >
               <UserAvatar name={userName} photoUrl={profilePhotoUrl} className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600/20 text-sm font-semibold text-blue-400" />
               <span className="hidden sm:inline text-sm text-slate-300">{userName}</span>
-              <ChevronDown size={16} className="text-slate-400" />
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-all"
-              aria-label="Logout"
-              title="Logout"
-            >
-              <LogOut size={20} />
-            </button>
+            </ProfileLogoutMenu>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16]">
+        <main className="plant-manager-main flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16]">
           <Outlet />
         </main>
       </div>
     </div>
+    </PlantManagerDetailOverlayContext.Provider>
   );
 };
 

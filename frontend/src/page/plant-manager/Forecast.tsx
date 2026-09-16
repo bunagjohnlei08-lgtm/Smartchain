@@ -339,8 +339,8 @@ const Forecast: React.FC = () => {
           />
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
+        <div className="pm-table-scroll">
+          <table className="pm-responsive-table pm-cols-5 pm-sticky-2 w-full min-w-[700px]">
             <thead className="border-b border-slate-800">
               <tr>
                 <th
@@ -439,7 +439,7 @@ const Forecast: React.FC = () => {
             <button className="p-1.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
+            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950">
               1
             </button>
             <button className="p-1.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">

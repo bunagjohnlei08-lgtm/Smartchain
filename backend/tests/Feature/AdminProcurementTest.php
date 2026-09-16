@@ -66,7 +66,7 @@ class AdminProcurementTest extends TestCase
             ->assertJsonPath('data.0.warehouse_name', 'Main Warehouse')
             ->assertJsonPath('data.0.requested_qty', 60)
             ->assertJsonPath('data.0.priority', 'Critical')
-            ->assertJsonPath('data.0.status', 'Pending Approval')
+            ->assertJsonPath('data.0.status', ReplenishmentRequest::STATUS_PENDING)
             ->assertJsonPath('data.0.requested_by', 'M. Santos')
             ->assertJsonPath('data.0.submitted_date', '2026-08-27');
     }
@@ -82,12 +82,12 @@ class AdminProcurementTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('request_no', 'RR-1001')
-            ->assertJsonPath('status', 'Approved')
+            ->assertJsonPath('status', ReplenishmentRequest::STATUS_APPROVED)
             ->assertJsonPath('available_for_purchase_order', true);
 
         $this->assertDatabaseHas('replenishment_requests', [
             'request_no' => 'RR-1001',
-            'status' => 'Approved',
+            'status' => ReplenishmentRequest::STATUS_APPROVED,
         ]);
         Notification::assertSentTo($this->requester, WorkflowNotification::class, fn ($notification) =>
             $notification->title === 'Request Approved'
@@ -106,10 +106,10 @@ class AdminProcurementTest extends TestCase
         $this->actingAs($this->userWithRole('ADMIN'))
             ->postJson("/api/admin/procurement/requests/{$replenishmentRequest->id}/decline", ['remarks' => 'Insufficient budget'])
             ->assertOk()
-            ->assertJsonPath('status', 'Rejected')
+            ->assertJsonPath('status', ReplenishmentRequest::STATUS_REJECTED)
             ->assertJsonPath('admin_decision', 'Insufficient budget');
 
-        $this->assertDatabaseHas('replenishment_requests', ['request_no' => 'RR-1001', 'status' => 'Rejected']);
+        $this->assertDatabaseHas('replenishment_requests', ['request_no' => 'RR-1001', 'status' => ReplenishmentRequest::STATUS_REJECTED]);
         Notification::assertSentTo($this->requester, WorkflowNotification::class, fn ($notification) =>
             $notification->title === 'Request Rejected'
             && $notification->message === 'Your request #RR-1001 has been Rejected.'
@@ -143,7 +143,7 @@ class AdminProcurementTest extends TestCase
                 'approved' => 1,
                 'rejected' => 1,
                 'po_created' => 2,
-                'for_purchase_order' => 1,
+                'for_purchase_order' => 2,
             ]);
     }
 

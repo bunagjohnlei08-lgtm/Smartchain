@@ -405,7 +405,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
  const color = getStatusColor(status);
  const Icon = getStatusIcon(status);
  return (
-  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
+  <span className={`admin-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
    <Icon className="w-3 h-3" />
    {status}
   </span>
@@ -457,7 +457,7 @@ const AlertPill: React.FC<{
 }> = ({ title, count, color, icon }) => {
  if (count === 0) return null;
  return (
-  <div className={`inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border border-${color}-500/30 bg-${color}-500/10 text-${color}-400 text-xs sm:text-sm font-medium`}>
+  <div className={`admin-badge inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border border-${color}-500/30 bg-${color}-500/10 text-${color}-400 text-xs sm:text-sm font-medium`}>
    {icon}
    <span>{count} {title}</span>
   </div>
@@ -551,7 +551,7 @@ const Pagination: React.FC<{
       onClick={() => onPageChange(page)}
       className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
        currentPage === page
-        ? 'bg-cyan-500 text-slate-950'
+         ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
         : 'text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800'
       }`}
      >
@@ -780,8 +780,8 @@ const DamagedStockModal: React.FC<{
     {records.length === 0 ? (
      <p className="text-gray-400 text-center py-8">No damaged stock records.</p>
     ) : (
-     <div className="overflow-x-auto">
-      <table className="w-full min-w-[600px]">
+     <div className="admin-table-scroll">
+      <table className="admin-responsive-table admin-cols-6 admin-sticky-1 w-full min-w-[600px]">
        <thead className="bg-gray-800/50 bg-gray-800/50 border-b border-gray-800 border-gray-800">
         <tr>
          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Product</th>
@@ -1010,8 +1010,8 @@ const InventoryGrid: React.FC<{
 
       {/* Category & Warehouse */}
       <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mb-3">
-       <span className="bg-gray-800/50 bg-gray-800/50 px-2 py-1 rounded-lg truncate">{item.category}</span>
-       <span className="bg-gray-800/50 bg-gray-800/50 px-2 py-1 rounded-lg truncate">{item.warehouse}</span>
+       <span className="admin-badge bg-gray-800/50 bg-gray-800/50 px-2 py-1 rounded-lg truncate">{item.category}</span>
+       <span className="admin-badge bg-gray-800/50 bg-gray-800/50 px-2 py-1 rounded-lg truncate">{item.warehouse}</span>
       </div>
 
       {/* Stock Quantities */}
@@ -1421,12 +1421,12 @@ export const InventoryList: React.FC = () => {
      <div className="flex-1 hidden md:block"></div>
      <div className="flex items-center gap-2">
       {outOfStockCount > 0 && (
-       <span className="px-2 py-1 sm:px-3 sm:py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
+       <span className="admin-badge px-2 py-1 sm:px-3 sm:py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
         <XCircle className="w-3 h-3" /> {outOfStockCount} Out of Stock
        </span>
       )}
       {criticalCount > 0 && (
-       <span className="px-2 py-1 sm:px-3 sm:py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
+       <span className="admin-badge px-2 py-1 sm:px-3 sm:py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1">
         <AlertTriangle className="w-3 h-3" /> {criticalCount} Critical
        </span>
       )}
@@ -1467,8 +1467,8 @@ export const InventoryList: React.FC = () => {
    {viewMode === 'table' ? (
     // Table View
     <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl overflow-hidden">
-     <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
-      <table className="w-full min-w-[1000px] text-left border-collapse">
+     <div className="admin-table-scroll w-full scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+      <table className="admin-responsive-table admin-cols-15 admin-sticky-1 w-full min-w-[1000px] text-left border-collapse">
        <thead className="bg-gray-800/50 bg-gray-800/50 border-b border-gray-800 border-gray-800 sticky top-0 z-10">
         <tr>
          <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-400 sm:px-4 sm:py-3.5">Barcode</th>

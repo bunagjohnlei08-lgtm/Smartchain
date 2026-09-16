@@ -53,7 +53,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const { color, bg, dotColor } = config[status] || config.Available;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
+      className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {status}
@@ -232,26 +232,26 @@ const Inventory: React.FC = () => {
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-[#0f172a]/70 border border-slate-800/80 rounded-2xl p-5 md:p-6 shadow-sm space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+          <p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">
             Available Stock
           </p>
-          <p className="text-3xl md:text-4xl font-bold text-emerald-400">
+          <p className="mobile-kpi-value text-3xl md:text-4xl font-bold text-emerald-400">
             {totalAvailable.toLocaleString()}
           </p>
         </div>
         <div className="bg-[#0f172a]/70 border border-slate-800/80 rounded-2xl p-5 md:p-6 shadow-sm space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+          <p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">
             Reserved Stock
           </p>
-          <p className="text-3xl md:text-4xl font-bold text-cyan-400">
+          <p className="mobile-kpi-value text-3xl md:text-4xl font-bold text-cyan-400">
             {totalReserved.toLocaleString()}
           </p>
         </div>
         <div className="bg-[#0f172a]/70 border border-slate-800/80 rounded-2xl p-5 md:p-6 shadow-sm space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+          <p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">
             Backload Stock
           </p>
-          <p className="text-3xl md:text-4xl font-bold text-rose-500">
+          <p className="mobile-kpi-value text-3xl md:text-4xl font-bold text-rose-500">
             {totalBackload.toLocaleString()}
           </p>
         </div>
@@ -286,7 +286,7 @@ const Inventory: React.FC = () => {
             <button onClick={fetchInventory} className="p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/30 transition-colors text-slate-400 hover:text-slate-200">
               <RefreshCw className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-[#101929] p-1" aria-label="Inventory view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+            <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-[#101929] p-1" aria-label="Inventory view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
           </div>
         </div>
 
@@ -297,8 +297,8 @@ const Inventory: React.FC = () => {
           </div>
         )}
 
-        {viewMode === 'list' ? <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+        {viewMode === 'list' ? <div className="pm-table-scroll">
+          <table className="pm-inventory-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[900px]">
             <thead className="border-b border-slate-800/80">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -390,7 +390,7 @@ const Inventory: React.FC = () => {
             <button className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
+            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950">
               1
             </button>
             <button className="p-1.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">

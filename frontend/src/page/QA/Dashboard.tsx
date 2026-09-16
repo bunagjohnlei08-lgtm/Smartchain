@@ -50,7 +50,7 @@ const StatusBadge: React.FC<{ status: DashboardQueueItem['status'] }> = ({ statu
   const style = status === 'In Progress'
     ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
     : 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-  return <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${style}`}>{status}</span>;
+  return <span className={`qa-badge px-2.5 py-1 rounded-full text-xs font-medium border ${style}`}>{status}</span>;
 };
 
 const QADashboard: React.FC = () => {
@@ -99,7 +99,7 @@ const QADashboard: React.FC = () => {
     <div className="w-full min-w-0 max-w-7xl mx-auto p-4 md:p-6 space-y-6 overflow-x-hidden bg-[#090d16] text-slate-100 min-h-screen">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div><h1 className="text-2xl font-bold text-white">Good afternoon, {firstName}</h1><p className="text-sm text-slate-400">{dateLabel} — receiving inspection summary.</p></div>
-        <button onClick={() => navigate('/qa/inspection')} className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950 font-semibold"><ClipboardCheck className="w-4 h-4" /> Start Inspection</button>
+        <button onClick={() => navigate('/qa/inspection')} className="w-fit sm:w-auto px-4 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950 font-semibold"><ClipboardCheck className="w-4 h-4" /> Start Inspection</button>
       </div>
 
       {error && <div className="flex items-center justify-between gap-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300"><span>{error}</span><button onClick={loadDashboard} className="inline-flex items-center gap-2 text-red-200 hover:text-white"><RefreshCw className="h-4 w-4" /> Retry</button></div>}
@@ -107,7 +107,7 @@ const QADashboard: React.FC = () => {
       <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {metrics.map((metric) => {
           const Icon = metric.icon;
-          return <div key={metric.label} className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-gray-700 transition-all"><div className="flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">{metric.label}</p><p className="text-2xl font-bold text-white mt-1.5">{loading ? '—' : metric.value}</p><p className="text-xs text-slate-500 mt-1">{metric.subtitle}</p></div><div className={`p-2.5 rounded-full ${metric.bg} ${metric.color}`}><Icon className="w-6 h-6" /></div></div></div>;
+          return <div key={metric.label} className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-gray-700 transition-all"><div className="flex items-start justify-between"><div><p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">{metric.label}</p><p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{loading ? '—' : metric.value}</p><p className="mobile-kpi-helper text-xs text-slate-500 mt-1">{metric.subtitle}</p></div><div className={`p-2.5 rounded-full ${metric.bg} ${metric.color}`}><Icon className="w-6 h-6" /></div></div></div>;
         })}
       </div>
 

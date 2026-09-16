@@ -25,7 +25,7 @@ const escapeHtml = (value: string | number): string => String(value).replace(/&/
 
 const KpiCard: React.FC<{ label: string; value: string | number; subtext: string; icon: React.ReactNode; iconBg: string; iconColor: string }> = ({ label, value, subtext, icon, iconBg, iconColor }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none">
-    <div className="flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">{label}</p><p className="mt-1.5 text-2xl font-bold text-slate-900 dark:text-white">{value}</p><p className="mt-1 text-xs text-slate-500">{subtext}</p></div><div className={`p-2.5 rounded-full ${iconBg} ${iconColor}`}>{icon}</div></div>
+    <div className="flex items-start justify-between"><div><p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">{label}</p><p className="mobile-kpi-value mt-1.5 text-2xl font-bold text-slate-900 dark:text-white">{value}</p><p className="mobile-kpi-helper mt-1 text-xs text-slate-500">{subtext}</p></div><div className={`p-2.5 rounded-full ${iconBg} ${iconColor}`}>{icon}</div></div>
   </div>
 );
 

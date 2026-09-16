@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
   Brain,
   TrendingUp,
@@ -263,9 +264,9 @@ const KPICard: React.FC<{
   <div className={`bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-6 shadow-xl hover:border-slate-300 hover:border-gray-700 transition-all duration-200 h-full flex flex-col ${className}`}>
   <div className="flex items-start justify-between flex-1">
    <div>
-    <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-    <p className="text-3xl font-bold text-white">{value}</p>
-    {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+    <p className="admin-kpi-title text-gray-400 text-xs font-medium uppercase tracking-wider">{label}</p>
+    <p className="admin-kpi-value text-3xl font-bold text-white">{value}</p>
+    {subtitle && <p className="admin-kpi-helper text-xs text-gray-400 mt-1">{subtitle}</p>}
    </div>
    <div className="p-2.5 bg-gray-800/50 bg-gray-800/50 rounded-lg shrink-0">
     {icon}
@@ -294,7 +295,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
  };
  const { color, icon: Icon } = config[status] || config['Medium'];
  return (
-  <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${color} flex items-center gap-1.5 whitespace-nowrap`}>
+  <span className={`admin-badge px-2.5 py-1 rounded-full text-xs font-medium border ${color} flex items-center gap-1.5 whitespace-nowrap`}>
    <Icon className="w-3 h-3" />
    {status}
   </span>
@@ -332,6 +333,7 @@ const AIDemandForecast: React.FC = () => {
  const [statusFilter, setStatusFilter] = useState('All Status');
  const [selectedProduct, setSelectedProduct] = useState<ForecastProduct | null>(null);
  const [showDrawer, setShowDrawer] = useState(false);
+ useAdminDetailOverlay(showDrawer && selectedProduct !== null);
  const [expandedChart, setExpandedChart] = useState(false);
  const [currentPage, setCurrentPage] = useState(1);
  const itemsPerPage = 8;
@@ -438,7 +440,7 @@ const AIDemandForecast: React.FC = () => {
         onClick={() => setTimeFilter(filter)}
         className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
          timeFilter === filter
-          ? 'bg-blue-500 text-white'
+          ? 'bg-slate-200 text-slate-900 dark:bg-blue-500 dark:text-white'
           : 'text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800/50'
         }`}
        >
@@ -562,8 +564,8 @@ const AIDemandForecast: React.FC = () => {
        </div>
       </div>
 
-      <div className="w-full overflow-x-auto rounded-lg">
-        <table className="w-full table-auto text-left border-collapse">
+      <div className="admin-table-scroll w-full rounded-lg">
+        <table className="admin-forecast-table admin-responsive-table admin-cols-8 admin-sticky-1 w-full table-auto text-left border-collapse">
         <thead className="bg-gray-800/50 bg-gray-800/30 text-slate-400 uppercase tracking-wider text-xs font-semibold border-b border-slate-800">
          <tr>
            <th className="px-3 py-3 whitespace-nowrap text-left">Product</th>
@@ -579,7 +581,7 @@ const AIDemandForecast: React.FC = () => {
         <tbody className="border-collapse">
          {paginatedProducts.map((product) => (
           <tr key={product.id} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
-            <td className="px-3 py-3 whitespace-nowrap text-white font-medium">{product.name}</td>
+            <td className="px-3 py-3 whitespace-nowrap text-white font-medium" title={product.name}>{product.name}</td>
             <td className="px-3 py-3 whitespace-nowrap text-gray-400">{product.sku}</td>
             <td className="px-3 py-3 whitespace-nowrap text-gray-300">{product.warehouse}</td>
             <td className="px-3 py-3 whitespace-nowrap text-right text-gray-300">{product.historicalDemand}</td>
@@ -590,6 +592,7 @@ const AIDemandForecast: React.FC = () => {
             <div className="flex items-center justify-end gap-1">
              <button
               onClick={() => handleViewProduct(product)}
+              aria-label={`View forecast for ${product.name}`}
               className="p-1.5 rounded-lg hover:bg-[#1E293B] text-gray-400 hover:text-white transition-all duration-200"
              >
               <Eye className="w-4 h-4" />
@@ -627,7 +630,7 @@ const AIDemandForecast: React.FC = () => {
            onClick={() => setCurrentPage(pageNum)}
            className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
             currentPage === pageNum
-             ? 'bg-blue-500 text-white'
+              ? 'bg-slate-200 text-slate-900 dark:bg-blue-500 dark:text-white'
              : 'text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800/50'
            }`}
           >
@@ -703,7 +706,7 @@ const AIDemandForecast: React.FC = () => {
             <span className={`text-xs ${product.trend === 'up' ? 'text-emerald-400' : product.trend === 'down' ? 'text-red-400' : 'text-amber-400'}`}>
              ↑
             </span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+            <span className={`admin-badge px-2 py-0.5 rounded-full text-xs font-medium border ${
              product.status === 'Critical'
               ? 'bg-red-500/10 text-red-400 border-red-500/20'
               : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
@@ -722,8 +725,8 @@ const AIDemandForecast: React.FC = () => {
     {/* Forecast History */}
     <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-6">
      <h3 className="text-white font-semibold text-sm mb-4">Forecast History</h3>
-     <div className="overflow-x-auto">
-       <table className="w-full border-collapse">
+     <div className="admin-table-scroll">
+       <table className="admin-responsive-table admin-cols-5 admin-sticky-1 w-full border-collapse">
         <thead className="bg-gray-800/50 bg-gray-800/30 border-b border-slate-800">
         <tr>
          <th className="px-4 py-2 text-left text-gray-400 text-xs font-medium uppercase tracking-wider">Generated Date</th>
@@ -751,21 +754,21 @@ const AIDemandForecast: React.FC = () => {
     {/* Forecast Details Drawer */}
     {showDrawer && selectedProduct && (
      <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="bg-black/50 backdrop-blur-sm w-full" onClick={() => setShowDrawer(false)} />
-      <div className="bg-[#0d1322] border-l border-gray-800 border-gray-800 w-[480px] h-full overflow-y-auto p-6 shadow-sm ">
-       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">Forecast Details</h2>
-        <button onClick={() => setShowDrawer(false)} className="p-1.5 rounded-lg hover:bg-gray-800/50 hover:bg-gray-800/50 text-gray-400 hover:text-white transition-all duration-200">
+      <div className="min-w-0 flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowDrawer(false)} />
+      <div className="h-full w-[96vw] shrink-0 overflow-x-hidden overflow-y-auto overscroll-y-contain border-l border-gray-800 bg-[#0d1322] p-3 shadow-sm min-[400px]:w-[92vw] sm:w-[480px] sm:p-6">
+       <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-4 flex items-center justify-between gap-2 bg-[#0d1322] px-3 py-3 sm:static sm:mx-0 sm:mt-0 sm:mb-6 sm:bg-transparent sm:p-0">
+        <h2 className="min-w-0 text-base font-bold leading-tight text-white sm:text-xl">Forecast Details</h2>
+        <button aria-label="Close forecast details" onClick={() => setShowDrawer(false)} className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors duration-200 hover:bg-gray-800/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 sm:min-h-0 sm:min-w-0 sm:p-1.5">
          <X className="w-5 h-5" />
         </button>
        </div>
 
-       <div className="space-y-8">
+       <div className="space-y-5 sm:space-y-8">
         {/* Product Info */}
         <div>
-         <h3 className="text-white font-semibold text-lg">{selectedProduct.name}</h3>
+         <h3 className="break-words text-base font-semibold text-white sm:text-lg">{selectedProduct.name}</h3>
          <p className="text-gray-400 text-sm">{selectedProduct.sku} · {selectedProduct.warehouse}</p>
-         <div className="mt-2 flex items-center gap-2">
+         <div className="mt-2 flex flex-wrap items-center gap-2">
           <StatusBadge status={selectedProduct.status} />
           <span className={`text-xs ${selectedProduct.trend === 'up' ? 'text-emerald-400' : selectedProduct.trend === 'down' ? 'text-red-400' : 'text-amber-400'}`}>
            {selectedProduct.trend === 'up' ? '↑ Growing' : selectedProduct.trend === 'down' ? '↓ Declining' : '→ Stable'}
@@ -774,30 +777,30 @@ const AIDemandForecast: React.FC = () => {
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:gap-3">
          <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
-          <p className="text-gray-400 text-xs">Historical Demand</p>
-          <p className="text-white text-lg font-bold">{selectedProduct.historicalDemand}</p>
+          <p className="text-xs font-normal text-gray-400">Historical Demand</p>
+          <p className="text-[15px] font-semibold text-white sm:text-lg sm:font-bold">{selectedProduct.historicalDemand}</p>
          </div>
          <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
-          <p className="text-gray-400 text-xs">Predicted Demand</p>
-          <p className="text-white text-lg font-bold">{selectedProduct.predictedDemand}</p>
+          <p className="text-xs font-normal text-gray-400">Predicted Demand</p>
+          <p className="text-[15px] font-semibold text-white sm:text-lg sm:font-bold">{selectedProduct.predictedDemand}</p>
          </div>
          <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
-          <p className="text-gray-400 text-xs">Current Stock</p>
-          <p className="text-white text-lg font-bold">{selectedProduct.currentStock}</p>
+          <p className="text-xs font-normal text-gray-400">Current Stock</p>
+          <p className="text-[15px] font-semibold text-white sm:text-lg sm:font-bold">{selectedProduct.currentStock}</p>
          </div>
          <div className="bg-[#0d1322] rounded-xl p-3 border border-gray-800/50">
-          <p className="text-gray-400 text-xs">Suggested Reorder</p>
-          <p className="text-white text-lg font-bold">{selectedProduct.suggestedReorder}</p>
+          <p className="text-xs font-normal text-gray-400">Suggested Reorder</p>
+          <p className="text-[15px] font-semibold text-white sm:text-lg sm:font-bold">{selectedProduct.suggestedReorder}</p>
          </div>
         </div>
 
         {/* Confidence & Safety */}
-        <div className="bg-[#0d1322] rounded-xl p-4 border border-gray-800/50">
+        <div className="rounded-xl border border-gray-800/50 bg-[#0d1322] p-3 sm:p-4">
          <div className="flex items-center justify-between">
-          <span className="text-gray-400 text-sm">Forecast Confidence</span>
-          <span className="text-white font-semibold">{selectedProduct.confidence}%</span>
+          <span className="text-xs text-gray-400 sm:text-sm">Forecast Confidence</span>
+          <span className="text-xs font-semibold text-white sm:text-base">{selectedProduct.confidence}%</span>
          </div>
          <div className="w-full h-1.5 bg-slate-200 bg-gray-700 rounded-full mt-1.5 overflow-hidden">
           <div
@@ -808,18 +811,18 @@ const AIDemandForecast: React.FC = () => {
            }}
           />
          </div>
-         <div className="flex items-center justify-between mt-3 text-sm">
+         <div className="mt-3 flex items-center justify-between text-xs sm:text-sm">
           <span className="text-gray-400">Safety Stock</span>
           <span className="text-white font-medium">{selectedProduct.safetyStock} units</span>
          </div>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-3 pt-4 border-t border-gray-800/50">
-         <button className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950">
+        <div className="grid grid-cols-1 gap-2 border-t border-gray-800/50 pt-3 min-[360px]:grid-cols-2 sm:flex sm:items-center sm:gap-3 sm:pt-4">
+         <button className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium leading-[1.2] text-white transition-colors duration-200 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:min-h-11 sm:flex-1 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm sm:leading-5">
           <ShoppingCart className="w-4 h-4" /> Create PO
          </button>
-         <button className="px-4 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800/50 transition-all duration-200 flex items-center gap-2">
+         <button className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-gray-700 px-3 py-2 text-xs font-medium leading-[1.2] text-gray-400 transition-colors duration-200 hover:bg-gray-800/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm sm:font-normal sm:leading-5">
           <Download className="w-4 h-4" /> Export
          </button>
         </div>

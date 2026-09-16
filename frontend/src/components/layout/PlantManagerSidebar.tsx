@@ -104,6 +104,7 @@ const PlantManagerSidebar = ({ onClose }: PlantManagerSidebarProps) => {
                   <Link
                     key={item.id}
                     to={item.path}
+                    onClick={onClose}
                     className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all text-sm border-l-2 ${
                       active
                         ? 'bg-cyan-500/10 text-cyan-400 font-semibold border-l-cyan-400'

@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
+import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
 import {
   Package,
   Layers,
@@ -25,6 +26,7 @@ import {
   Minus,
   Sparkles,
   ExternalLink,
+  X,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -71,6 +73,14 @@ interface Transaction {
   time: string;
 }
 
+const compactTransactionTime = (value: string) => value
+  .replace(/\b(\d+)\s+years?\b/i, '$1y')
+  .replace(/\b(\d+)\s+months?\b/i, '$1mo')
+  .replace(/\b(\d+)\s+weeks?\b/i, '$1w')
+  .replace(/\b(\d+)\s+days?\b/i, '$1d')
+  .replace(/\b(\d+)\s+hours?\b/i, '$1h')
+  .replace(/\b(\d+)\s+minutes?\b/i, '$1m');
+
 interface SupplierPerformance {
   id: string;
   name: string;
@@ -89,18 +99,19 @@ interface ForecastProduct {
 
 interface DashboardData {
   metrics: { total_products: number; total_categories: number; stock_value: number; low_stock_items: number; out_of_stock: number; todays_stock_in: number; todays_stock_out: number };
-  inventory_trend: Array<{ month: string; stock: number; value: number }>;
+  inventory_trend: Array<{ month: string; stock: number; availability: number }>;
   stock_movement: Array<{ day: string; in: number; out: number }>;
   monthly_inventory_activity: Array<{ month: string; receiving: number; release: number; transfers: number }>;
   low_stock_summary: LowStockItem[];
   recent_transactions: Transaction[];
+  all_transactions: Transaction[];
   supplier_performance: SupplierPerformance[];
   ai_forecast_summary: { headline: string; products: ForecastProduct[]; source: string };
 }
 
 const emptyDashboard: DashboardData = {
   metrics: { total_products: 0, total_categories: 0, stock_value: 0, low_stock_items: 0, out_of_stock: 0, todays_stock_in: 0, todays_stock_out: 0 },
-  inventory_trend: [], stock_movement: [], monthly_inventory_activity: [], low_stock_summary: [], recent_transactions: [], supplier_performance: [],
+  inventory_trend: [], stock_movement: [], monthly_inventory_activity: [], low_stock_summary: [], recent_transactions: [], all_transactions: [], supplier_performance: [],
   ai_forecast_summary: { headline: '', products: [], source: 'placeholder' },
 };
 
@@ -117,7 +128,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   };
   const { color, icon: Icon } = config[status] || config.Pending;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
+    <span className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
       <Icon className="w-3 h-3" />
       {status}
     </span>
@@ -131,7 +142,7 @@ const LowStockBadge: React.FC<{ status: string }> = ({ status }) => {
     warning: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   };
   const color = config[status as keyof typeof config] || config.warning;
-  return <span className={`px-2 py-0.5 rounded text-xs font-medium border ${color}`}>{status}</span>;
+  return <span className={`plant-manager-badge px-2 py-0.5 rounded text-xs font-medium border ${color}`}>{status}</span>;
 };
 
 // ============================================
@@ -145,6 +156,8 @@ const Dashboard: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [transactionsOpen, setTransactionsOpen] = useState(false);
+  usePlantManagerDetailOverlay(transactionsOpen);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -177,7 +190,7 @@ const Dashboard: React.FC = () => {
   const chartAxisColor = isDark ? '#CBD5E1' : '#64748B';
   const chartCardColor = isDark ? '#0d1322' : '#FFFFFF';
   const stockColor = isDark ? '#60A5FA' : '#3B82F6';
-  const valuationColor = isDark ? '#34D399' : '#22C55E';
+  const availabilityColor = isDark ? '#34D399' : '#22C55E';
   const tooltipStyle = {
     backgroundColor: isDark ? '#111827' : '#FFFFFF',
     borderColor: isDark ? '#475569' : '#CBD5E1',
@@ -189,6 +202,7 @@ const Dashboard: React.FC = () => {
   const monthlyActivityData = dashboard.monthly_inventory_activity;
   const lowStockItems = dashboard.low_stock_summary;
   const transactions = dashboard.recent_transactions;
+  const allTransactions = dashboard.all_transactions ?? transactions;
   const supplierData = dashboard.supplier_performance;
   const forecastData = dashboard.ai_forecast_summary.products;
 
@@ -249,10 +263,10 @@ const Dashboard: React.FC = () => {
           >
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">{kpi.label}</p>
-                <p className="text-2xl font-bold text-white mt-1.5">{kpi.value}</p>
+                <p className="mobile-kpi-title text-slate-400 text-xs font-medium uppercase tracking-wider">{kpi.label}</p>
+                <p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{kpi.value}</p>
                 {kpi.change && (
-                  <p className={`text-sm mt-1 flex items-center gap-1 ${trendColor(kpi.trend)}`}>
+                  <p className={`mobile-kpi-helper text-sm mt-1 flex items-center gap-1 ${trendColor(kpi.trend)}`}>
                     {React.createElement(TrendIcon(kpi.trend), { className: "w-3.5 h-3.5" })}
                     {kpi.change}
                   </p>
@@ -275,7 +289,7 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-white font-semibold">Inventory Trend</h3>
-              <p className="text-slate-400 text-sm">Stock units and valuation trend across 7 months</p>
+              <p className="text-slate-400 text-sm">Stock units and availability trend across 7 months</p>
             </div>
             <button className="text-slate-400 hover:text-slate-300 transition-colors">
               <MoreVertical className="w-4 h-4" />
@@ -290,21 +304,21 @@ const Dashboard: React.FC = () => {
                       <stop offset="5%" stopColor={stockColor} stopOpacity={isDark ? 0.32 : 0.3} />
                       <stop offset="95%" stopColor={stockColor} stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="gradientValuation" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={valuationColor} stopOpacity={isDark ? 0.28 : 0.3} />
-                      <stop offset="95%" stopColor={valuationColor} stopOpacity={0} />
+                    <linearGradient id="gradientAvailability" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={availabilityColor} stopOpacity={isDark ? 0.28 : 0.3} />
+                      <stop offset="95%" stopColor={availabilityColor} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" strokeOpacity={isDark ? 0.7 : 1} vertical={false} />
                   <XAxis dataKey="month" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis yAxisId="left" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} allowDecimals={false} />
-                  <YAxis yAxisId="right" orientation="right" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} tickFormatter={(value: number) => `$${value}M`} />
+                  <YAxis yAxisId="right" orientation="right" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value}%`} />
                   <Tooltip
                     contentStyle={tooltipStyle}
                     labelStyle={{ color: isDark ? '#F8FAFC' : '#0F172A', fontWeight: 600 }}
                     itemStyle={{ color: isDark ? '#E2E8F0' : '#334155' }}
                     cursor={{ stroke: chartAxisColor, strokeOpacity: 0.35 }}
-                    formatter={(value, name, item) => [typeof value === 'number' ? item.dataKey === 'value' ? `$${value.toFixed(2)}M` : value.toLocaleString('en-US') : value, name]}
+                    formatter={(value, name, item) => [typeof value === 'number' ? item.dataKey === 'availability' ? `${Math.round(value)}%` : value.toLocaleString('en-US') : value, name]}
                   />
                   <Area
                     yAxisId="left"
@@ -321,7 +335,7 @@ const Dashboard: React.FC = () => {
                     animationEasing="ease-in-out"
                     animationBegin={100}
                   />
-                  <Area type="monotone" yAxisId="right" dataKey="value" stroke={valuationColor} strokeWidth={3} fill="url(#gradientValuation)" name="Valuation ($M)" dot={{ r: 3, fill: valuationColor, stroke: chartCardColor, strokeWidth: 2 }} activeDot={{ r: 5, stroke: chartCardColor, strokeWidth: 2 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={100} />
+                  <Area type="monotone" yAxisId="right" dataKey="availability" stroke={availabilityColor} strokeWidth={3} fill="url(#gradientAvailability)" name="Stock Availability (%)" dot={{ r: 3, fill: availabilityColor, stroke: chartCardColor, strokeWidth: 2 }} activeDot={{ r: 5, stroke: chartCardColor, strokeWidth: 2 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={100} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -331,8 +345,8 @@ const Dashboard: React.FC = () => {
                 <span className="text-slate-600 dark:text-slate-300">Stock Units</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: valuationColor }} />
-                <span className="text-slate-600 dark:text-slate-300">Valuation ($M)</span>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: availabilityColor }} />
+                <span className="text-slate-600 dark:text-slate-300">Stock Availability (%)</span>
               </div>
             </div>
           </div>
@@ -455,42 +469,36 @@ const Dashboard: React.FC = () => {
               <h3 className="text-lg font-semibold text-white">Recent Transactions</h3>
               <p className="text-sm text-slate-400">Latest inventory ledger entries</p>
             </div>
-            <button className="text-xs font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5">
+            <button type="button" onClick={() => setTransactionsOpen(true)} className="flex min-h-11 cursor-pointer items-center gap-1.5 text-xs font-medium text-cyan-400 transition-colors hover:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
               View all <Eye className="w-3.5 h-3.5"/>
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm table-fixed">
+          <div>
+            <table className="recent-transactions-preview w-full table-fixed text-xs min-[391px]:text-sm">
               <thead>
                 <tr className="border-b border-slate-800">
-                  <th className="text-left py-3 text-slate-400 font-medium w-[24%]">Reference</th>
-                  <th className="text-left py-3 text-slate-400 font-medium w-[10%]">Type</th>
-                  <th className="text-left py-3 text-slate-400 font-medium w-[30%]">Product Name</th>
-                  <th className="text-right py-3 text-slate-400 font-medium w-[8%]">Qty</th>
-                  <th className="text-left py-3 text-slate-400 font-medium w-[14%]">User</th>
-                  <th className="text-left py-3 text-slate-400 font-medium w-[14%]">Time</th>
+                  <th className="w-[38%] py-2.5 pr-1.5 text-left text-[10px] font-medium text-slate-400 min-[391px]:pr-2 min-[391px]:text-xs sm:w-[36%] sm:py-3 sm:pr-3 sm:text-sm">Transaction</th>
+                  <th className="w-[28%] py-2.5 pr-1.5 text-left text-[10px] font-medium text-slate-400 min-[391px]:pr-2 min-[391px]:text-xs sm:w-[32%] sm:py-3 sm:pr-3 sm:text-sm">Product</th>
+                  <th className="w-[11%] py-2.5 pr-1.5 text-right text-[10px] font-medium text-slate-400 min-[391px]:pr-2 min-[391px]:text-xs sm:w-[12%] sm:py-3 sm:pr-3 sm:text-sm">Qty</th>
+                  <th className="w-[23%] py-2.5 text-left text-[10px] font-medium text-slate-400 min-[391px]:text-xs sm:w-[20%] sm:py-3 sm:text-sm">Time</th>
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="border-b border-slate-800/60 hover:bg-slate-900/40 transition-colors">
-                    <td className="py-3 w-[24%]">
-                      <div className="flex items-center gap-2">
+                {transactions.slice(0, 5).map((tx) => (
+                  <tr key={tx.id} className="border-b border-slate-800/60 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40">
+                    <td className="w-[38%] py-2.5 pr-1.5 sm:w-[36%] sm:py-3 sm:pr-3">
+                      <div className="flex min-w-0 flex-col items-start gap-1">
                         <StatusBadge status={tx.type} />
-                        <span className="text-white font-mono text-xs">{tx.reference}</span>
+                        <span className="block max-w-full truncate font-mono text-[10px] text-white min-[391px]:text-xs" title={tx.reference}>{tx.reference}</span>
                       </div>
                     </td>
-                    <td className="py-3 text-slate-300 text-xs w-[10%]">{tx.type}</td>
-                    <td className="py-3 text-slate-300 font-medium truncate w-[30%]">{tx.product}</td>
-                    <td className="py-3 text-right text-white font-medium w-[8%]">{tx.qty}</td>
-                    <td className="py-3 text-slate-400 text-xs w-[14%]">
-                      <div className="flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5" /> {tx.user}
-                      </div>
-                    </td>
-                    <td className="py-3 text-slate-400 text-xs w-[14%]">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" /> {tx.time}
+                    <td className="w-[28%] truncate py-2.5 pr-1.5 font-medium text-slate-300 sm:w-[32%] sm:py-3 sm:pr-3" title={tx.product}>{tx.product}</td>
+                    <td className="w-[11%] whitespace-nowrap py-2.5 pr-1.5 text-right font-medium text-white sm:w-[12%] sm:py-3 sm:pr-3">{tx.qty}</td>
+                    <td className="w-[23%] py-2.5 text-[10px] text-slate-400 min-[391px]:text-xs sm:w-[20%] sm:py-3">
+                      <div className="flex min-w-0 items-center gap-1 whitespace-nowrap">
+                        <Clock className="h-3 w-3 shrink-0 min-[391px]:h-3.5 min-[391px]:w-3.5" />
+                        <span className="sm:hidden">{compactTransactionTime(tx.time)}</span>
+                        <span className="hidden sm:inline">{tx.time}</span>
                       </div>
                     </td>
                   </tr>
@@ -569,7 +577,7 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
 
-          <div className="mt-3 bg-sky-950/40 border border-sky-500/30 rounded-xl p-3 flex items-start gap-2.5 text-sky-400 text-xs">
+          <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 dark:border-sky-500/30 dark:bg-sky-950/40 dark:text-sky-400">
             <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{dashboard.ai_forecast_summary.headline || 'Forecast summary will appear when dashboard data is available.'}</span>
           </div>
@@ -600,6 +608,49 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {transactionsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="transactions-title">
+          <div className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#0d1322]">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+              <div>
+                <h2 id="transactions-title" className="text-lg font-semibold text-slate-900 dark:text-white">All Transactions</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Complete Stock In and Stock Out history</p>
+              </div>
+              <button type="button" onClick={() => setTransactionsOpen(false)} aria-label="Close transactions dialog" className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="pm-table-scroll min-h-0 flex-1 overflow-auto">
+              <table className="pm-responsive-table pm-cols-6 pm-sticky-1 min-w-[760px] w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                  <tr>
+                    <th className="px-5 py-3 text-left font-medium">Reference</th>
+                    <th className="px-4 py-3 text-left font-medium">Type</th>
+                    <th className="px-4 py-3 text-left font-medium">Product Name</th>
+                    <th className="px-4 py-3 text-right font-medium">Qty</th>
+                    <th className="px-4 py-3 text-left font-medium">User</th>
+                    <th className="px-5 py-3 text-left font-medium">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allTransactions.map((tx) => (
+                    <tr key={tx.id} className="border-b border-slate-200 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/60">
+                      <td className="px-5 py-3 font-mono text-xs text-slate-900 dark:text-white">{tx.reference}</td>
+                      <td className="px-4 py-3"><StatusBadge status={tx.type} /></td>
+                      <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">{tx.product}</td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-900 dark:text-white">{tx.qty}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400"><span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 shrink-0" />{tx.user}</span></td>
+                      <td className="px-5 py-3 text-slate-600 dark:text-slate-400"><span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 shrink-0" />{tx.time}</span></td>
+                    </tr>
+                  ))}
+                  {!allTransactions.length && <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-500 dark:text-slate-400">No transactions are available.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

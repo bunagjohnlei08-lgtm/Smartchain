@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ReplenishmentRequest extends Model
 {
     /** Replenishment request lifecycle: Plant Manager -> Admin Procurement -> Purchase Order. */
-    public const STATUS_DRAFT = 'Draft';
-    public const STATUS_PENDING = 'Pending Approval';
-    public const STATUS_APPROVED = 'Approved';
-    public const STATUS_REJECTED = 'Rejected';
-    public const STATUS_PO_CREATED = 'PO Created';
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_PO_CREATED = 'for_purchase_order';
 
     public const STATUSES = [
         self::STATUS_DRAFT,

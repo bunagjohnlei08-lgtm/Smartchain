@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AlertCircle, Calendar, CheckCircle2, User, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus';
@@ -6,6 +7,7 @@ import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus
 type DecisionStatus = 'Passed' | 'Partial' | 'Rejected';
 
 interface InspectionHistoryApi {
+  receiving_id: number;
   id: number;
   receiving_no: string;
   supplier: string;
@@ -20,6 +22,7 @@ interface InspectionHistoryApi {
 }
 
 interface InspectionRecord {
+  receivingId: number;
   id: string;
   product: string;
   supplier: string;
@@ -67,7 +70,7 @@ const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
     : formatStatusLabel(status);
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeConfig.color} ${badgeConfig.bg}`}>
+    <span className={`qa-badge ${normalizedStatus === 'Partial' ? 'qa-badge-attention' : ''} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeConfig.color} ${badgeConfig.bg}`}>
       {badgeConfig.icon}
       {label}
     </span>
@@ -114,6 +117,7 @@ const InspectionHistory: React.FC = () => {
 
         return {
           id: String(item.id),
+          receivingId: item.receiving_id,
           product: item.product ?? '-',
           supplier: item.supplier,
           inspector: item.submitted_by ?? item.inspected_by ?? '-',
@@ -165,7 +169,7 @@ const InspectionHistory: React.FC = () => {
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {timeFilters.map((label) => (
-            <button key={label} onClick={() => setActiveTimeFilter(label)} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTimeFilter === label ? 'bg-cyan-500 text-black' : 'bg-transparent border border-gray-700 text-slate-400 hover:text-white'}`}>
+            <button key={label} onClick={() => setActiveTimeFilter(label)} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTimeFilter === label ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-black' : 'bg-transparent border border-gray-700 text-slate-400 hover:text-white'}`}>
               {label}
             </button>
           ))}
@@ -223,6 +227,7 @@ const InspectionHistory: React.FC = () => {
                   <span className="text-slate-500 font-mono text-xs">{record.receivingNo}</span>
                 </div>
                 <div className="bg-[#090d16] border border-gray-800/60 rounded-xl p-3.5 text-sm text-gray-300">{record.remarks}</div>
+                <Link to={`../inspection?receiving=${record.receivingId}`} className="inline-flex min-h-11 items-center rounded-lg border border-gray-700 px-3 text-sm text-slate-300 hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-cyan-500">View inspection and attachments</Link>
               </div>
             </div>
           );

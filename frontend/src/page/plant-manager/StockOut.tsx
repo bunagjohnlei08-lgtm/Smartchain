@@ -127,13 +127,13 @@ const getError = (error: any) => {
   return error?.response?.data?.message || 'The request could not be completed. Please try again.';
 };
 
-const StatusBadge = ({ status }: { status: StockOutStatus }) => {
+const StatusBadge = ({ status, compact = false }: { status: StockOutStatus; compact?: boolean }) => {
   const color = status === 'Ready for Stock Out'
     ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
     : status === 'Stock Out In Progress'
       ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400'
       : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${color}`}>{status}</span>;
+  return <span className={`plant-manager-badge inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${compact ? 'max-w-full items-center justify-center text-center !whitespace-normal !px-1.5 !py-0.5 !text-[9px] !leading-3 sm:!whitespace-nowrap sm:!px-2.5 sm:!py-1 sm:!text-xs sm:!leading-normal' : ''} ${color}`}>{status}</span>;
 };
 
 const ItemStatusBadge = ({ status }: { status: StockOutItem['status'] }) => {
@@ -374,8 +374,8 @@ const StockOut: React.FC = () => {
 
       <section className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {cards.map(card => <div key={card.label} className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-4">
-          <div className="flex items-center gap-2"><card.icon className={`h-5 w-5 ${card.color}`} /><span className="text-xs font-semibold uppercase tracking-wider text-slate-400">{card.label}</span></div>
-          <p className="mt-3 text-2xl font-bold text-white">{card.value}</p>
+          <div className="flex items-center gap-2"><card.icon className={`h-5 w-5 ${card.color}`} /><span className="mobile-kpi-title text-xs font-semibold uppercase tracking-wider text-slate-400">{card.label}</span></div>
+          <p className="mobile-kpi-value mt-3 text-2xl font-bold text-white">{card.value}</p>
         </div>)}
       </section>
 
@@ -398,15 +398,15 @@ const StockOut: React.FC = () => {
       </section>
 
       <section className="overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d]">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
+        <div className="pm-table-scroll">
+          <table className="pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1100px] text-sm">
             <thead className="border-b border-slate-800 bg-[#070a12] text-xs uppercase tracking-wider text-slate-400">
               <tr>
-                {['Order No.', 'Customer / Destination', 'Products', 'Items', 'Assigned Date', 'Target Delivery', 'Status'].map(label => <th key={label} className="px-4 py-3 text-left font-medium">{label}</th>)}
-                <th className="px-4 py-3 text-right font-medium">Actions</th>
+                {['Order No.', 'Customer / Destination', 'Products', 'Items', 'Assigned Date', 'Target Delivery', 'Status'].map(label => <th key={label} className={`${label === 'Status' ? 'w-28 px-1 sm:w-auto sm:px-4' : 'px-4'} py-3 text-left font-medium`}>{label}</th>)}
+                <th className="w-16 px-1 py-3 text-center font-medium sm:w-auto sm:px-4 sm:text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
               {orders.map(order => <tr key={order.id} onClick={() => void openDetails(order)} className={`cursor-pointer transition-colors hover:bg-slate-800/30 ${selectedOrder?.id === order.id ? 'bg-cyan-500/5' : ''}`}>
                 <td className="px-4 py-3 font-mono font-medium text-white">{order.orderNo}</td>
                 <td className="px-4 py-3"><p className="text-slate-200">{order.customer}</p><p className="max-w-[150px] truncate text-xs text-slate-400">{order.destination}</p></td>
@@ -414,8 +414,8 @@ const StockOut: React.FC = () => {
                 <td className="px-4 py-3 text-slate-300">{order.productsCount} items</td>
                 <td className="px-4 py-3 text-slate-300">{order.assignedDate}</td>
                 <td className="px-4 py-3 text-slate-300">{order.requiredDelivery}</td>
-                <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
-                <td className="px-3 py-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-4 w-4" /></button></td>
+                <td className="w-28 px-1 py-3 sm:w-auto sm:px-4"><StatusBadge status={order.status} compact /></td>
+                <td className="w-16 px-1 py-3 text-center sm:w-auto sm:px-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-4 w-4" /></button></td>
               </tr>)}
               {!loading && orders.length === 0 && <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400">No eligible Stock Out orders found.</td></tr>}
             </tbody>
@@ -423,15 +423,15 @@ const StockOut: React.FC = () => {
         </div>
       </section>
 
-      {selectedOrder && <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="space-y-5 rounded-xl border border-slate-800/80 bg-[#0b101d] p-5 xl:col-span-2">
+      {selectedOrder && <section className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="min-w-0 space-y-5 overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d] p-5 xl:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
             <div><div className="flex items-center gap-3"><h2 className="text-lg font-semibold text-white">{selectedOrder.orderNo}</h2><StatusBadge status={selectedOrder.status} /></div><p className="mt-1 text-sm text-slate-400">{selectedOrder.customer} · {selectedOrder.warehouse}</p></div>
             <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"><ScanLine className="h-4 w-4" /> Scan Barcode</button>
           </div>
           <div><div className="flex justify-between text-sm"><span className="text-slate-400">Release progress</span><span className="font-medium text-white">{progress.released} / {progress.ordered} units</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress.percentage}%` }} /></div></div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] text-xs">
+          <div className="pm-table-scroll max-w-full overflow-x-auto overscroll-x-contain">
+            <table className="pm-responsive-table pm-cols-10 pm-sticky-2 w-full min-w-[1050px] text-xs">
               <thead className="border-b border-slate-800 bg-[#070a12] text-slate-400"><tr>{['Barcode', 'Product', 'Ordered Qty', 'Released Qty', 'Remaining Qty', 'Unit', 'Batch / Lot', 'Expiry', 'Location', 'Status'].map(label => <th key={label} className="px-3 py-2 text-left font-medium">{label}</th>)}</tr></thead>
               <tbody>{selectedOrder.items?.map(item => <tr key={item.id} className="border-b border-slate-800/60">
                 <td className="px-3 py-3 font-mono text-slate-300">{item.barcode || '—'}</td><td className="px-3 py-3 text-slate-200">{item.product}</td><td className="px-3 py-3 text-white">{item.orderedQty}</td><td className="px-3 py-3 text-white">{item.releasedQty}</td><td className="px-3 py-3 text-white">{item.remainingQty}</td><td className="px-3 py-3 text-slate-300">{item.unit}</td><td className="px-3 py-3 text-slate-400">{item.batchLot || '—'}</td><td className="px-3 py-3 text-slate-400">{item.expiryDate || '—'}</td><td className="px-3 py-3 text-slate-400">{item.location || '—'}</td><td className="px-3 py-3"><ItemStatusBadge status={item.status} /></td>
@@ -440,17 +440,17 @@ const StockOut: React.FC = () => {
           </div>
         </div>
 
-        <aside className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><Clock className="h-4 w-4 text-cyan-400" /> Stock Out History</h2>
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800/80 dark:bg-[#0b101d]">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white"><Clock className="h-4 w-4 text-cyan-400" /> Stock Out History</h2>
           <div className="mt-4 max-h-[460px] space-y-4 overflow-y-auto pr-1">
             {selectedOrder.history?.map(event => <div key={event.id} className="border-l-2 border-cyan-500/40 pl-3">
-              <p className="text-sm font-medium text-slate-200">{event.action.replaceAll('_', ' ')}</p>
-              {event.barcode && <p className="text-xs text-slate-400">Barcode: {event.barcode} · Quantity: {event.quantity}</p>}
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-200">{event.action.replaceAll('_', ' ')}</p>
+              {event.barcode && <p className="text-xs text-slate-600 dark:text-slate-400">Barcode: {event.barcode} · Quantity: {event.quantity}</p>}
               <p className="text-xs text-slate-500">{event.performedBy || 'System'} · {formatDate(event.createdAt, true)}</p>
             </div>)}
-            {!selectedOrder.history?.length && <p className="text-sm text-slate-400">No Stock Out events recorded yet.</p>}
+            {!selectedOrder.history?.length && <p className="text-sm text-slate-600 dark:text-slate-400">No Stock Out events recorded yet.</p>}
           </div>
-        </aside>
+        </section>
       </section>}
 
       {scannerOpen && selectedOrder && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
@@ -477,8 +477,8 @@ const StockOut: React.FC = () => {
           }} className="mt-5 rounded-xl border border-slate-800 bg-[#070a12] p-4">
             <h3 className="text-sm font-semibold text-white">Enter Barcode Manually</h3><p className="mt-1 text-xs text-slate-400">Camera and manual entry use the same backend barcode validation.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end">
-              <label className="text-sm text-slate-300">Barcode<input value={manualBarcode} onChange={event => setManualBarcode(event.target.value)} required maxLength={100} autoComplete="off" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
-              <label className="text-sm text-slate-300">Quantity<input type="number" min={1} step={1} value={manualQuantity} onChange={event => setManualQuantity(event.target.value)} required inputMode="numeric" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+              <label className="text-sm text-slate-300">Barcode<input value={manualBarcode} onChange={event => setManualBarcode(event.target.value)} required maxLength={100} autoComplete="off" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+              <label className="text-sm text-slate-300">Quantity<input type="number" min={1} step={1} value={manualQuantity} onChange={event => setManualQuantity(event.target.value)} required inputMode="numeric" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
               <button type="submit" disabled={actionBusy || !manualBarcode.trim() || !Number.isInteger(Number(manualQuantity)) || Number(manualQuantity) < 1} className="min-h-11 cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{actionBusy ? 'Working…' : 'Submit'}</button>
             </div>
           </form>

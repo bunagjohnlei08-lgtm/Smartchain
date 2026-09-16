@@ -1,5 +1,6 @@
 // src/page/admin/Inventory.tsx
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
   Search,
   ChevronLeft,
@@ -118,6 +119,14 @@ const toFormData = (item: InventoryItem): InventoryFormData => ({
   pending_receiving: item.pending_receiving,
 });
 
+const escapeHtml = (value: string): string => value.replace(/[&<>'"]/g, (character) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  "'": '&#39;',
+  '"': '&quot;',
+}[character] ?? character));
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -156,7 +165,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const color = getStatusColor(status);
   const Icon = getStatusIcon(status);
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
+    <span className={`admin-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
       <Icon className="w-3 h-3" />
       {status}
     </span>
@@ -222,10 +231,10 @@ const BarcodeSvg: React.FC<{ value: string; className?: string }> = ({ value, cl
   );
 };
 
-const BarcodeDisplay: React.FC<{ value: string }> = ({ value }) => (
-  <div className="inline-flex min-w-[150px] flex-col gap-1">
-    <span className="font-mono text-xs text-slate-900 dark:text-slate-300 sm:text-sm">{value}</span>
-    <BarcodeSvg value={value} className="h-10 w-40 rounded bg-white" />
+const BarcodeDisplay: React.FC<{ value: string; responsive?: boolean }> = ({ value, responsive = false }) => (
+  <div className={responsive ? 'flex w-full min-w-0 max-w-40 flex-col gap-1' : 'inline-flex min-w-[150px] flex-col gap-1'}>
+    <span className={`font-mono text-xs text-slate-900 dark:text-slate-300 sm:text-sm ${responsive ? 'break-all' : ''}`}>{value}</span>
+    <BarcodeSvg value={value} className={responsive ? 'h-10 w-full max-w-40 rounded bg-white' : 'h-10 w-40 rounded bg-white'} />
   </div>
 );
 
@@ -257,16 +266,16 @@ const KPICard: React.FC<{
 }> = ({ label, value, subtitle, icon, onClick, clickable, iconContainerClassName }) => {
   return (
     <div
-      className={`relative overflow-hidden bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-gray-700 transition-all duration-200 ${clickable ? 'cursor-pointer hover:bg-[#111927]' : ''}`}
+      className={`relative overflow-hidden bg-[#0d1322] border border-gray-800/50 rounded-2xl p-4 sm:p-5 hover:border-gray-700 transition-all duration-200 ${clickable ? 'cursor-pointer hover:bg-[#111927]' : ''}`}
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-          <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-          <p className="text-slate-500 text-xs mt-1">{subtitle}</p>
+          <p className="admin-kpi-title text-[11px] font-medium uppercase tracking-wider text-slate-400 sm:text-xs">{label}</p>
+          <p className="admin-kpi-value mt-1.5 text-xl font-bold text-white sm:text-2xl">{value}</p>
+          <p className="admin-kpi-helper mt-1 text-[11px] text-slate-500 sm:text-xs">{subtitle}</p>
         </div>
-        <div className={iconContainerClassName || 'p-2.5 bg-slate-800/60 rounded-lg'}>{icon}</div>
+        <div className={iconContainerClassName || 'rounded-lg bg-slate-800/60 p-2 [&_svg]:h-4 [&_svg]:w-4 sm:p-2.5 sm:[&_svg]:h-5 sm:[&_svg]:w-5'}>{icon}</div>
       </div>
     </div>
   );
@@ -281,7 +290,7 @@ const AlertPill: React.FC<{
 }> = ({ title, count, color, icon }) => {
   if (count === 0) return null;
   return (
-    <div className={`inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border border-${color}-500/30 bg-${color}-500/10 text-${color}-400 text-xs sm:text-sm font-medium`}>
+    <div className={`admin-badge inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border border-${color}-500/30 bg-${color}-500/10 text-${color}-400 text-xs sm:text-sm font-medium`}>
       {icon}
       <span>{count} {title}</span>
     </div>
@@ -375,7 +384,7 @@ const Pagination: React.FC<{
             onClick={() => onPageChange(page)}
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
-                ? 'bg-cyan-500 text-slate-950'
+                ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
@@ -687,8 +696,8 @@ const BackloadStockModal: React.FC<{
         {records.length === 0 ? (
           <p className="text-slate-400 text-center py-8">No backload stock records.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px]">
+          <div className="admin-table-scroll">
+            <table className="admin-responsive-table admin-cols-5 admin-sticky-1 w-full min-w-[600px]">
               <thead className="bg-[#0b0f19]/50 border-b border-slate-800">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
@@ -735,60 +744,60 @@ const DetailsDrawer: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="bg-black/60 backdrop-blur-sm w-full" onClick={onClose}></div>
-      <div className="bg-[#0d1322] border-l border-slate-800 w-full sm:w-[480px] h-full overflow-y-auto p-4 sm:p-6 animate-in slide-in-from-right duration-300">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Product Details</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
+      <div className="min-w-0 flex-1 bg-black/60 backdrop-blur-sm sm:w-full sm:flex-auto" onClick={onClose}></div>
+      <div className="admin-inventory-detail-drawer flex h-full w-[calc(100vw-20px)] shrink-0 flex-col overflow-hidden border-l border-slate-800 bg-[#0d1322] animate-in slide-in-from-right duration-300 sm:w-[480px] sm:shrink">
+        <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-3 sm:px-6 sm:py-6">
+          <h2 className="min-w-0 text-lg font-bold text-white sm:text-xl">Product Details</h2>
+          <button aria-label="Close product details" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-white sm:h-auto sm:w-auto sm:p-1.5">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-6">
-          <div className="flex items-start gap-4">
-            <div className="w-20 h-20 rounded-xl bg-slate-800/50 border border-slate-700 flex items-center justify-center text-slate-400">
-              <Package className="w-10 h-10" />
+        <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-3 pb-4 sm:space-y-6 sm:px-6 sm:pb-6">
+          <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800/50 text-slate-400 sm:h-20 sm:w-20">
+              <Package className="h-8 w-8 sm:h-10 sm:w-10" />
             </div>
-            <div>
-              <h3 className="text-white font-semibold text-lg">{product.product}</h3>
-              <p className="text-slate-400 text-sm">Barcode: {product.barcode}</p>
-              <p className="text-slate-400 text-sm">Category: {product.category || '—'} | Brand: {product.brand || '—'}</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="break-words text-base font-semibold leading-snug text-white sm:text-lg">{product.product}</h3>
+              <p className="break-all text-[13px] text-slate-400 sm:text-sm">Barcode: {product.barcode}</p>
+              <p className="break-words text-[13px] text-slate-400 sm:text-sm">Category: {product.category || '—'} | Brand: {product.brand || '—'}</p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4 text-center dark:border-slate-700 dark:bg-slate-800/30">
+          <div className="admin-inventory-barcode-card min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-3 text-center dark:border-slate-700 dark:bg-slate-800/30 sm:p-4">
             <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">Barcode</p>
-            <div className="flex justify-center">
-              <BarcodeDisplay value={product.barcode} />
+            <div className="admin-inventory-barcode-graphic flex w-full min-w-0 justify-center overflow-hidden">
+              <BarcodeDisplay value={product.barcode} responsive />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
+          <div className="grid grid-cols-1 gap-2.5 text-[13px] min-[350px]:grid-cols-2 sm:gap-3 sm:text-sm">
+            <div className="min-w-0 rounded-xl border border-slate-700 bg-slate-800/30 p-2.5 sm:p-3">
               <p className="text-slate-400">Warehouse</p>
-              <p className="text-white">{product.warehouse}</p>
+              <p className="break-words text-white">{product.warehouse}</p>
             </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
+            <div className="min-w-0 rounded-xl border border-slate-700 bg-slate-800/30 p-2.5 sm:p-3">
               <p className="text-slate-400">Unit</p>
-              <p className="text-white">{product.unit}</p>
+              <p className="break-words text-white">{product.unit}</p>
             </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
+            <div className="min-w-0 rounded-xl border border-slate-700 bg-slate-800/30 p-2.5 sm:p-3">
               <p className="text-slate-400">Pending Receiving</p>
-              <p className="text-white">{product.pending_receiving ? 'Yes' : 'No'}</p>
+              <p className="break-words text-white">{product.pending_receiving ? 'Yes' : 'No'}</p>
             </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
+            <div className="min-w-0 rounded-xl border border-slate-700 bg-slate-800/30 p-2.5 sm:p-3">
               <p className="text-slate-400">Last Updated</p>
-              <p className="text-white">{formatLastUpdated(product.updated_at)}</p>
+              <p className="break-words text-white">{formatLastUpdated(product.updated_at)}</p>
             </div>
-            <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700 col-span-2">
+            <div className="min-w-0 rounded-xl border border-slate-700 bg-slate-800/30 p-2.5 min-[350px]:col-span-2 sm:p-3">
               <p className="text-slate-400">Inventory Value</p>
-              <p className="text-white font-bold">₱{inventoryValue.toLocaleString()}</p>
+              <p className="break-words font-bold text-white">₱{inventoryValue.toLocaleString()}</p>
             </div>
           </div>
 
-          <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-3 sm:p-4">
             <p className="text-slate-400 text-xs mb-2">Stock Breakdown</p>
-            <div className="grid grid-cols-3 gap-2 text-sm">
+            <div className="grid grid-cols-3 gap-1 text-xs min-[350px]:gap-2 min-[350px]:text-[13px] sm:text-sm">
               <div className="text-center">
                 <p className="text-emerald-400">Available</p>
                 <p className="text-white font-medium">{product.available_stock}</p>
@@ -802,7 +811,7 @@ const DetailsDrawer: React.FC<{
                 <p className="text-white font-medium">{product.backload}</p>
               </div>
             </div>
-            <div className="mt-2 text-center text-sm text-slate-400">
+            <div className="mt-2 break-words text-center text-[13px] text-slate-400 sm:text-sm">
               Total Physical: {totalQty} {product.unit}
             </div>
             <div className="mt-2 flex justify-center">
@@ -811,12 +820,12 @@ const DetailsDrawer: React.FC<{
           </div>
 
           <div>
-            <h4 className="text-sm font-medium text-slate-300 mb-2">Movement History</h4>
-            <p className="text-slate-400 text-sm">No movement history available.</p>
+            <h4 className="mb-2 text-[13px] font-medium text-slate-300 sm:text-sm">Movement History</h4>
+            <p className="text-[13px] text-slate-400 sm:text-sm">No movement history available.</p>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-slate-800">
-            <button onClick={onClose} className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+          <div className="admin-inventory-detail-footer flex justify-end pt-4 border-t border-slate-800">
+            <button onClick={onClose} className="admin-inventory-detail-close min-h-11 rounded-xl border border-slate-700 px-4 py-2.5 text-[13px] text-slate-400 transition-all hover:bg-slate-800 hover:text-white sm:min-h-0 sm:px-5 sm:text-sm">
               Close
             </button>
           </div>
@@ -846,14 +855,14 @@ const InventoryGrid: React.FC<{
   onPrintBarcode,
 }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+    <div className="admin-inventory-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
       {items.map((item) => {
         const totalQty = item.available_stock + item.reserved_stock + item.backload;
         const inventoryValue = totalQty * item.cost_price;
         return (
           <div
             key={item.id}
-            className="bg-[#0d1322] border border-slate-800 rounded-2xl p-4 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/5 hover:-translate-y-1 flex flex-col h-full"
+            className="admin-inventory-grid-card bg-[#0d1322] border border-slate-800 rounded-2xl p-4 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/5 hover:-translate-y-1 flex flex-col h-full"
           >
             {/* Product Image & Name */}
             <div className="flex items-start gap-3 mb-3">
@@ -869,24 +878,24 @@ const InventoryGrid: React.FC<{
             </div>
 
             {/* Category & Warehouse */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-3">
-              <span className="bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.category || 'Uncategorized'}</span>
-              <span className="bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.warehouse}</span>
+            <div className="admin-inventory-grid-meta flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-3">
+              <span className="admin-inventory-grid-chip admin-badge bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.category || 'Uncategorized'}</span>
+              <span className="admin-inventory-grid-chip admin-badge bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.warehouse}</span>
             </div>
 
             {/* Stock Quantities */}
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
               <div className="bg-slate-800/30 rounded-xl p-2">
-                <p className="text-emerald-400 text-xs font-medium">Available</p>
-                <p className="text-white text-lg font-bold">{item.available_stock}</p>
+                <p className="admin-inventory-grid-stock-label text-emerald-400 text-xs font-medium">Available</p>
+                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.available_stock}</p>
               </div>
               <div className="bg-slate-800/30 rounded-xl p-2">
-                <p className="text-blue-400 text-xs font-medium">Reserved</p>
-                <p className="text-white text-lg font-bold">{item.reserved_stock}</p>
+                <p className="admin-inventory-grid-stock-label text-blue-400 text-xs font-medium">Reserved</p>
+                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.reserved_stock}</p>
               </div>
               <div className="bg-slate-800/30 rounded-xl p-2">
-                <p className="text-red-400 text-xs font-medium">Backload</p>
-                <p className="text-white text-lg font-bold">{item.backload}</p>
+                <p className="admin-inventory-grid-stock-label text-red-400 text-xs font-medium">Backload</p>
+                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.backload}</p>
               </div>
             </div>
 
@@ -894,13 +903,13 @@ const InventoryGrid: React.FC<{
             <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-800">
               <StatusBadge status={item.status} />
               <div className="text-right">
-                <p className="text-slate-400 text-xs">Inventory Value</p>
-                <p className="text-cyan-400 text-sm font-bold">₱{inventoryValue.toLocaleString()}</p>
+                <p className="admin-inventory-grid-secondary text-slate-400 text-xs">Inventory Value</p>
+                <p className="admin-inventory-grid-value text-cyan-400 text-sm font-bold">₱{inventoryValue.toLocaleString()}</p>
               </div>
             </div>
 
             {/* Last Updated */}
-            <div className="text-xs text-slate-500 mt-2">
+            <div className="admin-inventory-grid-secondary text-xs text-slate-500 mt-2">
               Updated: {formatLastUpdated(item.updated_at)}
             </div>
 
@@ -954,7 +963,7 @@ const movementDate = (value: string) => new Date(value).toLocaleString(undefined
 });
 
 const MovementTypeBadge: React.FC<{ type: InventoryMovementType }> = ({ type }) => (
-  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${
+  <span className={`admin-badge inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${
     type === 'STOCK_IN'
       ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
       : 'border-orange-500/20 bg-orange-500/10 text-orange-300'
@@ -964,8 +973,8 @@ const MovementTypeBadge: React.FC<{ type: InventoryMovementType }> = ({ type }) 
 );
 
 const MovementTable: React.FC<{ movements: ApiInventoryMovement[]; loading?: boolean }> = ({ movements, loading }) => (
-  <div className="overflow-x-auto custom-scrollbar">
-    <table className="w-full min-w-[820px]">
+  <div className="admin-table-scroll custom-scrollbar">
+    <table className="admin-responsive-table admin-cols-6 admin-sticky-2 w-full min-w-[820px]">
       <thead className="border-b border-slate-800 bg-[#0b0f19]/50">
         <tr>
           {['Type', 'Product', 'Barcode', 'Warehouse', 'Quantity', 'Date / Time'].map(label => (
@@ -1036,6 +1045,7 @@ export const InventoryList: React.FC = () => {
   const [showBackloadModal, setShowBackloadModal] = useState(false);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
+  useAdminDetailOverlay(showDetailsDrawer && selectedProduct !== null);
 
   // Fetching
   const fetchInventory = useCallback(async () => {
@@ -1163,11 +1173,11 @@ export const InventoryList: React.FC = () => {
       <html>
         <head><title>Print Barcode</title></head>
         <body style="font-family: Arial, sans-serif; text-align: center; padding: 24px; color: #111;">
-          <h2 style="margin-bottom: 4px; font-size: 18px;">${product.product}</h2>
-          <p style="color: #555; margin-top: 0;">${product.warehouse}</p>
+          <h2 style="margin-bottom: 4px; font-size: 18px;">${escapeHtml(product.product)}</h2>
+          <p style="color: #555; margin-top: 0;">${escapeHtml(product.warehouse)}</p>
           <div style="display: inline-block; margin: 18px 0; padding: 14px; border: 1px solid #ddd; background: #fff;">
             ${barcodeSvg}
-            <p style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 1px; margin: 6px 0 0;">${product.barcode}</p>
+            <p style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 1px; margin: 6px 0 0;">${escapeHtml(product.barcode)}</p>
           </div>
         </body>
       </html>
@@ -1245,8 +1255,8 @@ export const InventoryList: React.FC = () => {
     switch (sortBy) {
       case 'Newest First':
         list.sort((a, b) => {
-          const createdAtDifference = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          return createdAtDifference || b.id - a.id;
+          const updatedAtDifference = new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+          return updatedAtDifference || b.id - a.id;
         });
         break;
       case 'Name A-Z':
@@ -1299,7 +1309,7 @@ export const InventoryList: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 text-sm flex items-center justify-between gap-4">
           <span>{error}</span>
@@ -1310,21 +1320,21 @@ export const InventoryList: React.FC = () => {
       {/* Header with actions on the right */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Inventory</h1>
-          <p className="text-slate-400 text-sm mt-1">Monitor warehouse inventory, stock movements, and stock valuation.</p>
+          <h1 className="text-xl font-bold text-white sm:text-2xl">Inventory</h1>
+          <p className="mt-1 text-[13px] text-slate-400 sm:text-sm">Monitor warehouse inventory, stock movements, and stock valuation.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleReceiveStock}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+            className="flex min-h-11 items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:min-h-0 sm:gap-2 sm:px-4 sm:text-sm"
           >
-            <Plus className="w-4 h-4" /> Receive Stock
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Receive Stock
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+            className="flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition-all hover:bg-slate-800 sm:min-h-0 sm:gap-2 sm:px-4 sm:text-sm"
           >
-            <Download className="w-4 h-4" /> Export
+            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Export
           </button>
         </div>
       </div>
@@ -1368,7 +1378,7 @@ export const InventoryList: React.FC = () => {
           value={`₱${inventoryValue.toLocaleString()}`}
           subtitle="Cost-based"
           icon={<Coins className="w-5 h-5" />}
-          iconContainerClassName="p-2.5 bg-cyan-500/10 rounded-xl text-cyan-400"
+          iconContainerClassName="rounded-xl bg-cyan-500/10 p-2 text-cyan-400 [&_svg]:h-4 [&_svg]:w-4 sm:p-2.5 sm:[&_svg]:h-5 sm:[&_svg]:w-5"
         />
       </div>
 
@@ -1407,7 +1417,7 @@ export const InventoryList: React.FC = () => {
           />
         )}
         {outOfStockCount > 0 && (
-          <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+          <span className="admin-badge bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 cursor-pointer">
             <XCircle className="w-3.5 h-3.5" /> {outOfStockCount} Out of Stock
           </span>
         )}
@@ -1507,8 +1517,8 @@ export const InventoryList: React.FC = () => {
       ) : viewMode === 'table' ? (
         // Table View
         <div className="bg-[#0d1322] border border-slate-800 rounded-2xl">
-          <div className="overflow-x-auto w-full custom-scrollbar">
-            <table className="w-full min-w-[900px]">
+          <div className="admin-table-scroll w-full custom-scrollbar">
+            <table className="admin-responsive-table admin-inventory-table admin-cols-9 admin-sticky-1 w-full min-w-[900px]">
               <thead className="bg-[#0b0f19]/50 border-b border-slate-800 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Barcode</th>
@@ -1564,20 +1574,6 @@ export const InventoryList: React.FC = () => {
                           title="Edit"
                         >
                           <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleMovementHistory(item)}
-                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all hidden sm:flex"
-                          title="Movement History"
-                        >
-                          <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </button>
-                        <button
-                          onClick={() => handlePrintBarcode(item)}
-                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all hidden sm:flex"
-                          title="Print Barcode"
-                        >
-                          <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                       </div>
                     </td>
@@ -1722,35 +1718,35 @@ const WarehouseModule: React.FC = () => {
       <main className="flex-1 overflow-y-auto py-4 sm:py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-slate-400 text-sm">
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 sm:gap-2 sm:text-sm">
             <span>Dashboard</span>
-            <ChevronBreadcrumb className="w-4 h-4" />
+            <ChevronBreadcrumb className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span className="text-white font-medium">Warehouse</span>
           </div>
 
           {/* Navigation Tabs */}
           <div className="border-b border-slate-800">
-            <div className="flex gap-6">
+            <div className="flex gap-3 sm:gap-6">
               <button
                 onClick={() => setActiveTab('inventory')}
-                className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
+                className={`relative flex items-center gap-1.5 pb-2.5 text-xs font-medium transition-all sm:gap-2 sm:pb-3 sm:text-sm ${
                   activeTab === 'inventory'
-                    ? 'text-white border-b-2 border-cyan-500'
+                    ? 'text-[var(--text-primary)] dark:text-white border-b-2 border-cyan-500'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Package className="w-4 h-4" />
+                <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Inventory List
               </button>
               <button
                 onClick={() => setActiveTab('locations')}
-                className={`pb-3 text-sm font-medium transition-all relative flex items-center gap-2 ${
+                className={`relative flex items-center gap-1.5 pb-2.5 text-xs font-medium transition-all sm:gap-2 sm:pb-3 sm:text-sm ${
                   activeTab === 'locations'
                     ? 'text-white border-b-2 border-cyan-500'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <MapPin className="w-4 h-4" />
+                <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Manage Locations
               </button>
             </div>

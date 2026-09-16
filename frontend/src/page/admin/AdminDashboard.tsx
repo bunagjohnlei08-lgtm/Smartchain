@@ -56,11 +56,11 @@ const POStatusBadge: React.FC<{ status: string }> = ({ status }) => {
     Pending: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
     'Pending Approval': 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
     'Sent to Supplier': 'text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20',
-    Completed: 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20',
+    Completed: 'text-white dark:text-blue-400 bg-blue-600 dark:bg-blue-500/10 border-transparent dark:border-blue-500/20',
     Cancelled: 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20',
   };
   return (
-    <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Pending}`}>
+    <span className={`admin-badge inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Pending}`}>
       {status}
     </span>
   );
@@ -68,13 +68,13 @@ const POStatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
 const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const styles: Record<string, string> = {
-    Healthy: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20',
+    Healthy: 'text-white dark:text-emerald-400 bg-emerald-700 dark:bg-emerald-500/10 border-transparent dark:border-emerald-500/20',
     'Low Stock': 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
     Critical: 'text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20',
     'Out of Stock': 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20',
   };
   return (
-    <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Healthy}`}>
+    <span className={`admin-badge inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.Healthy}`}>
       {status}
     </span>
   );
@@ -168,11 +168,11 @@ export default function AdminDashboard() {
             </div>
 
             <div className="mt-4">
-              <span className="text-xs text-slate-500 dark:text-slate-300 font-medium">
+              <span className="admin-kpi-title text-xs text-slate-500 dark:text-slate-300 font-medium">
                 {stat.title}
               </span>
-              <div className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stat.value}</div>
-              <div className={`text-xs mt-1.5 font-medium ${stat.subtitleColor}`}>
+              <div className="admin-kpi-value text-3xl font-bold text-slate-900 dark:text-white mt-1">{stat.value}</div>
+              <div className={`admin-kpi-helper text-xs mt-1.5 font-medium ${stat.subtitleColor}`}>
                 {stat.subtitle}
               </div>
             </div>
@@ -281,8 +281,8 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="admin-table-scroll">
+            <table className="admin-dashboard-compact-table admin-dashboard-po-table admin-responsive-table admin-cols-4 admin-sticky-1 w-full text-left text-xs">
               <thead>
                 <tr className="text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                   <th className="pb-3 pl-1">PO NUMBER</th>
@@ -321,8 +321,8 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="admin-table-scroll">
+            <table className="admin-dashboard-compact-table admin-dashboard-inventory-table admin-responsive-table admin-cols-4 admin-sticky-1 w-full text-left text-xs">
               <thead>
                 <tr className="text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                   <th className="pb-3 pl-1">PRODUCT</th>

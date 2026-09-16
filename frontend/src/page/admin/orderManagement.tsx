@@ -1,6 +1,7 @@
 // src/pages/admin/OrderManagement.tsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '../../lib/api';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
   RotateCw,
   Plus,
@@ -90,6 +91,8 @@ interface CreateOrderForm {
   unit: string;
   unitPrice: string;
 }
+
+const orderUnitOptions = ['pcs', 'bulk', 'kg'] as const;
 
 const dateInputValue = (date: Date) => {
   const offset = date.getTimezoneOffset();
@@ -246,7 +249,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${config.color} ${config.bg} ${config.border}`}
+      className={`admin-badge admin-status-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${config.color} ${config.bg} ${config.border}`}
     >
       {config.icon}
       {config.label}
@@ -262,17 +265,17 @@ const KpiCard: React.FC<{
   bg: string;
 }> = ({ label, count, subtitle, color, bg }) => {
   return (
-    <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 flex flex-col hover:border-slate-700 transition-colors">
-      <div className="flex items-center gap-3">
-        <div className={`p-2.5 rounded-lg ${bg} ${color}`}>
-          <Package className="w-4 h-4" />
+    <div className="admin-orders-kpi flex flex-col rounded-xl border border-slate-800/80 bg-[#0b101d] p-4 transition-colors hover:border-slate-700">
+      <div className="admin-orders-kpi-main flex items-center gap-3">
+        <div className={`admin-orders-kpi-icon rounded-lg p-2.5 ${bg} ${color}`}>
+          <Package className="h-4 w-4" />
         </div>
-        <div>
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</p>
-          <p className="text-2xl font-bold text-white">{count}</p>
+        <div className="min-w-0">
+          <p className="admin-orders-kpi-title break-words text-[12px] font-medium uppercase tracking-wider text-slate-400 sm:text-xs">{label}</p>
+          <p className="admin-orders-kpi-value text-[15px] font-semibold text-white sm:text-2xl sm:font-bold">{count}</p>
         </div>
       </div>
-      <p className={`text-xs font-medium mt-1 ${color}`}>{subtitle}</p>
+      <p className={`admin-orders-kpi-helper mt-1 text-[10px] font-medium sm:text-xs ${color}`}>{subtitle}</p>
     </div>
   );
 };
@@ -285,6 +288,7 @@ const OrderManagement: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  useAdminDetailOverlay(isDrawerOpen && selectedOrder !== null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -385,10 +389,11 @@ const OrderManagement: React.FC = () => {
 
   const selectCreateOrderProduct = (productId: string) => {
     const product = catalogProducts.find((item) => String(item.id) === productId);
+    const productUnit = product?.unit?.trim().toLowerCase() ?? '';
     setCreateOrderForm((current) => ({
       ...current,
       productId,
-      unit: product?.unit ?? '',
+      unit: orderUnitOptions.some((unit) => unit === productUnit) ? productUnit : '',
     }));
   };
 
@@ -457,18 +462,18 @@ const OrderManagement: React.FC = () => {
       ============================================================ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Order Management</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <h1 className="text-[22px] font-bold leading-7 tracking-tight text-white sm:text-2xl">Order Management</h1>
+          <p className="mt-0.5 max-w-[34rem] text-[12px] leading-4 text-slate-400 sm:mt-1 sm:text-sm sm:leading-5">
             Manage and track customer orders from other groups. Assign to plant manager and monitor fulfillment.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={() => void loadOrders()} className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
-            <RotateCw className="w-4 h-4" />
+          <button onClick={() => void loadOrders()} className="admin-orders-refresh inline-flex h-8 w-auto cursor-pointer items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[12px] font-medium leading-4 text-slate-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 sm:h-auto sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2 sm:text-sm sm:leading-5">
+            <RotateCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Refresh
           </button>
-          <button onClick={() => void openCreateOrder()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-[#092635]/20 transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400">
-            <Plus className="w-4 h-4" />
+          <button onClick={() => void openCreateOrder()} className="admin-orders-create inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12px] font-medium leading-4 text-white shadow-lg shadow-[#092635]/20 transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:min-h-11 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2 sm:text-sm sm:leading-5">
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Create Order
           </button>
         </div>
@@ -487,19 +492,19 @@ const OrderManagement: React.FC = () => {
       TABLE & SEARCH CONTROLS
       ============================================================ */}
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        <div className="admin-orders-toolbar grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:gap-3">
+          <div className="relative col-span-2 w-full min-w-0 sm:flex-1 sm:min-w-[200px]">
+            <Search className="admin-orders-toolbar-search-icon absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search Order No., Customer, Product, Reference No..."
-              className="w-full bg-[#070a12] border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="admin-orders-toolbar-search h-11 w-full rounded-lg border border-slate-800 bg-[#070a12] py-1.5 pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:py-2 sm:pr-4 sm:text-sm"
             />
           </div>
 
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className="bg-[#070a12] border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Order status" className="admin-orders-toolbar-status col-span-2 h-11 w-full rounded-lg border border-slate-800 bg-[#070a12] px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:w-auto sm:px-3 sm:py-2 sm:text-sm">
             <option value="">All Status</option>
             <option value="NEW">New</option>
             <option value="ASSIGNED">Assigned</option>
@@ -514,37 +519,39 @@ const OrderManagement: React.FC = () => {
             <option value="CANCELLED">Cancelled</option>
           </select>
 
-          <div className="relative">
+          <div className="relative min-w-0 sm:min-w-fit">
             <input
               type="date"
               value={dateFrom}
               onChange={(event) => setDateFrom(event.target.value)}
               aria-label="Order date from"
-              className="bg-[#070a12] border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-36"
+              className="admin-orders-toolbar-date h-11 w-full min-w-0 rounded-lg border border-slate-800 bg-[#070a12] py-1.5 pl-2.5 pr-8 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:w-36 sm:px-3 sm:py-2 sm:text-sm"
             />
-            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <Calendar className="admin-orders-toolbar-date-icon pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 sm:right-3 sm:h-4 sm:w-4" />
           </div>
 
-          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-lg text-sm font-medium transition-colors">
-            <Filter className="w-4 h-4" />
+          <button className="admin-orders-toolbar-filter inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800/50 sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-sm">
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Filter
           </button>
 
-          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1" aria-label="Order view">
-            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
-            <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
-          </div>
+          <div className="col-span-2 flex items-center gap-4 sm:contents">
+            <div className="admin-orders-toolbar-view flex items-center justify-self-start gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1 sm:ml-auto" aria-label="Order view">
+              <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`admin-orders-toolbar-view-button rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`admin-orders-toolbar-view-button rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+            </div>
 
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-colors">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
+            <button className="admin-orders-toolbar-export inline-flex h-11 items-center justify-self-end gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:h-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-sm">
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+          </div>
         </div>
 
         {/* Table */}
         {viewMode === 'list' ? (
-        <div className="w-full max-w-full overflow-x-auto overscroll-x-contain custom-scrollbar">
-          <table className="table-auto w-full min-w-[1400px] border-collapse text-sm">
+        <div className="admin-table-scroll w-full custom-scrollbar">
+          <table className="admin-order-table admin-responsive-table admin-cols-10 admin-sticky-1 table-auto w-full min-w-[1400px] border-collapse text-sm">
             <thead className="border-b border-slate-800/80">
               <tr>
                 <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
@@ -623,44 +630,48 @@ const OrderManagement: React.FC = () => {
       ============================================================ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Timeline Card */}
-        <div className="lg:col-span-2 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d] p-5 lg:col-span-2">
           <h3 className="text-base font-semibold text-white mb-6 flex items-center gap-2">
             <Clock className="w-4 h-4 text-cyan-400" />
             Recent Order Timeline
           </h3>
-          <div className="flex items-center justify-between w-full relative">
+          <div className="max-w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+          <div className="relative flex min-w-[800px] items-start pb-2">
             {lifecycleSteps.map((step, idx) => {
               const currentStatusIndex = lifecycleSteps.indexOf(selectedOrder?.status || 'New');
               const isCompleted = idx <= currentStatusIndex;
               const isCurrent = idx === currentStatusIndex;
               return (
-                <div key={step} className="flex-1 flex flex-col items-center relative">
-                  {/* Connector Line */}
-                  {idx < lifecycleSteps.length - 1 && (
-                    <div className={`absolute top-4 left-[calc(50%+20px)] w-[calc(100%-40px)] h-0.5 ${isCompleted ? 'bg-cyan-500' : 'bg-slate-700'}`} />
-                  )}
-                  {/* Dot */}
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 ${
-                      isCompleted
-                        ? 'border-cyan-500 bg-cyan-500/20 text-cyan-500'
-                        : isCurrent
-                        ? 'border-cyan-500 bg-cyan-500/10 text-cyan-500 animate-pulse'
-                        : 'border-slate-600 bg-slate-800/50 text-slate-600'
-                    }`}
-                  >
-                    {isCompleted ? <Check className="w-4 h-4" /> : <span className="text-xs font-bold">{idx + 1}</span>}
+                <div key={step} className="relative flex min-w-20 flex-1 flex-col items-center">
+                  <div className="relative flex h-8 w-full shrink-0 items-center justify-center">
+                    {/* Connector Line */}
+                    {idx < lifecycleSteps.length - 1 && (
+                      <div className={`absolute left-1/2 top-1/2 h-0.5 w-full -translate-y-1/2 ${isCompleted ? 'bg-cyan-500' : 'bg-slate-700'}`} />
+                    )}
+                    {/* Dot */}
+                    <div
+                      className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${
+                        isCompleted
+                          ? 'border-cyan-500 bg-cyan-500/20 text-cyan-500'
+                          : isCurrent
+                          ? 'border-cyan-500 bg-cyan-500/10 text-cyan-500 animate-pulse'
+                          : 'border-slate-600 bg-slate-800/50 text-slate-600'
+                      }`}
+                    >
+                      {isCompleted ? <Check className="w-4 h-4" /> : <span className="text-xs font-bold">{idx + 1}</span>}
+                    </div>
                   </div>
                   {/* Label */}
-                  <p className={`text-xs font-medium mt-2 text-center ${isCompleted ? 'text-white' : 'text-slate-500'}`}>
+                  <p className={`mt-1.5 w-full px-1 text-center text-[10px] font-medium leading-3 sm:mt-2 sm:text-xs sm:leading-4 ${isCompleted ? 'text-white' : 'text-slate-500'}`}>
                     {step}
                   </p>
-                  <p className="text-[10px] text-slate-500 text-center">
+                  <p className="mt-1 w-full px-1 text-center text-[10px] leading-3 text-slate-500">
                     {isCompleted && selectedOrder?.assignedDate ? selectedOrder.assignedDate : ''}
                   </p>
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
 
@@ -700,36 +711,38 @@ const OrderManagement: React.FC = () => {
       {isDrawerOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
-          <div className="bg-black/60 backdrop-blur-sm w-full" onClick={handleCloseDrawer}></div>
+          <div className="min-w-0 flex-1 bg-black/60 backdrop-blur-sm" onClick={handleCloseDrawer}></div>
           {/* Drawer */}
-          <div className="bg-[#0b101d] border-l border-slate-800 w-full sm:w-96 h-full overflow-y-auto p-6 animate-in slide-in-from-right duration-300 flex flex-col gap-6">
+          <div className="admin-order-details-drawer flex h-full w-[96vw] shrink-0 flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-y-contain border-l border-slate-800 bg-[#0b101d] p-3 animate-in slide-in-from-right duration-300 min-[400px]:w-[92vw] sm:w-96 sm:gap-6 sm:p-6">
             {/* Header */}
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <div className="admin-order-details-header sticky top-0 z-10 -mx-3 -mt-3 flex items-start justify-between gap-2 bg-[#0b101d] px-3 py-3 sm:static sm:mx-0 sm:mt-0 sm:bg-transparent sm:p-0">
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h2 className="whitespace-nowrap text-base font-bold leading-tight text-white sm:text-xl">
                   {selectedOrder.orderNo}
                 </h2>
-                <p className="text-sm text-slate-400">{selectedOrder.refNo}</p>
                 <StatusBadge status={selectedOrder.status} />
+                </div>
+                <p className="text-sm text-slate-400">{selectedOrder.refNo}</p>
               </div>
-              <button onClick={handleCloseDrawer} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <button aria-label="Close order details" onClick={handleCloseDrawer} className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:hover:bg-slate-700 dark:hover:text-white sm:min-h-0 sm:min-w-0 sm:p-1.5">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Order Date */}
-            <div className="text-sm text-slate-400 flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span>Order Date: {selectedOrder.orderDate}</span>
+            <div className="admin-order-details-date flex items-start gap-2 text-xs text-slate-400 sm:items-center sm:text-sm">
+              <Calendar className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
+              <span className="break-words">Order Date: {selectedOrder.orderDate}</span>
             </div>
 
             {/* Customer Info */}
-            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700 space-y-2">
+            <div className="admin-order-details-customer space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 sm:p-4">
               <h4 className="text-sm font-semibold text-white">Customer Information</h4>
               <p className="text-slate-200 font-medium">{selectedOrder.customer}</p>
               <p className="text-slate-400 text-sm flex items-start gap-2">
                 <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{selectedOrder.address}</span>
+                <span className="min-w-0 break-words">{selectedOrder.address}</span>
               </p>
               <p className="text-slate-400 text-sm flex items-center gap-2">
                 <User className="w-4 h-4" />
@@ -738,7 +751,7 @@ const OrderManagement: React.FC = () => {
             </div>
 
             {/* Order Summary */}
-            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700 space-y-2">
+            <div className="admin-order-details-summary space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 text-sm sm:p-4 sm:text-base">
               <h4 className="text-sm font-semibold text-white">Order Summary</h4>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Items</span>
@@ -750,12 +763,12 @@ const OrderManagement: React.FC = () => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Required Delivery</span>
-                <span className="text-slate-200">{selectedOrder.requiredDelivery}</span>
+                <span className="min-w-0 break-words text-right text-slate-200">{selectedOrder.requiredDelivery}</span>
               </div>
             </div>
 
             {/* Status & Assignment */}
-            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700 space-y-2">
+            <div className="admin-order-details-assignment space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 text-sm sm:p-4 sm:text-base">
               <h4 className="text-sm font-semibold text-white">Status & Assignment</h4>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Status</span>
@@ -773,10 +786,10 @@ const OrderManagement: React.FC = () => {
               )}
             </div>
 
-            <div>
+            <div className="admin-order-details-items">
               <h4 className="text-sm font-semibold text-white">Order Items</h4>
-              <div className="mt-3 overflow-x-auto rounded-xl border border-slate-700">
-                <table className="w-full min-w-[620px] text-xs">
+              <div className="admin-order-details-items-scroll admin-table-scroll mt-3 rounded-xl border border-slate-700">
+                <table className="admin-order-details-items-table admin-responsive-table admin-cols-5 admin-sticky-1 w-full min-w-[620px] text-xs">
                   <thead className="bg-[#070a12] text-slate-400"><tr><th className="px-3 py-2 text-left">Product</th><th className="px-3 py-2 text-right">Ordered Quantity</th><th className="px-3 py-2 text-left">Unit</th><th className="px-3 py-2 text-right">Unit Price</th><th className="px-3 py-2 text-right">Subtotal</th></tr></thead>
                   <tbody className="divide-y divide-slate-800">{selectedOrder.items.map(item => <tr key={item.id}>
                     <td className="px-3 py-3 text-slate-200">{item.name}</td>
@@ -787,18 +800,18 @@ const OrderManagement: React.FC = () => {
             </div>
 
             {/* Actions */}
-            <div className="space-y-3 mt-auto pt-4 border-t border-slate-800">
+            <div className="admin-order-details-actions mt-auto space-y-2 border-t border-slate-800 pt-3 sm:space-y-3 sm:pt-4">
               <h4 className="text-sm font-semibold text-white">Actions</h4>
               <button
                 onClick={() => selectedOrder && void handleViewOrder(selectedOrder)}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-600/20"
+                className="min-h-11 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 View Order Details
               </button>
               <button
                 onClick={() => void openAssignment()}
                 disabled={!['New', 'Assigned'].includes(selectedOrder.status)}
-                className="w-full py-2.5 border border-orange-500/50 text-orange-400 hover:bg-orange-500/10 rounded-lg text-sm font-medium transition-colors"
+                className="min-h-11 w-full rounded-lg border border-orange-500/50 px-3 py-2.5 text-sm font-medium text-orange-400 transition-colors hover:bg-orange-500/10 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {selectedOrder.status === 'Assigned' ? 'Reassign Plant Manager' : 'Assign to Plant Manager'}
               </button>
@@ -808,7 +821,7 @@ const OrderManagement: React.FC = () => {
       )}
 
       {assignmentOpen && selectedOrder && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="assignment-title">
-        <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl">
+        <div className="admin-assign-manager-modal w-full max-w-md rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl">
           <div className="flex items-start justify-between gap-4"><div><h2 id="assignment-title" className="text-lg font-semibold text-white">Assign Plant Manager</h2><p className="mt-1 text-sm text-slate-400">{selectedOrder.orderNo} will remain the same order record.</p></div><button onClick={() => setAssignmentOpen(false)} aria-label="Close assignment dialog" className="min-h-11 min-w-11 cursor-pointer rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="mx-auto h-5 w-5" /></button></div>
           {assignmentError && <p role="alert" className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">{assignmentError}</p>}
           <label className="mt-5 block text-sm text-slate-300">Available Plant Manager<select value={managerId} onChange={event => setManagerId(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><option value="">Select a Plant Manager</option>{plantManagers.map(manager => <option key={manager.id} value={manager.id}>{manager.name}{manager.employee_id ? ` — ${manager.employee_id}` : ''}</option>)}</select></label>
@@ -818,7 +831,7 @@ const OrderManagement: React.FC = () => {
       </div>}
 
       {createOrderOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="create-order-title">
-        <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl sm:p-6">
+        <div className="admin-create-order-modal max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div><h2 id="create-order-title" className="text-xl font-semibold text-white">Create Order</h2><p className="mt-1 text-sm text-slate-400">Temporary manual entry for workflow testing. The order will start as New.</p></div>
             <button onClick={() => setCreateOrderOpen(false)} aria-label="Close create order dialog" className="min-h-11 min-w-11 cursor-pointer rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="mx-auto h-5 w-5" /></button>
@@ -834,7 +847,7 @@ const OrderManagement: React.FC = () => {
             <label className="text-sm text-slate-300 sm:col-span-2">Category <span className="text-rose-400">*</span><select value={selectedProductCategory} onChange={event => selectProductCategory(event.target.value)} disabled={productsLoading || catalogProducts.length === 0} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"><option value="">{productsLoading ? 'Loading Product Catalog…' : catalogProducts.length ? 'Select Category' : 'No catalog categories available'}</option>{productCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
             <label className="text-sm text-slate-300 sm:col-span-2">Product <span className="text-rose-400">*</span><select value={createOrderForm.productId} onChange={event => selectCreateOrderProduct(event.target.value)} disabled={!selectedProductCategory || filteredCatalogProducts.length === 0} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"><option value="">{!selectedProductCategory ? 'Select a category first' : filteredCatalogProducts.length ? 'Select Product' : 'No products available in this category'}</option>{filteredCatalogProducts.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
             <label className="text-sm text-slate-300">Quantity <span className="text-rose-400">*</span><input type="number" min="0.001" step="0.001" value={createOrderForm.quantity} onChange={event => setCreateOrderForm(current => ({ ...current, quantity: event.target.value }))} placeholder="0" className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
-            <label className="text-sm text-slate-300">Unit <span className="text-rose-400">*</span><input value={createOrderForm.unit} maxLength={50} onChange={event => setCreateOrderForm(current => ({ ...current, unit: event.target.value }))} placeholder="Enter the customer order unit" className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
+            <label className="text-sm text-slate-300">Unit <span className="text-rose-400">*</span><select value={createOrderForm.unit} onChange={event => setCreateOrderForm(current => ({ ...current, unit: event.target.value }))} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><option value="">Select unit</option>{orderUnitOptions.map(unit => <option key={unit} value={unit}>{unit}</option>)}</select></label>
             <label className="text-sm text-slate-300 sm:col-span-2">Unit price <span className="text-rose-400">*</span><input type="number" min="0" step="0.01" value={createOrderForm.unitPrice} onChange={event => setCreateOrderForm(current => ({ ...current, unitPrice: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
           </div>
           <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t border-slate-800 pt-5 sm:flex-row"><button onClick={() => setCreateOrderOpen(false)} className="min-h-11 cursor-pointer rounded-lg border border-slate-700 px-4 text-slate-300 transition-colors hover:bg-slate-800">Cancel</button><button onClick={() => void submitCreateOrder()} disabled={createOrderBusy || productsLoading} className="min-h-11 cursor-pointer rounded-lg bg-slate-900 px-5 font-semibold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50">{createOrderBusy ? 'Creating…' : 'Create Order'}</button></div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
   UserPlus,
   Search,
@@ -48,8 +49,8 @@ const KPICard: React.FC<{
   <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-5 hover:border-[#5B8CFF]/30 transition-all duration-200 h-full flex flex-col">
     <div className="flex items-start justify-between flex-1">
       <div>
-        <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-        <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
+        <p className="admin-kpi-title text-gray-400 text-xs font-medium uppercase tracking-wider">{label}</p>
+        <p className="admin-kpi-value text-2xl font-bold text-white mt-1.5">{value}</p>
       </div>
       <div className="p-2.5 bg-gray-800/50 rounded-lg shrink-0">
         {icon}
@@ -105,7 +106,7 @@ const Pagination: React.FC<{
             onClick={() => onPageChange(page)}
             className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
               currentPage === page
-                ? 'bg-[#5B8CFF] text-white'
+                ? 'bg-slate-200 text-slate-900 dark:bg-[#5B8CFF] dark:text-white'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
             }`}
           >
@@ -358,6 +359,7 @@ const UserManagement: React.FC = () => {
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<ApiUser | null>(null);
   const [viewUser, setViewUser] = useState<ApiUser | null>(null);
+  useAdminDetailOverlay(viewUser !== null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
@@ -432,7 +434,7 @@ const UserManagement: React.FC = () => {
       await apiClient.post('/users', {
         name: data.name,
         email: data.email,
-        password: data.password || 'password123',
+        password: data.password,
         employee_id: data.employee_id,
         role_id: data.role_id,
         department_id: data.department_id,
@@ -525,14 +527,14 @@ const UserManagement: React.FC = () => {
 
       {/* 3. TOOLBAR (Search, Filters, Export, New User) */}
       <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+        <div className="admin-user-search-wrap relative flex-1 min-w-[240px]">
+          <Search className="admin-user-search-icon w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
           <input
             type="text"
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
             placeholder="Search users..."
-            className="w-full bg-gray-800/50 border-gray-700 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            className="admin-user-search-input w-full bg-gray-800/50 border-gray-700 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -563,18 +565,18 @@ const UserManagement: React.FC = () => {
 
           <button
             onClick={resetFilters}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800/50 border border-gray-700 text-xs font-medium text-white rounded-lg hover:bg-gray-800 transition"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:hover:bg-gray-800 dark:hover:text-white"
           >
             <Filter className="w-3.5 h-3.5" /> Reset
           </button>
 
           <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/50 p-1" aria-label="User view">
-            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
-            <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
           </div>
 
           <button
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800/50 border border-gray-700 text-xs font-medium text-white rounded-lg hover:bg-gray-800 transition"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:hover:bg-gray-800 dark:hover:text-white"
           >
             <Download className="w-3.5 h-3.5" /> Export
           </button>
@@ -588,8 +590,8 @@ const UserManagement: React.FC = () => {
       {/* 4. TABLE CONTAINER */}
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden shadow-xl mt-6">
         {viewMode === 'list' ? (
-        <div className="overflow-x-auto w-full">
-          <table className="w-full table-auto text-left text-xs text-gray-300 border-collapse">
+        <div className="admin-table-scroll w-full">
+          <table className="admin-user-table admin-responsive-table admin-cols-8 admin-sticky-1 w-full table-auto text-left text-xs text-gray-300 border-collapse">
             <thead className="bg-[#0b101d] border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               <tr>
                 <th className="text-left pl-4 py-4 whitespace-nowrap">USER</th>
@@ -618,27 +620,27 @@ const UserManagement: React.FC = () => {
                   return (
                     <tr key={u.id} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
                       <td className="pl-4 pr-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/30">
+                        <div className="admin-user-identity flex items-center gap-3">
+                          <div className="admin-user-avatar w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 font-bold flex shrink-0 items-center justify-center text-xs border border-blue-500/30">
                             {initials}
                           </div>
-                          <div>
-                            <div className="font-semibold text-white text-xs">{displayName}</div>
-                            <div className="text-[10px] text-gray-400">{u.email}</div>
+                          <div className="admin-user-copy min-w-0">
+                            <div className="admin-user-name truncate font-semibold text-white text-xs" title={displayName}>{displayName}</div>
+                            <div className="admin-user-email truncate text-[10px] text-gray-400" title={u.email}>{u.email}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-gray-300 font-mono text-[11px]">{u.employee_id}</td>
                       <td className="px-4 py-4 whitespace-nowrap text-gray-300">{u.department?.name || '-'}</td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
+                        <span className="admin-badge px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
                           {u.role?.slug || '-'}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-gray-300">{u.branch?.code || '-'}</td>
                       <td className="px-4 py-4 whitespace-nowrap text-gray-300">{u.warehouse?.code || '-'}</td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${
+                        <span className={`admin-badge px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${
                           u.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                           u.status === 'PENDING' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                           u.status === 'SUSPENDED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
@@ -678,7 +680,7 @@ const UserManagement: React.FC = () => {
               const initials = displayName.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase();
               return (
                 <article key={u.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                  <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-blue-600/20 text-xs font-bold text-blue-600 dark:text-blue-400">{initials}</div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</h3><p className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</p></div><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${u.status === 'ACTIVE' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : u.status === 'PENDING' ? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>{u.status}</span></div>
+                  <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-blue-600/20 text-xs font-bold text-blue-600 dark:text-blue-400">{initials}</div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</h3><p className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</p></div><span className={`admin-badge rounded-full border px-2.5 py-1 text-[10px] font-semibold ${u.status === 'ACTIVE' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : u.status === 'PENDING' ? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>{u.status}</span></div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500 dark:text-slate-400">Employee ID</dt><dd className="font-mono text-slate-900 dark:text-white">{u.employee_id}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Role</dt><dd className="text-slate-900 dark:text-white">{u.role?.slug || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Department</dt><dd className="text-slate-900 dark:text-white">{u.department?.name || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{u.warehouse?.code || '—'}</dd></div></dl>
                   <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 text-slate-500 dark:border-slate-700 dark:text-slate-400"><button onClick={() => setViewUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button><button onClick={() => setEditUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="Edit"><Edit className="h-4 w-4" /></button>{u.status === 'PENDING' && <button onClick={() => handleApprove(u)} className="p-1 hover:text-green-500" title="Approve"><Check className="h-4 w-4" /></button>}{u.status === 'ACTIVE' && <button onClick={() => handleSuspend(u)} className="p-1 hover:text-red-500" title="Suspend"><UserX className="h-4 w-4" /></button>}{u.status === 'SUSPENDED' && <button onClick={() => handleActivate(u)} className="p-1 hover:text-green-500" title="Activate"><UserCheck className="h-4 w-4" /></button>}</div>
                 </article>
@@ -728,22 +730,22 @@ const UserManagement: React.FC = () => {
           <div className="fixed inset-y-0 right-0 flex max-w-full">
             <div className="w-screen max-w-md transform transition ease-in-out duration-500 sm:duration-700">
               <div className="flex h-full flex-col overflow-y-auto bg-[#0d1322] border-l border-gray-800 shadow-xl">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-                  <h2 className="text-lg font-semibold text-white">User Details</h2>
-                  <button onClick={() => setViewUser(null)} className="text-gray-400 hover:text-white transition-colors">
-                    <X className="w-5 h-5" />
+                <div className="flex items-center justify-between border-b border-gray-800 px-4 py-4 sm:px-6">
+                  <h2 className="text-[22px] font-semibold text-white sm:text-lg">User Details</h2>
+                  <button onClick={() => setViewUser(null)} aria-label="Close user details" className="inline-flex min-h-11 min-w-11 items-center justify-center text-gray-400 transition-colors hover:text-white sm:min-h-0 sm:min-w-0">
+                    <X className="h-4 w-4 sm:h-5 sm:w-5" />
                   </button>
                 </div>
-                <div className="p-6 space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-blue-500/20 border-2 border-blue-500/30 flex items-center justify-center text-2xl font-bold text-blue-400">
+                <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-blue-500/30 bg-blue-500/20 text-[20px] font-semibold text-blue-400 sm:text-2xl sm:font-bold">
                       {(viewUser.name || 'U').substring(0, 2).toUpperCase()}
                     </div>
-                    <div>
-                      <h3 className="text-white font-semibold text-lg">{viewUser.name || 'Unnamed'}</h3>
-                      <p className="text-gray-400 text-sm">{viewUser.email}</p>
+                    <div className="flex min-w-0 flex-col items-start gap-1 sm:block">
+                      <h3 className="max-w-full break-words text-[14px] font-semibold text-white sm:text-lg sm:[overflow-wrap:normal]">{viewUser.name || 'Unnamed'}</h3>
+                      <p className="max-w-full break-words text-[10px] leading-[14px] text-gray-400 sm:text-sm sm:leading-normal sm:[overflow-wrap:normal]">{viewUser.email}</p>
                       <span className={(
-                        'mt-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ' +
+                        'admin-badge mt-1 inline-flex h-5 items-center gap-1.5 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-medium sm:mt-3 sm:h-auto sm:px-2.5 sm:text-xs ' +
                         (viewUser.status === 'ACTIVE' ? 'text-green-400 bg-green-400/10 border-green-400/20' :
                          viewUser.status === 'PENDING' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' :
                          viewUser.status === 'SUSPENDED' ? 'text-red-400 bg-red-400/10 border-red-400/20' :
@@ -753,30 +755,30 @@ const UserManagement: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
-                      <p className="text-gray-400 text-xs mb-1">Employee ID</p>
-                      <p className="text-white text-sm font-medium">{viewUser.employee_id}</p>
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                    <div className="min-w-0 rounded-xl border border-gray-800/50 bg-gray-800/30 p-2.5 sm:p-3">
+                      <p className="mb-1 text-[10px] font-medium text-gray-400 sm:text-xs sm:font-normal">Employee ID</p>
+                      <p className="break-words text-[11px] font-medium text-white sm:text-sm sm:[overflow-wrap:normal]">{viewUser.employee_id}</p>
                     </div>
-                    <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
-                      <p className="text-gray-400 text-xs mb-1">Department</p>
-                      <p className="text-white text-sm font-medium">{viewUser.department?.name || '-'}</p>
+                    <div className="min-w-0 rounded-xl border border-gray-800/50 bg-gray-800/30 p-2.5 sm:p-3">
+                      <p className="mb-1 text-[10px] font-medium text-gray-400 sm:text-xs sm:font-normal">Department</p>
+                      <p className="break-words text-[11px] font-medium text-white sm:text-sm sm:[overflow-wrap:normal]">{viewUser.department?.name || '-'}</p>
                     </div>
-                    <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
-                      <p className="text-gray-400 text-xs mb-1">Role</p>
-                      <p className="text-white text-sm font-medium">{viewUser.role?.slug || '-'}</p>
+                    <div className="min-w-0 rounded-xl border border-gray-800/50 bg-gray-800/30 p-2.5 sm:p-3">
+                      <p className="mb-1 text-[10px] font-medium text-gray-400 sm:text-xs sm:font-normal">Role</p>
+                      <p className="break-words text-[11px] font-medium text-white sm:text-sm sm:[overflow-wrap:normal]">{viewUser.role?.slug || '-'}</p>
                     </div>
-                    <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
-                      <p className="text-gray-400 text-xs mb-1">Branch</p>
-                      <p className="text-white text-sm font-medium">{viewUser.branch?.name || '-'}</p>
+                    <div className="min-w-0 rounded-xl border border-gray-800/50 bg-gray-800/30 p-2.5 sm:p-3">
+                      <p className="mb-1 text-[10px] font-medium text-gray-400 sm:text-xs sm:font-normal">Branch</p>
+                      <p className="break-words text-[11px] font-medium text-white sm:text-sm sm:[overflow-wrap:normal]">{viewUser.branch?.name || '-'}</p>
                     </div>
-                    <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
-                      <p className="text-gray-400 text-xs mb-1">Warehouse</p>
-                      <p className="text-white text-sm font-medium">{viewUser.warehouse?.name || '-'}</p>
+                    <div className="min-w-0 rounded-xl border border-gray-800/50 bg-gray-800/30 p-2.5 sm:p-3">
+                      <p className="mb-1 text-[10px] font-medium text-gray-400 sm:text-xs sm:font-normal">Warehouse</p>
+                      <p className="break-words text-[11px] font-medium text-white sm:text-sm sm:[overflow-wrap:normal]">{viewUser.warehouse?.name || '-'}</p>
                     </div>
-                    <div className="bg-gray-800/30 rounded-xl p-3 border border-gray-800/50">
-                      <p className="text-gray-400 text-xs mb-1">Status</p>
-                      <p className="text-white text-sm font-medium">{viewUser.status}</p>
+                    <div className="min-w-0 rounded-xl border border-gray-800/50 bg-gray-800/30 p-2.5 sm:p-3">
+                      <p className="mb-1 text-[10px] font-medium text-gray-400 sm:text-xs sm:font-normal">Status</p>
+                      <p className="break-words text-[11px] font-medium text-white sm:text-sm sm:[overflow-wrap:normal]">{viewUser.status}</p>
                     </div>
                   </div>
                 </div>

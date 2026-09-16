@@ -194,7 +194,7 @@ const Suppliers: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#0b0f19] text-slate-100">
+    <div className="mx-auto w-full max-w-7xl space-y-6 bg-[#0b0f19] p-4 text-slate-100 sm:p-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Plant Manager</span>
@@ -263,20 +263,20 @@ const Suppliers: React.FC = () => {
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Total Suppliers</p>
-          <p className="text-2xl font-bold text-white mt-1">{totalSuppliers}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Total Suppliers</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{totalSuppliers}</p>
         </div>
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Active Vendors</p>
-          <p className="text-2xl font-bold text-white mt-1">{activeSuppliers}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Active Vendors</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{activeSuppliers}</p>
         </div>
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">On Hold</p>
-          <p className="text-2xl font-bold text-white mt-1">{onHoldSuppliers}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">On Hold</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{onHoldSuppliers}</p>
         </div>
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="text-xs text-slate-400 uppercase tracking-wider">Open POs</p>
-          <p className="text-2xl font-bold text-white mt-1">{totalOpenPOs}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Open POs</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{totalOpenPOs}</p>
         </div>
       </div>
 
@@ -290,7 +290,7 @@ const Suppliers: React.FC = () => {
                 onClick={() => setStatusFilter(status)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   statusFilter === status
-                    ? 'bg-cyan-500 text-slate-950'
+                    ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                     : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
@@ -380,8 +380,8 @@ const Suppliers: React.FC = () => {
       {/* Supplier Table View */}
       {viewMode === 'table' && (
         <div className="bg-[#0f172a] border border-slate-800/80 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+          <div className="pm-table-scroll">
+            <table className="pm-responsive-table pm-cols-7 pm-sticky-1 w-full min-w-[900px]">
               <thead className="bg-slate-800/30 border-b border-slate-800/60">
                 <tr>
                   <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -481,7 +481,7 @@ const Suppliers: React.FC = () => {
               <button className="p-1.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
+              <button className="px-3 py-1 rounded-xl text-sm font-medium bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950">
                 1
               </button>
               <button className="p-1.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors">
@@ -535,7 +535,7 @@ const Suppliers: React.FC = () => {
                   placeholder="Full name"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-slate-300">
                     Email *
@@ -651,7 +651,7 @@ const Suppliers: React.FC = () => {
                   className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-slate-300">
                     Email *

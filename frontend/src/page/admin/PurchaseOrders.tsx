@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { apiClient } from '../../lib/api';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
   Search,
   Plus,
@@ -64,7 +65,7 @@ const StatusBadge: React.FC<{ status: POStatus }> = ({ status }) => {
   };
   const { color, bg, border } = config[status] || config['Pending Approval'];
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg} ${border}`}>
+    <span className={`admin-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg} ${border}`}>
       {status}
     </span>
   );
@@ -89,6 +90,7 @@ const PurchaseOrders: React.FC = () => {
   const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  useAdminDetailOverlay(showDetailsDrawer && selectedOrder !== null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -209,7 +211,6 @@ const PurchaseOrders: React.FC = () => {
   };
 
   const resetNewOrder = () => setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierName: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', status: 'Approved', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
-  const openCreateModal = () => { resetNewOrder(); setShowCreateModal(true); };
   const closeCreateModal = () => { setShowCreateModal(false); resetNewOrder(); };
 
   const handleViewDetails = (order: PurchaseOrder) => {
@@ -281,42 +282,42 @@ const PurchaseOrders: React.FC = () => {
         <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 text-center">
           <div className="flex items-center justify-center gap-2 text-yellow-400">
             <Clock className="w-4 h-4" />
-            <span className="text-xs font-medium uppercase tracking-wider">Pending</span>
+            <span className="admin-kpi-title text-xs font-medium uppercase tracking-wider">Pending</span>
           </div>
-          <p className="text-2xl font-bold text-white mt-1">{kpiCounts.Pending}</p>
-          <p className="text-xs text-gray-400">Awaiting approval</p>
+          <p className="admin-kpi-value text-2xl font-bold text-white mt-1">{kpiCounts.Pending}</p>
+          <p className="admin-kpi-helper text-xs text-gray-400">Awaiting approval</p>
         </div>
         <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 text-center">
           <div className="flex items-center justify-center gap-2 text-emerald-400">
             <CheckCircle className="w-4 h-4" />
-            <span className="text-xs font-medium uppercase tracking-wider">Approved</span>
+            <span className="admin-kpi-title text-xs font-medium uppercase tracking-wider">Approved</span>
           </div>
-          <p className="text-2xl font-bold text-white mt-1">{kpiCounts.Approved}</p>
-          <p className="text-xs text-gray-400">Ready for supplier</p>
+          <p className="admin-kpi-value text-2xl font-bold text-white mt-1">{kpiCounts.Approved}</p>
+          <p className="admin-kpi-helper text-xs text-gray-400">Ready for supplier</p>
         </div>
         <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 text-center">
           <div className="flex items-center justify-center gap-2 text-indigo-400">
             <Package className="w-4 h-4" />
-            <span className="text-xs font-medium uppercase tracking-wider">Total POs</span>
+            <span className="admin-kpi-title text-xs font-medium uppercase tracking-wider">Total POs</span>
           </div>
-          <p className="text-2xl font-bold text-white mt-1">{orders.length}</p>
-          <p className="text-xs text-gray-400">Saved purchase orders</p>
+          <p className="admin-kpi-value text-2xl font-bold text-white mt-1">{orders.length}</p>
+          <p className="admin-kpi-helper text-xs text-gray-400">Saved purchase orders</p>
         </div>
         <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 text-center">
           <div className="flex items-center justify-center gap-2 text-teal-400">
             <Package className="w-4 h-4" />
-            <span className="text-xs font-medium uppercase tracking-wider">Completed</span>
+            <span className="admin-kpi-title text-xs font-medium uppercase tracking-wider">Completed</span>
           </div>
-          <p className="text-2xl font-bold text-white mt-1">{kpiCounts.Completed}</p>
-          <p className="text-xs text-gray-400">Fully received</p>
+          <p className="admin-kpi-value text-2xl font-bold text-white mt-1">{kpiCounts.Completed}</p>
+          <p className="admin-kpi-helper text-xs text-gray-400">Fully received</p>
         </div>
         <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 text-center">
           <div className="flex items-center justify-center gap-2 text-red-400">
             <X className="w-4 h-4" />
-            <span className="text-xs font-medium uppercase tracking-wider">Cancelled</span>
+            <span className="admin-kpi-title text-xs font-medium uppercase tracking-wider">Cancelled</span>
           </div>
-          <p className="text-2xl font-bold text-white mt-1">{kpiCounts.Cancelled}</p>
-          <p className="text-xs text-gray-400">Cancelled orders</p>
+          <p className="admin-kpi-value text-2xl font-bold text-white mt-1">{kpiCounts.Cancelled}</p>
+          <p className="admin-kpi-helper text-xs text-gray-400">Cancelled orders</p>
         </div>
       </div>
 
@@ -350,21 +351,14 @@ const PurchaseOrders: React.FC = () => {
           <ChevronRightIcon className="w-4 h-4 text-gray-400" />
         </div>
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#1e293b] p-1" aria-label="Purchase order view">
-          <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
-          <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+          <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+          <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
         </div>
         <button onClick={() => void loadOrders()} disabled={loading} className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
         <button className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors">
           <Download className="w-4 h-4" />
-        </button>
-        <button
-          onClick={openCreateModal}
-          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New PO</span>
         </button>
       </div>
 
@@ -373,8 +367,8 @@ const PurchaseOrders: React.FC = () => {
       {/* Table */}
       <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full table-auto">
+        <div className="admin-table-scroll">
+          <table className="admin-responsive-table admin-cols-9 admin-sticky-1 w-full min-w-[900px] table-auto">
             <thead className="bg-[#1e293b]/50 border-b border-[#1f2937]">
               <tr>
                 <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">PO No.</th>
@@ -468,7 +462,7 @@ const PurchaseOrders: React.FC = () => {
             <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">1</button>
+            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950">1</button>
             <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronRightIcon className="w-4 h-4" />
             </button>
@@ -481,88 +475,88 @@ const PurchaseOrders: React.FC = () => {
       {/* ============================================ */}
       {showDetailsDrawer && selectedOrder && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="bg-black/60 backdrop-blur-sm w-full" onClick={handleCloseDrawer}></div>
-          <div className="bg-[#0f172a] border-l border-[#1f2937] w-full sm:w-[600px] h-full overflow-y-auto p-6 animate-in slide-in-from-right duration-300">
+          <div className="min-w-0 flex-1 bg-black/60 backdrop-blur-sm" onClick={handleCloseDrawer}></div>
+          <div className="admin-po-details-drawer h-full w-[96vw] shrink-0 overflow-x-hidden overflow-y-auto overscroll-y-contain border-l border-[#1f2937] bg-[#0f172a] p-3 animate-in slide-in-from-right duration-300 min-[400px]:w-[92vw] sm:w-[600px] sm:p-6">
             {/* Header */}
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-3">
-                  {selectedOrder.poNumber}
+            <div className="admin-po-details-header sticky top-0 z-10 -mx-3 -mt-3 mb-4 flex items-start justify-between gap-2 bg-[#0f172a] px-3 py-3 sm:static sm:mx-0 sm:mt-0 sm:mb-6 sm:bg-transparent sm:p-0">
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                  <h2 className="admin-po-details-title min-w-0 text-base font-bold leading-tight text-white sm:text-xl">{selectedOrder.poNumber}</h2>
                   <StatusBadge status={selectedOrder.status} />
-                </h2>
-                <p className="text-sm text-gray-400">Supplier: {selectedOrder.supplier}</p>
+                </div>
+                <p className="admin-po-details-supplier mt-1 break-words text-xs text-gray-400 sm:mt-0 sm:text-sm">Supplier: {selectedOrder.supplier}</p>
               </div>
-              <button onClick={handleCloseDrawer} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <button aria-label="Close purchase order details" onClick={handleCloseDrawer} className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:hover:bg-slate-700 dark:hover:text-white sm:min-h-0 sm:min-w-0 sm:p-1.5">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* PO Info Grid */}
-            <div className="grid grid-cols-2 gap-4 text-sm mb-6 p-4 bg-[#1e293b]/30 rounded-xl border border-[#1f2937]">
-              <div><span className="text-gray-400">Created Date</span><p className="text-white">{selectedOrder.createdAt}</p></div>
-              <div><span className="text-gray-400">Expected Delivery</span><p className="text-white">{selectedOrder.expectedDeliveryDate}</p></div>
-              <div><span className="text-gray-400">Approved By</span><p className="text-white">{selectedOrder.approvedBy || '—'}</p></div>
-              <div className="col-span-2"><span className="text-gray-400">Delivery Details</span><p className="text-white">{selectedOrder.deliveryDetails}</p></div>
-              <div className="col-span-2"><span className="text-gray-400">Signature</span><p className="text-white">{selectedOrder.signatureData ? 'Signature recorded' : 'Approved electronically'}</p></div>
+            <div className="admin-po-details-info mb-4 grid grid-cols-1 gap-3 rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3 text-xs min-[360px]:grid-cols-2 sm:mb-6 sm:gap-4 sm:p-4 sm:text-sm">
+              <div><span className="text-gray-400">Created Date</span><p className="whitespace-nowrap text-white">{selectedOrder.createdAt}</p></div>
+              <div><span className="text-gray-400">Expected Delivery</span><p className="whitespace-nowrap text-white">{selectedOrder.expectedDeliveryDate}</p></div>
+              <div className="min-[360px]:col-span-2 sm:col-span-1"><span className="text-gray-400">Approved By</span><p className="break-words text-white">{selectedOrder.approvedBy || '—'}</p></div>
+              <div className="min-[360px]:col-span-2"><span className="text-gray-400">Delivery Details</span><p className="break-words text-white">{selectedOrder.deliveryDetails}</p></div>
+              <div className="min-[360px]:col-span-2"><span className="text-gray-400">Signature</span><p className="break-words text-white">{selectedOrder.signatureData ? 'Signature recorded' : 'Approved electronically'}</p></div>
             </div>
 
             {/* Supplier Info */}
-            <div className="bg-[#1e293b]/30 rounded-xl p-4 border border-[#1f2937] mb-6">
-              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+            <div className="admin-po-details-supplier-card mb-4 rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3 sm:mb-6 sm:p-4">
+              <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold text-white sm:text-sm">
                 <Building className="w-4 h-4 text-cyan-400" /> Supplier Information
               </h3>
-              <p className="text-sm text-white">{selectedOrder.supplier}</p>
+              <p className="break-words text-xs text-white sm:text-sm">{selectedOrder.supplier}</p>
             </div>
 
             {/* Items Table */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-white mb-2">Items</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+            <div className="admin-po-details-items mb-4 sm:mb-6">
+              <h3 className="mb-2 text-xs font-semibold text-white sm:text-sm">Items</h3>
+              <div className="admin-po-details-items-scroll admin-table-scroll">
+                <table className="admin-po-details-items-table admin-responsive-table admin-cols-4 admin-sticky-1 w-full min-w-[420px] text-xs sm:min-w-0 sm:text-sm">
                   <thead className="border-b border-[#1f2937]">
                     <tr className="text-gray-400 text-xs uppercase">
-                      <th className="px-3 py-2 text-left">Product</th>
-                      <th className="px-3 py-2 text-right">Qty</th>
-                      <th className="px-3 py-2 text-right">Unit Price</th>
-                      <th className="px-3 py-2 text-right">Amount</th>
+                      <th className="w-[40%] px-2 py-2 text-left sm:px-3">Product</th>
+                      <th className="w-[12%] px-2 py-2 text-right sm:px-3">Qty</th>
+                      <th className="w-[24%] px-2 py-2 text-right sm:px-3">Unit Price</th>
+                      <th className="w-[24%] px-2 py-2 text-right sm:px-3">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedOrder.items.map((item, idx) => (
                       <tr key={idx} className="border-b border-[#1f2937]">
-                        <td className="px-3 py-2 text-gray-300">{item.productName}</td>
-                        <td className="px-3 py-2 text-right text-white">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-white">₱{item.unitPrice.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right text-white">₱{item.amount.toLocaleString()}</td>
+                        <td className="px-2 py-2 text-gray-300 sm:px-3">{item.productName}</td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">{item.quantity}</td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">₱{item.unitPrice.toLocaleString()}</td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">₱{item.amount.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="border-t border-[#1f2937] font-medium">
-                    <tr className="text-lg"><td colSpan={3} className="px-3 py-2 text-right text-white font-bold">Total Amount</td><td className="px-3 py-2 text-right text-cyan-400 font-bold">₱{selectedOrder.totalAmount.toLocaleString()}</td></tr>
+                    <tr className="text-sm sm:text-lg"><td colSpan={3} className="px-2 py-2 text-right font-bold text-white sm:px-3">Total Amount</td><td className="whitespace-nowrap px-2 py-2 text-right font-bold text-cyan-400 sm:px-3">₱{selectedOrder.totalAmount.toLocaleString()}</td></tr>
                   </tfoot>
                 </table>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2 border-t border-[#1f2937] pt-4">
-              <button onClick={() => openPrintablePo(selectedOrder)} className="flex-1 min-h-11 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-300">
-                <Printer className="w-4 h-4" /> Print PO
+            <div className="admin-po-details-actions grid grid-cols-1 gap-2 border-t border-[#1f2937] pt-3 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:pt-4">
+              <button onClick={() => openPrintablePo(selectedOrder)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-2 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+                <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">Print PO</span>
               </button>
-              <button onClick={() => openPrintablePo(selectedOrder, true)} className="flex-1 min-h-11 py-2 border border-[#1f2937] hover:bg-slate-800/50 text-gray-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
-                <Download className="w-4 h-4" /> Download PO (PDF)
+              <button onClick={() => openPrintablePo(selectedOrder, true)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">Download PO (PDF)</span>
               </button>
-              <button onClick={() => void handleSendToSupplier(selectedOrder)} disabled={sending || selectedOrder.status === 'Sent to Supplier'} className="flex-1 min-h-11 py-2 border border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
-                <Send className="w-4 h-4" /> {sending ? 'Sending…' : selectedOrder.status === 'Sent to Supplier' ? 'Sent to Supplier' : 'Send PO to Supplier'}
+              <button onClick={() => void handleSendToSupplier(selectedOrder)} disabled={sending || selectedOrder.status === 'Sent to Supplier'} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/50 px-2 py-2 text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+                <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{sending ? 'Sending…' : selectedOrder.status === 'Sent to Supplier' ? 'Sent to Supplier' : 'Send PO to Supplier'}</span>
               </button>
-              <button onClick={() => setShowHistory((visible) => !visible)} aria-expanded={showHistory} className="flex-1 min-h-11 py-2 border border-[#1f2937] hover:bg-slate-800/50 text-gray-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500/50">
-                <Clock className="w-4 h-4" /> {showHistory ? 'Hide History' : 'View History'}
+              <button onClick={() => setShowHistory((visible) => !visible)} aria-expanded={showHistory} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+                <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{showHistory ? 'Hide History' : 'View History'}</span>
               </button>
             </div>
             {showHistory && (
-              <section className="mt-4 rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-4" aria-label="Purchase Order history">
-                <h3 className="mb-3 text-sm font-semibold text-white">Audit History</h3>
-                <ol className="space-y-3 border-l border-slate-700 pl-4 text-sm">
+              <section className="mt-4 rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3 sm:p-4" aria-label="Purchase Order history">
+                <h3 className="mb-3 text-xs font-semibold text-white sm:text-sm">Audit History</h3>
+                <ol className="space-y-3 border-l border-slate-700 pl-4 text-xs sm:text-sm">
                   <li><p className="font-medium text-white">Purchase Order created</p><p className="text-gray-400">{selectedOrder.createdAt}</p></li>
                   {selectedOrder.approvedBy && <li><p className="font-medium text-white">Approved by {selectedOrder.approvedBy}</p><p className="text-gray-400">{selectedOrder.createdAt}</p></li>}
                   {selectedOrder.sentAt && <li><p className="font-medium text-cyan-300">Sent to supplier</p><p className="text-gray-400">{new Date(selectedOrder.sentAt).toLocaleString()}</p></li>}
@@ -578,20 +572,20 @@ const PurchaseOrders: React.FC = () => {
       {/* ============================================ */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-[#0f172a] border border-[#1f2937] rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Create New Purchase Order</h2>
+          <div className="admin-create-po-modal bg-[#0f172a] border border-[#1f2937] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="admin-create-po-header flex items-center justify-between mb-6">
+              <h2 className="admin-create-po-title text-xl font-bold text-white">Create New Purchase Order</h2>
               <button onClick={closeCreateModal} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="admin-create-po-content space-y-4">
               {newOrder.replenishmentRequestId && (
-                <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm text-cyan-100">
+                <div className="admin-create-po-linked rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm text-slate-700 dark:text-cyan-100">
                   Linked request <strong>{newOrder.requestNo}</strong> · Delivery location: <strong>{newOrder.warehouseLocation}</strong>
                 </div>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="admin-create-po-form grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">Supplier *</label>
                   <select required disabled={loadingSuppliers} value={newOrder.supplierName} onChange={(e) => setNewOrder({ ...newOrder, supplierName: e.target.value })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-wait disabled:opacity-60">
@@ -621,12 +615,12 @@ const PurchaseOrders: React.FC = () => {
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white mb-2">Items</h3>
-                <button type="button" onClick={() => setNewOrder({ ...newOrder, items: [...newOrder.items, { productName: '', quantity: 1, unitPrice: 0 }] })} className="text-cyan-400 text-sm hover:text-cyan-300 transition-colors flex items-center gap-1 mb-2">
+                <h3 className="admin-create-po-items-title text-sm font-semibold text-white mb-2">Items</h3>
+                <button type="button" onClick={() => setNewOrder({ ...newOrder, items: [...newOrder.items, { productName: '', quantity: 1, unitPrice: 0 }] })} className="admin-create-po-add-item text-cyan-400 text-sm hover:text-cyan-300 transition-colors flex items-center gap-1 mb-2">
                   <Plus className="w-4 h-4" /> Add Item
                 </button>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="admin-table-scroll">
+                  <table className="admin-create-po-items-table admin-responsive-table admin-cols-5 admin-sticky-1 w-full text-sm">
                     <thead className="border-b border-[#1f2937] text-gray-400 text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2 text-left">Product</th>
@@ -651,9 +645,9 @@ const PurchaseOrders: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#1f2937]">
-            <button onClick={closeCreateModal} className="px-4 py-2 border border-[#1f2937] rounded-xl text-sm font-medium text-gray-300 hover:bg-slate-800/50 transition-colors">Cancel</button>
-              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierName} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <div className="admin-create-po-footer flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#1f2937]">
+            <button onClick={closeCreateModal} className="admin-create-po-action px-4 py-2 border border-[#1f2937] rounded-xl text-sm font-medium text-gray-300 hover:bg-slate-800/50 transition-colors">Cancel</button>
+              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierName} className="admin-create-po-action px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <Save className="w-4 h-4" /> Create PO
               </button>
             </div>

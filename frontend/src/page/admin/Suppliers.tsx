@@ -1,5 +1,6 @@
 // src/pages/admin/Suppliers.tsx
 import React, { useCallback, useEffect, useState } from 'react';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import { apiClient } from '../../lib/api';
 import {
   Search,
@@ -69,7 +70,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const { color, dotColor } = config[status] || config['Active'];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}
+      className={`admin-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {status}
@@ -89,6 +90,7 @@ const Suppliers: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  useAdminDetailOverlay(showEditModal && selectedSupplier !== null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -241,20 +243,20 @@ const Suppliers: React.FC = () => {
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
-          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Total Suppliers</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{totalSuppliers}</p>
+          <p className="admin-kpi-title text-xs text-[var(--text-muted)] uppercase tracking-wider">Total Suppliers</p>
+          <p className="admin-kpi-value text-2xl font-bold text-[var(--text-primary)] mt-1">{totalSuppliers}</p>
         </div>
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
-          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Active Vendors</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{activeSuppliers}</p>
+          <p className="admin-kpi-title text-xs text-[var(--text-muted)] uppercase tracking-wider">Active Vendors</p>
+          <p className="admin-kpi-value text-2xl font-bold text-[var(--text-primary)] mt-1">{activeSuppliers}</p>
         </div>
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
-          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">On Hold</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{onHoldSuppliers}</p>
+          <p className="admin-kpi-title text-xs text-[var(--text-muted)] uppercase tracking-wider">On Hold</p>
+          <p className="admin-kpi-value text-2xl font-bold text-[var(--text-primary)] mt-1">{onHoldSuppliers}</p>
         </div>
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center hover:border-[var(--border-color-strong)] transition-colors">
-          <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Open POs</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{totalOpenPOs}</p>
+          <p className="admin-kpi-title text-xs text-[var(--text-muted)] uppercase tracking-wider">Open POs</p>
+          <p className="admin-kpi-value text-2xl font-bold text-[var(--text-primary)] mt-1">{totalOpenPOs}</p>
         </div>
       </div>
 
@@ -268,7 +270,7 @@ const Suppliers: React.FC = () => {
                 onClick={() => setStatusFilter(status)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   statusFilter === status
-                    ? 'bg-cyan-500 text-slate-950'
+                    ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               >
@@ -360,8 +362,8 @@ const Suppliers: React.FC = () => {
       {/* Supplier Table View */}
       {viewMode === 'table' && (
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+          <div className="admin-table-scroll">
+            <table className="admin-responsive-table admin-cols-8 admin-sticky-1 w-full min-w-[900px]">
               <thead className="bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
                 <tr>
                   <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
@@ -462,7 +464,7 @@ const Suppliers: React.FC = () => {
               <button className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button className="px-3 py-1 rounded-xl text-sm font-medium bg-cyan-500 text-slate-950">
+              <button className="px-3 py-1 rounded-xl text-sm font-medium bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950">
                 1
               </button>
               <button className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">

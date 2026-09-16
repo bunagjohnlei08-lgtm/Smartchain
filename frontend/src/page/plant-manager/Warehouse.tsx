@@ -108,8 +108,8 @@ const Warehouse: React.FC = () => {
   );
 };
 
-const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => <article className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p><p className="mt-2 text-xl font-bold text-white">{value}</p></div><div className="rounded-lg bg-slate-800/50 p-2.5">{icon}</div></div></article>;
+const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => <article className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5"><div className="flex items-start justify-between gap-3"><div><p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p><p className="mobile-kpi-value mt-2 text-xl font-bold text-white">{value}</p></div><div className="rounded-lg bg-slate-800/50 p-2.5">{icon}</div></div></article>;
 const InventoryValue: React.FC<{ label: string; value: number }> = ({ label, value }) => <div className="rounded-xl bg-slate-800/50 p-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-1 text-lg font-semibold text-white">{value.toLocaleString()} units</p></div>;
-const StatusBadge: React.FC<{ status: WarehouseOverview['status'] }> = ({ status }) => <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-slate-600 bg-slate-700/30 text-slate-400'}`}>{status}</span>;
+const StatusBadge: React.FC<{ status: WarehouseOverview['status'] }> = ({ status }) => <span className={`plant-manager-badge rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-slate-600 bg-slate-700/30 text-slate-400'}`}>{status}</span>;
 
 export default Warehouse;

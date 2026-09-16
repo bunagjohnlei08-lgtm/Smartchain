@@ -47,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/{id}/read', [NotificationController::class, 'read'])->whereUuid('id');
     Route::get('/admin/dashboard', [DashboardController::class, 'index']);
     Route::get('/admin/reports/dashboard', [AdminReportController::class, 'dashboard']);
+    Route::post('/admin/reports/export', [AdminReportController::class, 'export']);
     Route::get('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'show']);
     Route::put('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'update']);
     Route::apiResource('/admin/products', ProductController::class);
@@ -99,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/qa/rejected-items', [QaRejectedItemsController::class, 'index']);
     Route::get('/qa/quality-reports', [QaQualityReportController::class, 'index']);
     Route::get('/qa/inspections/{receivingId}', [QaInspectionController::class, 'show']);
+    Route::get('/qa/inspections/{receivingId}/attachment', [QaInspectionController::class, 'attachment']);
     Route::post('/qa/inspections/{receivingId}', [QaInspectionController::class, 'store']);
     Route::put('/qa/inspections/{receivingId}', [QaInspectionController::class, 'update']);
 

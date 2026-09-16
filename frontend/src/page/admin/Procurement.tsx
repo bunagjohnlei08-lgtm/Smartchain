@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 
 // ============================================
 // TYPES
@@ -110,7 +111,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const { color, bg, border, dotColor } = config[status] || config.pending;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${color} ${bg} ${border}`}
+      className={`admin-badge admin-status-badge inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${color} ${bg} ${border}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {labels[status] || status}
@@ -129,7 +130,7 @@ const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
   };
   return (
     <span
-      className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${
+      className={`admin-badge inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${
         config[priority] || config.Medium
       }`}
     >
@@ -147,13 +148,13 @@ const KPICard: React.FC<{
   return (
     <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-5 flex items-start justify-between">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+        <p className="admin-kpi-title text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
           {label}
         </p>
-        <p className="text-2xl font-bold text-[var(--text-primary)] mt-2">
+        <p className="admin-kpi-value text-2xl font-bold text-[var(--text-primary)] mt-2">
           {value}
         </p>
-        <p className="text-xs text-[var(--text-muted)] mt-2">{indicator}</p>
+        <p className="admin-kpi-helper text-xs text-[var(--text-muted)] mt-2">{indicator}</p>
       </div>
       <div className="p-2.5 bg-[var(--bg-hover)] rounded-lg">{icon}</div>
     </div>
@@ -187,6 +188,7 @@ const Procurement: React.FC = () => {
   const [decidingId, setDecidingId] = useState<number | null>(null);
   const [pendingView, setPendingView] = useState<'cards' | 'table'>('cards');
   const [selectedRequest, setSelectedRequest] = useState<ReplenishmentRequest | null>(null);
+  useAdminDetailOverlay(selectedRequest !== null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -391,7 +393,7 @@ const Procurement: React.FC = () => {
                 onClick={() => setViewMode('list')}
                 className={`flex min-h-9 min-w-9 items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-600/50 ${
                   viewMode === 'list'
-                    ? 'bg-[#092635] text-white shadow-sm'
+                    ? 'bg-slate-200 text-slate-900 shadow-sm dark:bg-[#092635] dark:text-white'
                     : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
                 }`}
                 title="List view"
@@ -405,7 +407,7 @@ const Procurement: React.FC = () => {
                 onClick={() => setViewMode('grid')}
                 className={`flex min-h-9 min-w-9 items-center justify-center rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-600/50 ${
                   viewMode === 'grid'
-                    ? 'bg-[#092635] text-white shadow-sm'
+                    ? 'bg-slate-200 text-slate-900 shadow-sm dark:bg-[#092635] dark:text-white'
                     : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
                 }`}
                 title="Grid view"
@@ -419,8 +421,8 @@ const Procurement: React.FC = () => {
         </div>
 
         {viewMode === 'list' ? (
-        <div className="overflow-x-auto w-full custom-scrollbar">
-          <table className="w-full min-w-[900px]">
+        <div className="admin-table-scroll w-full custom-scrollbar">
+          <table className="admin-procurement-table admin-responsive-table admin-cols-9 admin-sticky-1 w-full min-w-[900px]">
             <thead className="border-b border-[var(--border-color)]">
               <tr>
                 {['Request No.', 'Requested By', 'Warehouse', 'Product', 'Requested Qty', 'Priority', 'Status', 'Date'].map((heading) => (
@@ -442,7 +444,7 @@ const Procurement: React.FC = () => {
                   <td className="px-4 py-3 text-sm whitespace-nowrap text-[var(--text-secondary)]">{request.submitted_date ?? '—'}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => setSelectedRequest(request)} className="min-h-9 rounded-lg border border-[var(--border-color)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors">View</button>
+                      <button onClick={() => setSelectedRequest(request)} aria-label="View request" title="View" className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"><Eye className="w-4 h-4" /></button>
                       {request.status === 'pending' && (
                         <>
                           <button onClick={() => void handleDecision(request, 'decline')} disabled={decidingId === request.id} className="min-h-9 rounded-lg border border-[var(--border-color)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-50 transition-colors">Decline</button>
@@ -532,9 +534,11 @@ const Procurement: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedRequest(request)}
-                    className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                    aria-label="View request"
+                    title="View"
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all focus:outline-none focus:ring-2 focus:ring-cyan-600/50"
                   >
-                    View
+                    <Eye className="w-4 h-4" />
                   </button>
                 </div>
               </article>
@@ -550,17 +554,17 @@ const Procurement: React.FC = () => {
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-6">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
               <div>
-                <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                <h3 className="admin-procurement-pending-title text-base font-semibold text-[var(--text-primary)]">
                   Pending Requests
                 </h3>
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="admin-procurement-pending-subtitle text-xs text-[var(--text-muted)]">
                   Replenishment requests submitted by Plant Managers
                 </p>
               </div>
-              <div className="flex items-center gap-1 p-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)]">
+              <div className="admin-procurement-pending-toggle flex items-center gap-1 p-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)]">
                 <button
                   onClick={() => setPendingView('cards')}
-                  className={`p-1.5 rounded-md transition-all ${
+                    className={`admin-procurement-pending-toggle-button p-1.5 rounded-md transition-all ${
                     pendingView === 'cards'
                       ? 'bg-slate-900 text-white shadow-sm dark:bg-cyan-500 dark:text-slate-950'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -571,7 +575,7 @@ const Procurement: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setPendingView('table')}
-                  className={`p-1.5 rounded-md transition-all ${
+                    className={`admin-procurement-pending-toggle-button p-1.5 rounded-md transition-all ${
                     pendingView === 'table'
                       ? 'bg-slate-900 text-white shadow-sm dark:bg-cyan-500 dark:text-slate-950'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -600,45 +604,47 @@ const Procurement: React.FC = () => {
                 {pendingRequests.map((request) => (
                   <div
                     key={request.id}
-                    className="bg-[var(--bg-surface-alt)] border border-[var(--border-color)] rounded-lg p-4 flex flex-col justify-between"
+                    className="admin-procurement-pending-card bg-[var(--bg-surface-alt)] border border-[var(--border-color)] rounded-lg p-4 flex flex-col justify-between"
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-tight">
+                        <h4 className="admin-procurement-pending-product text-sm font-semibold text-[var(--text-primary)] leading-tight">
                           {request.product_name}
                         </h4>
                         <StatusBadge status={request.status} />
                       </div>
-                      <p className="text-xs text-[var(--text-muted)] mb-3">
+                      <p className="admin-procurement-pending-meta text-xs text-[var(--text-muted)] mb-3">
                         {request.request_no} · {request.warehouse_name}
                       </p>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--text-secondary)] mb-3">
+                      <div className="admin-procurement-pending-quantity flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--text-secondary)] mb-3">
                         <span>Requested Qty: {request.requested_qty.toLocaleString()}</span>
                         <PriorityBadge priority={request.priority} />
                       </div>
-                      <p className="text-xs text-[var(--text-muted)] mb-4">
+                      <p className="admin-procurement-pending-meta text-xs text-[var(--text-muted)] mb-4">
                         Requested by {request.requested_by ?? '—'} · {request.submitted_date ?? '—'}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2">
+                    <div className="admin-procurement-pending-actions flex items-center gap-2 pt-2">
                       <button
                         onClick={() => setSelectedRequest(request)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all"
+                        aria-label="View request"
+                        title="View"
+                        className="admin-procurement-pending-view p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
                       >
-                        View
+                        <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => void handleDecision(request, 'decline')}
                         disabled={decidingId === request.id}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="admin-procurement-pending-decision px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Decline
                       </button>
                       <button
                         onClick={() => void handleDecision(request, 'approve')}
                         disabled={decidingId === request.id}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="admin-procurement-pending-decision px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Approve
                       </button>
@@ -649,8 +655,8 @@ const Procurement: React.FC = () => {
             )}
 
             {!loading && pendingRequests.length > 0 && pendingView === 'table' && (
-              <div className="w-full overflow-x-auto">
-                <table className="w-full min-w-[900px]">
+              <div className="admin-table-scroll w-full">
+                <table className="admin-procurement-pending-table admin-procurement-table admin-responsive-table admin-cols-9 admin-sticky-1 w-full min-w-[900px]">
                   <thead className="border-b border-[var(--border-color)]">
                     <tr>
                       {[
@@ -670,7 +676,7 @@ const Procurement: React.FC = () => {
                           {heading}
                         </th>
                       ))}
-                      <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                      <th className="admin-procurement-pending-actions-cell px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                         Actions
                       </th>
                     </tr>
@@ -705,11 +711,11 @@ const Procurement: React.FC = () => {
                         <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
                           {request.submitted_date ?? '—'}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="admin-procurement-pending-actions-cell px-4 py-3">
+                          <div className="admin-procurement-pending-actions flex items-center justify-center gap-2">
                             <button
                               onClick={() => setSelectedRequest(request)}
-                              className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
+                              className="admin-procurement-pending-view p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
                               title="View"
                             >
                               <Eye className="w-4 h-4" />
@@ -717,14 +723,14 @@ const Procurement: React.FC = () => {
                             <button
                               onClick={() => void handleDecision(request, 'decline')}
                               disabled={decidingId === request.id}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="admin-procurement-pending-decision px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Decline
                             </button>
                             <button
                               onClick={() => void handleDecision(request, 'approve')}
                               disabled={decidingId === request.id}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="admin-procurement-pending-decision px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Approve
                             </button>
@@ -740,14 +746,14 @@ const Procurement: React.FC = () => {
         </div>
 
         {/* Right Side - Recently Approved Requests */}
-        <div className="lg:col-span-1">
+        <div className="admin-procurement-recently-approved lg:col-span-1">
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-6 h-full">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                <h3 className="admin-procurement-recent-title text-base font-semibold text-[var(--text-primary)]">
                   Recently Approved Requests
                 </h3>
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="admin-procurement-recent-subtitle text-xs text-[var(--text-muted)]">
                   Latest approvals from Procurement
                 </p>
               </div>
@@ -758,25 +764,25 @@ const Procurement: React.FC = () => {
                 No approved requests yet.
               </p>
             ) : (
-              <div className="space-y-5">
+              <div className="admin-procurement-recent-list space-y-5">
                 {recentlyApproved.map((request, index) => (
-                  <div key={request.id} className="relative pl-5">
+                  <div key={request.id} className="admin-procurement-recent-record relative pl-5">
                     {index < recentlyApproved.length - 1 && (
                       <div className="absolute left-1.5 top-5 bottom-0 w-px bg-[var(--border-color)]" />
                     )}
                     <div className="absolute left-0 top-1.5 w-3 h-3 rounded-full bg-emerald-500" />
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">
+                        <p className="admin-procurement-recent-primary text-sm font-medium text-[var(--text-primary)]">
                           {request.request_no} · {request.product_name}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)] mb-1.5">
+                        <p className="admin-procurement-recent-meta text-xs text-[var(--text-muted)] mb-1.5">
                           {request.warehouse_name} · Qty{' '}
                           {request.requested_qty.toLocaleString()}
                         </p>
                         <StatusBadge status={request.status} />
                       </div>
-                      <span className="text-xs font-medium text-[var(--text-muted)] whitespace-nowrap">
+                      <span className="admin-procurement-recent-meta text-xs font-medium text-[var(--text-muted)] whitespace-nowrap">
                         {request.approved_date ?? '—'}
                       </span>
                     </div>
@@ -801,8 +807,8 @@ const Procurement: React.FC = () => {
           </div>
         </div>
 
-        <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+        <div className="admin-table-scroll w-full">
+          <table className="admin-procurement-approved-table admin-responsive-table admin-cols-9 admin-sticky-1 w-full min-w-[900px]">
             <thead className="border-b border-[var(--border-color)]">
               <tr>
                 {[
@@ -821,7 +827,7 @@ const Procurement: React.FC = () => {
                     {heading}
                   </th>
                 ))}
-                <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                <th className="admin-procurement-approved-actions-cell px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
                   Actions
                 </th>
               </tr>
@@ -853,17 +859,19 @@ const Procurement: React.FC = () => {
                   <td className="px-4 py-3">
                     <StatusBadge status={request.status} />
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
+                  <td className="admin-procurement-approved-actions-cell px-4 py-3">
+                    <div className="admin-procurement-approved-actions flex items-center justify-center gap-2">
                       <button
                         onClick={() => setSelectedRequest(request)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)] transition-all"
+                        aria-label="View request"
+                        title="View"
+                        className="admin-procurement-approved-view p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
                       >
-                        View
+                        <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleGeneratePo(request)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors"
+                        className="admin-procurement-generate-po rounded-lg font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors sm:px-3 sm:py-1.5 sm:text-xs"
                       >
                         Generate PO
                       </button>
@@ -930,31 +938,31 @@ const Procurement: React.FC = () => {
       {/* Request Details Modal */}
       {selectedRequest && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="admin-procurement-request-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setSelectedRequest(null)}
         >
           <div
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl w-full max-w-lg p-6"
+            className="admin-procurement-request-modal bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl w-full max-w-lg p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-bold text-[var(--text-primary)]">
+            <div className="admin-procurement-request-header flex items-start justify-between mb-6">
+              <div className="min-w-0">
+                <h2 className="admin-procurement-request-title text-lg font-bold text-[var(--text-primary)]">
                   {selectedRequest.request_no}
                 </h2>
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="admin-procurement-request-subtitle text-xs text-[var(--text-muted)]">
                   Replenishment request from Plant Manager
                 </p>
               </div>
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:hover:bg-slate-800"
+                className="admin-procurement-request-x p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <dl className="grid grid-cols-2 gap-4 text-sm">
+            <dl className="admin-procurement-request-details grid grid-cols-2 gap-4 text-sm">
               <div>
                 <dt className="text-xs text-[var(--text-muted)]">Product</dt>
                 <dd className="text-[var(--text-primary)] font-medium">
@@ -975,7 +983,7 @@ const Procurement: React.FC = () => {
               </div>
               <div>
                 <dt className="text-xs text-[var(--text-muted)]">Priority</dt>
-                <dd className="mt-0.5">
+                <dd className="admin-procurement-request-priority mt-0.5">
                   <PriorityBadge priority={selectedRequest.priority} />
                 </dd>
               </div>
@@ -993,12 +1001,12 @@ const Procurement: React.FC = () => {
               </div>
               <div>
                 <dt className="text-xs text-[var(--text-muted)]">Status</dt>
-                <dd className="mt-0.5">
+                <dd className="admin-procurement-request-status mt-0.5">
                   <StatusBadge status={selectedRequest.status} />
                 </dd>
               </div>
               {selectedRequest.admin_decision && (
-                <div className="col-span-2">
+                <div className="admin-procurement-request-decision col-span-2">
                   <dt className="text-xs text-[var(--text-muted)]">Admin Decision</dt>
                   <dd className="text-[var(--text-secondary)]">
                     {selectedRequest.admin_decision}
@@ -1008,7 +1016,7 @@ const Procurement: React.FC = () => {
               )}
             </dl>
 
-            <div className="flex items-center justify-end gap-3 pt-6 mt-6 border-t border-[var(--border-color)]">
+            <div className="admin-procurement-request-actions flex items-center justify-end gap-3 pt-6 mt-6 border-t border-[var(--border-color)]">
               {selectedRequest.status === 'pending' && (
                 <>
                   <button
@@ -1016,7 +1024,7 @@ const Procurement: React.FC = () => {
                       void handleDecision(selectedRequest, 'decline');
                       setSelectedRequest(null);
                     }}
-                    className="px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)]"
+                    className="admin-procurement-request-action px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:bg-[var(--bg-surface-alt)]"
                   >
                     Decline
                   </button>
@@ -1025,7 +1033,7 @@ const Procurement: React.FC = () => {
                       void handleDecision(selectedRequest, 'approve');
                       setSelectedRequest(null);
                     }}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none"
+                    className="admin-procurement-request-action px-4 py-2 rounded-lg text-xs font-semibold bg-[#00a3c4] hover:bg-[#008ca8] text-white shadow-none"
                   >
                     Approve
                   </button>
@@ -1033,7 +1041,7 @@ const Procurement: React.FC = () => {
               )}
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)]"
+                className="admin-procurement-request-action px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)]"
               >
                 Close
               </button>

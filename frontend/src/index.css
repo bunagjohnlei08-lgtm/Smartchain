@@ -50,6 +50,2283 @@
   }
 }
 
+/* Admin Order Management: compact Create Order and assignment modals on mobile. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-create-order-modal {
+      max-height: calc(100dvh - 32px) !important;
+      padding: 16px 16px calc(16px + env(safe-area-inset-bottom)) !important;
+      overscroll-behavior-y: contain;
+    }
+
+    .admin-main .admin-create-order-modal > div:first-child,
+    .admin-main .admin-assign-manager-modal > div:first-child {
+      gap: 8px !important;
+    }
+
+    .admin-main #create-order-title,
+    .admin-main #assignment-title {
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      line-height: 18px !important;
+    }
+
+    .admin-main #create-order-title + p,
+    .admin-main #assignment-title + p {
+      margin-top: 4px !important;
+      font-size: 12px !important;
+      font-weight: 400 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-create-order-modal > div:first-child > button,
+    .admin-main .admin-assign-manager-modal > div:first-child > button {
+      width: 32px;
+      min-width: 32px !important;
+      height: 32px;
+      min-height: 32px !important;
+      padding: 8px !important;
+    }
+
+    .admin-main .admin-create-order-modal > div:first-child > button svg,
+    .admin-main .admin-assign-manager-modal > div:first-child > button svg {
+      width: 16px !important;
+      height: 16px !important;
+    }
+
+    .admin-main .admin-create-order-modal > .grid {
+      gap: 10px !important;
+      margin-top: 12px !important;
+    }
+
+    .admin-main .admin-create-order-modal label,
+    .admin-main .admin-assign-manager-modal > label {
+      font-size: 11px !important;
+      font-weight: 500 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-order-modal :is(input, select),
+    .admin-main .admin-assign-manager-modal select {
+      height: 36px;
+      min-height: 36px !important;
+      margin-top: 5px !important;
+      padding: 6px 10px !important;
+      font-size: 11px !important;
+      font-weight: 400 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-order-modal :is(input, select, textarea)::placeholder,
+    .admin-main .admin-assign-manager-modal select:invalid {
+      font-size: 11px !important;
+      color: #64748b;
+    }
+
+    .admin-main .admin-create-order-modal textarea {
+      height: 52px;
+      min-height: 52px;
+      margin-top: 5px !important;
+      padding: 10px !important;
+      resize: vertical;
+      font-size: 11px !important;
+      font-weight: 400 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-order-modal input[type="date"]::-webkit-calendar-picker-indicator {
+      width: 14px;
+      height: 14px;
+    }
+
+    .admin-main .admin-create-order-modal > div:last-child {
+      margin-top: 12px !important;
+      gap: 8px !important;
+      padding-top: 12px !important;
+    }
+
+    .admin-main .admin-create-order-modal > div:last-child > button,
+    .admin-main .admin-assign-manager-modal > div:last-child > button {
+      height: 36px !important;
+      min-height: 36px !important;
+      padding: 6px 12px !important;
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-assign-manager-modal {
+      padding: 16px !important;
+    }
+
+    .admin-main .admin-assign-manager-modal > label {
+      margin-top: 12px !important;
+    }
+
+    .admin-main .admin-assign-manager-modal > div:last-child {
+      margin-top: 16px !important;
+      gap: 8px !important;
+    }
+
+    .admin-main .admin-assign-manager-modal > div:last-child > button {
+      padding-inline: 10px !important;
+    }
+  }
+}
+
+/* Procurement Pending Requests: match the compact Approved Requests mobile
+   hierarchy while retaining the existing card/table behavior and scrolling. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-procurement-pending-title {
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-procurement-pending-subtitle {
+      font-size: 10px !important;
+      font-weight: 400 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-procurement-pending-toggle {
+      gap: 2px !important;
+      padding: 2px !important;
+    }
+
+    .admin-main .admin-procurement-pending-toggle-button {
+      width: 26px !important;
+      min-width: 26px !important;
+      height: 26px !important;
+      min-height: 26px !important;
+      padding: 7px !important;
+    }
+
+    .admin-main .admin-procurement-pending-toggle-button > svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    .admin-main .admin-procurement-pending-card {
+      gap: 8px;
+      padding: 12px !important;
+    }
+
+    .admin-main .admin-procurement-pending-product {
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-procurement-pending-meta,
+    .admin-main .admin-procurement-pending-quantity {
+      margin-bottom: 8px !important;
+      font-size: 10px !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-procurement-pending-card .admin-badge,
+    .admin-main .admin-procurement-pending-table .admin-badge {
+      min-height: 20px !important;
+      padding: 2px 6px !important;
+      font-size: 9px !important;
+      font-weight: 500 !important;
+      line-height: 12px !important;
+    }
+
+    .admin-main .admin-procurement-pending-card .admin-status-badge > span:first-child,
+    .admin-main .admin-procurement-pending-table .admin-status-badge > span:first-child {
+      width: 8px !important;
+      height: 8px !important;
+    }
+
+    .admin-main .admin-procurement-pending-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+      gap: 6px !important;
+      padding-top: 0 !important;
+      white-space: nowrap;
+    }
+
+    .admin-main .admin-procurement-pending-table .admin-procurement-pending-actions {
+      justify-content: center;
+      gap: 4px !important;
+    }
+
+    .admin-main .admin-procurement-pending-view {
+      display: inline-flex;
+      width: 24px !important;
+      min-width: 24px !important;
+      height: 24px !important;
+      min-height: 24px !important;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      padding: 5px !important;
+    }
+
+    .admin-main .admin-procurement-pending-view > svg {
+      width: 14px !important;
+      height: 14px !important;
+    }
+
+    .admin-main .admin-procurement-pending-decision {
+      width: max-content !important;
+      min-width: max-content !important;
+      height: 24px !important;
+      min-height: 24px !important;
+      flex-shrink: 0;
+      padding: 3px 7px !important;
+      font-size: 10px !important;
+      font-weight: 500 !important;
+      line-height: 14px !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+
+    .admin-main .admin-procurement-pending-table :is(th, td) {
+      font-size: 10px !important;
+    }
+
+    .admin-main .admin-procurement-pending-table th {
+      padding: 5px 7px !important;
+      font-size: 11px !important;
+      font-weight: 500 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-procurement-pending-table td {
+      padding: 6px 7px !important;
+      font-size: 10px !important;
+      line-height: 18px !important;
+    }
+
+    .admin-main .admin-procurement-pending-table .admin-procurement-pending-actions-cell {
+      width: 156px !important;
+      min-width: 156px !important;
+      max-width: 156px !important;
+      overflow: visible;
+    }
+  }
+}
+
+/* Procurement owns its horizontal overflow at every breakpoint. The Admin
+   shell may clip page overflow; this immediate wrapper remains scrollable. */
+.admin-main .admin-table-scroll:has(> .admin-procurement-table) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-main :has(> .admin-table-scroll > .admin-procurement-table) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Plant Manager operational tables: compact, contained mobile scrolling. */
+@media (max-width: 639px) {
+  .pm-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pm-responsive-table,
+  .pm-status-table {
+    table-layout: fixed;
+    font-size: 10px;
+    line-height: 18px;
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
+
+  :is(.pm-responsive-table, .pm-status-table) th {
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+    line-height: 16px;
+    letter-spacing: 0.025em !important;
+  }
+
+  :is(.pm-responsive-table, .pm-status-table) td {
+    padding: 6px 7px !important;
+    font-size: 10px !important;
+    line-height: 18px;
+  }
+
+  :is(.pm-responsive-table, .pm-status-table) tbody td :is(p, span) {
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  :is(.pm-responsive-table, .pm-status-table) tbody td [class~="text-xs"] {
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+
+  .pm-responsive-table .plant-manager-badge {
+    max-width: 100%;
+    padding: 0.125rem 0.5rem !important;
+    border-radius: 9999px;
+    font-size: 9px !important;
+    line-height: 12px;
+    white-space: normal;
+  }
+
+  /* Targeted Plant Manager status tables reuse Stock Out's compact mobile pill. */
+  .plant-manager-main .pm-status-table .plant-manager-badge {
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem !important;
+    padding: 0.125rem 0.375rem !important;
+    font-size: 0.5625rem !important;
+    line-height: 0.75rem !important;
+    text-align: center;
+    white-space: normal !important;
+  }
+
+  .plant-manager-main .pm-status-table .plant-manager-badge > svg {
+    width: 0.625rem !important;
+    height: 0.625rem !important;
+    flex-shrink: 0;
+  }
+
+  .plant-manager-main .pm-status-table :is(th, td):last-child button:has(> svg:only-child) {
+    min-width: 28px;
+    min-height: 28px;
+  }
+
+  .plant-manager-main :is(.pm-responsive-table, .pm-status-table) td:last-child button:has(> svg:only-child),
+  .qa-main .qa-responsive-table td:last-child button:has(> svg:only-child) {
+    display: inline-flex;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 6px !important;
+  }
+
+  .plant-manager-main :is(.pm-responsive-table, .pm-status-table) td:last-child button:has(> svg:only-child) > svg,
+  .qa-main .qa-responsive-table td:last-child button:has(> svg:only-child) > svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .pm-order-status-table { min-width: 68.75rem !important; }
+  .pm-order-status-table :is(th, td):nth-child(7) { width: 10rem; }
+  .pm-order-status-table :is(th, td):nth-child(8) { width: 5.5rem; }
+
+  .pm-procurement-status-table { min-width: 78.5rem !important; }
+  .pm-procurement-status-table :is(th, td):nth-child(1) { width: 9.5rem; max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pm-procurement-status-table :is(th, td):nth-child(2) { width: 10rem; overflow-wrap: anywhere; }
+  .pm-procurement-status-table :is(th, td):nth-child(3) { width: 9rem; overflow-wrap: anywhere; }
+  .pm-procurement-status-table :is(th, td):nth-child(4) { width: 12rem; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pm-procurement-status-table :is(th, td):nth-child(5) { width: 7.5rem; white-space: nowrap; }
+  .pm-procurement-status-table :is(th, td):nth-child(6) { width: 7rem; }
+  .pm-procurement-status-table :is(th, td):nth-child(7) { width: 10rem; }
+  .pm-procurement-status-table :is(th, td):nth-child(8) { width: 8rem; white-space: nowrap; }
+  .pm-procurement-status-table :is(th, td):nth-child(9) { width: 5.5rem; }
+
+  .pm-stock-in-receivings-table { min-width: 49rem !important; }
+  .pm-stock-in-receivings-table :is(th, td):nth-child(6) { width: 7rem; }
+  .pm-stock-in-receivings-table :is(th, td):nth-child(9) { width: 7rem; }
+
+  .pm-stock-in-recent-table { min-width: 47.5rem !important; }
+  .pm-stock-in-recent-table :is(th, td):nth-child(6) { width: 8rem; }
+  .pm-stock-in-recent-table :is(th, td):nth-child(7) { width: 5.5rem; }
+
+  .pm-stock-in-history-table { min-width: 61.25rem !important; }
+  .pm-stock-in-history-table :is(th, td):nth-child(9) { width: 8rem; }
+
+  .pm-shipment-status-table { min-width: 62.5rem !important; }
+  .pm-shipment-status-table :is(th, td):nth-child(7) { width: 10rem; }
+  .pm-shipment-status-table :is(th, td):nth-child(8) { width: 7rem; }
+
+  /* Match Admin's compact table barcode without affecting card or print views. */
+  .pm-inventory-table td:first-child > div,
+  .pm-stock-in-recent-table td:first-child > div {
+    width: 115px;
+    min-width: 115px;
+    align-items: center;
+  }
+
+  .pm-inventory-table td:first-child > div > span,
+  .pm-stock-in-recent-table td:first-child > div > p {
+    max-width: 115px;
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+
+  .pm-inventory-table td:first-child svg,
+  .pm-stock-in-recent-table td:first-child svg {
+    width: 115px;
+    max-width: 115px;
+    height: 28px;
+    max-height: 28px;
+  }
+
+  .pm-cols-4, .admin-cols-4 { min-width: 35rem !important; }
+  .pm-cols-5, .admin-cols-5,
+  .pm-cols-6, .admin-cols-6 { min-width: 40rem !important; }
+  .pm-cols-7, .admin-cols-7 { min-width: 43rem !important; }
+  .pm-cols-8, .admin-cols-8 { min-width: 45rem !important; }
+  .pm-cols-9, .admin-cols-9 { min-width: 47rem !important; }
+  .pm-cols-10, .admin-cols-10 { min-width: 50rem !important; }
+  .admin-cols-12 { min-width: 56rem !important; }
+  .admin-cols-15 { min-width: 64rem !important; }
+
+  .pm-sticky-1 th:nth-child(1),
+  .pm-sticky-2 th:nth-child(2),
+  .pm-sticky-3 th:nth-child(3),
+  .pm-sticky-4 th:nth-child(4) {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    border-right: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+  }
+
+  .pm-sticky-1 tbody td:nth-child(1):not([colspan]),
+  .pm-sticky-2 tbody td:nth-child(2):not([colspan]),
+  .pm-sticky-3 tbody td:nth-child(3):not([colspan]),
+  .pm-sticky-4 tbody td:nth-child(4):not([colspan]) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    overflow: hidden;
+    border-right: 1px solid rgb(226 232 240);
+    background: white;
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dark .pm-sticky-1 th:nth-child(1),
+  .dark .pm-sticky-2 th:nth-child(2),
+  .dark .pm-sticky-3 th:nth-child(3),
+  .dark .pm-sticky-4 th:nth-child(4) {
+    border-right-color: rgb(30 41 59);
+    background: #070a12;
+  }
+
+  .dark .pm-sticky-1 tbody td:nth-child(1):not([colspan]),
+  .dark .pm-sticky-2 tbody td:nth-child(2):not([colspan]),
+  .dark .pm-sticky-3 tbody td:nth-child(3):not([colspan]),
+  .dark .pm-sticky-4 tbody td:nth-child(4):not([colspan]) {
+    border-right-color: rgb(30 41 59);
+    background: #0b101d;
+  }
+
+  .pm-reports :is(.overflow-x-auto, .overflow-auto) {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pm-reports table {
+    min-width: 40rem;
+    table-layout: fixed;
+    font-size: 10px;
+    line-height: 18px;
+  }
+
+  .pm-reports table th {
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+  }
+
+  .pm-reports table td {
+    padding: 6px 7px !important;
+    font-size: 10px !important;
+  }
+
+  .pm-reports table th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    background: rgb(248 250 252);
+  }
+
+  .pm-reports table tbody td:first-child:not([colspan]) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    overflow: hidden;
+    background: white;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dark .pm-reports table th:first-child {
+    background: #0f172a;
+  }
+
+  .dark .pm-reports table tbody td:first-child:not([colspan]) {
+    background: #111827;
+  }
+
+  .admin-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-responsive-table,
+  .admin-product-catalog table {
+    table-layout: fixed;
+    font-size: 10px;
+    line-height: 18px;
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
+
+  .admin-responsive-table th,
+  .admin-product-catalog table th {
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+    line-height: 16px;
+    letter-spacing: 0.025em !important;
+  }
+
+  .admin-responsive-table td,
+  .admin-product-catalog table td {
+    padding: 6px 7px !important;
+    font-size: 10px !important;
+    line-height: 18px;
+  }
+
+  .admin-responsive-table tbody td :is(p, span),
+  .admin-product-catalog table tbody td :is(p, span) {
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  .admin-responsive-table tbody td [class~="text-xs"],
+  .admin-product-catalog table tbody td [class~="text-xs"] {
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+
+  .admin-responsive-table :is(th, td).hidden {
+    display: table-cell !important;
+  }
+
+  .admin-responsive-table .admin-badge,
+  .admin-product-catalog table .admin-badge {
+    max-width: 100%;
+    padding: 2px 5px !important;
+    border-radius: 9999px;
+    font-size: 9px !important;
+    line-height: 12px;
+    white-space: normal;
+  }
+
+  /* Dashboard cards expose compact two-column summaries on mobile. */
+  .admin-main .admin-table-scroll:has(> .admin-dashboard-compact-table) {
+    overflow-x: hidden;
+  }
+
+  .admin-main .admin-dashboard-compact-table {
+    min-width: 0 !important;
+    max-width: 100%;
+    table-layout: fixed;
+  }
+
+  .admin-main .admin-dashboard-po-table { width: min(265px, 100%); }
+  .admin-main .admin-dashboard-inventory-table { width: min(270px, 100%); }
+
+  .admin-main .admin-dashboard-po-table :is(th, td):nth-child(1) { width: 41.5%; }
+  .admin-main .admin-dashboard-po-table :is(th, td):nth-child(2) { width: 58.5%; }
+  .admin-main .admin-dashboard-inventory-table :is(th, td):nth-child(1) { width: 42.6%; }
+  .admin-main .admin-dashboard-inventory-table :is(th, td):nth-child(2) { width: 57.4%; }
+
+  .admin-main .admin-dashboard-compact-table :is(th, td) {
+    padding: 5px !important;
+  }
+
+  .admin-main .admin-dashboard-compact-table :is(th, td):nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-main .admin-dashboard-compact-table :is(th, td):nth-child(n + 3) {
+    display: none !important;
+  }
+
+  .admin-main .admin-responsive-table td:last-child button:has(> svg:only-child),
+  .admin-product-catalog .product-catalog-table td:last-child button {
+    display: inline-flex;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 6px !important;
+  }
+
+  .admin-main .admin-responsive-table td:last-child button:has(> svg:only-child) > svg,
+  .admin-product-catalog .product-catalog-table td:last-child button > svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  /* Admin Procurement: stable mobile column boundaries with a matching sticky key column. */
+  .admin-procurement-table { min-width: 906px !important; }
+  .admin-procurement-table :is(th, td):nth-child(1) { width: 120px; min-width: 120px; max-width: 120px; }
+  .admin-procurement-table :is(th, td):nth-child(2) { width: 95px; min-width: 95px; max-width: 95px; overflow-wrap: anywhere; }
+  .admin-procurement-table :is(th, td):nth-child(3) { width: 95px; min-width: 95px; max-width: 95px; overflow-wrap: anywhere; }
+  .admin-procurement-table :is(th, td):nth-child(4) { width: 115px; min-width: 115px; max-width: 115px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-procurement-table :is(th, td):nth-child(5) { width: 70px; min-width: 70px; max-width: 70px; white-space: nowrap; }
+  .admin-procurement-table :is(th, td):nth-child(6) { width: 70px; min-width: 70px; max-width: 70px; }
+  .admin-procurement-table :is(th, td):nth-child(7) { width: 105px; min-width: 105px; max-width: 105px; text-align: center; }
+  .admin-procurement-table :is(th, td):nth-child(8) { width: 80px; min-width: 80px; max-width: 80px; white-space: normal; }
+  .admin-procurement-table :is(th, td):nth-child(9) { width: 156px; min-width: 156px; max-width: 156px; }
+  .admin-procurement-table th {
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    white-space: normal !important;
+  }
+  .admin-procurement-table td:nth-child(1) { background: white; }
+  .dark .admin-procurement-table td:nth-child(1) { background: #0d1322; }
+  .admin-main .admin-procurement-table td:nth-child(9) { overflow: visible; padding: 4px !important; }
+  .admin-main .admin-procurement-table td:nth-child(9) > div {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    gap: 4px !important;
+    white-space: nowrap;
+  }
+  .admin-main .admin-procurement-table td:nth-child(9) button {
+    flex-shrink: 0;
+    min-height: 24px;
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+  .admin-main .admin-procurement-table td:nth-child(9) button:has(> svg:only-child) {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 5px !important;
+  }
+  .admin-main .admin-procurement-table td:nth-child(9) button:has(> svg:only-child) > svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .admin-main .admin-procurement-table td:last-child button:not(:has(> svg:only-child)) {
+    width: auto;
+    min-width: 0;
+    height: 24px;
+    min-height: 24px;
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+  .admin-main .admin-procurement-table td:nth-child(9) button[class*="border"]:not(:has(svg)) {
+    width: 46px;
+    min-width: 46px;
+  }
+  .admin-main .admin-procurement-table td:nth-child(9) button[class*="bg-[#00a3c4]"] {
+    width: 50px;
+    min-width: 50px;
+  }
+  .admin-procurement-approved-table { min-width: 780px !important; }
+  .admin-procurement-approved-table :is(th, td):nth-child(1) { width: 125px; min-width: 125px; max-width: 125px; }
+  .admin-procurement-approved-table :is(th, td):nth-child(2) { width: 115px; min-width: 115px; max-width: 115px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-procurement-approved-table :is(th, td):nth-child(3) { width: 95px; min-width: 95px; max-width: 95px; overflow-wrap: anywhere; }
+  .admin-procurement-approved-table :is(th, td):nth-child(4) { width: 70px; min-width: 70px; max-width: 70px; white-space: nowrap; }
+  .admin-procurement-approved-table :is(th, td):nth-child(5) { width: 75px; min-width: 75px; max-width: 75px; }
+  .admin-procurement-approved-table :is(th, td):nth-child(6) { width: 90px; min-width: 90px; max-width: 90px; white-space: normal; }
+  .admin-procurement-approved-table :is(th, td):nth-child(7) { width: 95px; min-width: 95px; max-width: 95px; }
+  .admin-procurement-approved-table :is(th, td):nth-child(8) { width: 115px; min-width: 115px; max-width: 115px; }
+
+  /* Admin User Management: fit USER + EMPLOYEE ID in the initial narrow-phone viewport. */
+  .admin-user-table { min-width: 63.75rem !important; }
+  .admin-user-table :is(th, td):nth-child(1) { width: 9.75rem; max-width: 9.75rem; }
+  .admin-user-table :is(th, td):nth-child(2) { width: 7rem; }
+  .admin-user-table :is(th, td):nth-child(3) { width: 10rem; }
+  .admin-user-table :is(th, td):nth-child(4) { width: 7rem; }
+  .admin-user-table :is(th, td):nth-child(5) { width: 7rem; }
+  .admin-user-table :is(th, td):nth-child(6) { width: 8rem; }
+  .admin-user-table :is(th, td):nth-child(7) { width: 6rem; }
+  .admin-user-table :is(th, td):nth-child(8) { width: 9rem; }
+  .admin-user-table :is(th, td):first-child { padding-inline: 0.625rem !important; }
+  .admin-user-table .admin-user-identity { min-width: 0; gap: 0.375rem; }
+  .admin-user-table .admin-user-avatar { width: 1.75rem; height: 1.75rem; font-size: 0.625rem; }
+  .admin-user-table .admin-user-copy { min-width: 0; overflow: hidden; }
+  .admin-user-table .admin-user-name { font-size: 0.6875rem; line-height: 1rem; }
+  .admin-user-table .admin-user-email { font-size: 0.5625rem; line-height: 0.875rem; }
+  .admin-user-table td:nth-child(7) .admin-badge { padding: 0.125rem 0.375rem !important; font-size: 0.5625rem !important; }
+  .admin-user-table td:nth-child(8) { padding-inline: 0.25rem !important; }
+  .admin-user-table td:nth-child(8) > div { gap: 0.25rem; }
+  .admin-user-table td:nth-child(8) button { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
+
+  /* AI Demand Forecasting: keep long headers within explicit mobile column boundaries. */
+  .admin-forecast-table { min-width: 715px !important; }
+  .admin-forecast-table :is(th, td):nth-child(1) { width: 125px; min-width: 125px; max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-forecast-table :is(th, td):nth-child(2) { width: 75px; min-width: 75px; max-width: 75px; }
+  .admin-forecast-table :is(th, td):nth-child(3) { width: 95px; min-width: 95px; max-width: 95px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-forecast-table :is(th, td):nth-child(4) { width: 85px; min-width: 85px; max-width: 85px; }
+  .admin-forecast-table :is(th, td):nth-child(5) { width: 75px; min-width: 75px; max-width: 75px; }
+  .admin-forecast-table :is(th, td):nth-child(6) { width: 80px; min-width: 80px; max-width: 80px; }
+  .admin-forecast-table :is(th, td):nth-child(7) { width: 105px; min-width: 105px; max-width: 105px; white-space: normal; }
+  .admin-forecast-table :is(th, td):nth-child(8) { width: 75px; min-width: 75px; max-width: 75px; }
+  .admin-forecast-table td:nth-child(8) > div { justify-content: center; }
+  .admin-forecast-table td:nth-child(8) button { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
+
+  /* Admin Inventory: protect barcode content and give every mobile column a stable boundary. */
+  .admin-inventory-table { min-width: 770px !important; }
+  .admin-inventory-table :is(th, td):nth-child(1) {
+    width: 130px;
+    min-width: 130px;
+    max-width: 130px;
+  }
+  .admin-inventory-table :is(th, td):nth-child(2) { width: 110px; min-width: 110px; max-width: 110px; }
+  .admin-inventory-table :is(th, td):nth-child(3) { width: 95px; min-width: 95px; max-width: 95px; }
+  .admin-inventory-table :is(th, td):nth-child(4),
+  .admin-inventory-table :is(th, td):nth-child(5),
+  .admin-inventory-table :is(th, td):nth-child(6) { width: 60px; min-width: 60px; max-width: 60px; }
+  .admin-inventory-table :is(th, td):nth-child(7) { width: 80px; min-width: 80px; max-width: 80px; }
+  .admin-inventory-table :is(th, td):nth-child(8) { width: 80px; min-width: 80px; max-width: 80px; white-space: normal; }
+  .admin-inventory-table :is(th, td):nth-child(9) { width: 95px; min-width: 95px; max-width: 95px; }
+  .admin-inventory-table th:nth-child(1) { padding-inline: 4px !important; }
+  .admin-inventory-table td:nth-child(1) { padding: 2px 4px !important; }
+  .admin-inventory-table td:nth-child(1) > div {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 1px;
+    overflow: hidden;
+  }
+  .admin-inventory-table td:nth-child(1) > div > span {
+    display: block;
+    max-width: 115px;
+    overflow: hidden;
+    font-size: 9px !important;
+    line-height: 10px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .admin-inventory-table td:nth-child(1) svg {
+    width: 115px;
+    max-width: 115px;
+    height: 28px;
+  }
+  .admin-inventory-table td:nth-child(2) > div { min-width: 0; }
+  .admin-inventory-table td:nth-child(2) > div > div { flex-shrink: 0; }
+  .admin-inventory-table td:nth-child(3) { overflow-wrap: anywhere; white-space: normal; }
+  .admin-inventory-table td:nth-child(7) .admin-badge { justify-content: center; padding-inline: 0.375rem !important; font-size: 0.5625rem !important; }
+  .admin-inventory-table td:nth-child(9) { overflow: hidden; padding-inline: 0.25rem !important; }
+  .admin-inventory-table td:nth-child(9) > div { max-width: 100%; gap: 0.125rem !important; }
+  .admin-inventory-table td:nth-child(9) button { min-width: 28px; min-height: 28px; }
+
+  /* Admin Inventory product details drawer: compact mobile-only presentation. */
+  .admin-main .admin-inventory-detail-drawer > div:first-child {
+    padding: 12px 14px;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:first-child h2 {
+    font-size: 22px !important;
+    line-height: 28px !important;
+    font-weight: 600;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:first-child button {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+    padding: 7px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:first-child button > svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) {
+    padding-inline: 14px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > * + * {
+    margin-top: 10px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(1) > div:first-child {
+    width: 44px;
+    height: 44px;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(1) > div:first-child > svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(1) h3 {
+    font-size: 14px !important;
+    line-height: 20px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(1) p {
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-inventory-barcode-card {
+    padding: 10px 12px;
+  }
+  .admin-main .admin-inventory-barcode-card > p,
+  .admin-main .admin-inventory-barcode-card span {
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-inventory-barcode-card > p {
+    margin-bottom: 4px;
+  }
+  .admin-main .admin-inventory-barcode-graphic > div {
+    width: 100%;
+    max-width: 160px;
+    gap: 2px;
+  }
+  .admin-main .admin-inventory-barcode-graphic svg {
+    display: block;
+    width: 100%;
+    max-width: 160px;
+    height: 32px;
+    max-height: 32px;
+    margin-inline: auto;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(3) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(3) > div {
+    padding: 10px;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(3) > div:last-child {
+    grid-column: span 2 / span 2;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(3) p:first-child {
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(3) p:last-child {
+    font-size: 11px !important;
+    line-height: 16px !important;
+    font-weight: 500;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) {
+    padding: 10px;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) > p:first-child,
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(5) h4 {
+    margin-bottom: 8px;
+    font-size: 11px !important;
+    line-height: 16px !important;
+    font-weight: 500;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) .grid p:first-child {
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) .grid p:last-child {
+    font-size: 10px !important;
+    line-height: 14px !important;
+    font-weight: 500;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) > div:nth-child(3) {
+    margin-top: 6px;
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) > div:nth-child(4) {
+    margin-top: 6px;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) .admin-badge {
+    min-height: 20px;
+    gap: 3px !important;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    line-height: 11px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(4) .admin-badge > svg {
+    width: 9px !important;
+    height: 9px !important;
+  }
+  .admin-main .admin-inventory-detail-drawer > div:nth-child(2) > div:nth-child(5) p {
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-inventory-detail-footer {
+    padding: 12px 2px 4px;
+  }
+  .admin-main .admin-inventory-detail-close {
+    width: auto;
+    min-width: 0;
+    height: 44px;
+    min-height: 44px;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+  }
+
+  /* Admin Purchase Order details drawer: compact mobile-only presentation. */
+  .admin-main .admin-po-details-drawer {
+    padding: 12px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .admin-main .admin-po-details-header {
+    margin-inline: -16px;
+    margin-top: -12px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+  }
+  .admin-main .admin-po-details-title {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    line-height: 18px !important;
+  }
+  .admin-main .admin-po-details-header .admin-badge {
+    min-height: 20px;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    font-weight: 500 !important;
+    line-height: 11px !important;
+  }
+  .admin-main .admin-po-details-supplier {
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 16px !important;
+  }
+  .admin-main .admin-po-details-header > button {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+    padding: 7px !important;
+  }
+  .admin-main .admin-po-details-header > button > svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .admin-main .admin-po-details-info {
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px;
+  }
+  .admin-main .admin-po-details-info span {
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    line-height: 13px !important;
+  }
+  .admin-main .admin-po-details-info p {
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-po-details-supplier-card {
+    margin-bottom: 12px;
+    padding: 10px;
+  }
+  .admin-main .admin-po-details-supplier-card h3,
+  .admin-main .admin-po-details-items > h3 {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    line-height: 16px !important;
+  }
+  .admin-main .admin-po-details-supplier-card p {
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-po-details-supplier-card h3 {
+    margin-bottom: 6px;
+  }
+  .admin-main .admin-po-details-supplier-card h3 > svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .admin-main .admin-po-details-items {
+    margin-bottom: 12px;
+  }
+  .admin-main .admin-po-details-items-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-main .admin-po-details-items-table {
+    width: 100%;
+    min-width: 0 !important;
+    table-layout: fixed;
+  }
+  .admin-main .admin-po-details-items-table :is(th, td):nth-child(1) { width: 37%; min-width: 0; max-width: none; }
+  .admin-main .admin-po-details-items-table :is(th, td):nth-child(2) { width: 13%; min-width: 0; max-width: none; }
+  .admin-main .admin-po-details-items-table :is(th, td):nth-child(3),
+  .admin-main .admin-po-details-items-table :is(th, td):nth-child(4) { width: 25%; min-width: 0; max-width: none; }
+  .admin-main .admin-po-details-items-table th {
+    padding: 4px 6px !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-po-details-items-table tbody td {
+    padding: 5px 6px !important;
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-po-details-items-table tfoot td {
+    padding: 6px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-po-details-items-table tfoot td:last-child {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+  .admin-main .admin-po-details-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding-top: 10px;
+  }
+  .admin-main .admin-po-details-actions button {
+    min-width: 0;
+    min-height: 36px;
+    height: 36px;
+    gap: 6px !important;
+    padding: 3px 10px !important;
+    font-size: 12px !important;
+    line-height: 14px !important;
+    font-weight: 500 !important;
+    text-align: center;
+    overflow: hidden;
+  }
+  .admin-main .admin-po-details-actions button > svg {
+    width: 14px !important;
+    height: 14px !important;
+    flex-shrink: 0;
+  }
+  .admin-main .admin-po-details-actions .admin-po-action-label {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px !important;
+    line-height: 14px;
+    text-align: center;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* Admin Logistics shipment details: balanced, collision-free mobile modal. */
+  .admin-main .admin-logistics-details-overlay { padding: 12px; }
+  .admin-main .admin-logistics-details-modal {
+    max-height: calc(100dvh - 24px);
+    padding: 16px 16px calc(18px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .admin-main .admin-logistics-details-header { margin-bottom: 16px; }
+  .admin-main .admin-logistics-details-header h2 {
+    font-size: 22px !important;
+    line-height: 26px !important;
+  }
+  .admin-main .admin-logistics-details-header p {
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+  .admin-main .admin-logistics-details-header > button {
+    display: inline-flex;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 7px !important;
+  }
+  .admin-main .admin-logistics-details-header > button > svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .admin-main .admin-logistics-details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 14px;
+    row-gap: 12px;
+    margin-bottom: 16px;
+  }
+  .admin-main .admin-logistics-details-grid > div { min-width: 0; }
+  .admin-main .admin-logistics-details-grid > div > p:first-child {
+    font-size: 11px !important;
+    line-height: 14px !important;
+    font-weight: 500;
+  }
+  .admin-main .admin-logistics-details-grid > div > p:nth-child(2) {
+    overflow-wrap: anywhere;
+    font-size: 12px !important;
+    line-height: 16px !important;
+    font-weight: 500;
+  }
+  .admin-main .admin-logistics-details-grid .admin-badge {
+    min-height: 20px;
+    max-width: 100%;
+    gap: 4px !important;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    line-height: 11px !important;
+    white-space: normal;
+  }
+  .admin-main .admin-logistics-details-grid .admin-badge > span:first-child {
+    width: 8px !important;
+    height: 8px !important;
+    flex-shrink: 0;
+  }
+  .admin-main .admin-logistics-details-items { margin-bottom: 16px; }
+  .admin-main .admin-logistics-details-items > h4 {
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+  .admin-main .admin-logistics-details-items-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-main .admin-logistics-details-items-table {
+    width: 225px;
+    min-width: 225px !important;
+    table-layout: fixed;
+  }
+  .admin-main .admin-logistics-details-items-table :is(th, td):nth-child(1) { width: 125px; min-width: 125px; max-width: 125px; }
+  .admin-main .admin-logistics-details-items-table :is(th, td):nth-child(2),
+  .admin-main .admin-logistics-details-items-table :is(th, td):nth-child(3) { width: 50px; min-width: 50px; max-width: 50px; }
+  .admin-main .admin-logistics-details-items-table th {
+    padding: 4px 6px !important;
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-logistics-details-items-table td {
+    padding: 5px 6px !important;
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-logistics-details-timeline > h4 {
+    margin-bottom: 10px;
+    font-size: 14px !important;
+    line-height: 18px !important;
+    font-weight: 600;
+  }
+  .admin-main .admin-logistics-details-timeline > div {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .admin-main .admin-logistics-timeline-row {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) 105px;
+    column-gap: 7px;
+    align-items: start;
+  }
+  .admin-main .admin-logistics-timeline-row > div:first-child {
+    width: 9px;
+    height: 9px;
+    margin-top: 2px;
+  }
+  .admin-main .admin-logistics-timeline-content { display: contents; }
+  .admin-main .admin-logistics-timeline-content > span:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 11px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-logistics-timeline-content > span:last-child:not(:first-child) {
+    min-width: 0;
+    font-size: 9px !important;
+    line-height: 13px !important;
+    text-align: right;
+    white-space: normal;
+  }
+  .admin-main .admin-logistics-details-footer {
+    margin-top: 16px;
+    padding-top: 10px;
+  }
+  .admin-main .admin-logistics-details-footer button {
+    width: auto;
+    min-width: 0;
+    height: 32px;
+    min-height: 32px;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+  }
+
+  /* Admin Order Management details: compact, readable mobile drawer. */
+  .admin-main .admin-order-details-drawer {
+    gap: 14px;
+    padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .admin-main .admin-order-details-header {
+    margin-inline: -14px;
+    margin-top: -12px;
+    padding: 12px 14px;
+  }
+  .admin-main .admin-order-details-header h2 {
+    font-size: 22px !important;
+    line-height: 26px !important;
+  }
+  .admin-main .admin-order-details-header p {
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+  .admin-main .admin-order-details-drawer .admin-status-badge {
+    min-height: 20px;
+    max-width: 100%;
+    gap: 4px !important;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    line-height: 11px !important;
+    white-space: normal;
+  }
+  .admin-main .admin-order-details-drawer .admin-status-badge > svg {
+    width: 9px !important;
+    height: 9px !important;
+    flex-shrink: 0;
+  }
+  .admin-main .admin-order-details-header > button {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    min-height: 30px;
+    padding: 7px !important;
+  }
+  .admin-main .admin-order-details-header > button > svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .admin-main .admin-order-details-date {
+    gap: 6px;
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+  .admin-main .admin-order-details-date > svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .admin-main :is(.admin-order-details-customer, .admin-order-details-summary, .admin-order-details-assignment) {
+    padding: 10px;
+  }
+  .admin-main :is(.admin-order-details-customer, .admin-order-details-summary, .admin-order-details-assignment, .admin-order-details-items, .admin-order-details-actions) > h4 {
+    font-size: 12px !important;
+    line-height: 16px !important;
+    font-weight: 600;
+  }
+  .admin-main .admin-order-details-customer {
+    gap: 7px;
+  }
+  .admin-main .admin-order-details-customer > p:nth-child(2) {
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+  .admin-main .admin-order-details-customer > p:nth-child(n + 3) {
+    gap: 6px;
+    font-size: 11px !important;
+    line-height: 15px !important;
+  }
+  .admin-main .admin-order-details-customer > p:nth-child(n + 3) > svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .admin-main :is(.admin-order-details-summary, .admin-order-details-assignment) > div {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+  }
+  .admin-main :is(.admin-order-details-summary, .admin-order-details-assignment) > div > span:first-child {
+    font-size: 11px !important;
+    line-height: 15px !important;
+  }
+  .admin-main :is(.admin-order-details-summary, .admin-order-details-assignment) > div > span:last-child,
+  .admin-main .admin-order-details-assignment > div > .admin-status-badge {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 12px !important;
+    line-height: 16px !important;
+    text-align: right;
+  }
+  .admin-main .admin-order-details-assignment > div > .admin-status-badge {
+    justify-self: end;
+    font-size: 9px !important;
+    line-height: 11px !important;
+  }
+  .admin-main .admin-order-details-items-scroll {
+    max-width: 100%;
+    margin-top: 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-main .admin-order-details-items-table {
+    width: 395px;
+    min-width: 395px !important;
+    table-layout: fixed;
+  }
+  .admin-main .admin-order-details-items-table :is(th, td):nth-child(1) { width: 120px; min-width: 120px; max-width: 120px; }
+  .admin-main .admin-order-details-items-table :is(th, td):nth-child(2) { width: 80px; min-width: 80px; max-width: 80px; }
+  .admin-main .admin-order-details-items-table :is(th, td):nth-child(3) { width: 50px; min-width: 50px; max-width: 50px; }
+  .admin-main .admin-order-details-items-table :is(th, td):nth-child(4) { width: 70px; min-width: 70px; max-width: 70px; }
+  .admin-main .admin-order-details-items-table :is(th, td):nth-child(5) { width: 75px; min-width: 75px; max-width: 75px; }
+  .admin-main .admin-order-details-items-table th {
+    padding: 4px 6px !important;
+    font-size: 10px !important;
+    line-height: 14px !important;
+    white-space: normal !important;
+  }
+  .admin-main .admin-order-details-items-table td {
+    padding: 5px 6px !important;
+    font-size: 10px !important;
+    line-height: 14px !important;
+  }
+  .admin-main .admin-order-details-actions {
+    padding-top: 10px;
+  }
+  .admin-main .admin-order-details-actions button {
+    min-height: 36px;
+    height: 36px;
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+    line-height: 16px !important;
+  }
+
+  .admin-product-catalog .custom-scrollbar {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-product-catalog .product-catalog-table { min-width: 972px !important; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(1) { width: 115px; min-width: 115px; max-width: 115px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(2) { width: 85px; min-width: 85px; max-width: 85px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(3) { width: 55px; min-width: 55px; max-width: 55px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(4) { width: 70px; min-width: 70px; max-width: 70px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(5) { width: 85px; min-width: 85px; max-width: 85px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(6) { width: 105px; min-width: 105px; max-width: 105px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(7) { width: 42px; min-width: 42px; max-width: 42px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(8) { width: 80px; min-width: 80px; max-width: 80px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(9) { width: 95px; min-width: 95px; max-width: 95px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(10) { width: 102px; min-width: 102px; max-width: 102px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(11) { width: 62px; min-width: 62px; max-width: 62px; text-align: center; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(12) { width: 76px; min-width: 76px; max-width: 76px; text-align: center; }
+  .admin-product-catalog .product-catalog-table th {
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: nowrap !important;
+  }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(-n + 5) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Admin status tables: reuse Stock Out's compact, contained mobile pill pattern. */
+  .admin-main :is(.product-catalog-table, .admin-procurement-table, .admin-procurement-approved-table, .admin-order-table) .admin-status-badge {
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem !important;
+    padding: 2px 5px !important;
+    border-radius: 9999px;
+    font-size: 0.5625rem !important;
+    line-height: 0.75rem !important;
+    text-align: center;
+    white-space: normal !important;
+  }
+
+  .admin-product-catalog .product-catalog-table .admin-status-badge {
+    width: fit-content;
+    max-width: none;
+    min-height: 20px;
+    gap: 3px !important;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    font-weight: 500 !important;
+    line-height: 11px !important;
+    white-space: nowrap !important;
+  }
+  .admin-product-catalog .product-catalog-table .admin-status-badge > svg:first-child {
+    width: 9px !important;
+    height: 9px !important;
+  }
+  .admin-product-catalog .product-detail-drawer {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+  }
+  .admin-product-catalog .product-detail-header h2 {
+    font-size: 22px !important;
+    line-height: 28px !important;
+  }
+  .admin-product-catalog .product-detail-rows {
+    margin-top: 16px;
+  }
+  .admin-product-catalog .product-detail-row {
+    padding-bottom: 8px !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+  }
+  .admin-product-catalog .product-detail-row > span {
+    font-size: 12px !important;
+  }
+  .admin-product-catalog .product-detail-row > span:last-child {
+    font-weight: 500;
+  }
+  .admin-product-catalog .product-detail-drawer .admin-status-badge {
+    width: fit-content;
+    min-height: 20px;
+    gap: 3px !important;
+    padding: 2px 6px !important;
+    font-size: 9px !important;
+    font-weight: 500 !important;
+    line-height: 11px !important;
+    white-space: nowrap !important;
+  }
+  .admin-product-catalog .product-detail-drawer .admin-status-badge > svg:first-child {
+    width: 9px !important;
+    height: 9px !important;
+  }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) > div {
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) {
+    padding: 4px !important;
+  }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) button {
+    width: 16px;
+    min-width: 16px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 !important;
+  }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) button:first-child {
+    order: 2;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 7px !important;
+  }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) button:first-child > svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) button:nth-child(2) { order: 1; }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) button:nth-child(3) { order: 3; }
+  .admin-main .admin-procurement-table .admin-status-badge {
+    width: fit-content;
+    max-width: 100%;
+    min-height: 20px;
+    gap: 3px !important;
+    padding: 2px 5px !important;
+    border-radius: 9999px;
+    font-size: 7px !important;
+    font-weight: 500 !important;
+    line-height: 8px !important;
+    white-space: normal !important;
+  }
+  .admin-main .admin-procurement-approved-table .admin-status-badge { max-width: 75px; }
+
+  .admin-main :is(.product-catalog-table, .admin-procurement-table, .admin-procurement-approved-table, .admin-order-table) .admin-status-badge > svg:first-child {
+    width: 0.625rem !important;
+    height: 0.625rem !important;
+    flex-shrink: 0;
+  }
+
+  .admin-main :is(.admin-procurement-table, .admin-procurement-approved-table) .admin-status-badge > span:first-child {
+    width: 0.375rem !important;
+    height: 0.375rem !important;
+    flex-shrink: 0;
+  }
+  .admin-main .admin-procurement-table .admin-status-badge > span:first-child {
+    width: 8px !important;
+    height: 8px !important;
+  }
+
+  .admin-procurement-approved-table td:nth-child(8) button {
+    min-width: 28px;
+    min-height: 28px;
+  }
+
+  .admin-order-table {
+    min-width: 1150px !important;
+    font-size: 10px !important;
+    line-height: 18px !important;
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
+  .admin-main .admin-order-table th {
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+    line-height: 16px !important;
+    letter-spacing: 0.025em !important;
+  }
+  .admin-main .admin-order-table td {
+    padding: 6px 7px !important;
+    font-size: 10px !important;
+    line-height: 18px !important;
+  }
+  .admin-main .admin-order-table tbody td :is(p, span) {
+    font-size: inherit;
+    line-height: inherit;
+  }
+  .admin-main .admin-order-table tbody td [class~="text-xs"] {
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+  .admin-main .admin-order-table .admin-status-badge {
+    gap: 3px !important;
+    padding: 2px 5px !important;
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+  .admin-order-table :is(th, td):nth-child(1) { width: 100px; max-width: 100px; }
+  .admin-order-table :is(th, td):nth-child(2) { width: 150px; }
+  .admin-order-table :is(th, td):nth-child(3) { width: 100px; }
+  .admin-order-table :is(th, td):nth-child(4) { width: 120px; }
+  .admin-order-table :is(th, td):nth-child(5) { width: 170px; }
+  .admin-order-table :is(th, td):nth-child(6) { width: 70px; }
+  .admin-order-table :is(th, td):nth-child(7) { width: 110px; }
+  .admin-order-table :is(th, td):nth-child(8) { width: 140px; }
+  .admin-order-table :is(th, td):nth-child(9) { width: 140px; }
+  .admin-order-table :is(th, td):nth-child(10) { width: 50px; }
+  .admin-order-table td:nth-child(10) { text-align: center; }
+  .admin-main .admin-order-table td:nth-child(10) button {
+    display: inline-flex;
+    width: 28px !important;
+    min-width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    align-items: center;
+    justify-content: center;
+    padding: 6px !important;
+  }
+  .admin-main .admin-order-table td:nth-child(10) button svg {
+    width: 16px !important;
+    height: 16px !important;
+    stroke-width: 2.25;
+  }
+
+  .admin-sticky-1 th:nth-child(1),
+  .admin-sticky-2 th:nth-child(2),
+  .admin-sticky-3 th:nth-child(3),
+  .admin-sticky-4 th:nth-child(4),
+  .admin-product-catalog table th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    border-right: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+  }
+
+  .admin-sticky-1 tbody td:nth-child(1):not([colspan]),
+  .admin-sticky-2 tbody td:nth-child(2):not([colspan]),
+  .admin-sticky-3 tbody td:nth-child(3):not([colspan]),
+  .admin-sticky-4 tbody td:nth-child(4):not([colspan]),
+  .admin-product-catalog table tbody td:first-child:not([colspan]) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    overflow: hidden;
+    border-right: 1px solid rgb(226 232 240);
+    background: white;
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dark .admin-sticky-1 th:nth-child(1),
+  .dark .admin-sticky-2 th:nth-child(2),
+  .dark .admin-sticky-3 th:nth-child(3),
+  .dark .admin-sticky-4 th:nth-child(4),
+  .dark .admin-product-catalog table th:first-child {
+    border-right-color: rgb(30 41 59);
+    background: #070a12;
+  }
+
+  .dark .admin-sticky-1 tbody td:nth-child(1):not([colspan]),
+  .dark .admin-sticky-2 tbody td:nth-child(2):not([colspan]),
+  .dark .admin-sticky-3 tbody td:nth-child(3):not([colspan]),
+  .dark .admin-sticky-4 tbody td:nth-child(4):not([colspan]),
+  .dark .admin-product-catalog table tbody td:first-child:not([colspan]) {
+    border-right-color: rgb(30 41 59);
+    background: #0d1322;
+  }
+
+  .qa-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .qa-responsive-table {
+    table-layout: fixed;
+    font-size: 10px;
+    line-height: 18px;
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
+
+  .qa-responsive-table th {
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+    line-height: 16px;
+    letter-spacing: 0.025em !important;
+  }
+
+  .qa-responsive-table td {
+    padding: 6px 7px !important;
+    font-size: 10px !important;
+    line-height: 18px;
+  }
+
+  .qa-responsive-table tbody td :is(p, span) {
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  .qa-responsive-table tbody td [class~="text-xs"] {
+    font-size: 9px !important;
+    line-height: 12px !important;
+  }
+
+  .qa-responsive-table .qa-badge {
+    max-width: 100%;
+    padding: 0.125rem 0.5rem !important;
+    border-radius: 9999px;
+    font-size: 9px !important;
+    line-height: 12px;
+    white-space: normal;
+  }
+
+  .qa-cols-7 { min-width: 43rem !important; }
+  .qa-cols-9 { min-width: 47rem !important; }
+
+  /* Quality Inspection list: reserve independent space for status and actions.
+     The explicit columns prevent fixed-table equal sizing from pushing action
+     controls backward into the neighboring status cell on narrow screens. */
+  .qa-inspection-list-table { min-width: 72.75rem !important; }
+  .qa-inspection-list-table .qa-inspection-col-receiving { width: 8rem; }
+  .qa-inspection-list-table .qa-inspection-col-po { width: 7.5rem; }
+  .qa-inspection-list-table .qa-inspection-col-product { width: 8.5rem; }
+  .qa-inspection-list-table .qa-inspection-col-supplier { width: 9rem; }
+  .qa-inspection-list-table .qa-inspection-col-date { width: 7.5rem; }
+  .qa-inspection-list-table .qa-inspection-col-items { width: 5rem; }
+  .qa-inspection-list-table .qa-inspection-col-prepared { width: 7.5rem; }
+  .qa-inspection-list-table .qa-inspection-col-status { width: 8.5rem; }
+  .qa-inspection-list-table .qa-inspection-col-actions { width: 11.25rem; }
+
+  .qa-inspection-list-table :is(th, td):nth-child(8),
+  .qa-inspection-list-table :is(th, td):nth-child(9) {
+    border-left: 1px solid rgb(226 232 240);
+  }
+
+  .qa-inspection-list-table .qa-inspection-status-cell,
+  .qa-inspection-list-table .qa-inspection-actions-cell {
+    overflow: hidden;
+  }
+
+  .qa-inspection-list-table .qa-inspection-actions-cell > div {
+    min-width: 0;
+  }
+
+  .qa-inspection-list-table .qa-inspection-actions-cell button:first-child {
+    white-space: normal;
+  }
+
+  .dark .qa-inspection-list-table :is(th, td):nth-child(8),
+  .dark .qa-inspection-list-table :is(th, td):nth-child(9) {
+    border-left-color: rgb(30 41 59);
+  }
+
+  .qa-sticky-1 th:nth-child(1),
+  .qa-sticky-2 th:nth-child(2),
+  .qa-sticky-3 th:nth-child(3),
+  .qa-sticky-4 th:nth-child(4) {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    border-right: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+  }
+
+  .qa-sticky-1 tbody td:nth-child(1):not([colspan]),
+  .qa-sticky-2 tbody td:nth-child(2):not([colspan]),
+  .qa-sticky-3 tbody td:nth-child(3):not([colspan]),
+  .qa-sticky-4 tbody td:nth-child(4):not([colspan]) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    overflow: hidden;
+    border-right: 1px solid rgb(226 232 240);
+    background: white;
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dark .qa-sticky-1 th:nth-child(1),
+  .dark .qa-sticky-2 th:nth-child(2),
+  .dark .qa-sticky-3 th:nth-child(3),
+  .dark .qa-sticky-4 th:nth-child(4) {
+    border-right-color: rgb(30 41 59);
+    background: #090d16;
+  }
+
+  .dark .qa-sticky-1 tbody td:nth-child(1):not([colspan]),
+  .dark .qa-sticky-2 tbody td:nth-child(2):not([colspan]),
+  .dark .qa-sticky-3 tbody td:nth-child(3):not([colspan]),
+  .dark .qa-sticky-4 tbody td:nth-child(4):not([colspan]) {
+    border-right-color: rgb(30 41 59);
+    background: #0d1322;
+  }
+
+  .qa-rejected-items .overflow-x-auto {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .qa-rejected-items table {
+    min-width: 47rem !important;
+    table-layout: fixed;
+    font-size: 10px;
+    line-height: 18px;
+  }
+
+  .qa-rejected-items table th {
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+    line-height: 16px;
+    letter-spacing: 0.025em !important;
+  }
+
+  .qa-rejected-items table td {
+    padding: 6px 7px !important;
+    font-size: 10px !important;
+    line-height: 18px;
+  }
+
+  .qa-rejected-items table .qa-badge {
+    max-width: 100%;
+    padding: 0.125rem 0.5rem !important;
+    border-radius: 9999px;
+    font-size: 9px !important;
+    line-height: 12px;
+    white-space: normal;
+  }
+
+  .qa-rejected-items table th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+    border-right: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+  }
+
+  .qa-rejected-items table tbody td:first-child:not([colspan]) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    overflow: hidden;
+    border-right: 1px solid rgb(226 232 240);
+    background: white;
+    box-shadow: 2px 0 4px rgb(15 23 42 / 8%);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dark .qa-rejected-items table th:first-child {
+    border-right-color: rgb(30 41 59);
+    background: #090d16;
+  }
+
+  .dark .qa-rejected-items table tbody td:first-child:not([colspan]) {
+    border-right-color: rgb(30 41 59);
+    background: #0d1322;
+  }
+}
+
+/* Plant Manager + QA narrow-mobile density. Keep the established 400px+
+   mobile layouts unchanged and preserve accessible header touch targets. */
+@layer utilities {
+  @media (max-width: 390px) {
+    :is(.plant-manager-main, .qa-main) h1 {
+      font-size: 1.125rem !important;
+      line-height: 1.5rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) h1 + p {
+      font-size: 0.75rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="grid"][class~="grid-cols-1"]:is([class~="gap-4"], [class~="gap-5"], [class~="gap-6"]) {
+      gap: 0.75rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="flex"][class~="flex-wrap"]:is([class~="gap-3"], [class~="gap-4"]) {
+      gap: 0.5rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="space-y-6"] > :not(:last-child) {
+      margin-block-end: 1rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="space-y-4"] > :not(:last-child) {
+      margin-block-end: 0.75rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="rounded-2xl"][class~="p-4"] {
+      padding: 0.75rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="rounded-2xl"]:is([class~="p-5"], [class~="p-6"]) {
+      padding: 1rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="uppercase"][class~="tracking-wider"] {
+      font-size: 0.6875rem !important;
+      line-height: 1rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) :not(h1):not(h2)[class~="text-xl"][class~="font-bold"] {
+      font-size: 1.125rem !important;
+      line-height: 1.5rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) :not(h1):not(h2)[class~="text-2xl"][class~="font-bold"] {
+      font-size: 1.25rem !important;
+      line-height: 1.75rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) :not(h1):not(h2)[class~="text-3xl"][class~="font-bold"] {
+      font-size: 1.5rem !important;
+      line-height: 2rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) :is(button, input, select, textarea)[class~="text-sm"] {
+      font-size: 0.8125rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) :is(button, input, select)[class~="px-4"] {
+      padding-inline: 0.75rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) button[class~="text-sm"] svg {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) table:not(.pm-responsive-table):not(.pm-status-table):not(.qa-responsive-table) th {
+      padding: 0.5rem 0.625rem !important;
+      font-size: 0.6875rem !important;
+      line-height: 1rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) table:not(.pm-responsive-table):not(.pm-status-table):not(.qa-responsive-table) td {
+      padding: 0.5rem 0.625rem !important;
+      font-size: 0.75rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    .plant-manager-main .recent-transactions-preview th,
+    .plant-manager-main .recent-transactions-preview td {
+      padding-inline: 0.25rem !important;
+    }
+
+    .plant-manager-main .recent-transactions-preview .plant-manager-badge {
+      gap: 0.25rem !important;
+      padding: 0.125rem 0.375rem !important;
+      font-size: 0.625rem !important;
+      line-height: 0.875rem !important;
+    }
+
+    .plant-manager-main .recent-transactions-preview .plant-manager-badge svg {
+      width: 0.625rem !important;
+      height: 0.625rem !important;
+    }
+
+    .plant-manager-main .plant-manager-badge,
+    .qa-main .qa-badge {
+      padding: 0.25rem 0.5rem !important;
+      font-size: 0.6875rem !important;
+      line-height: 1rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="fixed"][class~="inset-0"][class~="items-center"][class~="justify-center"] {
+      padding: 0.75rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) [class~="fixed"][class~="inset-0"] h2[class~="text-xl"] {
+      font-size: 1.125rem !important;
+      line-height: 1.5rem !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) .recharts-responsive-container {
+      min-width: 0 !important;
+      max-width: 100% !important;
+    }
+
+    .operations-shell .operations-topbar {
+      height: 3.5rem !important;
+      min-height: 3.5rem !important;
+      max-height: 3.5rem !important;
+      padding-inline: 0.75rem !important;
+    }
+
+    .operations-shell .operations-mobile-menu-button {
+      top: 0.375rem !important;
+      left: 0.75rem !important;
+      display: flex !important;
+      min-width: 2.75rem !important;
+      min-height: 2.75rem !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0.5rem !important;
+    }
+
+    .operations-shell .operations-mobile-menu-button svg {
+      width: 1.25rem !important;
+      height: 1.25rem !important;
+    }
+
+    .operations-shell .operations-mobile-menu-spacer {
+      width: 2.75rem !important;
+    }
+
+    .operations-shell .operations-header-actions {
+      gap: 0.5rem !important;
+    }
+
+    .operations-shell .operations-header-icon-button,
+    .operations-shell .operations-header-actions > button,
+    .operations-shell .operations-header-actions > div > button {
+      display: flex !important;
+      min-width: 2.75rem !important;
+      min-height: 2.75rem !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0.5rem !important;
+    }
+
+    .operations-shell .operations-header-actions > button > svg,
+    .operations-shell .operations-header-actions > div > button > svg {
+      width: 1.125rem !important;
+      height: 1.125rem !important;
+    }
+
+    .operations-shell .operations-profile-control {
+      height: 2.75rem !important;
+      min-height: 2.75rem !important;
+      gap: 0.25rem !important;
+      margin-left: 0 !important;
+      padding: 0.25rem !important;
+    }
+
+    .operations-shell .operations-profile-control > :first-child {
+      width: 1.75rem !important;
+      height: 1.75rem !important;
+    }
+
+    .operations-shell .operations-profile-control > svg {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+    }
+  }
+}
+
+/* Cross-panel mobile button scale, derived from Admin Suppliers' Add Supplier.
+   Width, colors, state styling, and handlers remain owned by each component. */
+@layer utilities {
+  @media (max-width: 639px) {
+    :is(.admin-main, .plant-manager-main, .qa-main) button {
+      min-height: 2.75rem;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) button[class*="px-"] {
+      column-gap: 0.375rem !important;
+      padding: 0.5rem 0.75rem !important;
+      border-radius: 0.75rem !important;
+      font-size: 0.8125rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) button[class*="px-"] svg {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+      flex-shrink: 0;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) button:is([class~="p-1"], [class~="p-1.5"], [class~="p-2"], [class~="p-2.5"]):has(> svg) {
+      display: inline-flex;
+      width: 2.75rem;
+      min-width: 2.75rem;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem !important;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) button:is([class~="p-1"], [class~="p-1.5"], [class~="p-2"], [class~="p-2.5"]):has(> svg) > svg {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+    }
+
+    :is(.admin-table-scroll, .pm-table-scroll, .qa-table-scroll) button[class*="px-"] {
+      padding-inline: 0.5rem !important;
+      font-size: 0.625rem !important;
+      line-height: 0.875rem !important;
+    }
+  }
+}
+
+/* Procurement table actions override the shared page-button scale at the same
+   cascade layer. These controls intentionally use the compact table scale. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-procurement-table td:nth-child(9) button:has(> svg:only-child) {
+      width: 24px;
+      min-width: 24px;
+      height: 24px;
+      min-height: 24px;
+      padding: 5px !important;
+    }
+
+    .admin-main .admin-procurement-table td:nth-child(9) button:has(> svg:only-child) > svg {
+      width: 14px !important;
+      height: 14px !important;
+      stroke-width: 2;
+    }
+
+    .admin-main .admin-procurement-table td:nth-child(9) button:not(:has(> svg:only-child)) {
+      height: 24px;
+      min-height: 24px;
+      padding: 2px 5px !important;
+      font-size: 8px !important;
+      line-height: 10px !important;
+    }
+
+    .admin-main .admin-procurement-table td:nth-child(9) button[class*="border"]:not(:has(svg)) {
+      width: 46px;
+      min-width: 46px;
+    }
+
+    .admin-main .admin-procurement-table td:nth-child(9) button[class*="bg-[#00a3c4]"] {
+      width: 50px;
+      min-width: 50px;
+    }
+
+    .admin-main .admin-procurement-table td:nth-child(9) button[class*="bg-slate-900"] {
+      width: auto;
+      min-width: 0;
+      padding-inline: 6px !important;
+    }
+  }
+}
+
+/* Admin Order Management mobile metric-card density. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main button.admin-orders-refresh {
+      width: auto;
+      min-width: 0;
+      height: 24px;
+      min-height: 0;
+      flex: none;
+      gap: 2px !important;
+      padding: 2px 6px !important;
+      border-radius: 8px !important;
+      font-size: 8px !important;
+      line-height: 12px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main button.admin-orders-refresh svg {
+      width: 10px !important;
+      height: 10px !important;
+    }
+
+    .admin-main button.admin-orders-create {
+      width: auto;
+      min-width: 0;
+      height: 32px;
+      min-height: 0;
+      flex: none;
+      gap: 4px !important;
+      padding: 4px 10px !important;
+      border-radius: 8px !important;
+      font-size: 12px !important;
+      line-height: 16px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main button.admin-orders-create svg {
+      width: 14px !important;
+      height: 14px !important;
+    }
+
+    .admin-main .admin-orders-toolbar {
+      column-gap: 8px !important;
+      row-gap: 8px !important;
+    }
+
+    .admin-main .admin-orders-toolbar-search {
+      height: 32px;
+      min-height: 0;
+      padding: 6px 8px 6px 30px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main .admin-orders-toolbar-search-icon {
+      left: 10px;
+      width: 13px;
+      height: 13px;
+    }
+
+    .admin-main .admin-orders-toolbar-status {
+      height: 30px;
+      min-height: 0;
+      padding: 5px 9px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main .admin-orders-toolbar-date {
+      height: 30px;
+      min-height: 0;
+      padding: 5px 8px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main .admin-orders-toolbar-date-icon {
+      right: 8px;
+      width: 12px;
+      height: 12px;
+    }
+
+    .admin-main button.admin-orders-toolbar-filter,
+    .admin-main button.admin-orders-toolbar-export {
+      width: auto;
+      min-width: 0;
+      height: 28px;
+      min-height: 0;
+      flex: none;
+      gap: 4px !important;
+      padding: 4px 8px !important;
+      font-size: 12px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main button.admin-orders-toolbar-filter svg,
+    .admin-main button.admin-orders-toolbar-export svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    .admin-main .admin-orders-toolbar-view {
+      height: 30px;
+      gap: 2px !important;
+      padding: 2px !important;
+    }
+
+    .admin-main button.admin-orders-toolbar-view-button {
+      width: 24px;
+      min-width: 24px;
+      height: 24px;
+      min-height: 0;
+      padding: 4px !important;
+    }
+
+    .admin-main button.admin-orders-toolbar-view-button svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    .admin-main .admin-orders-kpi {
+      min-width: 0;
+      padding: 0.75rem !important;
+    }
+
+    .admin-main .admin-orders-kpi-main {
+      min-width: 0;
+      gap: 0.5rem !important;
+    }
+
+    .admin-main .admin-orders-kpi-icon {
+      flex-shrink: 0;
+      padding: 0.4375rem !important;
+    }
+
+    .admin-main .admin-orders-kpi-icon svg {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+    }
+
+    .admin-main .admin-orders-kpi .admin-orders-kpi-title[class~="uppercase"] {
+      font-size: 12px !important;
+      line-height: 16px !important;
+      letter-spacing: 0.025em !important;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+
+    .admin-main .admin-orders-kpi-value {
+      margin-top: 1px;
+      font-size: 15px !important;
+      font-weight: 600 !important;
+      line-height: 18px !important;
+    }
+
+    .admin-main .admin-orders-kpi-helper {
+      margin-top: 2px !important;
+      font-size: 10px !important;
+      line-height: 14px !important;
+    }
+  }
+}
+
 :root {
   color-scheme: light;
 
@@ -186,7 +2463,7 @@ body {
 @layer utilities {
 
   /* MAIN DARK BACKGROUNDS → LIGHT (Excluding Sidebar) */
-  html:not(.dark) body *:not(aside):not(.sidebar):not(aside *):not(.sidebar *) {
+  html:not(.dark) body *:not(aside):not(.sidebar):not(aside *):not(.sidebar *):not(.auth-surface):not(.auth-surface *) {
 
     &[class~="bg-[#090d16]"] {
       background-color: var(--bg-app) !important;
@@ -506,5 +2783,1350 @@ body {
   html:not(.dark) .sidebar [class*="bg-[#0b2234]"] * {
     background-color: rgba(0, 163, 196, 0.16) !important;
     color: #38bdf8 !important;
+  }
+}
+
+/* Plant Manager workflow pills: preserve existing hues and all dark styling.
+   Explicit markers exclude charts, progress indicators, alerts, and buttons. */
+@layer utilities {
+  html:not(.dark) .plant-manager-main .plant-manager-badge {
+    --plant-manager-badge-fill: var(--color-slate-600);
+    background-color: var(--plant-manager-badge-fill) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    font-weight: 500 !important;
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge:is([class*="bg-red-"], [class*="bg-rose-"]) {
+    --plant-manager-badge-fill: var(--color-red-500);
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge:is([class*="bg-yellow-"], [class*="bg-amber-"]) {
+    --plant-manager-badge-fill: var(--color-amber-500);
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge[class*="bg-orange-"] {
+    --plant-manager-badge-fill: var(--color-orange-500);
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge:is([class*="bg-green-"], [class*="bg-emerald-"]) {
+    --plant-manager-badge-fill: var(--color-green-500);
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge:is([class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-cyan-"]) {
+    --plant-manager-badge-fill: var(--color-blue-500);
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge[class*="bg-purple-"] {
+    --plant-manager-badge-fill: var(--color-purple-700);
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge[class*="bg-violet-"] {
+    --plant-manager-badge-fill: var(--color-violet-700);
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge * {
+    color: #fff !important;
+  }
+
+  html:not(.dark) .plant-manager-main .plant-manager-badge > span.rounded-full {
+    background-color: #fff !important;
+  }
+}
+
+/* QA workflow badges: solid semantic fills in light mode only. */
+@layer utilities {
+  html:not(.dark) .qa-main .qa-badge {
+    --qa-badge-fill: var(--color-slate-600);
+    background-color: var(--qa-badge-fill) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    font-weight: 500 !important;
+  }
+
+  html:not(.dark) .qa-main .qa-badge:is([class*="bg-red-"], [class*="bg-rose-"]) {
+    --qa-badge-fill: var(--color-red-500);
+  }
+
+  html:not(.dark) .qa-main .qa-badge:is([class*="bg-yellow-"], [class*="bg-amber-"]) {
+    --qa-badge-fill: var(--color-amber-500);
+  }
+
+  html:not(.dark) .qa-main .qa-badge[class*="bg-orange-"] {
+    --qa-badge-fill: var(--color-orange-500);
+  }
+
+  html:not(.dark) .qa-main .qa-badge:is([class*="bg-green-"], [class*="bg-emerald-"]) {
+    --qa-badge-fill: var(--color-green-500);
+  }
+
+  html:not(.dark) .qa-main .qa-badge:is([class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-cyan-"]) {
+    --qa-badge-fill: var(--color-blue-500);
+  }
+
+  html:not(.dark) .qa-main .qa-badge:is([class*="bg-purple-"], [class*="bg-violet-"]) {
+    --qa-badge-fill: var(--color-purple-500);
+  }
+
+  html:not(.dark) .qa-main .qa-badge.qa-badge-attention {
+    --qa-badge-fill: var(--color-amber-500);
+  }
+
+  html:not(.dark) .qa-main .qa-badge * {
+    color: #fff !important;
+  }
+
+  html:not(.dark) .qa-main .qa-badge > span.rounded-full {
+    background-color: #fff !important;
+  }
+}
+
+/* Only explicitly marked Admin badges receive the solid light-mode treatment.
+   Keep existing utility classes as the source of each badge's semantic hue
+   and leave their dark-mode rendering, dimensions, and content untouched. */
+@layer utilities {
+  html:not(.dark) .admin-main .admin-badge {
+    --admin-badge-fill: var(--color-slate-600);
+    background-color: var(--admin-badge-fill) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    font-weight: 500 !important;
+  }
+
+  html:not(.dark) .admin-main .admin-badge:is([class*="bg-red-"], [class*="bg-rose-"]) {
+    --admin-badge-fill: var(--color-red-600);
+  }
+
+  html:not(.dark) .admin-main .admin-badge:is([class*="bg-yellow-"], [class*="bg-amber-"]) {
+    --admin-badge-fill: var(--color-amber-700);
+  }
+
+  html:not(.dark) .admin-main .admin-badge[class*="bg-orange-"] {
+    --admin-badge-fill: var(--color-orange-700);
+  }
+
+  html:not(.dark) .admin-main .admin-badge:is([class*="bg-green-"], [class*="bg-emerald-"]) {
+    --admin-badge-fill: var(--color-emerald-700);
+  }
+
+  html:not(.dark) .admin-main .admin-badge:is([class*="bg-blue-"], [class*="bg-indigo-"]) {
+    --admin-badge-fill: var(--color-blue-600);
+  }
+
+  html:not(.dark) .admin-main .admin-badge:is([class*="bg-cyan-"], [class*="bg-sky-"], [class*="bg-teal-"]) {
+    --admin-badge-fill: var(--color-teal-700);
+  }
+
+  html:not(.dark) .admin-main .admin-badge:is([class*="bg-purple-"], [class*="bg-violet-"]) {
+    --admin-badge-fill: var(--color-purple-700);
+  }
+
+  html:not(.dark) .admin-main .admin-badge[class*="bg-pink-"] {
+    --admin-badge-fill: var(--color-pink-700);
+  }
+
+  /* Override legacy colored child text; Lucide strokes inherit currentColor. */
+  html:not(.dark) .admin-main .admin-badge * {
+    color: #fff !important;
+  }
+
+  html:not(.dark) .admin-main .admin-badge svg[class*="fill-"]:not([class~="fill-none"]) {
+    fill: #fff !important;
+  }
+
+  html:not(.dark) .admin-main .admin-badge > span.rounded-full {
+    background-color: #fff !important;
+  }
+}
+
+/* Admin Reports table light mode: neutral format pill and subtle separators. */
+@layer utilities {
+  html:not(.dark) .admin-main .admin-reports-table .admin-report-format-badge {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #334155 !important;
+  }
+
+  html:not(.dark) .admin-main .admin-reports-table thead {
+    border-color: #e2e8f0 !important;
+  }
+
+  html:not(.dark) .admin-main .admin-reports-table tbody > :not(:last-child) {
+    border-color: #e5e7eb !important;
+  }
+
+  html:not(.dark) .admin-main .admin-reports-pagination {
+    border-color: #e2e8f0 !important;
+  }
+}
+
+/* Admin-only density pass for narrow phones. The 390px ceiling intentionally
+   leaves the approved 440px mobile layout and every other role untouched. */
+@layer utilities {
+  @media (max-width: 390px) {
+    .admin-main h1 {
+      font-size: 1.125rem !important;
+      line-height: 1.5rem !important;
+    }
+
+    .admin-main h1 + p {
+      font-size: 0.75rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    .admin-main [class~="grid"][class~="grid-cols-1"]:is([class~="gap-4"], [class~="gap-5"], [class~="gap-6"]) {
+      gap: 0.75rem !important;
+    }
+
+    .admin-main [class~="rounded-2xl"][class~="p-4"] {
+      padding: 0.75rem !important;
+    }
+
+    .admin-main [class~="rounded-2xl"]:is([class~="p-5"], [class~="p-6"]) {
+      padding: 1rem !important;
+    }
+
+    .admin-main [class~="uppercase"][class~="tracking-wider"] {
+      font-size: 0.6875rem !important;
+      line-height: 1rem !important;
+    }
+
+    .admin-main :not(h1):not(h2)[class~="text-2xl"][class~="font-bold"] {
+      font-size: 1.25rem !important;
+      line-height: 1.75rem !important;
+    }
+
+    .admin-main :not(h1):not(h2)[class~="text-xl"][class~="font-bold"] {
+      font-size: 1.125rem !important;
+      line-height: 1.5rem !important;
+    }
+
+    .admin-main :not(h1):not(h2)[class~="text-3xl"][class~="font-bold"] {
+      font-size: 1.5rem !important;
+      line-height: 2rem !important;
+    }
+
+    .admin-main :is(button, input, select, textarea)[class~="text-sm"] {
+      font-size: 0.8125rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    .admin-main .catalog-input {
+      font-size: 0.8125rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    .admin-main :is(button, input, select)[class~="px-4"] {
+      padding-inline: 0.75rem !important;
+    }
+
+    .admin-main table:not(.admin-responsive-table):not(.product-catalog-table) th {
+      padding: 0.5rem 0.625rem !important;
+      font-size: 0.6875rem !important;
+      line-height: 1rem !important;
+    }
+
+    .admin-main table:not(.admin-responsive-table):not(.product-catalog-table) td {
+      padding: 0.5rem 0.625rem !important;
+      font-size: 0.75rem !important;
+      line-height: 1.125rem !important;
+    }
+
+    .admin-main table:not(.admin-responsive-table):not(.product-catalog-table) .admin-badge {
+      padding: 0.25rem 0.5rem !important;
+      font-size: 0.6875rem !important;
+      line-height: 1rem !important;
+    }
+
+    .admin-main .admin-primary-action {
+      gap: 0.25rem !important;
+      padding-inline: 0.625rem !important;
+      font-size: 0.75rem !important;
+    }
+
+    .admin-main .admin-primary-action svg {
+      width: 0.8125rem !important;
+      height: 0.8125rem !important;
+    }
+
+    .admin-main .admin-kpi-icon {
+      padding: 0.375rem !important;
+    }
+
+    .admin-main .admin-kpi-icon svg {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+    }
+
+    .admin-shell .admin-topbar {
+      height: 3.5rem !important;
+      padding-inline: 0.75rem !important;
+    }
+
+    .admin-shell .admin-mobile-menu-button {
+      display: flex !important;
+      min-width: 2.75rem !important;
+      min-height: 2.75rem !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0.5rem !important;
+    }
+
+    .admin-shell .admin-mobile-menu-button svg {
+      width: 1.25rem !important;
+      height: 1.25rem !important;
+    }
+
+    .admin-shell .admin-header-actions {
+      gap: 0.5rem !important;
+    }
+
+    .admin-shell .admin-header-icon-button,
+    .admin-shell .admin-header-actions > div > button:not(.admin-profile-control) {
+      display: flex !important;
+      width: 2rem !important;
+      min-width: 2rem !important;
+      height: 2rem !important;
+      min-height: 2rem !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0.4375rem !important;
+    }
+
+    .admin-shell .admin-header-actions > button > svg,
+    .admin-shell .admin-header-actions > div > button > svg {
+      width: 1.125rem !important;
+      height: 1.125rem !important;
+    }
+
+    .admin-shell .admin-profile-control {
+      height: 2.25rem !important;
+      min-height: 2.25rem !important;
+      gap: 0.25rem !important;
+      margin-left: 0 !important;
+      padding: 0.125rem !important;
+    }
+
+    .admin-shell .admin-profile-control > :first-child {
+      width: 2rem !important;
+      height: 2rem !important;
+    }
+
+    .admin-shell .admin-profile-control > svg {
+      width: 0.875rem !important;
+      height: 0.875rem !important;
+    }
+  }
+}
+
+/* Admin Reports details drawer: compact mobile typography and controlled title wrapping. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-report-details-header {
+      gap: 8px;
+      padding: 12px 16px;
+    }
+    .admin-main .admin-report-details-heading {
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: 8px;
+    }
+    .admin-main .admin-report-details-title {
+      display: -webkit-box;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      font-size: 15px !important;
+      line-height: 20px !important;
+      font-weight: 600;
+      text-overflow: clip;
+      white-space: normal;
+      overflow-wrap: break-word;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+    .admin-main .admin-report-details-status {
+      flex-shrink: 0;
+    }
+    .admin-main .admin-report-details-status .admin-badge,
+    .admin-main .admin-report-details-format .admin-badge {
+      min-height: 20px;
+      padding: 2px 6px !important;
+      font-size: 12px !important;
+      line-height: 16px !important;
+    }
+    .admin-main .admin-report-details-status .admin-badge svg {
+      width: 9px !important;
+      height: 9px !important;
+    }
+    .admin-main .admin-report-details-close {
+      width: 44px;
+      min-width: 44px;
+      height: 44px;
+      min-height: 44px;
+      padding: 14px !important;
+    }
+    .admin-main .admin-report-details-close svg {
+      width: 16px !important;
+      height: 16px !important;
+    }
+    .admin-main .admin-report-details-body {
+      flex: 0 1 auto;
+      gap: 0;
+      padding: 12px 16px 4px;
+    }
+    .admin-main .admin-report-details-body > * + * {
+      margin-top: 10px !important;
+    }
+    .admin-main .admin-report-details-grid {
+      gap: 10px;
+    }
+    .admin-main .admin-report-details-card,
+    .admin-main .admin-report-details-history {
+      min-width: 0;
+      padding: 12px;
+    }
+    .admin-main .admin-report-details-label {
+      margin-bottom: 4px;
+      font-size: 12px !important;
+      line-height: 16px !important;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .admin-main .admin-report-details-value {
+      overflow: visible;
+      font-size: 12px !important;
+      line-height: 16px !important;
+      font-weight: 400;
+      text-overflow: clip;
+      white-space: normal;
+      overflow-wrap: break-word;
+    }
+    .admin-main .admin-report-details-history-text {
+      font-size: 12px !important;
+      line-height: 16px !important;
+    }
+    .admin-main .admin-report-details-footer {
+      padding: 8px 16px calc(12px + env(safe-area-inset-bottom));
+      display: none;
+    }
+    .admin-main .admin-report-details-history-row {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    .admin-main .admin-report-details-download {
+      flex: 0 0 180px !important;
+      width: 180px;
+      max-width: 100%;
+      height: 36px;
+      min-height: 36px;
+      margin-inline: auto;
+      gap: 6px !important;
+      padding: 8px 14px !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      line-height: 16px !important;
+    }
+    .admin-main .admin-report-details-download svg {
+      width: 14px !important;
+      height: 14px !important;
+    }
+    .admin-main .admin-report-details-mobile-action {
+      display: inline-flex !important;
+      flex: none !important;
+      width: 150px;
+      margin-inline: 0 !important;
+      align-self: flex-start;
+      white-space: nowrap;
+    }
+    html:not(.dark) .admin-main .admin-report-details-format .admin-report-format-badge {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      color: #334155 !important;
+    }
+  }
+
+}
+
+/* Shared Admin page-level mobile typography. Explicit markers keep KPI rules
+   out of tables, charts, drawers, and dialogs. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main h1 {
+      font-size: 22px !important;
+      line-height: 28px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main h1 + p {
+      font-size: 12px !important;
+      line-height: 16px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main button:is([class*="px-"], [class*="py-"]):not(table button):not(.fixed button):not(.admin-orders-refresh):not(.admin-orders-create):not([class*="admin-orders-toolbar"]) {
+      height: auto !important;
+      min-height: 28px !important;
+      gap: 4px !important;
+      padding: 4px 8px !important;
+      font-size: 12px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main button:is([class*="px-"], [class*="py-"]):not(table button):not(.fixed button):not(.admin-orders-refresh):not(.admin-orders-create):not([class*="admin-orders-toolbar"]):is([class*="bg-cyan-"], [class*="bg-slate-900"], [class*="bg-[#00a3c4]"]) {
+      min-height: 32px !important;
+      padding: 5px 10px !important;
+    }
+
+    .admin-main button:is([class*="px-"], [class*="py-"]):not(table button):not(.fixed button):not(.admin-orders-refresh):not(.admin-orders-create):not([class*="admin-orders-toolbar"]) > svg {
+      width: 12px !important;
+      height: 12px !important;
+      flex-shrink: 0;
+    }
+
+    .admin-main .admin-kpi-title.admin-kpi-title {
+      font-size: 12px !important;
+      line-height: 16px !important;
+      letter-spacing: 0.025em !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main .admin-kpi-value.admin-kpi-value {
+      font-size: 15px !important;
+      font-weight: 600 !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main .admin-kpi-helper.admin-kpi-helper {
+      font-size: 10px !important;
+      line-height: 14px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+  }
+}
+
+/* Plant Manager and QA page-level mobile standard. KPI marker classes keep
+   these typography overrides out of tables, charts, drawers, and dialogs. */
+@layer utilities {
+  @media (max-width: 639px) {
+    :is(.plant-manager-main, .qa-main) h1 {
+      font-size: 22px !important;
+      line-height: 28px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    :is(.plant-manager-main, .qa-main) h1 + p {
+      font-size: 12px !important;
+      line-height: 16px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    :is(.plant-manager-main, .qa-main) button:is([class*="px-"], [class*="py-"]):not(table button):not(.fixed button) {
+      height: auto !important;
+      min-height: 28px !important;
+      gap: 4px !important;
+      padding: 4px 8px !important;
+      font-size: 12px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    :is(.plant-manager-main, .qa-main) button:is([class*="px-"], [class*="py-"]):not(table button):not(.fixed button):is([class*="bg-cyan-"], [class*="bg-slate-900"], [class*="bg-[#092635]"]) {
+      min-height: 32px !important;
+      padding: 5px 10px !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) button:is([class*="px-"], [class*="py-"]):not(table button):not(.fixed button) > svg {
+      width: 12px !important;
+      height: 12px !important;
+      flex-shrink: 0;
+    }
+
+    :is(.plant-manager-main, .qa-main) .mobile-kpi-title.mobile-kpi-title {
+      font-size: 12px !important;
+      line-height: 16px !important;
+      letter-spacing: 0.025em !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    :is(.plant-manager-main, .qa-main) .mobile-kpi-value.mobile-kpi-value {
+      font-size: 15px !important;
+      font-weight: 600 !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    :is(.plant-manager-main, .qa-main) .mobile-kpi-helper.mobile-kpi-helper {
+      font-size: 10px !important;
+      line-height: 14px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+  }
+}
+
+/* Admin table-page controls mirror Order Management on mobile. Fixed dialogs
+   and drawers are deliberately excluded so their form sizing is unchanged. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main input:is([type="search"], [placeholder*="Search" i]):not(.fixed *),
+    .admin-main input:is([type="search"], [placeholder*="search" i]):not(.fixed *) {
+      height: 32px !important;
+      min-height: 0 !important;
+      padding: 6px 8px 6px 30px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-product-catalog :has(> input.catalog-search) > svg,
+    .admin-main :has(> input[placeholder^="Search request"]) > svg,
+    .admin-main :has(> input[placeholder="Search products..."]) > svg {
+      width: 13px !important;
+      height: 13px !important;
+    }
+
+    .admin-product-catalog div:has(> button > svg.lucide-table) {
+      display: inline-flex;
+      align-items: center;
+      height: 30px;
+      width: 62px;
+      min-width: 62px;
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      gap: 2px !important;
+      padding: 2px !important;
+    }
+
+    .admin-product-catalog div:has(> span + div > button > svg.lucide-table) {
+      align-items: center;
+      gap: 8px !important;
+      flex-wrap: nowrap;
+    }
+
+    .admin-product-catalog div:has(> span + div > button > svg.lucide-table) > span {
+      min-width: 0;
+    }
+
+    .admin-product-catalog div:has(> button > svg.lucide-table) > button {
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 28px !important;
+      min-width: 28px !important;
+      height: 26px !important;
+      min-height: 26px !important;
+      padding: 7px 8px !important;
+    }
+
+    .admin-product-catalog div:has(> button > svg.lucide-table) > button > svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    .admin-main div:has(> label input[placeholder^="Search request"]) {
+      width: 100%;
+      gap: 8px !important;
+    }
+
+    .admin-main div:has(> label input[placeholder^="Search request"]) > label {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .admin-main div:has(> label input[placeholder^="Search request"]) > div[aria-label="Replenishment request view"] {
+      width: 58px;
+      height: 30px;
+      flex-shrink: 0;
+      gap: 2px;
+      padding: 2px !important;
+    }
+
+    .admin-main div[aria-label="Replenishment request view"] > button {
+      width: 24px;
+      min-width: 24px;
+      height: 24px;
+      min-height: 24px;
+    }
+
+    .admin-main div[aria-label="Replenishment request view"] > button > svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    .admin-main select:not(.fixed *) {
+      height: 30px !important;
+      min-height: 0 !important;
+      padding: 5px 9px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    .admin-main input:is([type="date"], [type="datetime-local"]):not(.fixed *) {
+      height: 30px !important;
+      min-height: 0 !important;
+      padding: 5px 8px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+    }
+
+    .admin-main button:is([title="List view"], [title="Grid view"]):not(.fixed *) {
+      width: 24px !important;
+      min-width: 24px !important;
+      height: 24px !important;
+      min-height: 24px !important;
+      padding: 4px !important;
+    }
+
+    .admin-main button:is([title="List view"], [title="Grid view"]):not(.fixed *) > svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+  }
+}
+
+/* Plant Manager and QA table-page controls use the final Admin mobile scale.
+   Fixed dialogs and drawers retain their existing form dimensions. */
+@layer utilities {
+  @media (max-width: 639px) {
+    :is(.plant-manager-main, .qa-main) input:is([type="search"], [placeholder*="search" i]):not(.fixed *) {
+      height: 32px !important;
+      min-height: 0 !important;
+      padding: 6px 8px 6px 30px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    :is(.plant-manager-main, .qa-main) select:not(.fixed *) {
+      height: 30px !important;
+      min-height: 0 !important;
+      padding: 5px 9px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    :is(.plant-manager-main, .qa-main) input:is([type="date"], [type="datetime-local"]):not(.fixed *) {
+      height: 30px !important;
+      min-height: 0 !important;
+      padding: 5px 8px !important;
+      font-size: 11px !important;
+      line-height: 18px !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) button:is([title="List view"], [title="Grid view"]):not(.fixed *) {
+      width: 24px !important;
+      min-width: 24px !important;
+      height: 24px !important;
+      min-height: 24px !important;
+      padding: 4px !important;
+    }
+
+    :is(.plant-manager-main, .qa-main) button:is([title="List view"], [title="Grid view"]):not(.fixed *) > svg {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    :is(.pm-reports, .qa-rejected-items) table {
+      font-size: 10px !important;
+      line-height: 18px !important;
+    }
+
+    :is(.pm-reports, .qa-rejected-items) table th {
+      padding: 5px 7px !important;
+      font-size: 11px !important;
+      line-height: 16px !important;
+    }
+
+    :is(.pm-reports, .qa-rejected-items) table td {
+      padding: 6px 7px !important;
+      font-size: 10px !important;
+      line-height: 18px !important;
+    }
+  }
+}
+
+/* Approved Requests: keep the compact Generate PO action fully visible on mobile.
+   This comes after the shared responsive-table rules so it is the sole mobile
+   sizing source for this button; desktop continues to use its sm: utilities. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-procurement-approved-table .admin-procurement-approved-actions-cell {
+      overflow: visible;
+    }
+
+    .admin-main .admin-procurement-approved-table .admin-procurement-approved-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: nowrap;
+      gap: 4px !important;
+      white-space: nowrap;
+    }
+
+    .admin-main .admin-procurement-approved-table .admin-procurement-approved-view {
+      flex-shrink: 0;
+    }
+
+    .admin-main .admin-procurement-approved-table .admin-procurement-generate-po {
+      display: inline-flex;
+      width: max-content !important;
+      min-width: max-content !important;
+      max-width: none !important;
+      height: 24px !important;
+      min-height: 24px !important;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      overflow: visible !important;
+      padding: 4px 6px !important;
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      line-height: 12px !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+  }
+}
+
+/* Final Pending Requests action sizing must follow the shared Admin mobile
+   button scale so Decline and Approve retain their compact 10px treatment. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main button.admin-procurement-pending-decision.admin-procurement-pending-decision {
+      width: max-content !important;
+      min-width: max-content !important;
+      height: 24px !important;
+      min-height: 24px !important;
+      flex-shrink: 0;
+      padding: 3px 7px !important;
+      font-size: 10px !important;
+      font-weight: 500 !important;
+      line-height: 14px !important;
+      text-overflow: clip !important;
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+  }
+}
+
+/* Procurement Recently Approved: mobile-only type scale and proportional
+   record rhythm. Status colors and all request behavior remain unchanged. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-procurement-recent-title {
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-procurement-recent-subtitle {
+      font-size: 11px !important;
+      font-weight: 400 !important;
+      line-height: 15px !important;
+    }
+
+    .admin-main .admin-procurement-recent-list > * + * {
+      margin-top: 10px !important;
+    }
+
+    .admin-main .admin-procurement-recent-record {
+      min-width: 0;
+    }
+
+    .admin-main .admin-procurement-recent-primary {
+      font-size: 11px !important;
+      font-weight: 500 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-procurement-recent-meta {
+      font-size: 10px !important;
+      line-height: 13px !important;
+    }
+
+    .admin-main .admin-procurement-recent-record .admin-status-badge {
+      min-height: 20px !important;
+      padding: 2px 6px !important;
+      font-size: 9px !important;
+      font-weight: 500 !important;
+      line-height: 12px !important;
+    }
+
+    .admin-main .admin-procurement-recent-record .admin-status-badge > span:first-child {
+      width: 8px !important;
+      height: 8px !important;
+    }
+  }
+}
+
+/* User Management: mobile-only full-width search field. This follows the
+   shared Admin search rules so its 36px/12px sizing wins without affecting
+   filters, actions, tables, or other modules. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-user-search-wrap {
+      width: 100%;
+      min-width: 0;
+      flex: 1 0 100%;
+    }
+
+    .admin-main .admin-user-search-input {
+      width: 100%;
+      height: 36px !important;
+      min-height: 36px !important;
+      padding: 6px 12px 6px 34px !important;
+      font-size: 12px !important;
+      font-weight: 400;
+      line-height: 16px !important;
+      text-overflow: clip;
+    }
+
+    .admin-main .admin-user-search-icon {
+      top: 50%;
+      left: 12px;
+      width: 14px !important;
+      height: 14px !important;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+  }
+}
+
+/* Admin Inventory grid: mobile-only typography and light-theme chip contrast.
+   Table view, barcode rendering, actions, and desktop card styles are excluded. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-inventory-grid .admin-inventory-grid-meta,
+    .admin-main .admin-inventory-grid .admin-inventory-grid-secondary {
+      font-size: 11px !important;
+      font-weight: 400 !important;
+      line-height: 15px !important;
+    }
+
+    .admin-main .admin-inventory-grid .admin-inventory-grid-chip {
+      font-size: 11px !important;
+      font-weight: 400 !important;
+      line-height: 15px !important;
+    }
+
+    .admin-main .admin-inventory-grid .admin-inventory-grid-stock-label {
+      font-size: 11px !important;
+      font-weight: 400 !important;
+      line-height: 15px !important;
+    }
+
+    .admin-main .admin-inventory-grid .admin-inventory-grid-stock-value,
+    .admin-main .admin-inventory-grid .admin-inventory-grid-value {
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-inventory-grid .admin-status-badge {
+      min-height: 20px !important;
+      padding: 2px 6px !important;
+      font-size: 11px !important;
+      font-weight: 500 !important;
+      line-height: 15px !important;
+    }
+
+    .admin-main .admin-inventory-grid .admin-status-badge > svg:first-child {
+      width: 9px !important;
+      height: 9px !important;
+    }
+
+    html:not(.dark) .admin-main .admin-inventory-grid .admin-inventory-grid-chip {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+  }
+}
+
+/* Admin Sidebar: compact mobile-only navigation typography and alignment. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .sidebar .admin-sidebar-nav {
+      padding: 12px !important;
+    }
+
+    .sidebar .admin-sidebar-main-item {
+      gap: 8px !important;
+      padding: 8px 12px !important;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      line-height: 18px !important;
+    }
+
+    .sidebar .admin-sidebar-main-item > div {
+      gap: 8px !important;
+    }
+
+    .sidebar .admin-sidebar-sub-item {
+      padding: 6px 12px !important;
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      line-height: 16px !important;
+    }
+
+    .sidebar .admin-sidebar-section-label {
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      line-height: 14px !important;
+      letter-spacing: 0.05em !important;
+    }
+  }
+}
+
+/* Procurement Request Details: shared compact mobile treatment for Pending
+   Approval and approved/For Purchase Order states. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-procurement-request-overlay {
+      padding: 12px !important;
+    }
+
+    .admin-main .admin-procurement-request-modal {
+      max-height: calc(100dvh - 24px);
+      overflow-y: auto;
+      padding: 16px !important;
+    }
+
+    .admin-main .admin-procurement-request-header {
+      gap: 10px;
+      margin-bottom: 16px !important;
+    }
+
+    .admin-main .admin-procurement-request-title {
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      line-height: 18px !important;
+      overflow-wrap: anywhere;
+    }
+
+    .admin-main .admin-procurement-request-subtitle {
+      margin-top: 4px;
+      font-size: 12px !important;
+      font-weight: 400 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-procurement-request-x {
+      flex-shrink: 0;
+    }
+
+    .admin-main .admin-procurement-request-x > svg {
+      width: 16px !important;
+      height: 16px !important;
+    }
+
+    .admin-main .admin-procurement-request-details {
+      column-gap: 12px !important;
+      row-gap: 12px !important;
+    }
+
+    .admin-main .admin-procurement-request-details > div {
+      min-width: 0;
+    }
+
+    .admin-main .admin-procurement-request-details dt {
+      font-size: 10px !important;
+      font-weight: 500 !important;
+      line-height: 13px !important;
+    }
+
+    .admin-main .admin-procurement-request-details dd {
+      margin-top: 2px;
+      font-size: 11px !important;
+      font-weight: 500 !important;
+      line-height: 14px !important;
+      overflow-wrap: anywhere;
+    }
+
+    .admin-main .admin-procurement-request-priority .admin-badge,
+    .admin-main .admin-procurement-request-status .admin-badge {
+      min-height: 20px !important;
+      padding: 2px 6px !important;
+      font-size: 9px !important;
+      font-weight: 500 !important;
+      line-height: 12px !important;
+    }
+
+    .admin-main .admin-procurement-request-status .admin-status-badge > span:first-child {
+      width: 8px !important;
+      height: 8px !important;
+    }
+
+    .admin-main .admin-procurement-request-decision {
+      margin-top: 0;
+    }
+
+    .admin-main .admin-procurement-request-decision dd {
+      line-height: 15px !important;
+    }
+
+    .admin-main .admin-procurement-request-actions {
+      flex-wrap: wrap;
+      gap: 8px !important;
+      margin-top: 12px !important;
+      padding-top: 12px !important;
+    }
+
+    .admin-main .admin-procurement-request-action {
+      width: auto !important;
+      min-width: 0;
+      height: 36px !important;
+      min-height: 36px !important;
+      padding: 6px 10px !important;
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      line-height: 16px !important;
+    }
+  }
+}
+
+/* Product Catalog grid: mobile-only typography hierarchy. Semantic hooks keep
+   table view, actions, themes, and desktop card styling unchanged. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-product-catalog .product-catalog-grid-title {
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      line-height: 18px !important;
+    }
+
+    .admin-product-catalog .product-catalog-grid-meta,
+    .admin-product-catalog .product-catalog-grid-warehouse {
+      font-size: 12px !important;
+      font-weight: 400 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-product-catalog .product-catalog-grid-meta {
+      margin-top: 4px;
+    }
+
+    .admin-product-catalog .product-catalog-grid-stock {
+      margin-top: 10px !important;
+      margin-bottom: 10px !important;
+    }
+
+    .admin-product-catalog .product-catalog-grid-stock-label {
+      font-size: 12px !important;
+      font-weight: 400 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-product-catalog .product-catalog-grid-stock-value {
+      margin-top: 2px;
+      font-size: 14px !important;
+      font-weight: 500 !important;
+      line-height: 18px !important;
+    }
+
+    .admin-product-catalog .product-catalog-grid-other-value {
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      line-height: 16px !important;
+    }
+  }
+}
+
+/* Barcode Center: mobile-only search sizing and icon clearance. The unique
+   accessible label keeps this independent from every other Admin search. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main div:has(> input[aria-label="Search barcodes"]) {
+      position: relative;
+      width: 100%;
+      min-width: 0;
+      flex: 1 0 100%;
+    }
+
+    .admin-main input[aria-label="Search barcodes"] {
+      width: 100%;
+      height: 40px !important;
+      min-height: 40px !important;
+      padding: 6px 12px 6px 46px !important;
+      font-size: 12px !important;
+      font-weight: 400;
+      line-height: 16px !important;
+      text-overflow: clip;
+    }
+
+    .admin-main div:has(> input[aria-label="Search barcodes"]) > svg {
+      position: absolute;
+      top: 50%;
+      left: 16px;
+      width: 16px !important;
+      height: 16px !important;
+      translate: 0 0 !important;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .admin-main div:has(> div > input[aria-label="Search barcodes"]) {
+      gap: 10px !important;
+    }
+  }
+}
+
+/* Create Purchase Order: compact mobile form scale. All selectors are rooted
+   in the create modal so PO tables, details, handlers, and desktop stay intact. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-create-po-modal {
+      max-height: calc(100dvh - 24px);
+      padding: 16px 16px calc(16px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .admin-main .admin-create-po-header {
+      gap: 10px;
+      margin-bottom: 12px !important;
+    }
+
+    .admin-main .admin-create-po-title {
+      min-width: 0;
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      line-height: 22px !important;
+      white-space: normal;
+      overflow-wrap: break-word;
+    }
+
+    .admin-main .admin-create-po-content > * + * {
+      margin-top: 12px !important;
+    }
+
+    .admin-main .admin-create-po-linked {
+      padding: 10px !important;
+      font-size: 11px !important;
+      font-weight: 400;
+      line-height: 15px !important;
+    }
+
+    .admin-main .admin-create-po-linked strong {
+      font-size: inherit;
+      font-weight: 600;
+    }
+
+    .admin-main .admin-create-po-form {
+      gap: 12px !important;
+    }
+
+    .admin-main .admin-create-po-form label {
+      margin-bottom: 5px !important;
+      font-size: 11px !important;
+      font-weight: 500 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-po-form :is(input, select) {
+      width: 100%;
+      height: 36px !important;
+      min-height: 36px !important;
+      padding: 6px 11px !important;
+      font-size: 11px !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-create-po-form textarea {
+      width: 100%;
+      height: 52px !important;
+      min-height: 52px !important;
+      padding: 10px 11px !important;
+      font-size: 11px !important;
+      line-height: 16px !important;
+      resize: vertical;
+    }
+
+    .admin-main .admin-create-po-form :is(input, textarea)::placeholder {
+      font-size: 10px;
+    }
+
+    .admin-main .admin-create-po-items-title {
+      margin-bottom: 6px !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-po-add-item {
+      min-height: 24px !important;
+      margin-bottom: 6px !important;
+      padding: 2px 0 !important;
+      font-size: 10px !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-po-add-item > svg {
+      width: 11px !important;
+      height: 11px !important;
+    }
+
+    .admin-main .admin-create-po-items-table th {
+      padding: 4px 6px !important;
+      font-size: 9px !important;
+      font-weight: 500 !important;
+      line-height: 12px !important;
+    }
+
+    .admin-main .admin-create-po-items-table td {
+      padding: 4px 6px !important;
+      font-size: 10px !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-po-items-table :is(input, select) {
+      height: 32px !important;
+      min-height: 32px !important;
+      padding: 5px 7px !important;
+      font-size: 10px !important;
+      line-height: 14px !important;
+    }
+
+    .admin-main .admin-create-po-footer {
+      gap: 8px !important;
+      margin-top: 12px !important;
+      padding-top: 12px !important;
+    }
+
+    .admin-main .admin-create-po-action {
+      height: 36px !important;
+      min-height: 36px !important;
+      padding: 6px 12px !important;
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      line-height: 16px !important;
+    }
+
+    .admin-main .admin-create-po-action > svg {
+      width: 13px !important;
+      height: 13px !important;
+    }
   }
 }

@@ -171,7 +171,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const { color, bg, dotColor } = matchedConfig;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
+      className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {status}
@@ -190,11 +190,11 @@ const KPICard: React.FC<{
     <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-5 hover:border-[#3b82f6]/30 transition-all duration-200">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">
+          <p className="mobile-kpi-title text-slate-400 text-xs font-medium uppercase tracking-wider">
             {label}
           </p>
-          <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-          {subtitle && <p className="text-slate-500 text-xs mt-1">{subtitle}</p>}
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{value}</p>
+          {subtitle && <p className="mobile-kpi-helper text-slate-500 text-xs mt-1">{subtitle}</p>}
         </div>
         <div className={`p-2.5 bg-[#0b1220] rounded-lg ${color}`}>{icon}</div>
       </div>
@@ -304,7 +304,7 @@ const CreateReceivingModal: React.FC<{
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium mb-1.5 text-slate-300">Purchase Order *</label>
               <select
@@ -514,7 +514,7 @@ const ReceivingManagement: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#0b1220] text-slate-100 min-h-screen">
+    <div className="mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#0b1220] p-4 text-slate-100 sm:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -525,7 +525,7 @@ const ReceivingManagement: React.FC = () => {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
+          className="w-fit bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors sm:w-auto"
         >
           <Plus className="w-4 h-4" /> Create Receiving
         </button>
@@ -630,14 +630,14 @@ const ReceivingManagement: React.FC = () => {
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#0b1220] p-1" aria-label="Receiving view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#0b1220] p-1" aria-label="Receiving view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
       </div>
 
       {/* Full-width Table */}
       <div className="bg-[#111827] border border-[#1f2937] rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+        <div className="pm-table-scroll">
+          <table className="pm-responsive-table pm-cols-9 pm-sticky-1 w-full min-w-[900px]">
             <thead className="bg-[#0b1220]/50 border-b border-[#1f2937]">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -767,7 +767,7 @@ const ReceivingManagement: React.FC = () => {
                 onClick={() => setCurrentPage(p)}
                 className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
                   currentPage === p
-                    ? 'bg-cyan-500 text-slate-950'
+                    ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
                 }`}
               >
@@ -810,7 +810,7 @@ const ReceivingManagement: React.FC = () => {
               </div>
 
               {/* Details Grid */}
-              <div className="p-5 grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 gap-4 p-4 text-sm sm:grid-cols-2 sm:p-5">
                 <div>
                   <p className="text-slate-400">Receiving No.</p>
                   <p className="text-white font-medium">{selectedReceiving.receiving_no}</p>
@@ -844,8 +844,8 @@ const ReceivingManagement: React.FC = () => {
               {/* Products */}
               <div className="border-t border-[#1f2937] p-5">
                 <h4 className="text-sm font-medium text-slate-300 mb-3">Products</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="pm-table-scroll">
+                  <table className="pm-responsive-table pm-cols-4 pm-sticky-1 w-full min-w-[560px] text-sm">
                     <thead className="border-b border-[#1f2937]">
                       <tr className="text-left text-slate-400">
                         <th className="px-2 py-2 font-medium">Product</th>

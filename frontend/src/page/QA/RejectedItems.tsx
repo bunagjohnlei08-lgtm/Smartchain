@@ -36,8 +36,8 @@ type ViewMode = 'list' | 'grid';
 
 const ViewModeToggle: React.FC<{ value: ViewMode; onChange: (value: ViewMode) => void }> = ({ value, onChange }) => (
   <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1" role="group" aria-label="Rejected items view">
-    <button type="button" onClick={() => onChange('list')} aria-label="Show rejected items as a list" aria-pressed={value === 'list'} title="List view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Table className="w-4 h-4" /></button>
-    <button type="button" onClick={() => onChange('grid')} aria-label="Show rejected items as a grid" aria-pressed={value === 'grid'} title="Grid view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Grid className="w-4 h-4" /></button>
+    <button type="button" onClick={() => onChange('list')} aria-label="Show rejected items as a list" aria-pressed={value === 'list'} title="List view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Table className="w-4 h-4" /></button>
+    <button type="button" onClick={() => onChange('grid')} aria-label="Show rejected items as a grid" aria-pressed={value === 'grid'} title="Grid view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Grid className="w-4 h-4" /></button>
   </div>
 );
 
@@ -75,7 +75,7 @@ const ResultBadge: React.FC<{ result: unknown }> = ({ result }) => {
       : 'text-slate-300 bg-slate-500/10 border-slate-500/20';
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${classes}`}>
+    <span className={`qa-badge ${normalized === 'Partial' ? 'qa-badge-attention' : ''} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${classes}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
       {label}
     </span>
@@ -199,7 +199,7 @@ const RejectedItems: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+    <div className="qa-rejected-items w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-white">Rejected Items</h1>
@@ -212,8 +212,8 @@ const RejectedItems: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">Rejected Records</p><p className="text-2xl font-bold text-white mt-1.5">{visibleRecords.length}</p><p className="text-xs text-slate-500 mt-1">Most recent month</p></div><div className="p-2.5 rounded-full bg-red-500/10 text-red-400"><Ban className="w-6 h-6" /></div></div>
-        <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-wider text-slate-400">Rejected Quantity</p><p className="text-2xl font-bold text-white mt-1.5">{totalRejectedQuantity.toLocaleString()}</p><p className="text-xs text-slate-500 mt-1">Within the visible month</p></div><div className="p-2.5 rounded-full bg-amber-500/10 text-amber-400"><AlertCircle className="w-6 h-6" /></div></div>
+        <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 flex items-start justify-between"><div><p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">Rejected Records</p><p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{visibleRecords.length}</p><p className="mobile-kpi-helper text-xs text-slate-500 mt-1">Most recent month</p></div><div className="p-2.5 rounded-full bg-red-500/10 text-red-400"><Ban className="w-6 h-6" /></div></div>
+        <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 flex items-start justify-between"><div><p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">Rejected Quantity</p><p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{totalRejectedQuantity.toLocaleString()}</p><p className="mobile-kpi-helper text-xs text-slate-500 mt-1">Within the visible month</p></div><div className="p-2.5 rounded-full bg-amber-500/10 text-amber-400"><AlertCircle className="w-6 h-6" /></div></div>
       </div>
 
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">

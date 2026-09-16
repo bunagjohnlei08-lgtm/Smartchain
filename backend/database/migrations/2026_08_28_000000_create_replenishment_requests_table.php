@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained('products')->restrictOnDelete();
             $table->unsignedInteger('requested_qty');
             $table->string('priority', 16)->default('Medium')->index();
-            $table->string('status', 32)->default('Draft')->index();
+            $table->string('status', 32)->default('draft')->index();
             $table->dateTime('submitted_at')->nullable()->index();
 
             // Admin Procurement decision.

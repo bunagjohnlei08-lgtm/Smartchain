@@ -23,7 +23,7 @@ const highlights = [
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[#020914] px-3 py-3 text-slate-100 sm:px-4 sm:py-4 md:flex md:items-center md:justify-center lg:px-5 xl:px-8 xl:py-7">
+    <main className="auth-surface relative min-h-screen overflow-x-hidden bg-[#020914] px-3 py-3 text-slate-100 sm:px-4 sm:py-4 md:flex md:items-center md:justify-center lg:px-5 xl:px-8 xl:py-7">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(14,116,255,0.16),transparent_32%),radial-gradient(circle_at_84%_52%,rgba(37,99,235,0.08),transparent_34%)]" />
       <div className="relative mx-auto grid w-full max-w-[1400px] overflow-hidden rounded-2xl border border-blue-400/15 bg-[#06101d]/95 shadow-[0_24px_80px_rgba(0,0,0,0.5)] md:grid-cols-[48%_52%]">
         <section className="relative overflow-hidden border-b border-blue-300/15 bg-[linear-gradient(145deg,#071c37_0%,#06162d_52%,#061326_100%)] p-4 sm:p-5 md:border-b-0 md:border-r md:p-4 lg:p-7 xl:p-10">

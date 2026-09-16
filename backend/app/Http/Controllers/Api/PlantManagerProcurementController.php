@@ -17,8 +17,8 @@ use Illuminate\Validation\ValidationException;
 
 class PlantManagerProcurementController extends Controller
 {
-    private const STATUS_DRAFT = 'draft';
-    private const STATUS_PENDING = 'pending';
+    private const STATUS_DRAFT = ReplenishmentRequest::STATUS_DRAFT;
+    private const STATUS_PENDING = ReplenishmentRequest::STATUS_PENDING;
 
     public function options(Request $request): JsonResponse
     {

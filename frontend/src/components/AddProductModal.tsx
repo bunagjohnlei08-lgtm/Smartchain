@@ -19,8 +19,6 @@ const AddProductModal: React.FC<{
   onClose: () => void;
   onSave: (data: ProductFormData) => void;
 }> = ({ isOpen, onClose, onSave }) => {
-  if (!isOpen) return null;
-
   const [formData, setFormData] = useState<ProductFormData>({
     sku: '',
     name: '',
@@ -32,6 +30,8 @@ const AddProductModal: React.FC<{
     unit: 'pcs',
     reorderLimit: 0
   });
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

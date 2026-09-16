@@ -72,7 +72,7 @@ class InventoryController extends Controller
         }
 
         $items = $query
-            ->orderByDesc('inventories.created_at')
+            ->orderByDesc('inventories.updated_at')
             ->orderByDesc('inventories.id')
             ->get()
             ->map(fn(Inventory $inventory) => $this->present($inventory, $user));

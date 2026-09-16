@@ -1,11 +1,11 @@
 // src/pages/admin/Reports.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
   FileText,
   Eye,
-  Printer,
   Download,
   BarChart3,
   Clock,
@@ -14,8 +14,6 @@ import {
   CheckCircle,
   Plus,
   Search,
-  ChevronDown,
-  MoreVertical,
   AlertCircle,
   Package,
   Truck,
@@ -24,11 +22,8 @@ import {
   LayoutGrid,
   Zap,
   X,
-  RefreshCw,
 } from 'lucide-react';
 import {
-  PieChart,
-  Pie,
   Cell,
   BarChart,
   Bar,
@@ -50,7 +45,7 @@ interface ReportItem {
   category: string;
   lastGenerated: string;
   format: 'PDF' | 'Excel' | 'CSV';
-  status: 'Generated' | 'Pending';
+  status: 'Available';
   fileSize: string;
   parameters: string;
 }
@@ -62,12 +57,16 @@ interface Category {
 }
 
 interface ReportsDashboardResponse {
-  metrics: { total_reports_available:number; exports_today:number; pending_reports:number; generated_today:number; total_inventory_value:number; ai_forecast_accuracy:number };
-  reports_list: Array<{ id:string; name:string; description:string; category:string; last_generated:string|null; format:'PDF'|'Excel'|'CSV'; status:'Generated'|'Pending'; file_size:string; parameters:string }>;
-  inventory_value_by_warehouse: Array<{ name:string; value:number; color:string }>;
+  metrics: { total_reports_available:number; exports_today:number|null; pending_reports:number|null; generated_today:number|null; warehouse_capacity:{ used:number; total:number|null; utilization_percentage:number|null }; total_stock_units:number; ai_forecast_accuracy:number|null };
+  reports_list: Array<{ id:string; name:string; description:string; category:string; last_generated:string|null; format:'PDF'|'Excel'|'CSV'; status:'Available'; file_size:string; parameters:string }>;
+  warehouse_capacity_overview: Array<{ name:string; code:string; used:number; capacity:number|null; utilization_percentage:number|null; color:string }>;
   stock_status_overview: Array<{ name:string; value:number; color:string }>;
   recent_exports: Array<{ filename:string; date:string; size:string; format:'PDF'|'Excel'|'CSV' }>;
 }
+
+type WarehouseCapacityItem = ReportsDashboardResponse['warehouse_capacity_overview'][number];
+type StockStatusItem = ReportsDashboardResponse['stock_status_overview'][number];
+type ExportItem = { name:string; format:'PDF'|'Excel'|'CSV'; date:string; size:string };
 
 // ============================================
 // MOCK DATA
@@ -86,154 +85,15 @@ const reportCategories: Category[] = [
   { id: 'system', name: 'System Reports', icon: <AlertCircle className="w-4 h-4" /> },
 ];
 
-const mockReportsData: ReportItem[] = [
-  {
-    id: '1',
-    name: 'Stock Movement Report',
-    description: 'Detailed logs of stock in, out, transfers and adjustments.',
-    category: 'Stock Movement Reports',
-    lastGenerated: 'May 31, 2025 09:15 AM',
-    format: 'PDF',
-    status: 'Generated',
-    fileSize: '2.4 MB',
-    parameters: 'Date Range: May 1 - May 31, 2025',
-  },
-  {
-    id: '2',
-    name: 'Receiving Report',
-    description: 'Incoming deliveries, QA results, and receiving summary.',
-    category: 'Receiving Reports',
-    lastGenerated: 'May 31, 2025 08:45 AM',
-    format: 'Excel',
-    status: 'Generated',
-    fileSize: '1.1 MB',
-    parameters: 'Date Range: May 1 - May 31, 2025',
-  },
-  {
-    id: '3',
-    name: 'Inventory Valuation Report',
-    description: 'Stock value by cost method and warehouse.',
-    category: 'Inventory Reports',
-    lastGenerated: 'May 31, 2025 08:30 AM',
-    format: 'PDF',
-    status: 'Generated',
-    fileSize: '3.7 MB',
-    parameters: 'Cost Method: FIFO, Warehouse: All',
-  },
-  {
-    id: '4',
-    name: 'Shipment Report',
-    description: 'Orders shipped, in transit, delivered and pending.',
-    category: 'Shipment Reports',
-    lastGenerated: 'May 31, 2025 07:55 AM',
-    format: 'CSV',
-    status: 'Generated',
-    fileSize: '1.8 MB',
-    parameters: 'Date Range: May 1 - May 31, 2025',
-  },
-  {
-    id: '5',
-    name: 'Order Report',
-    description: 'Customer orders summary and fulfillment status.',
-    category: 'Order Reports',
-    lastGenerated: 'May 31, 2025 07:30 AM',
-    format: 'Excel',
-    status: 'Pending',
-    fileSize: '0.9 MB',
-    parameters: 'Date Range: May 1 - May 31, 2025',
-  },
-  {
-    id: '6',
-    name: 'Procurement Report',
-    description: 'Replenishment, approvals, and procurement summary.',
-    category: 'Procurement Reports',
-    lastGenerated: 'May 31, 2025 06:40 AM',
-    format: 'PDF',
-    status: 'Generated',
-    fileSize: '2.1 MB',
-    parameters: 'Date Range: May 1 - May 31, 2025',
-  },
-  {
-    id: '7',
-    name: 'Supplier Performance Report',
-    description: 'Supplier rating, on-time delivery and acceptance rate.',
-    category: 'Supplier Reports',
-    lastGenerated: 'May 31, 2025 06:20 AM',
-    format: 'Excel',
-    status: 'Generated',
-    fileSize: '1.5 MB',
-    parameters: 'Period: Q2 2025',
-  },
-  {
-    id: '8',
-    name: 'Low Stock Alert Report',
-    description: 'List of items under minimum stock level.',
-    category: 'Inventory Reports',
-    lastGenerated: 'May 31, 2025 05:50 AM',
-    format: 'PDF',
-    status: 'Generated',
-    fileSize: '0.6 MB',
-    parameters: 'Threshold: Min Stock Level',
-  },
-  {
-    id: '9',
-    name: 'AI Demand Forecast Report',
-    description: 'Forecasted demand, trends and recommended replenishment.',
-    category: 'AI Forecast Reports',
-    lastGenerated: 'May 31, 2025 05:10 AM',
-    format: 'CSV',
-    status: 'Generated',
-    fileSize: '4.2 MB',
-    parameters: 'Model: Prophet, Horizon: 30 days',
-  },
-  {
-    id: '10',
-    name: 'Warehouse Utilization Report',
-    description: 'Warehouse utilization and capacity overview.',
-    category: 'Warehouse Reports',
-    lastGenerated: 'May 31, 2025 04:30 AM',
-    format: 'Excel',
-    status: 'Generated',
-    fileSize: '1.3 MB',
-    parameters: 'Warehouse: All, Capacity: 100%',
-  },
-];
-
-const warehouseData = [
-  { name: 'Central Depot', value: 10.45, color: '#06b6d4' },
-  { name: 'North Warehouse', value: 6.62, color: '#8b5cf6' },
-  { name: 'South Warehouse', value: 4.12, color: '#f59e0b' },
-  { name: 'East Warehouse', value: 3.59, color: '#10b981' },
-];
-
-const stockStatusData = [
-  { name: 'Available', value: 6247, color: '#10b981' },
-  { name: 'Reserved', value: 2183, color: '#3b82f6' },
-  { name: 'In Transit', value: 1097, color: '#8b5cf6' },
-  { name: 'Low Stock', value: 742, color: '#f59e0b' },
-  { name: 'Out of Stock', value: 318, color: '#ef4444' },
-];
-
-const recentExports = [
-  { name: 'Inventory_Report_May31.xlsx', format: 'Excel', date: 'May 31, 2025 10:30 AM', size: '2.4 MB' },
-  { name: 'Shipment_Summary.pdf', format: 'PDF', date: 'May 31, 2025 08:45 AM', size: '1.1 MB' },
-  { name: 'Stock_Movement_Export.csv', format: 'CSV', date: 'May 31, 2025 07:55 AM', size: '3.7 MB' },
-  { name: 'Procurement_Report.pdf', format: 'PDF', date: 'May 31, 2025 03:00 AM', size: '0.8 MB' },
-  { name: 'Supplier_Scorecard.xlsx', format: 'Excel', date: 'May 31, 2025 09:15 AM', size: '1.9 MB' },
-];
 
 // ============================================
 // HELPER COMPONENTS
 // ============================================
 
-const StatusBadge: React.FC<{ status: 'Generated' | 'Pending' }> = ({ status }) => {
-  const styles = {
-    Generated: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-    Pending: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  };
+const StatusBadge: React.FC<{ status: 'Available' }> = ({ status }) => {
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>
-      {status === 'Generated' ? <CheckCircle className="w-3 h-3 mr-1" /> : <Clock className="w-3 h-3 mr-1" />}
+    <span className="admin-badge inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+      <CheckCircle className="mr-1 h-3 w-3" />
       {status}
     </span>
   );
@@ -246,7 +106,7 @@ const FormatBadge: React.FC<{ format: 'PDF' | 'Excel' | 'CSV' }> = ({ format }) 
     CSV: 'text-slate-400 bg-slate-500/10 border-slate-500/20',
   };
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${styles[format]}`}>
+    <span className={`admin-badge admin-report-format-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${styles[format]}`}>
       {format}
     </span>
   );
@@ -267,7 +127,7 @@ const CategoryBadge: React.FC<{ category: string }> = ({ category }) => {
   };
   const color = colors[category] || 'text-slate-400 bg-slate-500/10 border-slate-500/20';
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
+    <span className={`admin-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
       {category}
     </span>
   );
@@ -281,14 +141,18 @@ const Reports: React.FC = () => {
   const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string>('inventory');
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Available'>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [reports, setReports] = useState<(typeof mockReportsData)[number][]>([]);
-  const [warehouseChartData, setWarehouseChartData] = useState<(typeof warehouseData)[number][]>([]);
-  const [stockChartData, setStockChartData] = useState<(typeof stockStatusData)[number][]>([]);
-  const [exportFiles, setExportFiles] = useState<(typeof recentExports)[number][]>([]);
-  const [metrics, setMetrics] = useState({ total_reports_available:0, exports_today:0, pending_reports:0, generated_today:0, total_inventory_value:0, ai_forecast_accuracy:0 });
+  const [reports, setReports] = useState<ReportItem[]>([]);
+  const [warehouseChartData, setWarehouseChartData] = useState<WarehouseCapacityItem[]>([]);
+  const [stockChartData, setStockChartData] = useState<StockStatusItem[]>([]);
+  const [exportFiles, setExportFiles] = useState<ExportItem[]>([]);
+  const [metrics, setMetrics] = useState<ReportsDashboardResponse['metrics'] | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type:'success'|'error'; text:string } | null>(null);
+  const [isScheduleInfoOpen, setIsScheduleInfoOpen] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const itemsPerPage = 10;
   const isDark = theme === 'dark';
   const chartGridColor = isDark ? '#1e293b' : '#E2E8F0';
@@ -304,35 +168,40 @@ const Reports: React.FC = () => {
   };
 
   const [isCustomReportOpen, setIsCustomReportOpen] = useState(false);
+  const [exportMode, setExportMode] = useState<'raw' | 'custom'>('raw');
   const [reportTitle, setReportTitle] = useState('');
   const [reportCategory, setReportCategory] = useState('inventory');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [exportFormat, setExportFormat] = useState<'PDF' | 'Excel' | 'CSV'>('PDF');
-  const [reportNotes, setReportNotes] = useState('');
+  const [exportFormat, setExportFormat] = useState<'CSV'>('CSV');
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false);
+  useAdminDetailOverlay(isViewDrawerOpen && selectedReport !== null);
 
-  useEffect(() => {
-    let active = true;
-    apiClient.get<ReportsDashboardResponse>('/admin/reports/dashboard')
-      .then(({ data }) => {
-        if (!active) return;
-        setMetrics(data.metrics);
-        setReports(data.reports_list.map((report) => ({ id:report.id, name:report.name, description:report.description, category:report.category, lastGenerated:report.last_generated ? new Date(report.last_generated).toLocaleString() : 'Not generated', format:report.format, status:report.status, fileSize:report.file_size, parameters:report.parameters })));
-        setWarehouseChartData(data.inventory_value_by_warehouse);
-        setStockChartData(data.stock_status_overview);
-        setExportFiles(data.recent_exports.map((file) => ({ name:file.filename, format:file.format, date:new Date(file.date).toLocaleString(), size:file.size })));
-        setDashboardError(null);
-      })
-      .catch((error) => { if (active) setDashboardError(error?.response?.data?.message || 'Unable to load reports dashboard.'); })
-      .finally(() => { if (active) setDashboardLoading(false); });
-    return () => { active = false; };
+  const fetchDashboard = useCallback(async (signal?: AbortSignal) => {
+    setDashboardLoading(true);
+    try {
+      const { data } = await apiClient.get<ReportsDashboardResponse>('/admin/reports/dashboard', { signal });
+      setMetrics(data.metrics);
+      setReports(data.reports_list.map((report) => ({ id:report.id, name:report.name, description:report.description, category:report.category, lastGenerated:report.last_generated ? new Date(report.last_generated).toLocaleString() : 'Not generated', format:report.format, status:report.status, fileSize:report.file_size, parameters:report.parameters })));
+      setWarehouseChartData(data.warehouse_capacity_overview);
+      setStockChartData(data.stock_status_overview);
+      setExportFiles(data.recent_exports.map((file) => ({ name:file.filename, format:file.format, date:new Date(file.date).toLocaleString(), size:file.size })));
+      setDashboardError(null);
+    } catch (error: any) {
+      if (error?.code !== 'ERR_CANCELED') setDashboardError(error?.response?.data?.message || 'Unable to load reports dashboard.');
+    } finally {
+      if (!signal?.aborted) setDashboardLoading(false);
+    }
   }, []);
 
-  const currency = (value:number) => new Intl.NumberFormat('en-PH', { style:'currency', currency:'PHP' }).format(value);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchDashboard(controller.signal);
+    return () => controller.abort();
+  }, [fetchDashboard]);
 
   const openDrawer = (report: ReportItem) => {
     setSelectedReport(report);
@@ -344,43 +213,70 @@ const Reports: React.FC = () => {
     setSelectedReport(null);
   };
 
-  const categoryLabelMap: Record<string, string> = {
-    inventory: 'Inventory Reports',
-    'stock-movement': 'Stock Movement Reports',
-    receiving: 'Receiving Reports',
-    shipment: 'Shipment Reports',
-    order: 'Order Reports',
-    procurement: 'Procurement Reports',
+  const openExportModal = (mode: 'raw' | 'custom') => {
+    setExportMode(mode);
+    setActionMessage(null);
+    setIsCustomReportOpen(true);
   };
 
-  const generateReport = () => {
-    if (!reportTitle.trim() || !startDate || !endDate) return;
+  const downloadReport = async (report: Pick<ReportItem, 'id' | 'name'>, options?: { startDate?:string; endDate?:string; name?:string }) => {
+    if (downloadingId) return false;
+    setDownloadingId(report.id);
+    setActionMessage(null);
+    try {
+      const response = await apiClient.post('/admin/reports/export', {
+        report_id: report.id,
+        format: 'CSV',
+        name: options?.name || report.name,
+        start_date: options?.startDate || undefined,
+        end_date: options?.endDate || undefined,
+      }, { responseType: 'blob' });
+      const disposition = String(response.headers['content-disposition'] ?? '');
+      const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || `${report.id}-${new Date().toISOString().slice(0, 10)}.csv`;
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setActionMessage({ type:'success', text:`${filename} downloaded.` });
+      await fetchDashboard();
+      return true;
+    } catch (error: any) {
+      setActionMessage({ type:'error', text:error?.response?.data?.message || 'Unable to export report data.' });
+      return false;
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const generateReport = async () => {
+    if (exportMode === 'custom' && !reportTitle.trim()) {
+      setActionMessage({ type:'error', text:'Enter a report title.' });
+      return;
+    }
+    if (startDate && endDate && endDate < startDate) {
+      setActionMessage({ type:'error', text:'End date must be on or after the start date.' });
+      return;
+    }
     setIsGenerating(true);
-    setTimeout(() => {
-      const newReport: ReportItem = {
-        id: Date.now().toString(),
-        name: reportTitle,
-        description: reportNotes || `Custom ${categoryLabelMap[reportCategory] || 'Report'}`,
-        category: categoryLabelMap[reportCategory] || 'System Reports',
-        lastGenerated: new Date().toLocaleString('en-US', {
-          month: 'short', day: 'numeric', year: 'numeric',
-          hour: '2-digit', minute: '2-digit',
-        }),
-        format: exportFormat,
-        status: 'Generated',
-        fileSize: 'N/A',
-        parameters: `Date Range: ${startDate} - ${endDate}`,
-      };
-      setReports(prev => [newReport, ...prev]);
+    const reportIdMap: Record<string,string> = { inventory:'inventory-summary', 'stock-movement':'stock-movement', receiving:'receiving', shipment:'shipment', order:'order', procurement:'procurement' };
+    const reportId = reportIdMap[reportCategory];
+    try {
+      const selectedDefinition = reports.find((report) => report.id === reportId);
+      const exportName = exportMode === 'custom' ? reportTitle.trim() : (selectedDefinition?.name ?? reportId);
+      const exported = await downloadReport({ id:reportId, name:exportName }, { name:exportName, startDate, endDate });
+      if (!exported) return;
       setReportTitle('');
       setReportCategory('inventory');
       setStartDate('');
       setEndDate('');
-      setExportFormat('PDF');
-      setReportNotes('');
+      setExportFormat('CSV');
       setIsGenerating(false);
       setIsCustomReportOpen(false);
-    }, 1200);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const resetForm = () => {
@@ -388,8 +284,7 @@ const Reports: React.FC = () => {
     setReportCategory('inventory');
     setStartDate('');
     setEndDate('');
-    setExportFormat('PDF');
-    setReportNotes('');
+    setExportFormat('CSV');
   };
 
   // Filter reports based on category and search
@@ -397,7 +292,8 @@ const Reports: React.FC = () => {
     const categoryMatch = selectedCategory === 'all' || report.category === reportCategories.find(c => c.id === selectedCategory)?.name;
     const searchMatch = report.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         report.description.toLowerCase().includes(searchTerm.toLowerCase());
-    return categoryMatch && searchMatch;
+    const statusMatch = statusFilter === 'all' || report.status === statusFilter;
+    return categoryMatch && searchMatch && statusMatch;
   });
 
   // Pagination
@@ -424,16 +320,16 @@ const Reports: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <button className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+          <button onClick={() => openExportModal('raw')} className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
             <Download className="w-4 h-4 shrink-0" />
             Export Data
           </button>
-          <button className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+          <button onClick={() => setIsScheduleInfoOpen(true)} className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
             <Calendar className="w-4 h-4 shrink-0" />
             Schedule Report
           </button>
           <button
-            onClick={() => setIsCustomReportOpen(true)}
+            onClick={() => openExportModal('custom')}
             className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-300/60"
           >
             <Plus className="w-4 h-4 shrink-0" />
@@ -444,10 +340,10 @@ const Reports: React.FC = () => {
 
       {/* CUSTOM REPORT MODAL */}
       {isCustomReportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0b101d] border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-labelledby="export-dialog-title">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-700/80 bg-white shadow-2xl dark:bg-[#0b101d]">
             <div className="flex items-center justify-between p-5 border-b border-slate-800/60">
-              <h2 className="text-lg font-semibold text-white">Create Custom Report</h2>
+              <h2 id="export-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-white">{exportMode === 'custom' ? 'Create Custom Report' : 'Export Data'}</h2>
               <button
                 onClick={() => { setIsCustomReportOpen(false); resetForm(); }}
                 className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
@@ -456,8 +352,7 @@ const Reports: React.FC = () => {
               </button>
             </div>
             <div className="p-5 space-y-4">
-              {/* Report Title */}
-              <div>
+              {exportMode === 'custom' && <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">Report Title</label>
                 <input
                   type="text"
@@ -466,7 +361,7 @@ const Reports: React.FC = () => {
                   placeholder="e.g. Monthly Inventory Summary"
                   className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                 />
-              </div>
+              </div>}
 
               {/* Category Dropdown */}
               <div>
@@ -486,7 +381,7 @@ const Reports: React.FC = () => {
               </div>
 
               {/* Date Range */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1.5">Start Date</label>
                   <input
@@ -511,14 +406,14 @@ const Reports: React.FC = () => {
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">Export Format</label>
                 <div className="flex items-center gap-4">
-                  {['PDF', 'Excel', 'CSV'].map((fmt) => (
+                  {['CSV'].map((fmt) => (
                     <label key={fmt} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="radio"
                         name="exportFormat"
                         value={fmt}
                         checked={exportFormat === fmt}
-                        onChange={() => setExportFormat(fmt as 'PDF' | 'Excel' | 'CSV')}
+                        onChange={() => setExportFormat(fmt as 'CSV')}
                         className="accent-cyan-500"
                       />
                       <span className="text-sm text-slate-300">{fmt}</span>
@@ -527,18 +422,8 @@ const Reports: React.FC = () => {
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Notes / File Description</label>
-                <textarea
-                  value={reportNotes}
-                  onChange={(e) => setReportNotes(e.target.value)}
-                  placeholder="Optional description or notes for this report..."
-                  rows={3}
-                  className="w-full bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 resize-none"
-                />
-              </div>
             </div>
+            {actionMessage?.type === 'error' && <p role="alert" className="mx-5 mb-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">{actionMessage.text}</p>}
             <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-800/60">
               <button
                 onClick={() => { setIsCustomReportOpen(false); resetForm(); }}
@@ -558,23 +443,27 @@ const Reports: React.FC = () => {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 ) : null}
-                {isGenerating ? 'Generating...' : 'Generate Report'}
+                {isGenerating ? 'Exporting...' : exportMode === 'custom' ? 'Generate & Download CSV' : 'Export CSV'}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {isScheduleInfoOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="schedule-info-title"><div className="w-full max-w-md rounded-2xl border border-slate-700 bg-white p-5 shadow-2xl dark:bg-[#0b101d]"><div className="flex items-start justify-between gap-3"><div><h2 id="schedule-info-title" className="font-semibold text-slate-900 dark:text-white">Scheduled reports unavailable</h2><p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">This project has no scheduled-report storage, queue job, scheduler command, or delivery service. No schedule was created.</p></div><button onClick={() => setIsScheduleInfoOpen(false)} aria-label="Close schedule information" className="min-h-11 min-w-11 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="mx-auto h-5 w-5" /></button></div></div></div>}
+
+      {actionMessage && <div role="status" className={`rounded-xl border px-4 py-3 text-sm ${actionMessage.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'}`}>{actionMessage.text}</div>}
+
       {/* KPI CARDS */}
       {dashboardError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{dashboardError}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {[
-          { label: 'Total Reports', value: metrics.total_reports_available, subtitle: 'Available Reports', icon: <FileText className="w-4 h-4 text-blue-400" /> },
-          { label: 'Exports Today', value: metrics.exports_today, subtitle: 'Excel / PDF / CSV', icon: <Download className="w-4 h-4 text-emerald-400" /> },
-          { label: 'Pending Reports', value: metrics.pending_reports, subtitle: 'Awaiting data', icon: <Clock className="w-4 h-4 text-amber-400" /> },
-          { label: 'Generated Today', value: metrics.generated_today, subtitle: 'All Reports', icon: <CheckCircle className="w-4 h-4 text-cyan-400" /> },
-          { label: 'Total Inventory Value', value: currency(metrics.total_inventory_value), subtitle: 'Across All Warehouses', icon: <BarChart3 className="w-4 h-4 text-purple-400" /> },
-          { label: 'AI Forecast Accuracy', value: `${metrics.ai_forecast_accuracy}%`, subtitle: 'This Month', icon: <TrendingUp className="w-4 h-4 text-rose-400" /> },
+          { label: 'Total Reports', value: metrics?.total_reports_available ?? 'N/A', subtitle: 'Available report definitions', icon: <FileText className="w-4 h-4 text-blue-400" /> },
+          { label: 'Exports Today', value: metrics?.exports_today ?? 'N/A', subtitle: metrics?.exports_today === null ? 'Export history is not recorded' : 'Excel / PDF / CSV', icon: <Download className="w-4 h-4 text-emerald-400" /> },
+          { label: 'Pending Reports', value: metrics?.pending_reports ?? 'N/A', subtitle: metrics?.pending_reports === null ? 'No scheduling workflow configured' : 'Awaiting generation', icon: <Clock className="w-4 h-4 text-amber-400" /> },
+          { label: 'Generated Today', value: metrics?.generated_today ?? 'N/A', subtitle: metrics?.generated_today === null ? 'Generation history is not recorded' : 'All reports', icon: <CheckCircle className="w-4 h-4 text-cyan-400" /> },
+          { label: metrics?.warehouse_capacity.total ? 'Warehouse Capacity' : 'Total Stock Units', value: metrics?.warehouse_capacity.total ? `${metrics.warehouse_capacity.utilization_percentage}%` : (metrics?.total_stock_units ?? 'N/A'), subtitle: metrics?.warehouse_capacity.total ? `${metrics.warehouse_capacity.used.toLocaleString()} / ${metrics.warehouse_capacity.total.toLocaleString()} units` : 'Capacity configuration unavailable', icon: <WarehouseIcon className="w-4 h-4 text-purple-400" /> },
+          { label: 'AI Forecast Accuracy', value: metrics?.ai_forecast_accuracy === null || metrics?.ai_forecast_accuracy === undefined ? 'N/A' : `${metrics.ai_forecast_accuracy}%`, subtitle: metrics?.ai_forecast_accuracy === null ? 'No measured forecast results' : 'Measured forecast performance', icon: <TrendingUp className="w-4 h-4 text-rose-400" /> },
         ].map((kpi, idx) => (
           <div key={idx} className="min-h-32 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
             <div className="flex items-start justify-between">
@@ -583,9 +472,9 @@ const Reports: React.FC = () => {
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-xl font-bold text-white">{dashboardLoading ? '—' : kpi.value}</p>
-              <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-300">{kpi.label}</p>
-              <p className="text-xs text-slate-500 mt-1">{kpi.subtitle}</p>
+              <p className="admin-kpi-value text-xl font-bold text-white">{dashboardLoading ? '—' : kpi.value}</p>
+              <p className="admin-kpi-title mt-1 text-xs font-medium uppercase tracking-wider text-slate-300">{kpi.label}</p>
+              <p className="admin-kpi-helper text-xs text-slate-500 mt-1">{kpi.subtitle}</p>
             </div>
           </div>
         ))}
@@ -607,7 +496,7 @@ const Reports: React.FC = () => {
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`w-full min-h-11 text-left px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${
                   isActive
-                    ? 'border border-cyan-500/60 bg-cyan-500/10 text-cyan-300'
+                    ? 'border border-slate-200 bg-slate-200 text-slate-900 dark:border-cyan-500/60 dark:bg-cyan-500/10 dark:text-cyan-300'
                     : 'border border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white'
                 }`}
               >
@@ -635,41 +524,36 @@ const Reports: React.FC = () => {
                 />
               </div>
 
-              <select className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                <option>All Categories</option>
+              <select aria-label="Report category" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                <option value="all">All Categories</option>
                 {reportCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
 
-              <select className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <select aria-label="Warehouse" disabled title="Report definitions are not warehouse-specific" className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60">
                 <option>All Warehouses</option>
                 {warehouseChartData.map((warehouse) => <option key={warehouse.name}>{warehouse.name}</option>)}
               </select>
 
-              <div className="min-h-11 sm:col-span-2 xl:col-span-4 flex items-center justify-between gap-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300">
+              <div title="Generation history is not recorded" className="min-h-11 sm:col-span-2 xl:col-span-4 flex items-center justify-between gap-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-500">
                 <Calendar className="w-4 h-4 text-slate-500" />
-                <span>May 1, 2025 - May 31, 2025</span>
-                <ChevronDown className="w-4 h-4 text-slate-500" />
+                <span>Generation dates unavailable</span>
+                <AlertCircle className="w-4 h-4 text-slate-500" />
               </div>
 
-              <select className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                <option>All Status</option>
-                <option>Generated</option>
-                <option>Pending</option>
+              <select aria-label="Report status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'Available')} className="min-h-11 xl:col-span-2 bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                <option value="all">All Status</option>
+                <option value="Available">Available</option>
               </select>
 
-              <button className="min-h-11 sm:col-span-2 xl:col-span-3 xl:col-start-10 px-4 py-2 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                <FileText className="w-4 h-4" />
-                Export History
-              </button>
             </div>
           </div>
 
           {/* Report Table */}
-          <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[1050px] table-auto text-left border-collapse text-sm">
+          <div className="admin-reports-table-shell bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden">
+            <div className="admin-table-scroll w-full">
+              <table className="admin-reports-table admin-responsive-table admin-cols-7 admin-sticky-1 w-full min-w-[1050px] table-auto text-left border-collapse text-sm">
                 <thead className="bg-[#070a12] border-b border-slate-800/50">
                   <tr>
                     <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Report Name</th>
@@ -678,7 +562,7 @@ const Reports: React.FC = () => {
                     <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Last Generated</th>
                     <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Format</th>
                     <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-300">Status</th>
-                    <th className="px-4 py-3.5 text-right min-w-[150px] text-xs font-semibold uppercase tracking-wider text-slate-300">Actions</th>
+                    <th className="w-28 min-w-28 px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-slate-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -690,19 +574,13 @@ const Reports: React.FC = () => {
                       <td className="px-4 py-4 text-slate-300 text-xs whitespace-nowrap">{report.lastGenerated}</td>
                       <td className="px-4 py-4"><FormatBadge format={report.format} /></td>
                       <td className="px-4 py-4"><StatusBadge status={report.status} /></td>
-                      <td className="px-4 py-4 text-right min-w-[150px]">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="w-28 min-w-28 px-4 py-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
                           <button onClick={() => openDrawer(report)} aria-label={`View ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button aria-label={`Download ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                          <button onClick={() => void downloadReport(report)} disabled={downloadingId !== null} aria-label={`Download ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50">
                             <Download className="w-4 h-4" />
-                          </button>
-                          <button aria-label={`Print ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                            <Printer className="w-4 h-4" />
-                          </button>
-                          <button aria-label={`More actions for ${report.name}`} className="min-w-9 min-h-9 p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                            <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -720,7 +598,7 @@ const Reports: React.FC = () => {
             </div>
 
             {/* Pagination */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4 border-t border-slate-800/80 bg-[#070a12]/50">
+            <div className="admin-reports-pagination flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4 border-t border-slate-800/80 bg-[#070a12]/50">
               <div className="text-sm text-slate-400">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} reports
               </div>
@@ -738,7 +616,7 @@ const Reports: React.FC = () => {
                     onClick={() => handlePageChange(page)}
                     className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                       currentPage === page
-                        ? 'bg-cyan-500 text-slate-950'
+                        ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                     }`}
                   >
@@ -760,49 +638,25 @@ const Reports: React.FC = () => {
 
       {/* BOTTOM ANALYTICS & QUICK ACTIONS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Inventory Value by Warehouse - Donut Chart */}
+        {/* Warehouse Capacity Overview */}
         <div className="min-h-[320px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
           <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
             <WarehouseIcon className="w-4 h-4 text-cyan-400" />
-            Inventory Value by Warehouse
+            Warehouse Capacity Overview
           </h4>
-          <div className="flex-1 min-h-[230px] relative">
-            {!dashboardLoading && warehouseChartData.length === 0 && <div className="absolute inset-0 z-10 flex items-center justify-center text-xs text-slate-500">No warehouse inventory data.</div>}
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Tooltip contentStyle={chartTooltipStyle} />
-                <Pie
-                  data={warehouseChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  dataKey="value"
-                  label={false}
-                  labelLine={false}
-                  isAnimationActive={true}
-                  animationDuration={1200}
-                  animationEasing="ease-out"
-                >
-                  {warehouseChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke={isDark ? '#0b101d' : '#FFFFFF'} strokeWidth={2} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
-                <p className="text-xs text-slate-400">Total Value</p>
-                <p className="text-lg font-bold text-white">{currency(metrics.total_inventory_value)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-            {warehouseChartData.map((item) => (
-              <div key={item.name} className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-slate-400 truncate">{item.name}</span>
-                <span className="text-white ml-auto">{currency(item.value)}</span>
+          <p className="mb-5 text-xs text-slate-500">Physical stock uses available plus reserved quantities for active warehouses.</p>
+          <div className="flex-1 space-y-5" aria-live="polite">
+            {dashboardLoading && <div className="flex h-full items-center justify-center text-xs text-slate-500">Loading warehouse capacity…</div>}
+            {!dashboardLoading && warehouseChartData.length === 0 && <div className="flex h-full items-center justify-center text-xs text-slate-500">No active warehouses found.</div>}
+            {!dashboardLoading && warehouseChartData.map((item) => (
+              <div key={item.code}>
+                <div className="mb-2 flex items-start justify-between gap-4 text-xs">
+                  <div className="min-w-0"><p className="truncate font-medium text-slate-200">{item.name}</p><p className="text-slate-500">{item.code}</p></div>
+                  <div className="shrink-0 text-right"><p className="font-semibold text-white">{item.utilization_percentage === null ? 'Capacity N/A' : `${item.utilization_percentage}%`}</p><p className="text-slate-500">{item.used.toLocaleString()} used{item.capacity === null ? '' : ` / ${item.capacity.toLocaleString()}`}</p></div>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" role="img" aria-label={`${item.name}: ${item.utilization_percentage === null ? 'capacity not configured' : `${item.utilization_percentage}% utilized`}`}>
+                  <div className="h-full rounded-full bg-cyan-500 transition-[width] duration-500" style={{ width: `${item.utilization_percentage ?? 0}%` }} />
+                </div>
               </div>
             ))}
           </div>
@@ -836,12 +690,11 @@ const Reports: React.FC = () => {
 
         {/* Recent Exports */}
         <div className="min-h-[280px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <h4 className="text-sm font-semibold text-white flex items-center gap-2">
               <FileText className="w-4 h-4 text-cyan-400" />
               Recent Exports
             </h4>
-            <button className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">View All</button>
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto max-h-[240px] pr-1">
             {exportFiles.slice(0, 4).map((file, idx) => (
@@ -866,29 +719,9 @@ const Reports: React.FC = () => {
             Quick Actions
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-            {[
-              { label: 'Create Custom Report', icon: <Plus className="w-4 h-4" />, primary: true },
-              { label: 'Schedule Report', icon: <Calendar className="w-4 h-4" />, primary: false },
-              { label: 'Export Raw Data', icon: <Download className="w-4 h-4" />, primary: false },
-              { label: 'Report Templates', icon: <FileText className="w-4 h-4" />, primary: false },
-            ].map((action, idx) => (
-              <button
-                key={idx}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  action.primary
-                    ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950'
-                    : 'border border-slate-700 hover:bg-slate-800/50 text-slate-300 hover:text-white'
-                }`}
-              >
-                {action.icon}
-                {action.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 pt-2 border-t border-slate-800/60">
-            <button className="w-full text-center text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
-              Manage Report Templates →
-            </button>
+            <button onClick={() => openExportModal('custom')} className="flex w-full items-center gap-3 rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"><Plus className="h-4 w-4" />Create Custom Report</button>
+            <button onClick={() => setIsScheduleInfoOpen(true)} className="flex w-full items-center gap-3 rounded-lg border border-slate-700 px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/50 hover:text-white"><Calendar className="h-4 w-4" />Schedule Report</button>
+            <button onClick={() => openExportModal('raw')} className="flex w-full items-center gap-3 rounded-lg border border-slate-700 px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/50 hover:text-white"><Download className="h-4 w-4" />Export Raw Data</button>
           </div>
         </div>
       </div>
@@ -897,97 +730,72 @@ const Reports: React.FC = () => {
       {isViewDrawerOpen && selectedReport && (
         <div className="fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDrawer} />
-          <div className="relative ml-auto h-full w-full max-w-lg bg-[#0b101d] border-l border-slate-700/80 shadow-2xl flex flex-col">
+          <div className="admin-report-details-drawer relative ml-auto h-full w-full max-w-lg bg-[#0b101d] border-l border-slate-700/80 shadow-2xl flex flex-col">
             {/* Drawer Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-800/60 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <h2 className="text-lg font-semibold text-white truncate">{selectedReport.name}</h2>
-                <StatusBadge status={selectedReport.status} />
+            <div className="admin-report-details-header flex items-center justify-between p-5 border-b border-slate-800/60 shrink-0">
+              <div className="admin-report-details-heading flex items-center gap-3 min-w-0">
+                <h2 className="admin-report-details-title text-lg font-semibold text-white truncate">{selectedReport.name}</h2>
+                <span className="admin-report-details-status"><StatusBadge status={selectedReport.status} /></span>
               </div>
               <button
                 onClick={closeDrawer}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
+                aria-label="Close report details"
+                className="admin-report-details-close p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div className="admin-report-details-body flex-1 overflow-y-auto p-5 space-y-5">
               {/* Key Information Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
-                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Category</p>
-                  <p className="text-sm text-slate-200 truncate">{selectedReport.category}</p>
+              <div className="admin-report-details-grid grid grid-cols-2 gap-4">
+                <div className="admin-report-details-card bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="admin-report-details-label text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Category</p>
+                  <p className="admin-report-details-value text-sm text-slate-200 truncate">{selectedReport.category}</p>
                 </div>
-                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
-                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Format</p>
-                  <div className="mt-1">
+                <div className="admin-report-details-card bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="admin-report-details-label text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Format</p>
+                  <div className="admin-report-details-format mt-1">
                     <FormatBadge format={selectedReport.format} />
                   </div>
                 </div>
-                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
-                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Last Generated</p>
-                  <p className="text-sm text-slate-200">{selectedReport.lastGenerated}</p>
+                <div className="admin-report-details-card bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="admin-report-details-label text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Last Generated</p>
+                  <p className="admin-report-details-value text-sm text-slate-200">{selectedReport.lastGenerated}</p>
                 </div>
-                <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
-                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">File Size</p>
-                  <p className="text-sm text-slate-200">{selectedReport.fileSize}</p>
+                <div className="admin-report-details-card bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="admin-report-details-label text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">File Size</p>
+                  <p className="admin-report-details-value text-sm text-slate-200">{selectedReport.fileSize}</p>
                 </div>
-                <div className="col-span-2 bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
-                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Description</p>
-                  <p className="text-sm text-slate-300">{selectedReport.description}</p>
+                <div className="admin-report-details-card col-span-2 bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="admin-report-details-label text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Description</p>
+                  <p className="admin-report-details-value text-sm text-slate-300">{selectedReport.description}</p>
                 </div>
-                <div className="col-span-2 bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
-                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Parameters</p>
-                  <p className="text-sm text-slate-300">{selectedReport.parameters}</p>
+                <div className="admin-report-details-card col-span-2 bg-[#070a12] border border-slate-800/80 rounded-xl p-3">
+                  <p className="admin-report-details-label text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1">Parameters</p>
+                  <p className="admin-report-details-value text-sm text-slate-300">{selectedReport.parameters}</p>
                 </div>
               </div>
 
               {/* Report History / Summary */}
-              <div className="bg-[#070a12] border border-slate-800/80 rounded-xl p-4">
-                <h3 className="text-xs font-semibold text-white uppercase tracking-wider mb-3">Report History</h3>
-                <div className="space-y-2">
-                  {[
-                    { time: selectedReport.lastGenerated, action: 'Generated', user: 'System', status: 'Success' },
-                    { time: 'May 30, 2025 08:15 AM', action: 'Downloaded', user: 'Admin', status: 'Success' },
-                    { time: 'May 29, 2025 07:45 AM', action: 'Generated', user: 'System', status: 'Success' },
-                    { time: 'May 28, 2025 06:20 AM', action: 'Printed', user: 'Manager', status: 'Success' },
-                    { time: 'May 27, 2025 09:00 AM', action: 'Regenerated', user: 'Admin', status: 'Success' },
-                  ].map((log, idx) => (
-                    <div key={idx} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-b-0">
-                      <div className="flex items-center gap-3">
-                        <div className="p-1.5 rounded-lg bg-slate-800/60 text-slate-400">
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-slate-200">{log.action}</p>
-                          <p className="text-[10px] text-slate-500">by {log.user}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-slate-400">{log.time}</p>
-                        <p className="text-[10px] text-emerald-400">{log.status}</p>
-                      </div>
-                    </div>
-                  ))}
+              <div className="admin-report-details-history-row">
+                <div className="admin-report-details-history bg-[#070a12] border border-slate-800/80 rounded-xl p-4">
+                  <h3 className="admin-report-details-label text-xs font-semibold text-white uppercase tracking-wider mb-3">Report History</h3>
+                  <p className="admin-report-details-history-text text-xs leading-5 text-slate-500">Generation, download, and print events are not currently recorded by the reporting service.</p>
                 </div>
+                <button onClick={() => void downloadReport(selectedReport)} disabled={downloadingId !== null} className="admin-report-details-download admin-report-details-mobile-action hidden inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+                  <Download className="w-4 h-4" />
+                  {downloadingId === selectedReport.id ? 'Generating…' : 'Download CSV'}
+                </button>
               </div>
             </div>
 
             {/* Drawer Footer Actions */}
-            <div className="p-5 border-t border-slate-800/60 flex items-center gap-3 shrink-0">
-              <button className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-colors">
+            <div className="admin-report-details-footer p-5 border-t border-slate-800/60 flex items-center gap-3 shrink-0">
+              <button onClick={() => void downloadReport(selectedReport)} disabled={downloadingId !== null} className="admin-report-details-download flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                 <Download className="w-4 h-4" />
-                Download File
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-colors">
-                <Printer className="w-4 h-4" />
-                Print Report
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm font-medium transition-colors">
-                <RefreshCw className="w-4 h-4" />
-                Regenerate
+                {downloadingId === selectedReport.id ? 'Generating…' : 'Download CSV'}
               </button>
             </div>
           </div>

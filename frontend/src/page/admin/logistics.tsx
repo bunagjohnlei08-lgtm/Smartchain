@@ -1,6 +1,7 @@
 // src/page/admin/Logistics.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { apiClient } from '../../lib/api';
+import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
   Truck,
   Search,
@@ -132,7 +133,10 @@ const logisticsOptions = ['All Logistics', 'Integrated Logistics System', 'Exter
 // HELPER COMPONENTS
 // ============================================
 
-const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
+const StatusBadge: React.FC<{ status: ShipmentStatus; abbreviatePendingApproval?: boolean }> = ({
+ status,
+ abbreviatePendingApproval = false,
+}) => {
  const config: Record<ShipmentStatus, { color: string; bg: string; dotColor: string }> = {
   'Pending Approval': {
    color: 'text-amber-400 not-dark:text-amber-600',
@@ -172,9 +176,18 @@ const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
  };
  const { color, bg, dotColor } = config[status];
  return (
-  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium not-dark:font-semibold border ${color} ${bg}`}>
+  <span
+   className={`admin-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium not-dark:font-semibold border ${color} ${bg}`}
+   aria-label={status}
+   title={status}
+  >
    <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
-   {status}
+    {status === 'Pending Approval' && abbreviatePendingApproval ? (
+     <>
+      <span aria-hidden="true" className="min-[391px]:hidden">PA</span>
+      <span aria-hidden="true" className="hidden min-[391px]:inline">{status}</span>
+     </>
+    ) : status}
   </span>
  );
 };
@@ -188,9 +201,9 @@ const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
   <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-5 hover:border-slate-700 transition-all duration-200 h-full flex flex-col">
   <div className="flex items-start justify-between flex-1">
    <div>
-    <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-    <p className="text-2xl font-bold text-white mt-1.5">{value}</p>
-    {subtitle && <p className="text-gray-400 text-xs mt-1">{subtitle}</p>}
+    <p className="admin-kpi-title text-gray-400 text-xs font-medium uppercase tracking-wider">{label}</p>
+    <p className="admin-kpi-value text-2xl font-bold text-white mt-1.5">{value}</p>
+    {subtitle && <p className="admin-kpi-helper text-gray-400 text-xs mt-1">{subtitle}</p>}
    </div>
    <div className="p-2.5 bg-gray-800/50 bg-gray-800/50 rounded-lg shrink-0">{icon}</div>
   </div>
@@ -279,7 +292,7 @@ const Pagination: React.FC<{
        onClick={() => onPageChange(page)}
        className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
         currentPage === page
-         ? 'bg-blue-600 text-white'
+          ? 'bg-slate-200 text-slate-900 dark:bg-blue-600 dark:text-white'
          : 'text-slate-400 hover:bg-slate-700/50'
        }`}
       >
@@ -345,6 +358,7 @@ const Logistics: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  useAdminDetailOverlay(showViewModal && selectedShipment !== null);
  const [assignForm, setAssignForm] = useState({
   logisticsPartner: '',
   pickupDate: '',
@@ -461,8 +475,8 @@ const Logistics: React.FC = () => {
      <Filter className="w-4 h-4" /> More Filters
     </button>
     <div className="ml-auto flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/50 p-1" aria-label="Shipment view">
-     <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
-     <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+     <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+     <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
     </div>
     <button className="p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all">
      <RefreshCw className="w-4 h-4" />
@@ -472,8 +486,8 @@ const Logistics: React.FC = () => {
    {/* Table */}
    <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl overflow-hidden">
     {viewMode === 'list' ? (
-    <div className="overflow-x-auto">
-     <table className="w-full min-w-[1000px]">
+    <div className="admin-table-scroll">
+     <table className="admin-responsive-table admin-cols-8 admin-sticky-1 w-full min-w-[1000px]">
       <thead className="bg-gray-800/50 border-b border-gray-800 border-gray-800/50">
        <tr>
         <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Shipment No.</th>
@@ -497,7 +511,7 @@ const Logistics: React.FC = () => {
          <td className="px-4 py-3.5 text-sm text-gray-300">
           {shipment.assignedLogistics || '—'}
          </td>
-         <td className="px-4 py-3.5"><StatusBadge status={shipment.status} /></td>
+         <td className="px-4 py-3.5"><StatusBadge status={shipment.status} abbreviatePendingApproval /></td>
          <td className="px-4 py-3.5">
           <div className="flex items-center justify-center gap-1">
            <button
@@ -577,27 +591,28 @@ const Logistics: React.FC = () => {
    {/* ============================================ */}
    {showViewModal && selectedShipment && (
     <div
-     className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="admin-logistics-details-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
      onClick={() => setShowViewModal(false)}
     >
      <div
-      className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6"
+       className="admin-logistics-details-modal bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6"
       onClick={(e) => e.stopPropagation()}
      >
-      <div className="flex items-center justify-between mb-6">
+       <div className="admin-logistics-details-header flex items-center justify-between mb-6">
        <div>
         <h2 className="text-xl font-bold text-white">Shipment Details</h2>
         <p className="text-sm text-gray-400">{selectedShipment.shipmentNo} · {selectedShipment.poNumber}</p>
        </div>
-       <button
-        onClick={() => setShowViewModal(false)}
+        <button
+         aria-label="Close shipment details"
+         onClick={() => setShowViewModal(false)}
         className="p-1.5 rounded-lg hover:bg-gray-800/50 hover:bg-gray-800/50 text-gray-400 hover:text-white transition-all"
        >
         <X className="w-5 h-5" />
        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+       <div className="admin-logistics-details-grid grid grid-cols-2 gap-4 mb-4">
        <div>
         <p className="text-xs text-gray-400">Customer</p>
         <p className="text-sm text-white">{selectedShipment.customer}</p>
@@ -632,25 +647,23 @@ const Logistics: React.FC = () => {
        </div>
       </div>
 
-       <div className="mb-4">
+        <div className="admin-logistics-details-items mb-4">
         <h4 className="text-sm font-medium text-gray-300 mb-2">Items</h4>
-        <div className="bg-gray-800/50 rounded-xl border border-gray-800 border-gray-800/50 overflow-hidden">
-         <table className="w-full text-sm">
+         <div className="admin-logistics-details-items-scroll admin-table-scroll bg-gray-800/50 rounded-xl border border-gray-800 border-gray-800/50 overflow-hidden">
+           <table className="admin-logistics-details-items-table admin-responsive-table admin-sticky-1 w-full table-fixed text-sm">
           <thead className="bg-gray-800/50 bg-gray-800/50 border-b border-gray-800 border-gray-800/50">
            <tr>
-            <th className="px-4 py-2 text-left text-xs text-gray-400">Product</th>
-            <th className="px-4 py-2 text-left text-xs text-gray-400">SKU</th>
-            <th className="px-4 py-2 text-right text-xs text-gray-400">Qty</th>
-            <th className="px-4 py-2 text-left text-xs text-gray-400">Unit</th>
+             <th className="px-4 py-2 text-left text-xs text-gray-400">Product</th>
+             <th className="w-20 px-4 py-2 text-right text-xs text-gray-400">Qty</th>
+             <th className="w-20 px-4 py-2 text-left text-xs text-gray-400">Unit</th>
            </tr>
           </thead>
           <tbody>
            {selectedShipment.items.map((item, idx) => (
             <tr key={idx} className="border-b border-gray-800 border-gray-800/50">
-             <td className="px-4 py-2 text-white text-gray-200">{item.name}</td>
-             <td className="px-4 py-2 text-gray-400 font-mono">{item.sku}</td>
-             <td className="px-4 py-2 text-right text-white">{item.qty}</td>
-             <td className="px-4 py-2 text-gray-400">{item.unit}</td>
+              <td className="px-4 py-2 text-white text-gray-200">{item.name}</td>
+              <td className="whitespace-nowrap px-4 py-2 text-right text-white">{item.qty}</td>
+              <td className="whitespace-nowrap px-4 py-2 text-gray-400">{item.unit}</td>
             </tr>
            ))}
           </tbody>
@@ -658,13 +671,13 @@ const Logistics: React.FC = () => {
         </div>
        </div>
 
-       <div>
+       <div className="admin-logistics-details-timeline">
         <h4 className="text-sm font-medium text-gray-300 mb-2">Progress Timeline</h4>
        <div className="space-y-2">
         {selectedShipment.timeline.map((step, idx) => (
-         <div key={idx} className="flex items-center gap-3">
+         <div key={idx} className="admin-logistics-timeline-row flex items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${step.completed ? 'bg-cyan-500' : 'bg-slate-700'}`} />
-          <div className="flex-1 flex justify-between">
+           <div className="admin-logistics-timeline-content flex-1 flex justify-between">
            <span className="text-sm text-white">{step.step}</span>
            {step.timestamp && <span className="text-xs text-gray-400">{step.timestamp}</span>}
           </div>
@@ -673,7 +686,7 @@ const Logistics: React.FC = () => {
        </div>
       </div>
 
-      <div className="flex justify-end mt-6 pt-4 border-t border-gray-800 border-gray-800/50">
+       <div className="admin-logistics-details-footer flex justify-end mt-6 pt-4 border-t border-gray-800 border-gray-800/50">
        <button
         onClick={() => setShowViewModal(false)}
         className="px-5 py-2 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all"

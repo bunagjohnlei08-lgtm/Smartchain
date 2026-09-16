@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { apiClient } from '../../lib/api';
+import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
 import {
   ChevronRight,
   Search,
@@ -275,7 +276,7 @@ const QaStatusBadge: React.FC<{ status: QaStatus }> = ({ status }) => {
     Partial: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
   };
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
+    <span className={`plant-manager-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
       {status === 'Passed' && <Check className="w-3 h-3 mr-1" />}
       {status === 'Pending QA' && <Clock className="w-3 h-3 mr-1" />}
       {status === 'Rejected' && <X className="w-3 h-3 mr-1" />}
@@ -293,7 +294,7 @@ const ReceivingStatusBadge: React.FC<{ status: ReceivingStatus | 'Stocked In' }>
     'Stocked In': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   };
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
+    <span className={`plant-manager-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
       {status}
     </span>
   );
@@ -311,7 +312,7 @@ const ViewModeToggle: React.FC<{
       aria-label={`Show ${label} as a list`}
       aria-pressed={value === 'list'}
       title="List view"
-      className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+      className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
     >
       <Table className="w-4 h-4" />
     </button>
@@ -321,7 +322,7 @@ const ViewModeToggle: React.FC<{
       aria-label={`Show ${label} as a grid`}
       aria-pressed={value === 'grid'}
       title="Grid view"
-      className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+      className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
     >
       <Grid className="w-4 h-4" />
     </button>
@@ -381,6 +382,7 @@ const StockIn: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedStockedId, setSelectedStockedId] = useState<number | null>(null);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  usePlantManagerDetailOverlay(drawerMode !== null);
   const [activeTab, setActiveTab] = useState<'info' | 'items' | 'attachments' | 'history'>('info');
   const [receivingsViewMode, setReceivingsViewMode] = useState<ViewMode>('list');
   const [recentlyStockedViewMode, setRecentlyStockedViewMode] = useState<ViewMode>('list');
@@ -553,10 +555,11 @@ const StockIn: React.FC = () => {
 
   const pieData = [
     { name: 'Ready', value: qaPassed, color: '#10b981' },
-    { name: 'Rejected', value: rejected, color: '#ef4444' },
     { name: 'Pending', value: pendingQa, color: '#f59e0b' },
   ];
-  const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0) || 1;
+  const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0);
+  const readyPercentage = pieTotal > 0 ? Math.round((qaPassed / pieTotal) * 100) : 0;
+  const pendingPercentage = pieTotal > 0 ? 100 - readyPercentage : 0;
 
   return (
     <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
@@ -638,8 +641,8 @@ const StockIn: React.FC = () => {
             <div key={idx} className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 hover:border-slate-700 transition-colors">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{kpi.label}</p>
-                  <p className="text-2xl font-bold text-white mt-1">{kpi.value}</p>
+                  <p className="mobile-kpi-title text-xs font-medium text-slate-400 uppercase tracking-wider">{kpi.label}</p>
+                  <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{kpi.value}</p>
                 </div>
                 <div className={`p-2.5 rounded-lg flex items-center justify-center ${accentClasses[idx]}`}>
                   {idx === 0 && <Box className="w-5 h-5" />}
@@ -695,52 +698,53 @@ const StockIn: React.FC = () => {
         </div>
 
         {receivingsViewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="max-w-full overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+          <table className="pm-status-table pm-stock-in-receivings-table w-full min-w-[752px] table-fixed text-[11px] sm:min-w-[900px] sm:table-auto sm:text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Ref. No.</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Received Value</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
+                <th className="w-20 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Receiving No.</th>
+                <th className="sticky left-0 z-20 w-28 border-r border-slate-200 bg-slate-50 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-600 shadow-[2px_0_4px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-[#070a12] dark:text-slate-400 sm:static sm:w-auto sm:border-r-0 sm:bg-transparent sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider sm:shadow-none dark:sm:bg-transparent">Product</th>
+                <th className="w-24 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Supplier</th>
+                <th className="w-20 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Receiving Date</th>
+                <th className="w-16 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Ref. No.</th>
+                <th className="w-24 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Status</th>
+                <th className="w-16 px-2 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Items</th>
+                <th className="w-20 px-2 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Received Value</th>
+                <th className="w-20 px-2 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
               {isLoading && receivings.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                     <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
                     Loading receivings...
                   </td>
                 </tr>
               )}
               {filteredReceivings.map((rec) => (
-                <tr key={rec.id} className={`hover:bg-slate-800/20 transition-colors ${selectedReceiving?.id === rec.id ? 'bg-slate-800/20' : ''}`}>
-                  <td className="px-4 py-3 font-mono text-slate-900 dark:text-blue-400 hover:underline font-medium">{rec.receivingNo}</td>
-                  <td className="px-4 py-3 text-slate-300">{rec.productSummary}</td>
-                  <td className="px-4 py-3 text-slate-300">{rec.supplier}</td>
-                  <td className="px-4 py-3 text-slate-300">{rec.receivingDate}</td>
-                  <td className="px-4 py-3 text-slate-400">{rec.refNo}</td>
-                  <td className="px-4 py-3"><ReceivingStatusBadge status={rec.status} /></td>
-                  <td className="px-4 py-3 text-center text-white">
+                <tr key={rec.id} className={`group hover:bg-slate-800/20 transition-colors ${selectedReceiving?.id === rec.id ? 'bg-slate-800/20' : ''}`}>
+                  <td className="truncate px-2 py-2 font-mono font-medium text-slate-900 hover:underline dark:text-blue-400 sm:px-4 sm:py-3">{rec.receivingNo}</td>
+                  <td className="sticky left-0 z-10 truncate border-r border-slate-200 bg-white px-2 py-2 text-slate-700 shadow-[2px_0_4px_rgba(15,23,42,0.08)] group-hover:bg-slate-100 dark:border-slate-800 dark:bg-[#0b101d] dark:text-slate-300 dark:group-hover:bg-slate-800 sm:static sm:border-r-0 sm:bg-transparent sm:px-4 sm:py-3 sm:shadow-none sm:group-hover:bg-transparent dark:sm:bg-transparent dark:sm:group-hover:bg-transparent" title={rec.productSummary}>{rec.productSummary}</td>
+                  <td className="truncate px-2 py-2 text-slate-300 sm:px-4 sm:py-3" title={rec.supplier}>{rec.supplier}</td>
+                  <td className="px-2 py-2 text-slate-300 sm:px-4 sm:py-3">{rec.receivingDate}</td>
+                  <td className="truncate px-2 py-2 text-slate-400 sm:px-4 sm:py-3">{rec.refNo}</td>
+                  <td className="px-2 py-2 sm:px-4 sm:py-3 [&_.plant-manager-badge]:px-2 [&_.plant-manager-badge]:py-0.5 [&_.plant-manager-badge]:text-[10px] sm:[&_.plant-manager-badge]:px-2.5 sm:[&_.plant-manager-badge]:py-1 sm:[&_.plant-manager-badge]:text-xs"><ReceivingStatusBadge status={rec.status} /></td>
+                  <td className="px-2 py-2 text-center text-white sm:px-4 sm:py-3">
                     <div>{rec.itemsCount} item{rec.itemsCount === 1 ? '' : 's'}</div>
                     <div className="text-xs text-slate-500">{rec.totalQuantity} units</div>
                   </td>
-                  <td className="px-4 py-3 text-right text-white">₱{rec.receivedValue.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-2 py-2 text-right text-white sm:px-4 sm:py-3">₱{rec.receivedValue.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right sm:px-4 sm:py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         onClick={() => handleSelect(rec.id)}
+                        aria-label={`View ${rec.receivingNo}`}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                      <button className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors" aria-label={`More options for ${rec.receivingNo}`}>
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
@@ -749,7 +753,7 @@ const StockIn: React.FC = () => {
               ))}
               {!isLoading && filteredReceivings.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                     No receiving records found.
                   </td>
                 </tr>
@@ -773,7 +777,9 @@ const StockIn: React.FC = () => {
                     <p className="font-mono text-sm font-semibold text-slate-900 dark:text-blue-400">{rec.receivingNo}</p>
                     <p className="mt-1 truncate text-sm font-medium text-slate-900 dark:text-white" title={rec.productSummary}>{rec.productSummary}</p>
                   </div>
-                  <ReceivingStatusBadge status={rec.status} />
+                  <div className="shrink-0 self-start whitespace-nowrap">
+                    <ReceivingStatusBadge status={rec.status} />
+                  </div>
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Supplier</dt><dd className="text-slate-900 dark:text-slate-200">{rec.supplier}</dd></div>
@@ -812,8 +818,8 @@ const StockIn: React.FC = () => {
         )}
 
         {recentlyStockedViewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="pm-table-scroll">
+          <table className="pm-status-table pm-stock-in-recent-table pm-responsive-table pm-cols-7 pm-sticky-2 w-full min-w-[760px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Barcode</th>
@@ -913,8 +919,8 @@ const StockIn: React.FC = () => {
         )}
 
         {historyViewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="pm-table-scroll">
+          <table className="pm-status-table pm-stock-in-history-table pm-responsive-table pm-cols-9 pm-sticky-2 w-full min-w-[980px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
@@ -1039,9 +1045,8 @@ const StockIn: React.FC = () => {
               </ResponsiveContainer>
             </div>
             <div className="flex justify-center flex-wrap gap-4 text-xs pt-2">
-              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Ready {Math.round((qaPassed / pieTotal) * 100)}%</div>
-              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Rejected {Math.round((rejected / pieTotal) * 100)}%</div>
-              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Pending {Math.round((pendingQa / pieTotal) * 100)}%</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Ready {readyPercentage}%</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Pending {pendingPercentage}%</div>
             </div>
           </div>
         </div>
@@ -1092,20 +1097,23 @@ const StockIn: React.FC = () => {
       </div>
 
       {drawerMode && (
-        <div className="fixed inset-y-0 right-0 z-40 w-full max-w-md border-l border-slate-800 bg-[#0b101d] shadow-2xl">
-          <div className="h-full overflow-y-auto p-5 space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-white">
+        <div className="fixed inset-y-0 right-0 z-50 w-[96vw] overflow-x-hidden border-l border-slate-800 bg-[#0b101d] shadow-2xl min-[400px]:w-[92vw] sm:w-full sm:max-w-md">
+          <div className={`h-full overflow-x-hidden overflow-y-auto ${drawerMode === 'receiving' ? 'space-y-3 p-3 sm:space-y-5 sm:p-5' : 'space-y-5 p-5'}`}>
+            <div className={`sticky top-0 z-10 -mx-3 -mt-3 bg-[#0b101d] px-3 py-3 sm:static sm:mx-0 sm:mt-0 sm:bg-transparent sm:p-0 flex justify-between ${drawerMode === 'receiving' ? 'min-w-0 items-start gap-2' : 'items-center'}`}>
+              <div className={drawerMode === 'receiving' ? 'min-w-0' : undefined}>
+                <h3 className={`${drawerMode === 'receiving' ? 'text-base sm:text-lg' : 'text-lg'} font-semibold leading-tight text-white`}>
                   {drawerMode === 'receiving' ? 'Receiving Details' : 'Stock In Details'}
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className={`${drawerMode === 'receiving' ? 'text-[11px] leading-4 sm:text-xs' : 'text-xs'} mt-1 text-slate-400`}>
                   {drawerMode === 'receiving' ? 'Review the selected receiving before posting Stock In.' : 'Most recent stocked-in inventory detail.'}
                 </p>
               </div>
               <button
                 onClick={() => setDrawerMode(null)}
-                className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                className={drawerMode === 'receiving'
+                  ? 'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white'
+                  : 'flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white'}
+                aria-label="Close details"
               >
                 <PanelRightClose className="w-4 h-4" />
               </button>
@@ -1113,14 +1121,14 @@ const StockIn: React.FC = () => {
 
             {drawerMode === 'receiving' && selectedReceiving && (
               <>
-                <div className="rounded-xl border border-slate-800 bg-[#070a12] p-4 space-y-3 text-sm">
+                <div className="min-w-0 space-y-2.5 rounded-xl border border-slate-800 bg-[#070a12] p-3 text-xs sm:space-y-3 sm:p-4 sm:text-sm [&_p]:break-words [&_p]:leading-5">
                   <div><span className="text-slate-400">Receiving No.</span><p className="text-white">{selectedReceiving.receivingNo}</p></div>
                   <div><span className="text-slate-400">Supplier</span><p className="text-white">{selectedReceiving.supplier}</p></div>
                   <div><span className="text-slate-400">Purchase Order</span><p className="text-white">{selectedReceiving.purchaseOrder}</p></div>
                   <div><span className="text-slate-400">Reference No.</span><p className="text-white">{selectedReceiving.refNo}</p></div>
                   <div><span className="text-slate-400">Receiving Date</span><p className="text-white">{selectedReceiving.receivingDate}</p></div>
                   <div><span className="text-slate-400">Prepared By</span><p className="text-white">{selectedReceiving.preparedBy ?? '—'}</p></div>
-                  <div><span className="text-slate-400">Product</span><p className="text-white">{selectedReceiving.productSummary}</p></div>
+                  <div><span className="text-slate-400">Product</span><p className="text-white [overflow-wrap:anywhere]">{selectedReceiving.productSummary}</p></div>
                   <div><span className="text-slate-400">Quantity</span><p className="text-white">{selectedReceiving.eligibleQuantity} units</p></div>
                   <div>
                     <span className="text-slate-400">Available Capacity</span>
@@ -1131,16 +1139,16 @@ const StockIn: React.FC = () => {
                     </p>
                     {capacityError && <p className="mt-1 text-xs text-amber-400">Live capacity could not be loaded. The server will validate capacity on submission.</p>}
                   </div>
-                  <div><span className="text-slate-400">Status</span><div className="pt-1"><ReceivingStatusBadge status={selectedReceiving.status} /></div></div>
+                  <div><span className="text-slate-400">Status</span><div className="w-fit max-w-full whitespace-nowrap pt-1 [&_.plant-manager-badge]:px-2 [&_.plant-manager-badge]:py-0.5 [&_.plant-manager-badge]:text-[11px] sm:[&_.plant-manager-badge]:px-2.5 sm:[&_.plant-manager-badge]:py-1 sm:[&_.plant-manager-badge]:text-xs"><ReceivingStatusBadge status={selectedReceiving.status} /></div></div>
                   <div><span className="text-slate-400">Received Value</span><p className="text-white">₱{selectedReceiving.receivedValue.toLocaleString()}</p></div>
                 </div>
 
-                <div className="rounded-xl border border-slate-800 bg-[#070a12] p-4">
-                  <h4 className="text-sm font-semibold text-white mb-3">Products</h4>
-                  <div className="space-y-3">
+                <div className="min-w-0 rounded-xl border border-slate-800 bg-[#070a12] p-3 sm:p-4">
+                  <h4 className="mb-2 text-xs font-semibold text-white sm:mb-3 sm:text-sm">Products</h4>
+                  <div className="space-y-2 sm:space-y-3">
                     {selectedReceiving.items.map((item) => (
-                      <div key={item.id} className="rounded-lg border border-slate-800 p-3">
-                        <p className="text-white text-sm font-medium">{item.productName}</p>
+                      <div key={item.id} className="min-w-0 rounded-lg border border-slate-800 p-2.5 sm:p-3">
+                        <p className="break-words text-xs font-medium leading-5 text-white [overflow-wrap:anywhere] sm:text-sm">{item.productName}</p>
                         <p className="text-xs text-slate-400 mt-1">Accepted Quantity: <span className="text-white">{item.acceptedQuantity} {item.unit}</span></p>
                         <p className="text-xs text-slate-400">Eligible Quantity: <span className="text-white">{item.stockableQuantity} {item.unit}</span></p>
                         {item.barcode && <p className="text-xs text-slate-400">Barcode: <span className="text-cyan-300 font-mono">{item.barcode}</span></p>}
@@ -1149,8 +1157,8 @@ const StockIn: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-800 bg-[#070a12] p-4 space-y-3">
-                  <h4 className="text-sm font-semibold text-white">Quick Actions</h4>
+                <div className="space-y-2.5 rounded-xl border border-slate-800 bg-[#070a12] p-3 sm:space-y-3 sm:p-4">
+                  <h4 className="text-xs font-semibold text-white sm:text-sm">Quick Actions</h4>
                   <button
                     disabled={!canPerformStockIn || isStockingIn}
                     onClick={handlePerformStockIn}

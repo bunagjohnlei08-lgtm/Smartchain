@@ -14,7 +14,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class QaInspectionController extends Controller
@@ -147,6 +150,7 @@ class QaInspectionController extends Controller
                 'occurred_at' => $event->occurred_at,
             ])->values(),
             'inspection' => [
+                'attachment_path' => $receiving->qaInspection?->attachment_path,
                 'started_at' => $receiving->qaInspection?->started_at,
                 'completed_at' => $receiving->qaInspection?->completed_at,
                 'inspected_by' => $receiving->qaInspection?->inspectedBy?->name,
@@ -222,9 +226,11 @@ class QaInspectionController extends Controller
         $validated = $this->validatePayload($request);
         $shouldSubmit = $request->boolean('submit', true);
         $user = $request->user();
+        $storedPath = null;
+        $previousPath = null;
 
         try {
-            $receiving = DB::transaction(function () use ($validated, $receivingId, $user, $shouldSubmit) {
+            $receiving = DB::transaction(function () use ($request, $validated, $receivingId, $user, $shouldSubmit, &$storedPath, &$previousPath) {
                 $receiving = Receiving::query()
                     ->with(['items', 'qaInspection.items'])
                     ->lockForUpdate()
@@ -272,6 +278,25 @@ class QaInspectionController extends Controller
                     return $itemPayload;
                 });
 
+                $existingPath = $receiving->qaInspection?->attachment_path;
+                $hasStoredProof = $existingPath && Storage::disk('local')->exists($existingPath);
+                $request->validate([
+                    'attachment' => [
+                        Rule::requiredIf($shouldSubmit && $submittedItems->sum('rejected_quantity') > 0 && ! $hasStoredProof),
+                        'nullable', 'file', 'mimes:jpeg,jpg,png,pdf',
+                        'mimetypes:image/jpeg,image/png,application/pdf',
+                        'extensions:jpeg,jpg,png,pdf', 'max:5120',
+                    ],
+                ], [
+                    'attachment.required' => 'Proof of rejection is required. Please upload an attachment.',
+                    'attachment.file' => 'Attachment must be a JPG, PNG, or PDF file.',
+                    'attachment.mimes' => 'Attachment must be a JPG, PNG, or PDF file.',
+                    'attachment.mimetypes' => 'Attachment must be a JPG, PNG, or PDF file.',
+                    'attachment.extensions' => 'Attachment must be a JPG, PNG, or PDF file.',
+                    'attachment.max' => 'Attachment must not exceed 5 MB.',
+                    'attachment.uploaded' => 'Attachment could not be uploaded. Use a JPG, PNG, or PDF file up to 5 MB.',
+                ]);
+
                 $inspection = QaInspection::firstOrCreate(
                     ['receiving_id' => $receiving->id],
                     [
@@ -280,6 +305,15 @@ class QaInspectionController extends Controller
                         'inspected_by_id' => $user->id,
                     ]
                 );
+
+                if ($request->hasFile('attachment')) {
+                    $storedPath = Storage::disk('local')->putFile('qa-attachments', $request->file('attachment'));
+                    if (! $storedPath) {
+                        throw new \RuntimeException('QA attachment storage failed.');
+                    }
+                    $previousPath = $inspection->attachment_path;
+                    $inspection->forceFill(['attachment_path' => $storedPath])->save();
+                }
 
                 if (! $inspection->started_at) {
                     $inspection->forceFill([
@@ -348,6 +382,12 @@ class QaInspectionController extends Controller
                 ]);
             });
         } catch (Throwable $e) {
+            if ($storedPath) {
+                $this->deleteAttachment($storedPath);
+            }
+            if ($e instanceof ValidationException) {
+                throw $e;
+            }
             $status = $e->getCode();
             if (in_array($status, [404, 422], true)) {
                 return response()->json(['message' => $e->getMessage()], $status);
@@ -356,6 +396,10 @@ class QaInspectionController extends Controller
             report($e);
 
             return response()->json(['message' => 'Failed to save QA inspection.'], 500);
+        }
+
+        if ($previousPath && $previousPath !== $storedPath) {
+            $this->deleteAttachment($previousPath);
         }
 
         if ($shouldSubmit) {
@@ -379,6 +423,39 @@ class QaInspectionController extends Controller
         }
 
         return response()->json($this->presentDetail($receiving));
+    }
+
+    private function deleteAttachment(string $path): void
+    {
+        // Only generated QA attachment paths may be cleaned up.
+        if (! preg_match('~^qa-attachments/[A-Za-z0-9]+\.(?:jpe?g|png|pdf)$~', $path)) {
+            return;
+        }
+        try {
+            if (! Storage::disk('local')->delete($path)) {
+                report(new \RuntimeException('QA attachment cleanup failed.'));
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    public function attachment(Request $request, int $receivingId): JsonResponse|StreamedResponse
+    {
+        if ($response = $this->authorizeQa($request)) {
+            return $response;
+        }
+
+        $inspection = QaInspection::where('receiving_id', $receivingId)->first();
+        $path = $inspection?->attachment_path;
+        if (! $path || ! Storage::disk('local')->exists($path)) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
+        }
+
+        return Storage::disk('local')->download($path, basename($path), [
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ]);
     }
 
     public function index(Request $request): JsonResponse

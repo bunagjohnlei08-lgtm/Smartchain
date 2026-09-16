@@ -1,6 +1,7 @@
 // src/pages/plant-manager/OrderManagement.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/api';
+import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
 import {
   RefreshCw,
   Printer,
@@ -152,7 +153,7 @@ const getStatusColor = (status: OrderStatus) => {
 // Status Badge
 const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
+    <span className={`plant-manager-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
       {status}
     </span>
   );
@@ -175,12 +176,12 @@ const KPICard: React.FC<{
           <span className={colorClass}>{icon}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-[11px] font-bold tracking-wider text-slate-300 uppercase leading-snug truncate block">{label}</span>
+          <span className="mobile-kpi-title text-[11px] font-bold tracking-wider text-slate-300 uppercase leading-snug truncate block">{label}</span>
         </div>
       </div>
       <div className="flex items-baseline gap-1.5 mt-auto">
-        <span className="text-2xl font-bold text-white">{value}</span>
-        <span className="text-xs font-medium text-slate-400">orders</span>
+        <span className="mobile-kpi-value text-2xl font-bold text-white">{value}</span>
+        <span className="mobile-kpi-helper text-xs font-medium text-slate-400">orders</span>
       </div>
     </button>
   );
@@ -199,6 +200,7 @@ const OrderManagement: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  usePlantManagerDetailOverlay(isPanelOpen && selectedOrder !== null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<OrderSummary>({ assigned: 0, preparing: 0, readyForStockOut: 0, inTransit: 0, delivered: 0, cancelled: 0 });
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
@@ -391,7 +393,7 @@ const OrderManagement: React.FC = () => {
             <Calendar className="w-4 h-4" />
           </button>
 
-          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1" aria-label="Order view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-[#092635] text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1" aria-label="Order view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
 
           <button className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
             <FileText className="w-4 h-4" />
@@ -403,8 +405,8 @@ const OrderManagement: React.FC = () => {
       {/* ORDER TABLE */}
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
+        <div className="pm-table-scroll">
+          <table className="pm-status-table pm-order-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1100px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
@@ -558,26 +560,26 @@ const OrderManagement: React.FC = () => {
       {isPanelOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
-          <div className="bg-black/60 backdrop-blur-sm w-full" onClick={handleClosePanel}></div>
+          <div className="min-w-0 flex-1 bg-black/60 backdrop-blur-sm" onClick={handleClosePanel}></div>
           {/* Panel */}
-          <div className="bg-[#0b101d] border-l border-slate-800 w-full sm:w-[480px] h-full overflow-y-auto p-6 animate-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <div className="h-full w-[96vw] shrink-0 overflow-x-hidden overflow-y-auto overscroll-y-contain border-l border-slate-800 bg-[#0b101d] p-3 animate-in slide-in-from-right duration-300 min-[400px]:w-[92vw] sm:w-[480px] sm:p-6">
+            <div className="sticky top-0 z-10 -mx-3 -mt-3 mb-4 flex items-start justify-between gap-2 bg-[#0b101d] px-3 py-3 sm:static sm:mx-0 sm:mt-0 sm:mb-6 sm:items-center sm:bg-transparent sm:p-0">
+              <h2 className="flex min-w-0 flex-wrap items-center gap-2 whitespace-nowrap text-base font-bold leading-tight text-white sm:text-xl">
                 {selectedOrder.orderNumber}
                 <StatusBadge status={selectedOrder.status} />
               </h2>
-              <button onClick={handleClosePanel} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <button aria-label="Close order details" onClick={handleClosePanel} className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:hover:bg-slate-700 dark:hover:text-white sm:min-h-0 sm:min-w-0 sm:p-1.5">
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
 
             {/* Customer Info */}
-            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700 mb-6">
+            <div className="mb-4 rounded-xl border border-slate-700 bg-slate-800/30 p-3 sm:mb-6 sm:p-4">
               <div className="flex items-start gap-3">
                 <User className="w-5 h-5 text-slate-400 mt-0.5" />
-                <div>
+                <div className="min-w-0">
                   <p className="text-white font-medium">{selectedOrder.customer}</p>
-                  <p className="text-slate-400 text-sm">{selectedOrder.destination}</p>
+                  <p className="break-words text-sm text-slate-400">{selectedOrder.destination}</p>
                   <p className="text-slate-400 text-sm">{selectedOrder.contact}</p>
                   <p className="text-slate-400 text-sm">Warehouse: {selectedOrder.assignedWarehouse}</p>
                 </div>
@@ -585,7 +587,7 @@ const OrderManagement: React.FC = () => {
             </div>
 
             {/* Stock Allocation Checklist */}
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <h3 className="text-sm font-semibold text-white mb-3">Stock Allocation Checklist</h3>
               <div className="space-y-3">
                 {selectedOrder.items.map((item) => {
@@ -626,11 +628,11 @@ const OrderManagement: React.FC = () => {
                   {actionError}
                 </p>
               )}
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap">
                 {selectedOrder.status === 'Assigned' && (
                   <button
                     onClick={() => void handleStartPreparation(selectedOrder.id)}
-                    className="flex-1 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:flex-1 sm:px-4 sm:text-sm"
                   >
                     <Package className="w-4 h-4" />
                     Start Preparation
@@ -640,7 +642,7 @@ const OrderManagement: React.FC = () => {
                   <button
                     onClick={() => void handleReadyForStockOut(selectedOrder.id)}
                     disabled={processingOrderId === selectedOrder.id}
-                    className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-medium text-slate-950 transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1 sm:px-4 sm:text-sm"
                   >
                     <Check className="w-4 h-4" />
                     {processingOrderId === selectedOrder.id ? 'Updating...' : 'Ready for Stock Out'}
@@ -648,14 +650,14 @@ const OrderManagement: React.FC = () => {
                 )}
                 <button
                   onClick={() => handleGeneratePickList(selectedOrder.id)}
-                  className="flex-1 px-4 py-2 border border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 sm:flex-1 sm:px-4 sm:text-sm"
                 >
                   <FileText className="w-4 h-4" />
                   Generate Pick List
                 </button>
                 <button
                   onClick={() => handleFlagStockIssue(selectedOrder.id)}
-                  className="flex-1 px-4 py-2 border border-rose-700 hover:bg-rose-700/30 text-rose-400 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-700 px-3 py-2 text-xs font-medium text-rose-400 transition-colors hover:bg-rose-700/30 sm:flex-1 sm:px-4 sm:text-sm"
                 >
                   <AlertTriangle className="w-4 h-4" />
                   Flag Stock Issue

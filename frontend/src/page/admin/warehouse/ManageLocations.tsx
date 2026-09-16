@@ -127,7 +127,7 @@ const ManageLocations: React.FC = () => {
 };
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <label className="block"><span className="mb-1.5 block text-sm text-gray-300">{label}</span>{children}</label>;
-const StatusBadge: React.FC<{ status: WarehouseLocation['status'] }> = ({ status }) => <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-green-400/20 bg-green-400/10 text-green-400' : 'border-gray-400/20 bg-gray-400/10 text-gray-400'}`}>{status}</span>;
+const StatusBadge: React.FC<{ status: WarehouseLocation['status'] }> = ({ status }) => <span className={`admin-badge rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-green-400/20 bg-green-400/10 text-green-400' : 'border-gray-400/20 bg-gray-400/10 text-gray-400'}`}>{status}</span>;
 
 export { ManageLocations };
 export default ManageLocations;

@@ -13,12 +13,25 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class QaInspectionTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('local');
+    }
+
+    private function proof(string $name = 'proof.pdf'): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent($name, "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n");
+    }
 
     private function qaUser(): User
     {
@@ -110,6 +123,7 @@ class QaInspectionTest extends TestCase
         $receiving->update(['prepared_by_id' => $plantManager->id]);
 
         $payload = [
+            'attachment' => $this->proof(),
             'items' => [
                 [
                     'receiving_item_id' => $receiving->items[0]->id,
@@ -129,7 +143,7 @@ class QaInspectionTest extends TestCase
             ],
         ];
 
-        $response = $this->actingAs($qa)->postJson("/api/qa/inspections/{$receiving->id}", $payload);
+        $response = $this->actingAs($qa)->post("/api/qa/inspections/{$receiving->id}", $payload, ['Accept' => 'application/json']);
 
         $response->assertOk();
         $response->assertJsonPath('inspection_status', 'Partial');
@@ -195,7 +209,8 @@ class QaInspectionTest extends TestCase
         ]);
         $item = $receiving->items->firstOrFail();
 
-        $inspection = $this->actingAs($qa)->postJson("/api/qa/inspections/{$receiving->id}", [
+        $inspection = $this->actingAs($qa)->post("/api/qa/inspections/{$receiving->id}", [
+            'attachment' => $this->proof(),
             'items' => [[
                 'receiving_item_id' => $item->id,
                 'accepted_quantity' => 3,
@@ -329,5 +344,142 @@ class QaInspectionTest extends TestCase
             'receiving_item_id' => $receiving->items[0]->id,
             'remarks' => 'Admin must not be able to save this note.',
         ]);
+    }
+
+    private function attachmentPayload(Receiving $receiving, int $accepted = 3, int $rejected = 2): array
+    {
+        return [
+            'submit' => '1',
+            'items' => [[
+                'receiving_item_id' => (string) $receiving->items[0]->id,
+                'accepted_quantity' => (string) $accepted,
+                'rejected_quantity' => (string) $rejected,
+                'inspection_result' => 'Passed',
+                'remarks' => 'Proof checked.',
+            ]],
+        ];
+    }
+
+    public function test_all_passed_without_attachment_still_submits(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Passed', 'qty' => 5]]);
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, $this->attachmentPayload($receiving, 5, 0))
+            ->assertOk()->assertJsonPath('inspection_status', 'Passed')->assertJsonPath('inspection.attachment_path', null);
+        $this->assertSame([], Storage::disk('local')->allFiles('qa-attachments'));
+    }
+
+    public function test_direct_api_rejection_without_proof_cannot_be_bypassed_with_aggregate(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Rejected', 'qty' => 5]]);
+        $payload = $this->attachmentPayload($receiving);
+        $payload['rejected_qty'] = 0;
+        $this->actingAs($qa)->postJson('/api/qa/inspections/'.$receiving->id, $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('attachment')
+            ->assertJsonPath('errors.attachment.0', 'Proof of rejection is required. Please upload an attachment.');
+        $this->assertDatabaseMissing('qa_inspections', ['receiving_id' => $receiving->id]);
+        $this->assertSame('Pending QA', $receiving->fresh()->status);
+        $this->assertSame([], Storage::disk('local')->allFiles('qa-attachments'));
+    }
+
+    public function test_valid_jpeg_png_pdf_persist_and_are_available_on_fresh_detail_request(): void
+    {
+        $qa = $this->qaUser();
+        foreach (['jpg', 'jpeg', 'png', 'pdf'] as $extension) {
+            $receiving = $this->makeReceiving([['product' => 'Proof '.$extension, 'qty' => 5]]);
+            $file = $extension === 'pdf' ? $this->proof() : UploadedFile::fake()->image('damage.'.$extension);
+            $response = $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id,
+                [...$this->attachmentPayload($receiving, 0, 5), 'attachment' => $file], ['Accept' => 'application/json']);
+            $response->assertOk()->assertJsonPath('inspection_status', 'Rejected')
+                ->assertJsonPath('products.0.remarks', 'Proof checked.');
+            $path = $response->json('inspection.attachment_path');
+            $this->assertMatchesRegularExpression('~^qa-attachments/[A-Za-z0-9]+\.(jpg|jpeg|png|pdf)$~', $path);
+            Storage::disk('local')->assertExists($path);
+            $this->assertSame($path, $receiving->fresh()->qaInspection->attachment_path);
+            $this->getJson('/api/qa/inspections/'.$receiving->id)->assertOk()->assertJsonPath('inspection.attachment_path', $path);
+            $this->get('/api/qa/inspections/'.$receiving->id.'/attachment')->assertOk()->assertDownload(basename($path))
+                ->assertHeader('X-Content-Type-Options', 'nosniff');
+            $this->assertDatabaseMissing('receiving_timelines', ['receiving_id' => $receiving->id, 'status' => 'Ready for Stock In']);
+        }
+    }
+
+    public function test_invalid_and_oversized_attachments_are_rejected_even_without_rejected_quantity(): void
+    {
+        $qa = $this->qaUser();
+        $files = [
+            UploadedFile::fake()->createWithContent('proof.txt', 'not a supported file'),
+            UploadedFile::fake()->createWithContent('spoof.jpg', '<?php echo 1;'),
+            $this->proof('proof.exe'),
+            UploadedFile::fake()->createWithContent('large.pdf', "%PDF-1.4\n".str_repeat('a', 5 * 1024 * 1024)),
+        ];
+        foreach ($files as $fixture) {
+            // Use Symfony's real MIME detection; Laravel fakes infer MIME from the filename.
+            $file = new UploadedFile($fixture->getPathname(), $fixture->getClientOriginalName(), null, null, true);
+            $receiving = $this->makeReceiving([['product' => 'Invalid proof', 'qty' => 5]]);
+            $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id,
+                [...$this->attachmentPayload($receiving, 5, 0), 'attachment' => $file], ['Accept' => 'application/json'])
+                ->assertUnprocessable()->assertJsonValidationErrors('attachment');
+            $this->assertDatabaseMissing('qa_inspections', ['receiving_id' => $receiving->id]);
+        }
+        $this->assertSame([], Storage::disk('local')->allFiles('qa-attachments'));
+    }
+
+    public function test_draft_replacement_method_spoofing_and_submission_with_persisted_proof(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Draft', 'qty' => 5]]);
+        $payload = [...$this->attachmentPayload($receiving), 'submit' => '0'];
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, $payload)->assertOk();
+        $response = $this->post('/api/qa/inspections/'.$receiving->id, [...$payload, '_method' => 'PUT', 'attachment' => $this->proof()]);
+        $response->assertOk();
+        $oldPath = $response->json('inspection.attachment_path');
+        $response = $this->post('/api/qa/inspections/'.$receiving->id, [...$payload, '_method' => 'PUT', 'attachment' => $this->proof()]);
+        $response->assertOk();
+        $newPath = $response->json('inspection.attachment_path');
+        $this->assertNotSame($oldPath, $newPath);
+        Storage::disk('local')->assertMissing($oldPath);
+        Storage::disk('local')->assertExists($newPath);
+        $this->post('/api/qa/inspections/'.$receiving->id, [...$payload, '_method' => 'PUT', 'submit' => '1'])
+            ->assertOk()->assertJsonPath('inspection_status', 'Partial')->assertJsonPath('inspection.attachment_path', $newPath);
+    }
+
+    public function test_attachment_download_preserves_qa_authorization(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Private proof', 'qty' => 5]]);
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id,
+            [...$this->attachmentPayload($receiving), 'attachment' => $this->proof()])->assertOk();
+        $this->actingAs(User::factory()->create())->getJson('/api/qa/inspections/'.$receiving->id.'/attachment')->assertForbidden();
+    }
+
+    public function test_exactly_five_megabytes_is_allowed_and_client_path_cannot_replace_proof(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Boundary', 'qty' => 5]]);
+        $this->actingAs($qa)->postJson('/api/qa/inspections/'.$receiving->id,
+            [...$this->attachmentPayload($receiving), 'attachment_path' => 'qa-attachments/forged.pdf'])
+            ->assertUnprocessable()->assertJsonValidationErrors('attachment');
+        $fixture = UploadedFile::fake()->createWithContent('boundary.pdf', '%PDF-1.4'.str_repeat(' ', 5 * 1024 * 1024 - 8));
+        $file = new UploadedFile($fixture->getPathname(), 'boundary.pdf', null, null, true);
+        $this->post('/api/qa/inspections/'.$receiving->id,
+            [...$this->attachmentPayload($receiving), 'attachment' => $file], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('inspection_status', 'Partial');
+    }
+
+    public function test_database_failure_cleans_up_new_upload(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Rollback', 'qty' => 5]]);
+        QaInspection::updating(function () { throw new \RuntimeException('Simulated database failure'); });
+        try {
+            $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id,
+                [...$this->attachmentPayload($receiving), 'attachment' => $this->proof()], ['Accept' => 'application/json'])
+                ->assertStatus(500)->assertJsonPath('message', 'Failed to save QA inspection.');
+            $this->assertSame([], Storage::disk('local')->allFiles('qa-attachments'));
+            $this->assertDatabaseMissing('qa_inspections', ['receiving_id' => $receiving->id]);
+        } finally {
+            QaInspection::flushEventListeners();
+        }
     }
 }
