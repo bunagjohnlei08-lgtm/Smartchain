@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// Local development falls back to the Laravel dev server.
+// Railway (and any other deployed environment) supplies VITE_API_URL at build time.
+const API_BASE_URL: string = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   withXSRFToken: true,
   headers: {
@@ -11,7 +15,7 @@ const api = axios.create({
 });
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: `${API_BASE_URL}/api`,
   withCredentials: true,
   withXSRFToken: true,
   headers: {
