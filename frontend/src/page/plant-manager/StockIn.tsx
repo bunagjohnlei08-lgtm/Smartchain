@@ -383,7 +383,6 @@ const StockIn: React.FC = () => {
   const [selectedStockedId, setSelectedStockedId] = useState<number | null>(null);
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   usePlantManagerDetailOverlay(drawerMode !== null);
-  const [activeTab, setActiveTab] = useState<'info' | 'items' | 'attachments' | 'history'>('info');
   const [receivingsViewMode, setReceivingsViewMode] = useState<ViewMode>('list');
   const [recentlyStockedViewMode, setRecentlyStockedViewMode] = useState<ViewMode>('list');
   const [historyViewMode, setHistoryViewMode] = useState<ViewMode>('list');

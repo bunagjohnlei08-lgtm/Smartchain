@@ -181,7 +181,7 @@ const StockOut: React.FC = () => {
   const [manualBarcode, setManualBarcode] = useState('');
   const [manualQuantity, setManualQuantity] = useState('1');
   const [scanSuccess, setScanSuccess] = useState('');
-  const [completionNotice, setCompletionNotice] = useState('');
+  const [, setCompletionNotice] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const scanBusyRef = useRef(false);

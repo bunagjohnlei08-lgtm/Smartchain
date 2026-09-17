@@ -185,24 +185,6 @@ const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
   );
 };
 
-const KPICard: React.FC<{
-  label: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ReactNode;
-}> = ({ label, value, subtitle, icon }) => (
-  <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-slate-600 transition-all duration-200 h-full flex flex-col">
-    <div className="flex items-start justify-between flex-1">
-      <div>
-        <p className="mobile-kpi-title text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
-        <p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{value}</p>
-        {subtitle && <p className="mobile-kpi-helper text-slate-500 text-xs mt-1">{subtitle}</p>}
-      </div>
-      <div className="p-2.5 bg-slate-800/60 rounded-lg shrink-0">{icon}</div>
-    </div>
-  </div>
-);
-
 const SearchInput: React.FC<{
   value: string;
   onChange: (value: string) => void;
@@ -217,24 +199,6 @@ const SearchInput: React.FC<{
       placeholder={placeholder}
       className="w-full bg-[#101929] border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
     />
-  </div>
-);
-
-const FilterSelect: React.FC<{
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-}> = ({ value, onChange, options }) => (
-  <div className="min-w-[130px]">
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[#101929] border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>{opt}</option>
-      ))}
-    </select>
   </div>
 );
 
@@ -664,7 +628,7 @@ const Shipments: React.FC = () => {
     setShowPrepareModal(true);
   };
 
-  const handleMarkReady = (shipmentId: string, packingData: Partial<Shipment['packing']>, checklist: Shipment['checklist']) => {
+  const handleMarkReady = (shipmentId: string, _packingData: Partial<Shipment['packing']>, _checklist: Shipment['checklist']) => {
     // In a real app, we would update the shipment status and data.
     // For mock, we show a toast.
     setToast({

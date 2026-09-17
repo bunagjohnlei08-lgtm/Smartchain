@@ -185,7 +185,6 @@ const Suppliers: React.FC = () => {
   const totalSuppliers = mockSuppliers.length;
   const activeSuppliers = mockSuppliers.filter((s) => s.status === 'Active').length;
   const onHoldSuppliers = mockSuppliers.filter((s) => s.status === 'On Hold').length;
-  const inactiveSuppliers = mockSuppliers.filter((s) => s.status === 'Inactive').length;
   const totalOpenPOs = mockSuppliers.reduce((sum, s) => sum + s.openPOs, 0);
 
   const handleEdit = (supplier: Supplier) => {
