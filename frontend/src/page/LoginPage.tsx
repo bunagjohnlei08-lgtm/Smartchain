@@ -23,8 +23,6 @@ const LoginPage: React.FC = () => {
     onLogin: async (data) => {
       setIsAuthenticating(true);
       try {
-        await api.get('/sanctum/csrf-cookie', { withCredentials: true });
-
         const response = await api.post('/api/login', {
           email: data.email,
           password: data.password,

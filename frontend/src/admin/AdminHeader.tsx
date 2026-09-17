@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown, LogOut } from 'lucide-react';
+import { logout } from '../lib/logout';
 
 export default function AdminHeader() {
   const [userName, setUserName] = useState('User');
@@ -26,11 +27,8 @@ export default function AdminHeader() {
     }
   }, []);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('isAuthenticated');
-    sessionStorage.removeItem('userRole');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+  const handleLogout = async () => {
+    await logout();
     navigate('/login', { replace: true });
   };
 

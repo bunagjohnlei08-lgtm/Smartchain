@@ -12,6 +12,7 @@ import NotificationBell from '../components/NotificationBell';
 import UserAvatar from '../components/UserAvatar';
 import ProfileLogoutMenu from '../components/ProfileLogoutMenu';
 import { PlantManagerDetailOverlayContext } from '../components/layout/PlantManagerDetailOverlayContext';
+import { logout } from '../lib/logout';
 
 const PlantManagerLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -36,11 +37,8 @@ const PlantManagerLayout: React.FC = () => {
     if (isDetailOverlayOpen) setIsMobileMenuOpen(false);
   }, [isDetailOverlayOpen]);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('isAuthenticated');
-    sessionStorage.removeItem('userRole');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

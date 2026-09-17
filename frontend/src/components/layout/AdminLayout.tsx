@@ -14,6 +14,7 @@ import { readStoredUser, subscribeToStoredUser, type AuthUser } from '../../lib/
 import NotificationBell from '../NotificationBell';
 import UserAvatar from '../UserAvatar';
 import { AdminDetailOverlayContext } from './AdminDetailOverlayContext';
+import { logout } from '../../lib/logout';
 
 const AdminLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -57,11 +58,8 @@ const AdminLayout: React.FC = () => {
     };
   }, []);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('isAuthenticated');
-    sessionStorage.removeItem('userRole');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+  const handleLogout = async () => {
+    await logout();
     window.location.href = '/login';
   };
 

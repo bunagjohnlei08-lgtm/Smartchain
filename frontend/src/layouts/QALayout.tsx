@@ -12,6 +12,7 @@ import { readStoredUser, subscribeToStoredUser, type AuthUser } from '../lib/aut
 import NotificationBell from '../components/NotificationBell';
 import UserAvatar from '../components/UserAvatar';
 import ProfileLogoutMenu from '../components/ProfileLogoutMenu';
+import { logout } from '../lib/logout';
 
 const QALayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -31,11 +32,8 @@ const QALayout: React.FC = () => {
     return subscribeToStoredUser(applyUser);
   }, []);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('isAuthenticated');
-    sessionStorage.removeItem('userRole');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

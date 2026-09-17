@@ -15,7 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->statefulApi();
+        // Intentionally no statefulApi(): the SPA authenticates with Sanctum
+        // personal access tokens (Authorization: Bearer ...), not the cookie
+        // session flow. statefulApi() would push requests coming from a
+        // "stateful" origin through StartSession + ValidateCsrfToken, which is
+        // what forced the frontend to call /sanctum/csrf-cookie before login and
+        // would break once the frontend and backend live on separate domains.
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {

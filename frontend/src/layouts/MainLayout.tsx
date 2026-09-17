@@ -2,15 +2,13 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/auth/Sidebar';
 import Header from '../components/Header';
 import { LogOut } from 'lucide-react';
+import { logout } from '../lib/logout';
 
 export const MainLayout = () => {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('isAuthenticated');
-    sessionStorage.removeItem('userRole');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
