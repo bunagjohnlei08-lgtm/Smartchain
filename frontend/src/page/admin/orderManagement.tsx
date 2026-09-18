@@ -550,42 +550,42 @@ const OrderManagement: React.FC = () => {
 
         {/* Table */}
         {viewMode === 'list' ? (
-        <div className="admin-table-scroll w-full custom-scrollbar">
+        <div className="admin-table-scroll w-full max-w-full overflow-x-auto overscroll-x-contain custom-scrollbar">
           <table className="admin-order-table admin-responsive-table admin-cols-10 admin-sticky-1 table-auto w-full min-w-[1400px] border-collapse text-sm">
             <thead className="border-b border-slate-800/80">
               <tr>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Customer</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Order Date</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Required Delivery</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Products</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Total Amount</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
-                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Assigned To</th>
-                <th className="text-right py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400">Actions</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Order No.</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Customer</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Order Date</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Required Delivery</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Products</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Items</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Total Amount</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Status</th>
+                <th className="text-left py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Assigned To</th>
+                <th className="text-right py-3 px-3 text-xs font-medium uppercase tracking-wider text-slate-400 sm:whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {orders.map((order) => (
                 <tr key={order.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors cursor-pointer" onClick={() => handleViewOrder(order)}>
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-3 sm:whitespace-nowrap">
                     <p className="font-mono text-slate-900 dark:text-blue-400 hover:underline font-medium">{order.orderNo}</p>
                     <p className="text-xs text-slate-500">{order.refNo}</p>
                   </td>
-                  <td className="py-3 px-3">
-                    <p className="text-slate-200">{order.customer}</p>
+                  <td className="py-3 px-3 sm:min-w-[180px]">
+                    <p className="text-slate-200 sm:whitespace-nowrap">{order.customer}</p>
                     <p className="text-xs text-slate-500">{order.address.split(',').slice(1).join(',').trim()}</p>
                   </td>
-                  <td className="py-3 px-3 text-slate-300">{order.orderDate}</td>
-                  <td className="py-3 px-3 text-slate-300">{order.requiredDelivery}</td>
-                  <td className="max-w-56 py-3 px-3 text-slate-300">
+                  <td className="py-3 px-3 text-slate-300 sm:whitespace-nowrap">{order.orderDate}</td>
+                  <td className="py-3 px-3 text-slate-300 sm:whitespace-nowrap">{order.requiredDelivery}</td>
+                  <td className="max-w-56 py-3 px-3 text-slate-300 sm:min-w-[200px] sm:max-w-64">
                     {order.products.length ? order.products.map(product => <p key={product} className="text-slate-200">{product}</p>) : <p className="text-slate-500">No products</p>}
                   </td>
-                  <td className="py-3 px-3 text-slate-300">{order.itemCount} items</td>
-                  <td className="py-3 px-3 text-white font-medium">₱{order.totalAmount.toLocaleString()}</td>
-                  <td className="py-3 px-3"><StatusBadge status={order.status} /></td>
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-3 text-slate-300 sm:whitespace-nowrap">{order.itemCount} items</td>
+                  <td className="py-3 px-3 text-white font-medium sm:whitespace-nowrap">₱{order.totalAmount.toLocaleString()}</td>
+                  <td className="py-3 px-3 sm:whitespace-nowrap"><StatusBadge status={order.status} /></td>
+                  <td className="py-3 px-3 sm:whitespace-nowrap">
                     {order.assignedTo ? (
                       <div>
                         <p className="text-slate-200">{order.assignedTo}</p>
@@ -595,7 +595,7 @@ const OrderManagement: React.FC = () => {
                       <span className="text-slate-500">-</span>
                     )}
                   </td>
-                  <td className="py-3 px-3 text-right">
+                  <td className="py-3 px-3 text-right sm:whitespace-nowrap">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleViewOrder(order); }}
                       className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"

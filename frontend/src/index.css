@@ -4609,5 +4609,14 @@ body {
       border-right-color: rgb(31 41 55 / 0.8);
       border-bottom-color: rgb(31 41 55);
     }
+
+    /* Inventory Report only: pin each <th>/<td> to its <col> width so Barcode,
+       Product, Category and Warehouse can never be squeezed into each other. */
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table[data-report="inventory"] :is(th, td):not([colspan]) {
+      width: var(--pm-col-width);
+      min-width: var(--pm-col-width);
+      max-width: var(--pm-col-width);
+      box-sizing: border-box;
+    }
   }
 }
