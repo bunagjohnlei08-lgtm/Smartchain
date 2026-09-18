@@ -15,11 +15,11 @@ class PlantManagerWarehouseTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function user(string $slug): User
+    private function user(string $slug, array $attributes = []): User
     {
         $role = Role::create(['name' => $slug, 'slug' => $slug]);
 
-        return User::factory()->create(['role_id' => $role->id, 'status' => 'ACTIVE']);
+        return User::factory()->create(['role_id' => $role->id, 'status' => 'ACTIVE'] + $attributes);
     }
 
     public function test_plant_manager_sees_the_main_warehouse_and_live_inventory_totals(): void
@@ -36,7 +36,7 @@ class PlantManagerWarehouseTest extends TestCase
             'available_stock' => 300, 'reserved_stock' => 50, 'backload' => 10,
         ]);
 
-        $this->actingAs($this->user('PLANT_MANAGER'))->getJson('/api/plant-manager/warehouse')
+        $this->actingAs($this->user('PLANT_MANAGER', ['warehouse_id' => $warehouse->id]))->getJson('/api/plant-manager/warehouse')
             ->assertOk()
             ->assertJsonPath('id', $warehouse->id)
             ->assertJsonPath('name', 'Main Warehouse')

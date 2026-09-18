@@ -14,7 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
-import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser';
+import { BrowserCodeReader, type IScannerControls } from '@zxing/browser';
+import { ChecksumException, Code128Reader, DecodeHintType, FormatException, NotFoundException, type BinaryBitmap, type Result } from '@zxing/library';
 
 type StockOutStatus = 'Ready for Stock Out' | 'Stock Out In Progress' | 'Ready for Shipment';
 
@@ -166,6 +167,24 @@ const getCameraErrorMessage = (error: unknown) => {
   }
 };
 
+// Inventory barcodes are rendered as Code 128 (admin/Inventory.tsx encodeCode128B). A 13-digit
+// value is 178 modules wide, so decode only that symbology and try harder (scan many more rows per frame).
+const CODE_128_HINTS = new Map<DecodeHintType, unknown>([[DecodeHintType.TRY_HARDER, true]]);
+
+// TRY_HARDER also attempts a rotated pass, which @zxing/browser 0.2.1 cannot perform
+// (HTMLCanvasElementLuminanceSource.rotate throws a plain Error). The scan loop stops for
+// good on anything but NotFound/Checksum/Format, so report such frames as "not found".
+class Code128FrameReader extends Code128Reader {
+  decode(image: BinaryBitmap, hints?: Map<DecodeHintType, unknown>): Result {
+    try {
+      return super.decode(image, hints);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ChecksumException || error instanceof FormatException) throw error;
+      throw new NotFoundException();
+    }
+  }
+}
+
 const StockOut: React.FC = () => {
   const [orders, setOrders] = useState<StockOutOrder[]>([]);
   const [summary, setSummary] = useState<Summary>({ ordersReady: 0, pickingToday: 0, readyForShipment: 0, waitingLogistics: 0, releasedToday: 0, itemsReleased: 0, valueReleased: 0 });
@@ -298,30 +317,50 @@ const StockOut: React.FC = () => {
       }
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('No camera is available in this browser. Please use manual barcode entry.');
 
-      const handleResult = (result?: { getText: () => string }) => {
-        const value = result?.getText().trim();
+      // The decode loop runs its first frame before decodeFromConstraints resolves, so a
+      // detection can arrive before scannerControlsRef is set; stop via the callback's controls.
+      let detected = false;
+      const handleResult = (result: { getText: () => string } | undefined, _error: unknown, controls: IScannerControls) => {
+        const value = result ? String(result.getText()).trim() : '';
         const now = Date.now();
-        if (!value || scanBusyRef.current || (lastDetectionRef.current.value === value && now - lastDetectionRef.current.at <= 2500)) return;
+        if (!value || detected || scanBusyRef.current || (lastDetectionRef.current.value === value && now - lastDetectionRef.current.at <= 2500)) return;
+        detected = true;
         lastDetectionRef.current = { value, at: now };
+        if (import.meta.env.DEV) console.debug('[scanner] decoded CODE_128:', value);
+        controls.stop();
         stopCamera();
         void processScan(value, 1);
       };
       const startDecoder = (constraints: MediaStreamConstraints) => {
-        const reader = new BrowserMultiFormatReader(undefined, { delayBetweenScanAttempts: 150, delayBetweenScanSuccess: 1000 });
+        const reader = new BrowserCodeReader(new Code128FrameReader(), CODE_128_HINTS, { delayBetweenScanAttempts: 150, delayBetweenScanSuccess: 1000 });
         return reader.decodeFromConstraints(constraints, videoRef.current!, handleResult);
       };
 
+      let controls: IScannerControls;
       try {
-        scannerControlsRef.current = await startDecoder({
+        controls = await startDecoder({
           audio: false,
-          video: { facingMode: { ideal: 'environment' } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         });
       } catch (preferredCameraError: unknown) {
         if (!['NotFoundError', 'OverconstrainedError'].includes(getCameraErrorName(preferredCameraError))) throw preferredCameraError;
         stopCamera();
-        scannerControlsRef.current = await startDecoder({ audio: false, video: true });
+        controls = await startDecoder({ audio: false, video: true });
       }
+      if (detected) {
+        controls.stop();
+        return;
+      }
+      scannerControlsRef.current = controls;
       setCameraActive(true);
+
+      const stream = videoRef.current?.srcObject;
+      const track = stream instanceof MediaStream ? stream.getVideoTracks()[0] : undefined;
+      if (import.meta.env.DEV) console.debug('[scanner] decoder started', `${videoRef.current?.videoWidth}x${videoRef.current?.videoHeight}`, track?.getSettings());
+      const focusModes = (track?.getCapabilities?.() as { focusMode?: string[] } | undefined)?.focusMode;
+      if (track && focusModes?.includes('continuous')) {
+        track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => undefined);
+      }
     } catch (error: unknown) {
       stopCamera();
       setScannerError(getCameraErrorMessage(error));

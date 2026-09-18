@@ -4519,3 +4519,95 @@ body {
     }
   }
 }
+
+/* Plant Manager report preview: the modal stays inside the phone while the
+   report table keeps realistic per-column widths and swipes horizontally.
+   Widths come from the <colgroup> variables set in Reports.tsx, so <th> and <td>
+   share one geometry. Mobile-only; desktop keeps its existing auto layout. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .pm-reports .pm-report-preview {
+      padding: 10px !important;
+    }
+
+    .pm-reports .pm-report-preview-panel {
+      width: calc(100vw - 20px);
+      max-width: 100%;
+      min-width: 0;
+      max-height: calc(100dvh - 20px);
+    }
+
+    .pm-reports .pm-report-preview-scroll {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      padding: 0 10px 10px !important;
+      overflow: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-x pan-y;
+    }
+
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table {
+      width: var(--pm-report-min-width) !important;
+      min-width: var(--pm-report-min-width) !important;
+      max-width: none !important;
+      table-layout: fixed !important;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .pm-reports .pm-report-preview table.pm-report-table col {
+      width: var(--pm-col-width);
+    }
+
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table :is(th, td) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      border-right: 1px solid rgb(226 232 240 / 0.8);
+      border-bottom: 1px solid rgb(226 232 240);
+    }
+
+    /* Each header cell sticks on its own so it stays opaque and above the
+       sticky first body column while the table scrolls both ways. */
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table th {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgb(248 250 252);
+      padding: 8px !important;
+      font-size: 10px !important;
+      font-weight: 600;
+      line-height: 14px !important;
+    }
+
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table td {
+      padding: 7px 8px !important;
+      font-size: 10px !important;
+      line-height: 16px !important;
+    }
+
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table th:first-child {
+      left: 0;
+      z-index: 30;
+    }
+
+    .dark .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table th {
+      background: #0f172a;
+    }
+
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table :is(th, td):last-child {
+      border-right: 0;
+    }
+
+    .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table td[colspan] {
+      white-space: normal;
+    }
+
+    .dark .pm-reports .pm-report-preview table.pm-report-table.pm-report-table.pm-report-table :is(th, td) {
+      border-right-color: rgb(31 41 55 / 0.8);
+      border-bottom-color: rgb(31 41 55);
+    }
+  }
+}
