@@ -368,7 +368,7 @@ const CreateReceivingModal: React.FC<{
                     max={item.remaining_quantity}
                     value={item.delivered_quantity}
                     onChange={(e) => updateItem(index, { delivered_quantity: e.target.value })}
-                    className="col-span-4 bg-[#0b0f19] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    className="col-span-4 min-w-0 bg-white dark:bg-[#0b0f19] border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 placeholder:text-slate-400 dark:placeholder:text-inherit"
                     placeholder="Delivered qty"
                   />
                   <span className="col-span-3 text-sm text-slate-400">{item.unit ?? '—'}</span>
