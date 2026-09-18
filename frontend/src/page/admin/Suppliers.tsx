@@ -170,9 +170,66 @@ const Suppliers: React.FC = () => {
     finally { setSaving(false); }
   };
 
+  // Refresh / Export / Print and the view toggle are declared once and rendered in
+  // two places: the desktop header keeps them exactly where they were, while the
+  // mobile toolbar puts them in the filter card. Only one copy is ever displayed —
+  // the other side of the sm breakpoint is display:none, so it leaves no box and
+  // is excluded from the accessibility tree. Handlers and state are shared.
+  const toolbarIconButtons = (
+    <>
+      <button
+        onClick={() => void loadSuppliers()}
+        disabled={loading}
+        className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+        title="Refresh"
+      >
+        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+      </button>
+      <button
+        className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+        title="Export"
+      >
+        <Download className="w-4 h-4" />
+      </button>
+      <button
+        className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+        title="Print"
+      >
+        <Printer className="w-4 h-4" />
+      </button>
+    </>
+  );
+
+  const viewToggle = (
+    <div className="supplier-view-toggle flex items-center gap-1 bg-[var(--bg-hover)] rounded-xl p-1">
+      <button
+        onClick={() => setViewMode('cards')}
+        className={`p-1.5 rounded-lg transition-all ${
+          viewMode === 'cards'
+            ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
+            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+        }`}
+        title="Card View"
+      >
+        <Grid className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => setViewMode('table')}
+        className={`p-1.5 rounded-lg transition-all ${
+          viewMode === 'table'
+            ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
+            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+        }`}
+        title="Table View"
+      >
+        <List className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
   {/* FIX: Dark mode canvas adaptation */}
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200">
+    <div className="admin-suppliers w-full max-w-7xl mx-auto p-6 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
         <span>Admin</span>
@@ -181,55 +238,17 @@ const Suppliers: React.FC = () => {
       </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="supplier-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Suppliers</h1>
           <p className="text-sm text-[var(--text-secondary)]">Manage vendor relationships, contacts, and performance metrics</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={() => void loadSuppliers()}
-            disabled={loading}
-            className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="Export"
-          >
-            <Download className="w-4 h-4" />
-          </button>
-          <button
-            className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="Print"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
-          <div className="flex items-center gap-1 bg-[var(--bg-hover)] rounded-xl p-1">
-            <button
-              onClick={() => setViewMode('cards')}
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === 'cards'
-                  ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Card View"
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === 'table'
-                  ? 'bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Table View"
-            >
-              <List className="w-4 h-4" />
-            </button>
+        <div className="supplier-header-actions flex items-center gap-3 flex-wrap">
+          {/* Desktop only: on mobile these live in the toolbar card instead, and
+              display:none leaves no empty row behind. */}
+          <div className="supplier-header-tools hidden sm:flex items-center gap-3">
+            {toolbarIconButtons}
+            {viewToggle}
           </div>
           <button
             onClick={() => setShowAddModal(true)}
@@ -261,9 +280,28 @@ const Suppliers: React.FC = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-wrap items-center gap-1 bg-[var(--bg-hover)] rounded-full p-1">
+      <div className="supplier-toolbar bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4">
+        {/* Mobile row 1: search flush left, then Refresh / Export / Print. */}
+        <div className="supplier-search-row flex items-center sm:hidden">
+          <div className="supplier-search-field relative flex-1 min-w-0">
+            <Search className="supplier-search-icon absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              placeholder="Search by supplier name, contact, or ID"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl pl-9 pr-4 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            />
+          </div>
+          <div className="supplier-icon-actions flex items-center">
+            {toolbarIconButtons}
+          </div>
+        </div>
+
+        {/* Row 2: status filters left. Mobile adds the view toggle on the right;
+            desktop keeps the search field there, exactly as before. */}
+        <div className="supplier-filter-row flex flex-wrap items-center gap-3">
+          <div className="supplier-status-filters flex flex-wrap items-center gap-1 bg-[var(--bg-hover)] rounded-full p-1">
             {statusOptions.map((status) => (
               <button
                 key={status}
@@ -278,7 +316,10 @@ const Suppliers: React.FC = () => {
               </button>
             ))}
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="supplier-toggle-slot ml-auto sm:hidden">
+            {viewToggle}
+          </div>
+          <div className="ml-auto hidden sm:flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
               <input

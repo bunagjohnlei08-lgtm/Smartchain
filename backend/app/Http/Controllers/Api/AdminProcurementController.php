@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ReplenishmentRequest;
 use App\Notifications\WorkflowNotification;
+use App\Support\AuditLogger;
 use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -135,6 +136,22 @@ class AdminProcurementController extends Controller
         ])->save();
 
         $replenishmentRequest->load(['requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name']);
+
+        AuditLogger::success(
+            $status === self::STATUS_APPROVED ? 'PROCUREMENT_APPROVED' : 'PROCUREMENT_DECLINED',
+            AuditLogger::MODULE_PROCUREMENT,
+            [
+                'resource' => $replenishmentRequest,
+                'resource_label' => $replenishmentRequest->request_no,
+                'details' => sprintf(
+                    '%s request %s%s',
+                    $status === self::STATUS_APPROVED ? 'Approved' : 'Declined',
+                    $replenishmentRequest->request_no,
+                    $replenishmentRequest->product ? " for {$replenishmentRequest->product->name}" : '',
+                ),
+                'metadata' => ['status' => $status],
+            ],
+        );
 
         if ($replenishmentRequest->requester) {
             $label = $status === self::STATUS_APPROVED ? 'Approved' : 'Rejected';

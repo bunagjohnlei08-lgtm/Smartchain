@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryHistoryController;
 use App\Http\Controllers\Api\StockInController;
@@ -68,6 +69,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users/{id}/approve', [UserController::class, 'approve']);
     Route::post('/users/{id}/suspend', [UserController::class, 'suspend']);
     Route::post('/users/{id}/activate', [UserController::class, 'activate']);
+
+    Route::get('/admin/audit-logs', [AuditLogController::class, 'index']);
+    Route::get('/admin/audit-logs/options', [AuditLogController::class, 'options']);
 
     Route::get('/roles', [UserController::class, 'roles']);
     Route::get('/departments', [UserController::class, 'departments']);

@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
+use App\Support\AuditLogger;
 use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -186,6 +187,14 @@ class AdminOrderController extends Controller
             $order->histories()->create([
                 'previous_status' => $previous, 'new_status' => 'CANCELLED',
                 'action' => 'ORDER_CANCELLED', 'performed_by' => $request->user()->id,
+            ]);
+
+            // Deferred by AuditLogger until this transaction commits.
+            AuditLogger::success('ORDER_STATUS_CHANGED', AuditLogger::MODULE_ORDERS, [
+                'resource' => $order,
+                'resource_label' => $order->order_no,
+                'details' => AuditLogger::describeChanges(['status' => ['from' => $previous, 'to' => 'CANCELLED']]),
+                'metadata' => ['from' => $previous, 'to' => 'CANCELLED'],
             ]);
         });
 

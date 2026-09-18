@@ -19,14 +19,14 @@
 */
 
 $localOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
+    'http://localhost:4173',
+    'http://localhost:4173',
+    'http://localhost:4173',
+    'http://localhost:4173',
 ];
 
 $configuredOrigins = array_values(array_filter(array_map(
-    static fn (string $origin): string => rtrim(trim($origin), '/'),
+    static fn(string $origin): string => rtrim(trim($origin), '/'),
     explode(',', (string) env('CORS_ALLOWED_ORIGINS', (string) env('FRONTEND_URL', '')))
 )));
 

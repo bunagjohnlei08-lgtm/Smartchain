@@ -23,6 +23,7 @@ import {
 import type { ApiUser, ApiRole, ApiDepartment, ApiBranch, ApiWarehouse } from '../../types';
 import type { AxiosError } from 'axios';
 import { apiClient } from '../../lib/api';
+import AuditLogSection from './AuditLogSection';
 
 function getApiErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
@@ -36,6 +37,14 @@ function getApiErrorMessage(error: unknown): string {
   const msg = axiosError.response?.data?.message;
   if (typeof msg === 'string') return msg;
   return 'An unexpected error occurred. Please try again.';
+}
+
+const MAIN_WAREHOUSE_CODE = 'WH-MAIN';
+
+/** Resolve the Main Warehouse by its stable code (name as fallback), never by numeric id. */
+function findMainWarehouse(warehouses: ApiWarehouse[]): ApiWarehouse | undefined {
+  return warehouses.find((w) => w.code === MAIN_WAREHOUSE_CODE)
+    ?? warehouses.find((w) => w.name === 'Main Warehouse');
 }
 
 const STATUSES = ['All Status', 'ACTIVE', 'PENDING', 'SUSPENDED'];
@@ -149,12 +158,20 @@ const UserModal: React.FC<{
 
   const [formData, setFormData] = useState<Partial<ApiUser> & { password?: string }>(initialFormData as Partial<ApiUser> & { password?: string });
   const [showPassword, setShowPassword] = useState(false);
+  const mainWarehouse = findMainWarehouse(warehouses);
 
   useEffect(() => {
     if (user) {
       setFormData({ ...(user as ApiUser), password: '' });
     }
   }, [user]);
+
+  // Warehouses load asynchronously; assign Main Warehouse once it is known.
+  useEffect(() => {
+    if (!user && mainWarehouse) {
+      setFormData((current) => (current.warehouse_id ? current : { ...current, warehouse_id: mainWarehouse.id }));
+    }
+  }, [user, mainWarehouse]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,7 +203,7 @@ const UserModal: React.FC<{
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-400">Full Name *</label>
               <input
@@ -209,7 +226,7 @@ const UserModal: React.FC<{
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-400">Employee ID *</label>
               <input
@@ -257,7 +274,7 @@ const UserModal: React.FC<{
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-400">Role *</label>
               <select
@@ -275,49 +292,66 @@ const UserModal: React.FC<{
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-400">Department</label>
-              <select
-                value={String(formData.department_id ?? '')}
-                onChange={(e) => setFormData({ ...formData, department_id: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
-              >
-                <option value="">Select department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={String(d.id)}>{d.name}</option>
-                ))}
-              </select>
-            </div>
+            {user ? (
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-400">Department</label>
+                <select
+                  value={String(formData.department_id ?? '')}
+                  onChange={(e) => setFormData({ ...formData, department_id: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
+                >
+                  <option value="">Select department</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={String(d.id)}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="create-user-warehouse" className="block text-sm font-medium mb-2 text-gray-400">Warehouse</label>
+                {/* Single-warehouse operation: every new account joins the Main Warehouse. */}
+                <input
+                  id="create-user-warehouse"
+                  type="text"
+                  value={mainWarehouse?.name ?? 'Main Warehouse'}
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full h-11 cursor-not-allowed bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-gray-400 focus:outline-none"
+                />
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-400">Branch</label>
-              <select
-                value={String(formData.branch_id ?? '')}
-                onChange={(e) => setFormData({ ...formData, branch_id: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
-              >
-                <option value="">Select branch</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={String(b.id)}>{b.name}</option>
-                ))}
-              </select>
+          {user && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-400">Branch</label>
+                <select
+                  value={String(formData.branch_id ?? '')}
+                  onChange={(e) => setFormData({ ...formData, branch_id: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
+                >
+                  <option value="">Select branch</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={String(b.id)}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-400">Warehouse</label>
+                <select
+                  value={String(formData.warehouse_id ?? '')}
+                  onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
+                >
+                  <option value="">Select warehouse</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={String(w.id)}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-400">Warehouse</label>
-              <select
-                value={String(formData.warehouse_id ?? '')}
-                onChange={(e) => setFormData({ ...formData, warehouse_id: e.target.value ? Number(e.target.value) : undefined })}
-                className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
-              >
-                <option value="">Select warehouse</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={String(w.id)}>{w.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-800 border-gray-800/50">
             <button
@@ -437,9 +471,8 @@ const UserManagement: React.FC = () => {
         password: data.password,
         employee_id: data.employee_id,
         role_id: data.role_id,
-        department_id: data.department_id,
-        branch_id: data.branch_id,
-        warehouse_id: data.warehouse_id,
+        // Omitted when unresolved: the API then assigns the Main Warehouse itself.
+        warehouse_id: data.warehouse_id ?? findMainWarehouse(warehouses)?.id,
         status: data.status || 'ACTIVE',
       });
       await fetchUsers();
@@ -698,6 +731,9 @@ const UserManagement: React.FC = () => {
           itemsPerPage={itemsPerPage}
         />
       </div>
+
+      {/* 5. AUDIT LOGS */}
+      <AuditLogSection />
 
       {isAddUserModalOpen && (
         <UserModal

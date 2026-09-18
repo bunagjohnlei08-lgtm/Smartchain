@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\ReplenishmentRequest;
+use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +78,23 @@ class PurchaseOrderController extends Controller
             }
             return $order->load(['items', 'approver:id,name']);
         });
+
+        AuditLogger::success('PURCHASE_ORDER_GENERATED', AuditLogger::MODULE_PURCHASE_ORDERS, [
+            'resource' => $order,
+            'resource_label' => $order->po_number,
+            'details' => sprintf(
+                'Generated %s for %s (%d item%s)',
+                $order->po_number,
+                $order->supplier_name,
+                $order->items->count(),
+                $order->items->count() === 1 ? '' : 's',
+            ),
+            'metadata' => [
+                'supplier' => $order->supplier_name,
+                'total_amount' => (float) $order->total_amount,
+                'replenishment_request_id' => $order->replenishment_request_id,
+            ],
+        ]);
 
         return response()->json($this->present($order), 201);
     }

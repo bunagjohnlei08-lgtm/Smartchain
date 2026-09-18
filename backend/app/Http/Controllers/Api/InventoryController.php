@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -163,8 +164,27 @@ class InventoryController extends Controller
             $inventory->product_id = $product->id;
         }
 
+        $before = $inventory->only(['available_stock', 'reserved_stock', 'backload', 'status', 'warehouse_id']);
+
         $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray());
         $inventory->save();
+
+        $stockChanges = AuditLogger::diff($before, $validated, [
+            'available_stock' => 'available stock',
+            'reserved_stock' => 'reserved stock',
+            'backload' => 'backload',
+            'status' => 'status',
+            'warehouse_id' => 'warehouse',
+        ]);
+
+        if ($stockChanges !== []) {
+            AuditLogger::success('INVENTORY_ADJUSTED', AuditLogger::MODULE_INVENTORY, [
+                'resource' => $inventory,
+                'resource_label' => $inventory->barcode,
+                'details' => AuditLogger::describeChanges($stockChanges),
+                'metadata' => ['changes' => $stockChanges],
+            ]);
+        }
 
         return response()->json($this->present($inventory, $request->user()));
     }
@@ -174,6 +194,13 @@ class InventoryController extends Controller
         $this->authorizeAdmin($request);
         $inventory = Inventory::findOrFail($id);
         $inventory->delete();
+
+        AuditLogger::success('INVENTORY_DELETED', AuditLogger::MODULE_INVENTORY, [
+            'resource' => $inventory,
+            'resource_label' => $inventory->barcode,
+            'details' => "Deleted inventory record {$inventory->barcode}",
+            'metadata' => ['available_stock' => $inventory->available_stock],
+        ]);
 
         return response()->json(['message' => 'Inventory record deleted.']);
     }

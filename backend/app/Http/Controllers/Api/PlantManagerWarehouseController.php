@@ -13,11 +13,16 @@ class PlantManagerWarehouseController extends Controller
 
     public function show(Request $request): JsonResponse
     {
-        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+        $user = $request->user();
+        abort_unless($user?->isPlantManager(), 403, 'Plant Manager access is required.');
 
-        $warehouse = Warehouse::query()->where('code', 'WH-MAIN')->first();
+        if (! $user->warehouse_id) {
+            return response()->json(['message' => 'No warehouse is assigned to your account.'], 404);
+        }
+
+        $warehouse = Warehouse::query()->find($user->warehouse_id);
         if (! $warehouse) {
-            return response()->json(['message' => 'Warehouse details are not configured yet.'], 404);
+            return response()->json(['message' => 'Your assigned warehouse could not be found.'], 404);
         }
 
         $inventory = $warehouse->inventories()

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -33,6 +34,8 @@ class AuthController extends Controller
                 ->map(fn (string $key) => RateLimiter::availableIn($key))
                 ->max();
 
+            $this->auditFailedLogin($email, 'RATE_LIMITED', 'Login blocked after too many attempts');
+
             return response()->json([
                 'message' => 'Too many login attempts. Please try again later.',
                 'retry_after' => $retryAfter,
@@ -45,6 +48,8 @@ class AuthController extends Controller
             foreach ($rateLimitKeys as $key) {
                 RateLimiter::hit($key, self::LOGIN_DECAY_SECONDS);
             }
+
+            $this->auditFailedLogin($email, 'INVALID_CREDENTIALS', 'Invalid email or password', $user);
 
             return response()->json([
                 'message' => 'The provided credentials are incorrect.',
@@ -59,18 +64,29 @@ class AuthController extends Controller
         }
 
         if ($user->status === 'PENDING') {
+            $this->auditFailedLogin($email, 'ACCOUNT_PENDING', 'Login refused: account pending approval', $user);
+
             return response()->json([
                 'message' => 'Your account is pending approval.',
             ], 403);
         }
 
         if ($user->status === 'SUSPENDED') {
+            $this->auditFailedLogin($email, 'ACCOUNT_SUSPENDED', 'Login refused: account suspended', $user);
+
             return response()->json([
                 'message' => 'Your account has been suspended.',
             ], 403);
         }
 
         $token = $user->createToken('api-token')->plainTextToken;
+
+        AuditLogger::success('LOGIN', AuditLogger::MODULE_AUTH, [
+            'actor' => $user,
+            'resource' => $user,
+            'resource_label' => $user->employee_id ?: $user->email,
+            'details' => 'Successful login',
+        ]);
 
         return response()->json([
             'message' => 'Login successful',
@@ -109,10 +125,37 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+
+        // Record while the token is still valid so the actor is known.
+        AuditLogger::success('LOGOUT', AuditLogger::MODULE_AUTH, [
+            'actor' => $user,
+            'resource' => $user,
+            'resource_label' => $user->employee_id ?: $user->email,
+            'details' => 'Logged out',
+        ]);
+
+        $user->currentAccessToken()->delete();
 
         return response()->json([
             'message' => 'Logged out successfully',
+        ]);
+    }
+
+    /**
+     * Failed attempts record the typed email and a reason category only -
+     * the submitted password is never passed to the audit log.
+     */
+    private function auditFailedLogin(string $email, string $reason, string $details, ?User $user = null): void
+    {
+        AuditLogger::failure('LOGIN_FAILED', AuditLogger::MODULE_AUTH, [
+            'actor' => $user,
+            'actor_identifier' => $email,
+            'resource' => $user,
+            'resource_type' => 'User',
+            'resource_label' => $user?->employee_id ?: $email,
+            'details' => $details,
+            'metadata' => ['reason' => $reason],
         ]);
     }
 

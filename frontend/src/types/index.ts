@@ -87,6 +87,24 @@ export interface ApiWarehouse {
   branch_id: number;
 }
 
+export interface ApiAuditLog {
+  id: number;
+  created_at: string;
+  actor_user_id: number | null;
+  actor_name: string | null;
+  actor_identifier: string | null;
+  action: string;
+  module: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  resource_label: string | null;
+  status: 'SUCCESS' | 'FAILED';
+  details: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
 export interface ApiInventoryItem {
   id: number;
   barcode: string;

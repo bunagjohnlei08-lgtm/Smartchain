@@ -69,7 +69,7 @@ const AdminLayout: React.FC = () => {
       {/* Sidebar */}
       <div
         id="admin-sidebar"
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform bg-[#090d16] border-r border-slate-800/60 transition-transform duration-300 ease-in-out xl:relative xl:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-[#090d16] border-r border-slate-800/60 transition-transform duration-300 ease-in-out xl:relative xl:translate-x-0 ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -79,7 +79,7 @@ const AdminLayout: React.FC = () => {
       {/* Overlay for mobile */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 xl:hidden"
+          className="fixed inset-0 bg-black/50 z-40 xl:hidden"
           aria-hidden="true"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -88,7 +88,7 @@ const AdminLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="admin-main flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 dark:bg-transparent">
         {/* Top Bar */}
-        <header className="admin-topbar bg-white dark:bg-[#090d16]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/60 h-16 px-4 flex items-center justify-between flex-shrink-0 sticky top-0 z-20">
+        <header className="admin-topbar bg-white dark:bg-[#090d16]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/60 h-16 px-4 flex items-center justify-between flex-shrink-0 sticky top-0 z-30">
           {/* Mobile Hamburger */}
           {!isMobileMenuOpen && !isDetailOverlayOpen && <button
             type="button"

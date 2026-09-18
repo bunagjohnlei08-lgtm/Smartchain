@@ -331,6 +331,63 @@
   max-width: 100%;
 }
 
+/* Admin Inventory (tablet/desktop): every column has an explicit width, so no
+   single column absorbs the spare space. Their sum is the table's min-width;
+   wider content areas stretch all columns proportionally, narrower ones scroll
+   inside the wrapper. Mobile geometry lives in the max-width: 639px block. */
+/* Product names wrap to two lines (rows are already barcode-height); only
+   longer names are clipped with an ellipsis. The full name is in the title. */
+.admin-main .admin-inventory-table td:nth-child(2) > div > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+  .admin-main .admin-inventory-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 1130px;
+  }
+  .admin-main .admin-inventory-table :is(th, td) { padding: 12px 10px; }
+  .admin-main .admin-inventory-table th { white-space: nowrap; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(1) { width: 140px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(2) { width: 260px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(3) { width: 140px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(4),
+  .admin-main .admin-inventory-table :is(th, td):nth-child(5),
+  .admin-main .admin-inventory-table :is(th, td):nth-child(6) { width: 82px; padding-inline: 8px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(7) { width: 128px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(8) { width: 104px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(9) { width: 112px; padding-inline: 6px; }
+
+  /* Barcode: the SVG scales to the cell instead of setting the column width. */
+  .admin-main .admin-inventory-table td:nth-child(1) > div {
+    width: 100%;
+    min-width: 0;
+    max-width: 120px;
+  }
+  .admin-main .admin-inventory-table td:nth-child(1) > div > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .admin-main .admin-inventory-table td:nth-child(1) svg {
+    width: 100%;
+    height: 36px;
+  }
+
+  .admin-main .admin-inventory-table td:nth-child(2) > div { min-width: 0; }
+  .admin-main .admin-inventory-table td:nth-child(2) > div > div { flex-shrink: 0; }
+  .admin-main .admin-inventory-table td:nth-child(3) { overflow-wrap: anywhere; white-space: normal; }
+  .admin-main .admin-inventory-table td:nth-child(7) .admin-badge { white-space: nowrap; }
+  .admin-main .admin-inventory-table td:nth-child(9) > div { gap: 8px; }
+}
+
 /* Plant Manager operational tables: compact, contained mobile scrolling. */
 @media (max-width: 639px) {
   .pm-table-scroll {
@@ -789,21 +846,25 @@
   .admin-forecast-table td:nth-child(8) > div { justify-content: center; }
   .admin-forecast-table td:nth-child(8) button { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
 
-  /* Admin Inventory: protect barcode content and give every mobile column a stable boundary. */
-  .admin-inventory-table { min-width: 770px !important; }
+  /* Admin Inventory: realistic mobile column widths. The table keeps its full
+     width and scrolls inside .admin-table-scroll instead of squeezing columns
+     until the header labels collide. */
+  .admin-inventory-table { min-width: 1000px !important; }
+  .admin-inventory-table th { white-space: nowrap; }
   .admin-inventory-table :is(th, td):nth-child(1) {
     width: 130px;
     min-width: 130px;
     max-width: 130px;
   }
-  .admin-inventory-table :is(th, td):nth-child(2) { width: 110px; min-width: 110px; max-width: 110px; }
-  .admin-inventory-table :is(th, td):nth-child(3) { width: 95px; min-width: 95px; max-width: 95px; }
+  .admin-inventory-table :is(th, td):nth-child(2) { width: 200px; min-width: 200px; max-width: 200px; }
+  .admin-inventory-table :is(th, td):nth-child(3) { width: 120px; min-width: 120px; max-width: 120px; }
   .admin-inventory-table :is(th, td):nth-child(4),
   .admin-inventory-table :is(th, td):nth-child(5),
-  .admin-inventory-table :is(th, td):nth-child(6) { width: 60px; min-width: 60px; max-width: 60px; }
-  .admin-inventory-table :is(th, td):nth-child(7) { width: 80px; min-width: 80px; max-width: 80px; }
-  .admin-inventory-table :is(th, td):nth-child(8) { width: 80px; min-width: 80px; max-width: 80px; white-space: normal; }
-  .admin-inventory-table :is(th, td):nth-child(9) { width: 95px; min-width: 95px; max-width: 95px; }
+  .admin-inventory-table :is(th, td):nth-child(6) { width: 80px; min-width: 80px; max-width: 80px; }
+  .admin-inventory-table :is(th, td):nth-child(7) { width: 110px; min-width: 110px; max-width: 110px; }
+  .admin-inventory-table :is(th, td):nth-child(8) { width: 100px; min-width: 100px; max-width: 100px; }
+  .admin-inventory-table td:nth-child(8) { white-space: normal; }
+  .admin-inventory-table :is(th, td):nth-child(9) { width: 100px; min-width: 100px; max-width: 100px; }
   .admin-inventory-table th:nth-child(1) { padding-inline: 4px !important; }
   .admin-inventory-table td:nth-child(1) { padding: 2px 4px !important; }
   .admin-inventory-table td:nth-child(1) > div {
@@ -1410,31 +1471,69 @@
     line-height: 16px !important;
   }
 
+  /* The table wrapper — and only the table wrapper — scrolls horizontally.
+     The page itself never gains a horizontal scrollbar; min-width: 0 keeps the
+     wrapper from being stretched by the table it contains. */
   .admin-product-catalog .custom-scrollbar {
+    width: 100%;
     max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
   }
 
-  .admin-product-catalog .product-catalog-table { min-width: 972px !important; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(1) { width: 115px; min-width: 115px; max-width: 115px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(2) { width: 85px; min-width: 85px; max-width: 85px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(3) { width: 55px; min-width: 55px; max-width: 55px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(4) { width: 70px; min-width: 70px; max-width: 70px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(5) { width: 85px; min-width: 85px; max-width: 85px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(6) { width: 105px; min-width: 105px; max-width: 105px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(7) { width: 42px; min-width: 42px; max-width: 42px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(8) { width: 80px; min-width: 80px; max-width: 80px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(9) { width: 95px; min-width: 95px; max-width: 95px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(10) { width: 102px; min-width: 102px; max-width: 102px; }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(11) { width: 62px; min-width: 62px; max-width: 62px; text-align: center; }
+  /* Mobile Table View carries ALL twelve Product Catalog columns. Nothing is
+     hidden: the reserved widths below add up to 1034px, so the table is wider
+     than any phone viewport and the wrapper above scrolls it left/right.
+
+     table-layout: fixed makes one declaration size both <th> and <td>, so the
+     header can never drift out of line with the body underneath it. */
+  .admin-product-catalog .product-catalog-table {
+    width: 100%;
+    min-width: 1034px !important;
+    table-layout: fixed;
+  }
+
+  /* 132 + 92 + 84 + 100 + 110 + 62 + 48 + 84 + 88 + 70 + 88 + 76 = 1034px.
+     Each value is content width plus the 8px of horizontal cell padding set
+     further down, and every width is shared by the <th> and the <td>. */
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(1) { width: 132px; min-width: 132px; max-width: 132px; text-align: left; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(2) { width: 92px; min-width: 92px; max-width: 92px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(3) { width: 84px; min-width: 84px; max-width: 84px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(4) { width: 100px; min-width: 100px; max-width: 100px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(5) { width: 110px; min-width: 110px; max-width: 110px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(6) { width: 62px; min-width: 62px; max-width: 62px; text-align: center; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(7) { width: 48px; min-width: 48px; max-width: 48px; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(8) { width: 84px; min-width: 84px; max-width: 84px; text-align: right; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(9) { width: 88px; min-width: 88px; max-width: 88px; text-align: right; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(10) { width: 70px; min-width: 70px; max-width: 70px; text-align: center; }
+  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(11) { width: 88px; min-width: 88px; max-width: 88px; text-align: center; }
   .admin-product-catalog .product-catalog-table :is(th, td):nth-child(12) { width: 76px; min-width: 76px; max-width: 76px; text-align: center; }
+
+  /* The empty-state row spans the whole table rather than the first column. */
+  .admin-product-catalog .product-catalog-table td[colspan] {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    text-align: center;
+  }
+
+  /* Headers wrap to two short lines instead of clipping ("REORDER / LEVEL").
+     Column widths are fixed above, so wrapping cannot disturb alignment. */
   .admin-product-catalog .product-catalog-table th {
     overflow: hidden;
     text-overflow: clip;
-    white-space: nowrap !important;
+    white-space: normal !important;
+    font-size: 10px !important;
+    line-height: 12px !important;
+    vertical-align: bottom;
   }
-  .admin-product-catalog .product-catalog-table :is(th, td):nth-child(-n + 5) {
+  .admin-product-catalog .product-catalog-table :is(th, td) {
+    padding: 6px 4px !important;
+  }
+  .admin-product-catalog .product-catalog-table td {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1456,14 +1555,15 @@
 
   .admin-product-catalog .product-catalog-table .admin-status-badge {
     width: fit-content;
-    max-width: none;
+    max-width: 100%;
     min-height: 20px;
-    gap: 3px !important;
-    padding: 2px 6px !important;
+    gap: 2px !important;
+    padding: 2px 5px !important;
     font-size: 9px !important;
     font-weight: 500 !important;
     line-height: 11px !important;
     white-space: nowrap !important;
+    flex-shrink: 0;
   }
   .admin-product-catalog .product-catalog-table .admin-status-badge > svg:first-child {
     width: 9px !important;
@@ -1513,30 +1613,10 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-  }
-  .admin-product-catalog .product-catalog-table td:nth-child(12) {
-    padding: 4px !important;
-  }
-  .admin-product-catalog .product-catalog-table td:nth-child(12) button {
-    width: 16px;
-    min-width: 16px;
-    height: 28px;
-    min-height: 28px;
-    padding: 0 !important;
-  }
-  .admin-product-catalog .product-catalog-table td:nth-child(12) button:first-child {
-    order: 2;
-    width: 28px;
-    min-width: 28px;
-    height: 28px;
-    min-height: 28px;
-    padding: 7px !important;
-  }
-  .admin-product-catalog .product-catalog-table td:nth-child(12) button:first-child > svg {
-    width: 14px !important;
-    height: 14px !important;
+    overflow: hidden;
   }
   .admin-product-catalog .product-catalog-table td:nth-child(12) button:nth-child(2) { order: 1; }
+  .admin-product-catalog .product-catalog-table td:nth-child(12) button:first-child { order: 2; }
   .admin-product-catalog .product-catalog-table td:nth-child(12) button:nth-child(3) { order: 3; }
   .admin-main .admin-procurement-table .admin-status-badge {
     width: fit-content;
@@ -4127,6 +4207,315 @@ body {
     .admin-main .admin-create-po-action > svg {
       width: 13px !important;
       height: 13px !important;
+    }
+  }
+}
+
+/* ============================================================================
+   Product Catalog - mobile Actions column button box.
+
+   This has to live inside @layer utilities, not in the unlayered mobile block
+   above, for two separate cascade reasons:
+
+   1. :is() and :has() take the HIGHEST specificity of their arguments. The
+      shared rule
+        :is(.admin-main .admin-responsive-table td:last-child button:has(> svg:only-child),
+            .admin-product-catalog .product-catalog-table td:last-child button)
+      is scored on its .admin-responsive-table branch, so it outranks the
+      catalog's own td:nth-child(12) button rule and forced all three icon
+      buttons to 28px. 28 x 3 + 2 x 4px gap = 92px inside a 68px flex box;
+      justify-content: center then split the 24px overflow evenly, pushing the
+      Edit button 12px into the Status column and Delete 12px past the row.
+
+   2. For !important declarations the cascade inverts layer order, so
+      "padding: 0.5rem !important" on the layered
+      :is(.admin-main, ...) button:is([class~="p-2"], ...):has(> svg)
+      rule beat every "padding: ... !important" written unlayered.
+
+   Matching the layer and raising specificity is what makes these stick.
+   20px x 3 + 2 x 4px gap = 68px, inside a 76px column with 4px side padding.
+   Height stays 28px, so the vertical touch target is unchanged.
+   ============================================================================ */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-product-catalog .product-catalog-table td:nth-child(12) button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 20px !important;
+      min-width: 20px !important;
+      max-width: 20px !important;
+      height: 28px !important;
+      min-height: 28px !important;
+      padding: 3px !important;
+    }
+
+    .admin-main .admin-product-catalog .product-catalog-table td:nth-child(12) button > svg {
+      width: 14px !important;
+      height: 14px !important;
+      flex-shrink: 0;
+    }
+  }
+}
+
+/* ============================================================================
+   Admin Suppliers - mobile toolbar.
+
+   Desktop keeps the original arrangement (Refresh/Export/Print and the view
+   toggle in the page header, search right-aligned in the filter card). On
+   mobile the same controls regroup into two rows inside the filter card:
+
+     row 1:  [ search .......................... ] [refresh] [export] [print]
+     row 2:  [ All | Active | On Hold | Inactive ]          [ grid | table ]
+
+   This lives in @layer utilities because the shared mobile rules
+     :is(.admin-main, ...) button:is([class~="p-1"], [class~="p-1.5"], ...):has(> svg)
+   set "padding: 0.5rem !important" and a 2.75rem width in that layer, and for
+   !important declarations the cascade inverts layer order - an unlayered rule
+   could never win. Matching the layer and outranking it on specificity is what
+   makes these sizes stick.
+   ============================================================================ */
+@layer utilities {
+  @media (max-width: 639px) {
+    /* The header no longer carries the icon row, so close the gap that used to
+       separate it from Add Supplier: 16px -> 10px. */
+    .admin-main .admin-suppliers .supplier-header {
+      gap: 10px;
+    }
+
+    .admin-main .admin-suppliers .supplier-toolbar {
+      padding: 12px;
+    }
+
+    .admin-main .admin-suppliers .supplier-search-row {
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    /* Search takes the remaining width and never lets the icons crowd it out. */
+    .admin-main .admin-suppliers .supplier-search-field {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    /* The shared admin rule
+         .admin-main input:is([type="search"], [placeholder*="Search" i]):not(.fixed *)
+       pins every mobile search box to 32px/11px with !important. The extra class
+       here outranks it so this toolbar can use the requested 34px/12px. */
+    .admin-main .admin-suppliers .supplier-search-row .supplier-search-field input {
+      height: 34px !important;
+      min-height: 34px !important;
+      padding: 0 10px 0 32px !important;
+      font-size: 12px !important;
+      line-height: 18px !important;
+      text-overflow: ellipsis;
+    }
+
+    .admin-main .admin-suppliers .supplier-search-row .supplier-search-icon {
+      left: 10px;
+      width: 14px !important;
+      height: 14px !important;
+    }
+
+    .admin-main .admin-suppliers .supplier-icon-actions {
+      flex: 0 0 auto;
+      gap: 6px;
+    }
+
+    /* 34x34 compact icon buttons. The shared mobile rule would otherwise force
+       2.75rem square with 0.5rem padding. */
+    .admin-main .admin-suppliers .supplier-icon-actions button {
+      position: relative;
+      display: inline-flex;
+      width: 34px !important;
+      min-width: 34px !important;
+      max-width: 34px;
+      height: 34px;
+      min-height: 34px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 !important;
+      flex: 0 0 auto;
+    }
+
+    .admin-main .admin-suppliers .supplier-icon-actions button > svg {
+      width: 15px !important;
+      height: 15px !important;
+      flex-shrink: 0;
+    }
+
+    /* The project floors mobile controls at a 44px touch target. These buttons
+       are 34px wide by request, so restore the height of the target with a
+       transparent overlay. It grows vertically only - growing sideways would
+       overlap the neighbouring button's target and steal its taps. */
+    .admin-main .admin-suppliers .supplier-icon-actions button::after {
+      content: '';
+      position: absolute;
+      top: -5px;
+      right: -3px;
+      bottom: -5px;
+      left: -3px;
+    }
+
+    .admin-main .admin-suppliers .supplier-filter-row {
+      flex-wrap: nowrap;
+      gap: 8px;
+    }
+
+    /* Status pills stay left and keep their own row space. If the four labels
+       ever exceed the available width (they are close at 320px), the group
+       scrolls inside itself rather than pushing the toggle off the row. */
+    .admin-main .admin-suppliers .supplier-status-filters {
+      flex: 0 1 auto;
+      min-width: 0;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .admin-main .admin-suppliers .supplier-status-filters::-webkit-scrollbar {
+      display: none;
+    }
+
+    .admin-main .admin-suppliers .supplier-status-filters button {
+      flex: 0 0 auto;
+      min-height: 28px;
+      padding: 4px 9px !important;
+      font-size: 11px !important;
+      line-height: 16px !important;
+      border-radius: 9999px !important;
+      white-space: nowrap;
+    }
+
+    .admin-main .admin-suppliers .supplier-toggle-slot {
+      flex: 0 0 auto;
+      margin-left: auto;
+    }
+
+    /* Compact view toggle, active/inactive styling untouched. */
+    .admin-main .admin-suppliers .supplier-view-toggle {
+      gap: 2px;
+      padding: 3px;
+    }
+
+    .admin-main .admin-suppliers .supplier-view-toggle button {
+      display: inline-flex;
+      width: 30px !important;
+      min-width: 30px !important;
+      height: 30px;
+      min-height: 30px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 !important;
+      flex: 0 0 auto;
+    }
+
+    .admin-main .admin-suppliers .supplier-view-toggle button > svg {
+      width: 14px !important;
+      height: 14px !important;
+      flex-shrink: 0;
+    }
+  }
+}
+
+/* Admin User Management - Audit Logs table on mobile: real column widths inside
+   an internal horizontal scroller, with a sticky, opaque DATE / TIME column.
+   Lives in the utilities layer so it outranks the layered 390px density pass
+   (layered !important beats unlayered !important). Desktop is untouched. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-audit-section .admin-audit-scroll {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-main .admin-audit-section table.admin-audit-table {
+      width: 1150px !important;
+      min-width: 1150px !important;
+      table-layout: fixed;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    /* Column geometry comes from <col>, so header and body share it. */
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(1) { width: 140px !important; }
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(2) { width: 150px !important; }
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(3) { width: 180px !important; }
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(4) { width: 124px !important; }
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(5) { width: 120px !important; }
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(6) { width: 92px !important; }
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(7) { width: 124px !important; }
+    .admin-main .admin-audit-section .admin-audit-table col:nth-child(8) { width: 220px !important; }
+
+    .admin-main .admin-audit-section table.admin-audit-table th {
+      padding: 9px 10px !important;
+      font-size: 10.5px !important;
+      font-weight: 600 !important;
+      line-height: 14px !important;
+      white-space: nowrap;
+    }
+
+    .admin-main .admin-audit-section table.admin-audit-table td {
+      padding: 9px 10px !important;
+      font-size: 11px !important;
+      line-height: 16px !important;
+      border-bottom: 1px solid rgb(226 232 240); /* slate-200 */
+    }
+
+    .admin-main .admin-audit-section table.admin-audit-table td + td,
+    .admin-main .admin-audit-section table.admin-audit-table th + th {
+      border-left: 1px solid rgb(241 245 249); /* slate-100: light column separator */
+    }
+
+    .admin-main .admin-audit-section table.admin-audit-table .admin-badge {
+      padding: 1px 6px !important;
+      font-size: 10px !important;
+      line-height: 14px !important;
+    }
+
+    /* Sticky DATE / TIME column: opaque, above the scrolling cells. */
+    .admin-main .admin-audit-section table.admin-audit-table :is(th, td):first-child {
+      position: sticky;
+      left: 0;
+      background-color: #ffffff;
+      box-shadow: inset -1px 0 0 rgb(226 232 240), 4px 0 6px -4px rgb(15 23 42 / 0.18);
+    }
+    .admin-main .admin-audit-section table.admin-audit-table td:first-child { z-index: 10; }
+    .admin-main .admin-audit-section table.admin-audit-table th:first-child {
+      z-index: 20;
+      background-color: #f8fafc; /* slate-50, matches the light header */
+    }
+    .admin-main .admin-audit-section table.admin-audit-table tbody tr:hover td:first-child {
+      background-color: #f8fafc;
+    }
+    /* Full-width loading / empty / error rows are not part of the sticky column. */
+    .admin-main .admin-audit-section table.admin-audit-table td[colspan] {
+      position: static;
+      box-shadow: none;
+    }
+
+    .dark .admin-main .admin-audit-section table.admin-audit-table td {
+      border-bottom-color: rgb(30 41 59 / 0.6);
+    }
+    .dark .admin-main .admin-audit-section table.admin-audit-table td + td,
+    .dark .admin-main .admin-audit-section table.admin-audit-table th + th {
+      border-left-color: rgb(30 41 59 / 0.45);
+    }
+    .dark .admin-main .admin-audit-section table.admin-audit-table :is(th, td):first-child {
+      background-color: #0b101d; /* table card background */
+      box-shadow: inset -1px 0 0 rgb(30 41 59), 4px 0 6px -4px rgb(0 0 0 / 0.55);
+    }
+    .dark .admin-main .admin-audit-section table.admin-audit-table tbody tr:hover td:first-child {
+      background-color: #0f1523; /* slate-800/20 flattened over #0b101d */
     }
   }
 }

@@ -1516,9 +1516,9 @@ export const InventoryList: React.FC = () => {
         </div>
       ) : viewMode === 'table' ? (
         // Table View
-        <div className="bg-[#0d1322] border border-slate-800 rounded-2xl">
-          <div className="admin-table-scroll w-full custom-scrollbar">
-            <table className="admin-responsive-table admin-inventory-table admin-cols-9 admin-sticky-1 w-full min-w-[900px]">
+        <div className="min-w-0 bg-[#0d1322] border border-slate-800 rounded-2xl">
+          <div className="admin-table-scroll w-full min-w-0 max-w-full overflow-x-auto custom-scrollbar">
+            <table className="admin-responsive-table admin-inventory-table admin-cols-9 admin-sticky-1 w-full">
               <thead className="bg-[#0b0f19]/50 border-b border-slate-800 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Barcode</th>
@@ -1543,7 +1543,7 @@ export const InventoryList: React.FC = () => {
                         <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-md sm:rounded-lg bg-slate-800/50 border border-slate-700 flex items-center justify-center text-slate-400">
                           <Package className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                         </div>
-                        <span className="text-white text-xs sm:text-sm font-medium truncate">{item.product}</span>
+                        <span className="text-white text-xs sm:text-sm font-medium truncate" title={item.product}>{item.product}</span>
                       </div>
                     </td>
                     <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.warehouse}</td>
