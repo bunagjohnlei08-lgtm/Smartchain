@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { ChevronDown, LogOut, UserRound } from 'lucide-react';
 
@@ -92,7 +93,7 @@ export default function ProfileLogoutMenu({ children, profilePath, triggerLabel,
         )}
       </div>
 
-      {isDialogOpen && (
+      {isDialogOpen && createPortal(
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           role="dialog"
@@ -127,7 +128,8 @@ export default function ProfileLogoutMenu({ children, profilePath, triggerLabel,
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
