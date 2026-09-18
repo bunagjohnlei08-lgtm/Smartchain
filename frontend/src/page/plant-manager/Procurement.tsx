@@ -728,7 +728,7 @@ const ReplenishmentPlanning: React.FC = () => {
       {/* New Request Modal */}
       {showNewRequestModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setShowNewRequestModal(false)}
         >
           <div
@@ -746,7 +746,7 @@ const ReplenishmentPlanning: React.FC = () => {
             </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Request No.</label>
                     <input
                       type="text"
@@ -756,7 +756,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Date Submitted</label>
                     <input
                       type="date"
@@ -765,7 +765,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label htmlFor="procurement-category" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Category <span className="text-red-400">*</span></label>
                     <select
                       id="procurement-category"
@@ -777,7 +777,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       {catalogCategories.map((category) => <option key={category} value={category}>{category}</option>)}
                     </select>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label htmlFor="procurement-product" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
                     <select
                       id="procurement-product"
@@ -796,7 +796,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       {categoryProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
                     </select>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Warehouse <span className="text-red-400">*</span></label>
                     <input
                       type="text"
@@ -806,7 +806,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] opacity-80 cursor-not-allowed"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Priority <span className="text-red-400">*</span></label>
                     <select
                       value={newRequest.priority}
@@ -816,7 +816,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       {(['Low', 'Medium', 'High', 'Critical'] as Priority[]).map((priority) => <option key={priority}>{priority}</option>)}
                     </select>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Quantity <span className="text-red-400">*</span></label>
                     <input
                       type="number"
@@ -827,7 +827,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                     />
                   </div>
-                <div className="col-span-2">
+                <div className="min-w-0 sm:col-span-2">
                   <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Status</label>
                   <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium">
                     <Clock className="w-4 h-4" />

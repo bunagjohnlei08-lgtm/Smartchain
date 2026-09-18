@@ -728,7 +728,7 @@ const StockIn: React.FC = () => {
                   <td className="truncate px-2 py-2 text-slate-300 sm:px-4 sm:py-3" title={rec.supplier}>{rec.supplier}</td>
                   <td className="px-2 py-2 text-slate-300 sm:px-4 sm:py-3">{rec.receivingDate}</td>
                   <td className="truncate px-2 py-2 text-slate-400 sm:px-4 sm:py-3">{rec.refNo}</td>
-                  <td className="px-2 py-2 sm:px-4 sm:py-3 [&_.plant-manager-badge]:px-2 [&_.plant-manager-badge]:py-0.5 [&_.plant-manager-badge]:text-[10px] sm:[&_.plant-manager-badge]:px-2.5 sm:[&_.plant-manager-badge]:py-1 sm:[&_.plant-manager-badge]:text-xs"><ReceivingStatusBadge status={rec.status} /></td>
+                  <td className="px-2 py-2 sm:px-4 sm:py-3"><ReceivingStatusBadge status={rec.status} /></td>
                   <td className="px-2 py-2 text-center text-white sm:px-4 sm:py-3">
                     <div>{rec.itemsCount} item{rec.itemsCount === 1 ? '' : 's'}</div>
                     <div className="text-xs text-slate-500">{rec.totalQuantity} units</div>

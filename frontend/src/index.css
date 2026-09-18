@@ -496,8 +496,15 @@
   .pm-procurement-status-table :is(th, td):nth-child(9) { width: 5.5rem; }
 
   .pm-stock-in-receivings-table { min-width: 49rem !important; }
-  .pm-stock-in-receivings-table :is(th, td):nth-child(6) { width: 7rem; }
+  .pm-stock-in-receivings-table :is(th, td):nth-child(6) { width: 8.5rem; }
   .pm-stock-in-receivings-table :is(th, td):nth-child(9) { width: 7rem; }
+  /* Match the Receiving Details badge: compact, single-line pill. */
+  .plant-manager-main .pm-stock-in-receivings-table .plant-manager-badge {
+    padding: 0.125rem 0.5rem !important;
+    font-size: 0.6875rem !important;
+    line-height: 1rem !important;
+    white-space: nowrap !important;
+  }
 
   .pm-stock-in-recent-table { min-width: 47.5rem !important; }
   .pm-stock-in-recent-table :is(th, td):nth-child(6) { width: 8rem; }
@@ -509,6 +516,19 @@
   .pm-shipment-status-table { min-width: 62.5rem !important; }
   .pm-shipment-status-table :is(th, td):nth-child(7) { width: 10rem; }
   .pm-shipment-status-table :is(th, td):nth-child(8) { width: 7rem; }
+
+  /* Inventory: explicit fixed-layout geometry so the 115px barcode fits its cell; table scrolls horizontally. */
+  .pm-inventory-table :is(th, td):nth-child(1) { width: 8.5rem; }
+  .pm-inventory-table :is(th, td):nth-child(2) { width: 13rem; }
+  .pm-inventory-table :is(th, td):nth-child(3) { width: 9rem; }
+  .pm-inventory-table :is(th, td):is(:nth-child(4), :nth-child(5), :nth-child(6)) { width: 5.5rem; }
+  .pm-inventory-table :is(th, td):nth-child(7) { width: 7.5rem; }
+  .pm-inventory-table :is(th, td):nth-child(8) { width: 8.5rem; }
+  .pm-inventory-table td:first-child > div > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   /* Match Admin's compact table barcode without affecting card or print views. */
   .pm-inventory-table td:first-child > div,

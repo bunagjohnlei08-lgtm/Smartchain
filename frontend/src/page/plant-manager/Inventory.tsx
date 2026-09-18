@@ -297,7 +297,7 @@ const Inventory: React.FC = () => {
           </div>
         )}
 
-        {viewMode === 'list' ? <div className="pm-table-scroll">
+        {viewMode === 'list' ? <div className="pm-table-scroll max-w-full overflow-x-auto">
           <table className="pm-inventory-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[900px]">
             <thead className="border-b border-slate-800/80">
               <tr>
