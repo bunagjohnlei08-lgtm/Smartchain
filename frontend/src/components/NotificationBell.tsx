@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, LoaderCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMarkNotificationRead, useRecentNotifications } from '../lib/notifications';
@@ -8,9 +9,31 @@ import { readStoredUser } from '../lib/authUser';
 
 interface NotificationBellProps { viewAllPath: string }
 
+const PANEL_WIDTH = 380;
+const VIEWPORT_GUTTER = 12;
+const TRIGGER_GAP = 8;
+
+// Anchor the portaled panel to the bell's on-screen position: right-aligned
+// under it on desktop, full width minus gutters on narrow viewports.
+function getPanelStyle(trigger: HTMLElement): CSSProperties {
+  const rect = trigger.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth;
+  const top = Math.round(rect.bottom + TRIGGER_GAP);
+  const right = viewportWidth < 640 ? VIEWPORT_GUTTER : Math.max(VIEWPORT_GUTTER, Math.round(viewportWidth - rect.right));
+  return {
+    top,
+    right,
+    width: `min(${PANEL_WIDTH}px, calc(100vw - ${VIEWPORT_GUTTER * 2}px))`,
+    maxHeight: `calc(100dvh - ${top + VIEWPORT_GUTTER}px)`,
+  };
+}
+
 export default function NotificationBell({ viewAllPath }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const role = readStoredUser()?.role?.slug || sessionStorage.getItem('userRole');
   const { data, isLoading, isError, refetch } = useRecentNotifications();
@@ -21,7 +44,8 @@ export default function NotificationBell({ viewAllPath }: NotificationBellProps)
   useEffect(() => {
     if (!open) return;
     const closeOutside = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
     };
     const closeEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
@@ -34,9 +58,27 @@ export default function NotificationBell({ viewAllPath }: NotificationBellProps)
     };
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelStyle(null);
+      return;
+    }
+    const updatePosition = () => {
+      if (triggerRef.current) setPanelStyle(getPanelStyle(triggerRef.current));
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open]);
+
   return (
     <div className="relative" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => {
           setOpen((value) => {
@@ -53,13 +95,15 @@ export default function NotificationBell({ viewAllPath }: NotificationBellProps)
         {unreadCount > 0 && <span aria-hidden="true" className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white dark:ring-[#090d16]">{badgeLabel}</span>}
       </button>
 
-      {open && (
-        <div role="dialog" aria-label="Recent notifications" className="fixed right-3 top-16 z-50 w-[calc(100vw-1.5rem)] max-w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-          <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+      {/* Portaled to <body> so the sticky header's stacking context (z-30/z-40)
+          cannot trap the panel beneath page content. Sits above page modals (z-50..z-[70]). */}
+      {open && panelStyle && createPortal(
+        <div ref={panelRef} role="dialog" aria-label="Recent notifications" style={panelStyle} className="fixed z-[80] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+          <div className="shrink-0 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
             <p className="text-sm font-semibold">Notifications</p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{unreadCount} unread</p>
           </div>
-          <div className="max-h-[min(24rem,calc(100vh-9rem))] overflow-y-auto">
+          <div className="min-h-0 max-h-96 flex-1 overflow-y-auto overscroll-contain">
             {isLoading && <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-slate-400"><LoaderCircle className="h-4 w-4 animate-spin" /> Loading notifications…</div>}
             {isError && <p className="px-4 py-8 text-center text-sm text-rose-600 dark:text-rose-300">Unable to load notifications.</p>}
             {!isLoading && !isError && data?.data.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No notifications yet</p>}
@@ -96,8 +140,9 @@ export default function NotificationBell({ viewAllPath }: NotificationBellProps)
               );
             })}
           </div>
-          <button type="button" onClick={() => { setOpen(false); navigate(viewAllPath); }} className="min-h-11 w-full cursor-pointer border-t border-slate-200 px-4 py-3 text-sm font-semibold text-cyan-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500 dark:border-slate-700 dark:text-cyan-400 dark:hover:bg-slate-700">View all</button>
-        </div>
+          <button type="button" onClick={() => { setOpen(false); navigate(viewAllPath); }} className="min-h-11 w-full shrink-0 cursor-pointer border-t border-slate-200 px-4 py-3 text-sm font-semibold text-cyan-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500 dark:border-slate-700 dark:text-cyan-400 dark:hover:bg-slate-700">View all</button>
+        </div>,
+        document.body,
       )}
     </div>
   );
