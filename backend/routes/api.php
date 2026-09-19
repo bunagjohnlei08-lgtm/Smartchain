@@ -36,6 +36,11 @@ use App\Http\Controllers\Api\NotificationController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
+// Second login step. Public (no token exists yet) but throttled and bound to
+// a single-use challenge; a token is issued only by verify-otp.
+Route::post('/login/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:login-otp-verify');
+Route::post('/login/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:login-otp-resend');
+
 // Public activation-link endpoints. No token is issued by either.
 Route::middleware('throttle:invitations')->group(function () {
     Route::post('/invitations/validate', [InvitationController::class, 'check']);

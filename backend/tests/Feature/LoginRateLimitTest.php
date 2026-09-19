@@ -5,11 +5,12 @@ namespace Tests\Feature;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CompletesOtpLogin;
 use Tests\TestCase;
 
 class LoginRateLimitTest extends TestCase
 {
-    use RefreshDatabase;
+    use CompletesOtpLogin, RefreshDatabase;
 
     private function userWithRole(string $slug, string $email): User
     {
@@ -31,10 +32,7 @@ class LoginRateLimitTest extends TestCase
         foreach (['ADMIN', 'PLANT_MANAGER', 'QA_SUPERVISOR'] as $index => $role) {
             $user = $this->userWithRole($role, "valid-role-{$index}@example.com");
 
-            $this->postJson('/api/login', [
-                'email' => strtoupper($user->email),
-                'password' => 'correct-password',
-            ])->assertOk()
+            $this->loginWithOtp(strtoupper($user->email), 'correct-password')->assertOk()
                 ->assertJsonPath('message', 'Login successful')
                 ->assertJsonPath('user.role.slug', $role)
                 ->assertJsonStructure(['token']);

@@ -15,11 +15,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
+use Tests\Concerns\CompletesOtpLogin;
 use Tests\TestCase;
 
 class UserInvitationTest extends TestCase
 {
-    use RefreshDatabase;
+    use CompletesOtpLogin, RefreshDatabase;
 
     private const PASSWORD = 'Activate123';
 
@@ -325,8 +326,8 @@ class UserInvitationTest extends TestCase
             'actor_user_id' => $user->id,
         ]);
 
-        // Normal login now works.
-        $this->postJson('/api/login', ['email' => $user->email, 'password' => self::PASSWORD])
+        // Normal two-step login (password, then emailed code) now works.
+        $this->loginWithOtp($user->email, self::PASSWORD)
             ->assertOk()->assertJsonStructure(['token']);
     }
 

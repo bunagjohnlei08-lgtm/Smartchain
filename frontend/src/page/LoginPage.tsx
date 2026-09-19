@@ -4,6 +4,7 @@ import { useAuthForm } from '../hooks/useAuthForm';
 import { AuthLayout } from '../components/auth';
 import FormButton from '../components/auth/FormButton';
 import FormInput from '../components/auth/FormInput';
+import OtpVerificationForm, { type VerifiedLogin } from '../components/auth/OtpVerificationForm';
 import api from '../lib/api';
 import type { AxiosError } from 'axios';
 import { Lock, LockKeyhole, LogIn, Mail } from 'lucide-react';
@@ -15,6 +16,8 @@ const LoginPage: React.FC = () => {
   const notice = (location.state as { notice?: string } | null)?.notice;
   const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  // Pending second step. Held in component state only - never stored or put in the URL.
+  const [challenge, setChallenge] = useState<{ id: string; email: string; resendIn: number } | null>(null);
   const {
     formData,
     errors,
@@ -31,28 +34,29 @@ const LoginPage: React.FC = () => {
           password: data.password,
         });
 
-        const { token, user } = response.data;
-        sessionStorage.setItem('isAuthenticated', 'true');
-        sessionStorage.setItem('userRole', user.role?.slug || '');
-        sessionStorage.setItem('token', token);
-        sessionStorage.setItem('user', JSON.stringify(user));
-
-        const role = user.role?.slug;
-        if (role === 'ADMIN') {
-          navigate('/admin/dashboard');
-        } else if (role === 'QA_SUPERVISOR') {
-          navigate('/qa/dashboard');
-        } else if (role === 'PLANT_MANAGER') {
-          navigate('/plant-manager/dashboard');
-        } else {
-          navigate('/login');
+        // A correct password only starts the emailed-code step; nothing is
+        // stored and no navigation happens until the code is verified.
+        if (response.data?.requires_otp && typeof response.data.challenge_id === 'string') {
+          updateField('password', '');
+          setLoginErrors({});
+          setChallenge({
+            id: response.data.challenge_id,
+            email: data.email.trim(),
+            resendIn: Number(response.data.resend_available_in) || 60,
+          });
+          return;
         }
+
+        setLoginErrors({ form: 'Unable to sign in. Please try again.' });
       } catch (error) {
         const apiErrors: Record<string, string> = {};
         const axiosError = error as AxiosError;
+        const status = axiosError.response?.status;
         if (axiosError.response?.data && typeof axiosError.response.data === 'object') {
           const data = axiosError.response.data as Record<string, unknown>;
-          if (data.errors && typeof data.errors === 'object') {
+          if ((status === 429 || status === 503) && typeof data.message === 'string') {
+            apiErrors.form = data.message;
+          } else if (data.errors && typeof data.errors === 'object') {
             Object.entries(data.errors as Record<string, unknown>).forEach(([key, messages]) => {
               apiErrors[key] = Array.isArray(messages) ? String(messages[0]) : String(messages);
             });
@@ -73,6 +77,43 @@ const LoginPage: React.FC = () => {
   });
 
   const isLoginBusy = isSubmitting || isAuthenticating;
+
+  const completeLogin = ({ token, user }: VerifiedLogin) => {
+    sessionStorage.setItem('isAuthenticated', 'true');
+    sessionStorage.setItem('userRole', user.role?.slug || '');
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('user', JSON.stringify(user));
+    setChallenge(null);
+
+    const role = user.role?.slug;
+    if (role === 'ADMIN') {
+      navigate('/admin/dashboard');
+    } else if (role === 'QA_SUPERVISOR') {
+      navigate('/qa/dashboard');
+    } else if (role === 'PLANT_MANAGER') {
+      navigate('/plant-manager/dashboard');
+    } else {
+      navigate('/login');
+    }
+  };
+
+  if (challenge) {
+    return (
+      <AuthLayout>
+        <OtpVerificationForm
+          key={challenge.id}
+          challengeId={challenge.id}
+          email={challenge.email}
+          initialResendIn={challenge.resendIn}
+          onVerified={completeLogin}
+          onBack={() => {
+            setChallenge(null);
+            setLoginErrors({});
+          }}
+        />
+      </AuthLayout>
+    );
+  }
 
   const updateLoginField = (field: 'email' | 'password', value: string) => {
     updateField(field, value);

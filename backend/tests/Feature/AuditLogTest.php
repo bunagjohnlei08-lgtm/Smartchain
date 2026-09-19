@@ -13,11 +13,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use LogicException;
+use Tests\Concerns\CompletesOtpLogin;
 use Tests\TestCase;
 
 class AuditLogTest extends TestCase
 {
-    use RefreshDatabase;
+    use CompletesOtpLogin, RefreshDatabase;
 
     private Role $adminRole;
     private Role $plantManagerRole;
@@ -52,7 +53,7 @@ class AuditLogTest extends TestCase
     {
         $user = $this->user($this->qaRole, ['email' => 'qa@example.com', 'password' => 'correct-password']);
 
-        $token = $this->postJson('/api/login', ['email' => 'qa@example.com', 'password' => 'correct-password'])
+        $token = $this->loginWithOtp('qa@example.com', 'correct-password')
             ->assertOk()->json('token');
 
         $this->assertDatabaseHas('audit_logs', [

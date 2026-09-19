@@ -8,11 +8,12 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CompletesOtpLogin;
 use Tests\TestCase;
 
 class AuthHardeningTest extends TestCase
 {
-    use RefreshDatabase;
+    use CompletesOtpLogin, RefreshDatabase;
 
     private Role $adminRole;
     private Role $plantManagerRole;
@@ -64,7 +65,7 @@ class AuthHardeningTest extends TestCase
     {
         $user = $this->user($this->plantManagerRole);
 
-        $this->login($user)->assertOk()
+        $this->loginWithOtp($user->email, 'correct-password')->assertOk()
             ->assertJsonPath('message', 'Login successful')
             ->assertJsonStructure(['token', 'user' => ['id', 'role']]);
     }

@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\CompletesOtpLogin;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
 {
-    use RefreshDatabase;
+    use CompletesOtpLogin, RefreshDatabase;
 
     public function test_profile_requires_authentication(): void
     {
@@ -81,7 +82,7 @@ class ProfileTest extends TestCase
         $credentials = ['email' => $user->email, 'password' => 'password'];
         $this->assertNull($user->fresh()->profile_photo_path);
 
-        $login = $this->postJson('/api/login', $credentials)->assertOk();
+        $login = $this->loginWithOtp($credentials['email'], $credentials['password'])->assertOk();
         $this->withToken($login->json('token'));
         $upload = $this->post('/api/profile/photo', [
             'photo' => UploadedFile::fake()->image('avatar.jpg'),
@@ -101,7 +102,7 @@ class ProfileTest extends TestCase
         $this->postJson('/api/logout')->assertOk();
         $this->app['auth']->forgetGuards();
         $this->withHeaders(['Authorization' => '']);
-        $login = $this->postJson('/api/login', $credentials)
+        $login = $this->loginWithOtp($credentials['email'], $credentials['password'])
             ->assertOk()->assertJsonPath('user.profile_photo_url', $url);
         $this->withToken($login->json('token'));
         $this->app['auth']->forgetGuards();
