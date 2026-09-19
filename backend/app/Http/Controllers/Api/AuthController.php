@@ -63,20 +63,18 @@ class AuthController extends Controller
             RateLimiter::clear($key);
         }
 
-        if ($user->status === 'PENDING') {
-            $this->auditFailedLogin($email, 'ACCOUNT_PENDING', 'Login refused: account pending approval', $user);
+        // Allow-list: only ACTIVE accounts may authenticate. Any other status,
+        // including unexpected values, is refused.
+        if ($user->status !== 'ACTIVE') {
+            [$reason, $details, $message] = match ($user->status) {
+                'PENDING' => ['ACCOUNT_PENDING', 'Login refused: account pending approval', 'Your account is pending approval.'],
+                'SUSPENDED' => ['ACCOUNT_SUSPENDED', 'Login refused: account suspended', 'Your account has been suspended.'],
+                default => ['ACCOUNT_INACTIVE', 'Login refused: account not active', 'Your account is not active.'],
+            };
 
-            return response()->json([
-                'message' => 'Your account is pending approval.',
-            ], 403);
-        }
+            $this->auditFailedLogin($email, $reason, $details, $user);
 
-        if ($user->status === 'SUSPENDED') {
-            $this->auditFailedLogin($email, 'ACCOUNT_SUSPENDED', 'Login refused: account suspended', $user);
-
-            return response()->json([
-                'message' => 'Your account has been suspended.',
-            ], 403);
+            return response()->json(['message' => $message], 403);
         }
 
         $token = $user->createToken('api-token')->plainTextToken;

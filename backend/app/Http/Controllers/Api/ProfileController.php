@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Throwable;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class ProfileController extends Controller
 {
@@ -66,6 +67,15 @@ class ProfileController extends Controller
 
         $user->password = $validated['password'];
         $user->save();
+
+        // Sign out every other session; the session that proved the current
+        // password stays valid so the user is not dropped mid-page.
+        $otherTokens = $user->tokens();
+        $currentToken = $user->currentAccessToken();
+        if ($currentToken instanceof PersonalAccessToken) {
+            $otherTokens->whereKeyNot($currentToken->getKey());
+        }
+        $otherTokens->delete();
 
         return response()->json(['message' => 'Password changed successfully.']);
     }

@@ -158,6 +158,15 @@ class UserController extends Controller
         }
 
         $user->update($validated);
+
+        // Issued tokens must not outlive a security-relevant change: leaving
+        // ACTIVE, a role (privilege) change, or an admin password reset.
+        if (($user->wasChanged('status') && $user->status !== 'ACTIVE')
+            || $user->wasChanged('role_id')
+            || $passwordChanged) {
+            $user->tokens()->delete();
+        }
+
         $this->auditUserUpdate($user, $before, $validated, $passwordChanged);
 
         return response()->json($user->load(['role', 'department', 'branch', 'warehouse']));

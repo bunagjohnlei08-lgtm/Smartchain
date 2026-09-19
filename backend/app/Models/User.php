@@ -65,8 +65,8 @@ class User extends Authenticatable
 
     public function permissionsThroughRole(): BelongsToMany
     {
-        return $this->belongsToMany(Permission::class, 'permission_role', 'role_id', 'permission_id')
-            ->using(Role::class)
+        // Join permission_role.role_id against this user's role_id (not its id).
+        return $this->belongsToMany(Permission::class, 'permission_role', 'role_id', 'permission_id', 'role_id', 'id')
             ->withPivot('role_id');
     }
 
