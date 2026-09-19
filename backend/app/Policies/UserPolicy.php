@@ -43,17 +43,15 @@ class UserPolicy
         return false;
     }
 
+    /** Accounts are admin-created only: creating a user sends its invitation. */
     public function create(User $authUser): bool
     {
-        if ($authUser->isAdmin()) {
-            return true;
-        }
+        return $authUser->isAdmin();
+    }
 
-        if ($authUser->isPlantManager()) {
-            return $authUser->hasPermission('users.create');
-        }
-
-        return false;
+    public function resendInvitation(User $authUser, UserModel $user): bool
+    {
+        return $authUser->isAdmin();
     }
 
     public function update(User $authUser, UserModel $user): bool

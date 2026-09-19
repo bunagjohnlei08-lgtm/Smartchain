@@ -11,6 +11,7 @@ use App\Models\Warehouse;
 use App\Support\AuditLogger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use LogicException;
 use Tests\TestCase;
 
@@ -99,13 +100,14 @@ class AuditLogTest extends TestCase
         $main = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'status' => 'Active']);
         $admin = $this->user($this->adminRole);
 
+        Mail::fake();
+
+        // Accounts are invited: no admin-set password and no client-chosen status.
         $response = $this->actingAs($admin)->postJson('/api/users', [
             'name' => 'New Supervisor',
             'email' => 'new@example.com',
-            'password' => 'initial-secret',
             'employee_id' => 'EMP-9001',
             'role_id' => $this->qaRole->id,
-            'status' => 'ACTIVE',
         ])->assertCreated();
 
         $response->assertJsonPath('department_id', null)
@@ -115,7 +117,8 @@ class AuditLogTest extends TestCase
         $log = AuditLog::query()->where('action', 'USER_CREATED')->sole();
         $this->assertSame($admin->id, $log->actor_user_id);
         $this->assertSame('EMP-9001', $log->resource_label);
-        $this->assertNoAuditRowContains('initial-secret');
+        $this->assertSame('PENDING', $log->metadata['status']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'USER_INVITED', 'actor_user_id' => $admin->id]);
     }
 
     public function test_user_update_role_change_and_status_changes_are_audited(): void

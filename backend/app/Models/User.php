@@ -34,8 +34,15 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'invited_at' => 'datetime',
+            'activated_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(UserInvitation::class);
     }
 
     public function role(): BelongsTo

@@ -3,19 +3,28 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\User;
+use App\Models\UserInvitation;
 use App\Models\Role;
 use App\Models\Department;
 use App\Models\Branch;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use App\Policies\UserPolicy;
 use App\Support\AuditLogger;
+use App\Support\UserInvitations;
 
 class UserController extends Controller
 {
+    private const AWAITING_ACTIVATION_MESSAGE = 'This account must be activated by the user through their invitation link.';
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -90,47 +99,124 @@ class UserController extends Controller
         return response()->json($targetUser);
     }
 
+    /**
+     * Admin-only account creation. The account always starts PENDING with no
+     * password; the invitee sets their own password through the emailed link.
+     */
     public function store(Request $request)
     {
         $this->authorize('create', User::class);
 
+        if (is_string($request->input('email'))) {
+            $request->merge(['email' => Str::lower(trim($request->input('email')))]);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'employee_id' => 'required|string|unique:users,employee_id',
+            'email' => 'required|email|max:255|unique:users,email',
+            'employee_id' => 'required|string|max:255|unique:users,employee_id',
             'role_id' => $this->roleAssignmentRules($request, true),
             'department_id' => 'nullable|exists:departments,id',
             'branch_id' => 'nullable|exists:branches,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
-            'status' => 'nullable|in:ACTIVE,PENDING,SUSPENDED',
+            // Server-controlled: never accepted from the client.
+            'password' => 'prohibited',
+            'password_confirmation' => 'prohibited',
+            'status' => 'prohibited',
+            'email_verified_at' => 'prohibited',
+            'invited_at' => 'prohibited',
+            'activated_at' => 'prohibited',
         ]);
 
-        $validated['password'] = Hash::make($validated['password']);
-        $validated['status'] = $validated['status'] ?? 'ACTIVE';
         // New accounts belong to the single Main Warehouse unless one is given.
         $validated['warehouse_id'] ??= $this->mainWarehouseId();
 
-        $user = User::create($validated);
-        $user->load(['role', 'department', 'branch', 'warehouse']);
+        [$user, $invitation, $token] = DB::transaction(function () use ($validated, $request) {
+            $user = new User($validated);
+            $user->forceFill(['status' => 'PENDING'])->save();
 
-        AuditLogger::success('USER_CREATED', AuditLogger::MODULE_USERS, [
-            'resource' => $user,
-            'resource_label' => $user->employee_id,
-            'details' => sprintf(
-                'Created %s account for %s with status %s',
-                $user->role?->slug ?? 'user',
-                $user->name,
-                $user->status,
-            ),
-            'metadata' => [
-                'role' => $user->role?->slug,
-                'status' => $user->status,
-                'warehouse' => $user->warehouse?->code,
+            [$invitation, $token] = UserInvitations::issue($user, $request->user());
+
+            AuditLogger::success('USER_CREATED', AuditLogger::MODULE_USERS, [
+                'resource' => $user,
+                'resource_label' => $user->employee_id,
+                'details' => sprintf(
+                    'Created %s account for %s with status %s',
+                    $user->role?->slug ?? 'user',
+                    $user->name,
+                    $user->status,
+                ),
+                'metadata' => [
+                    'role' => $user->role?->slug,
+                    'status' => $user->status,
+                    'warehouse' => $user->warehouse?->code,
+                ],
+            ]);
+
+            return [$user, $invitation, $token];
+        });
+
+        // Mail goes out only after commit, so a rollback never leaves a live link.
+        $sent = UserInvitations::send($user, $invitation, $token);
+        $this->auditInvitation('USER_INVITED', $user, $invitation, $sent);
+
+        return response()->json(array_merge(
+            $user->fresh()->load(['role', 'department', 'branch', 'warehouse'])->toArray(),
+            [
+                'invitation' => ['sent' => $sent, 'expires_at' => $invitation->expires_at->toIso8601String()],
+                'message' => $sent
+                    ? 'User created. An activation invitation has been sent to their email.'
+                    : 'User created, but the invitation email could not be sent. Use Resend Invitation to try again.',
             ],
-        ]);
+        ), 201);
+    }
 
-        return response()->json($user->load(['role', 'department', 'branch', 'warehouse']), 201);
+    public function resendInvitation(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+        $this->authorize('resendInvitation', $user);
+
+        if ($user->status !== 'PENDING') {
+            return response()->json(['message' => 'Only pending accounts can be sent a new invitation.'], 422);
+        }
+
+        $cooldownKey = 'invitation-resend-user:'.$user->id;
+        if (RateLimiter::tooManyAttempts($cooldownKey, 1)) {
+            $retryAfter = RateLimiter::availableIn($cooldownKey);
+
+            return response()->json([
+                'message' => 'An invitation was sent recently. Please wait before sending another.',
+                'retry_after' => $retryAfter,
+            ], 429)->header('Retry-After', (string) $retryAfter);
+        }
+        RateLimiter::hit($cooldownKey, max(1, (int) config('invitations.resend_cooldown_seconds', 60)));
+
+        $issued = DB::transaction(function () use ($user, $request) {
+            $locked = User::query()->whereKey($user->id)->lockForUpdate()->first();
+            if (! $locked || $locked->status !== 'PENDING') {
+                return null;
+            }
+
+            [$invitation, $token] = UserInvitations::issue($locked, $request->user());
+
+            return [$locked, $invitation, $token];
+        });
+
+        if (! $issued) {
+            return response()->json(['message' => 'Only pending accounts can be sent a new invitation.'], 422);
+        }
+
+        [$user, $invitation, $token] = $issued;
+        $sent = UserInvitations::send($user, $invitation, $token);
+        $this->auditInvitation('INVITATION_RESENT', $user, $invitation, $sent);
+
+        return response()->json([
+            'sent' => $sent,
+            'expires_at' => $invitation->expires_at->toIso8601String(),
+            'message' => $sent
+                ? 'A new activation invitation has been sent. Previous invitation links no longer work.'
+                : 'A new invitation was created, but the email could not be sent. Please try again shortly.',
+        ], $sent ? 200 : 502);
     }
 
     public function update(Request $request, $id)
@@ -149,6 +235,13 @@ class UserController extends Controller
             'warehouse_id' => ['sometimes', 'nullable', 'exists:warehouses,id'],
             'status' => ['sometimes', 'in:ACTIVE,PENDING,SUSPENDED'],
         ]);
+
+        if ($this->awaitingActivation($user)
+            && (isset($validated['password']) || ($validated['status'] ?? null) === 'ACTIVE')) {
+            throw ValidationException::withMessages([
+                'status' => self::AWAITING_ACTIVATION_MESSAGE,
+            ]);
+        }
 
         $before = $user->only(['name', 'email', 'employee_id', 'role_id', 'department_id', 'branch_id', 'warehouse_id', 'status']);
         $passwordChanged = isset($validated['password']);
@@ -177,6 +270,10 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $this->authorize('approve', $user);
 
+        if ($this->awaitingActivation($user)) {
+            return response()->json(['message' => self::AWAITING_ACTIVATION_MESSAGE], 422);
+        }
+
         $previous = $user->status;
         $user->update(['status' => 'ACTIVE']);
         $this->auditStatusChange('ACCOUNT_ACTIVATED', $user, $previous);
@@ -201,6 +298,10 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         $this->authorize('activate', $user);
+
+        if ($this->awaitingActivation($user)) {
+            return response()->json(['message' => self::AWAITING_ACTIVATION_MESSAGE], 422);
+        }
 
         $previous = $user->status;
         $user->update(['status' => 'ACTIVE']);
@@ -233,6 +334,32 @@ class UserController extends Controller
         }
 
         return response()->json($query->get(['id', 'name', 'code', 'branch_id']));
+    }
+
+    /**
+     * An invited account that has never set a password can only become
+     * ACTIVE through its invitation link, not by an admin status change.
+     */
+    private function awaitingActivation(User $user): bool
+    {
+        return $user->password === null;
+    }
+
+    /** Never records the token or its hash; only delivery outcome and expiry. */
+    private function auditInvitation(string $action, User $user, UserInvitation $invitation, bool $sent): void
+    {
+        AuditLogger::log($action, AuditLogger::MODULE_USERS, [
+            'status' => $sent ? AuditLog::STATUS_SUCCESS : AuditLog::STATUS_FAILED,
+            'resource' => $user,
+            'resource_label' => $user->employee_id,
+            'details' => $sent
+                ? sprintf('Activation invitation emailed to %s', $user->name)
+                : sprintf('Activation invitation for %s could not be emailed', $user->name),
+            'metadata' => [
+                'email_delivered' => $sent,
+                'expires_at' => $invitation->expires_at->toIso8601String(),
+            ],
+        ]);
     }
 
     private function mainWarehouseId(): ?int

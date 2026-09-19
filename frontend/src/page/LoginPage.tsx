@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { AuthLayout } from '../components/auth';
 import FormButton from '../components/auth/FormButton';
@@ -10,6 +10,9 @@ import { Lock, LockKeyhole, LogIn, Mail } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Success notice handed over by the account activation page.
+  const notice = (location.state as { notice?: string } | null)?.notice;
   const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const {
@@ -96,6 +99,11 @@ const LoginPage: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-[18px]">
+        {notice && !loginErrors.form && (
+          <div role="status" aria-live="polite" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+            {notice}
+          </div>
+        )}
         {loginErrors.form && (
           <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
             {loginErrors.form}

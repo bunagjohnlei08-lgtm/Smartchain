@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\InvitationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\InventoryController;
@@ -34,6 +35,12 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\NotificationController;
 
 Route::post('/login', [AuthController::class, 'login']);
+
+// Public activation-link endpoints. No token is issued by either.
+Route::middleware('throttle:invitations')->group(function () {
+    Route::post('/invitations/validate', [InvitationController::class, 'check']);
+    Route::post('/invitations/accept', [InvitationController::class, 'accept']);
+});
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -69,6 +76,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/users/{id}/approve', [UserController::class, 'approve']);
     Route::post('/users/{id}/suspend', [UserController::class, 'suspend']);
     Route::post('/users/{id}/activate', [UserController::class, 'activate']);
+    Route::post('/users/{id}/resend-invitation', [UserController::class, 'resendInvitation'])
+        ->middleware('throttle:invitation-resend');
 
     Route::get('/admin/audit-logs', [AuditLogController::class, 'index']);
     Route::get('/admin/audit-logs/options', [AuditLogController::class, 'options']);

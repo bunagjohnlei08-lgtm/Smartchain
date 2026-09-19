@@ -184,6 +184,8 @@ export interface ApiUser {
   department_id?: number | null;
   branch_id?: number | null;
   warehouse_id?: number | null;
+  invited_at?: string | null;
+  activated_at?: string | null;
   created_at: string;
   updated_at: string;
 }

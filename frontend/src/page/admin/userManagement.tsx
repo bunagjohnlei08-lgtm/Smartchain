@@ -13,7 +13,8 @@ import {
   Download,
   Edit,
   Eye,
-  EyeOff,
+  Mail,
+  Send,
   X,
   Filter,
   Users,
@@ -48,6 +49,11 @@ function findMainWarehouse(warehouses: ApiWarehouse[]): ApiWarehouse | undefined
 }
 
 const STATUSES = ['All Status', 'ACTIVE', 'PENDING', 'SUSPENDED'];
+
+/** Invited but never activated: only the emailed link can activate it. */
+function isAwaitingActivation(user: ApiUser): boolean {
+  return user.status === 'PENDING' && !!user.invited_at && !user.activated_at;
+}
 const ROLE_OPTIONS = ['PLANT_MANAGER', 'QA_SUPERVISOR'];
 
 const KPICard: React.FC<{
@@ -138,13 +144,15 @@ const UserModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   user?: ApiUser | null;
-  onSave: (data: Partial<ApiUser> & { password?: string }) => void;
+  onSave: (data: Partial<ApiUser>) => void;
   roles: ApiRole[];
   departments: ApiDepartment[];
   branches: ApiBranch[];
   warehouses: ApiWarehouse[];
 }> = ({ isOpen, onClose, user, onSave, roles, departments, branches, warehouses }) => {
-  const initialFormData: Partial<ApiUser> & { password?: string } = user ? { ...(user as ApiUser), password: '' } as Partial<ApiUser> & { password?: string } : {
+  // New accounts get no password and no client-chosen status: the server
+  // creates them PENDING and emails an activation invitation.
+  const initialFormData: Partial<ApiUser> = user ? { ...user } : {
     name: '',
     email: '',
     employee_id: '',
@@ -152,17 +160,16 @@ const UserModal: React.FC<{
     role_id: undefined,
     warehouse_id: undefined,
     branch_id: undefined,
-    status: 'ACTIVE',
-    password: '',
   };
 
-  const [formData, setFormData] = useState<Partial<ApiUser> & { password?: string }>(initialFormData as Partial<ApiUser> & { password?: string });
-  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState<Partial<ApiUser>>(initialFormData);
   const mainWarehouse = findMainWarehouse(warehouses);
+  // An invited account can only become ACTIVE through its activation link.
+  const statusOptions = STATUSES.filter((s) => s !== 'All Status' && !(s === 'ACTIVE' && user && isAwaitingActivation(user)));
 
   useEffect(() => {
     if (user) {
-      setFormData({ ...(user as ApiUser), password: '' });
+      setFormData({ ...user });
     }
   }, [user]);
 
@@ -237,40 +244,41 @@ const UserModal: React.FC<{
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-400">Status *</label>
-              <select
-                value={formData.status || 'ACTIVE'}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as ApiUser['status'] })}
-                className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
-              >
-                {STATUSES.filter((s) => s !== 'All Status').map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
+            {user ? (
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-400">Status *</label>
+                <select
+                  value={formData.status || 'ACTIVE'}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as ApiUser['status'] })}
+                  className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
+                >
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="create-user-status" className="block text-sm font-medium mb-2 text-gray-400">Status</label>
+                <input
+                  id="create-user-status"
+                  type="text"
+                  value="PENDING (until activated)"
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full h-11 cursor-not-allowed bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-gray-400 focus:outline-none"
+                />
+              </div>
+            )}
           </div>
 
           {!user && (
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-400">Password *</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password || ''}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+            <div className="flex items-start gap-3 rounded-lg border border-[#5B8CFF]/20 bg-[#5B8CFF]/10 p-3 text-xs text-gray-300">
+              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[#5B8CFF]" aria-hidden="true" />
+              <p>
+                An activation invitation will be emailed to this address. The user sets their own
+                password through the single-use link before they can sign in.
+              </p>
             </div>
           )}
 
@@ -395,6 +403,8 @@ const UserManagement: React.FC = () => {
   const [viewUser, setViewUser] = useState<ApiUser | null>(null);
   useAdminDetailOverlay(viewUser !== null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
+  const [resendingId, setResendingId] = useState<number | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -463,17 +473,23 @@ const UserManagement: React.FC = () => {
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const handleCreateUser = async (data: Partial<ApiUser> & { password?: string }) => {
+  const handleCreateUser = async (data: Partial<ApiUser>) => {
     try {
-      await apiClient.post('/users', {
+      const response = await apiClient.post('/users', {
         name: data.name,
         email: data.email,
-        password: data.password,
         employee_id: data.employee_id,
         role_id: data.role_id,
         // Omitted when unresolved: the API then assigns the Main Warehouse itself.
         warehouse_id: data.warehouse_id ?? findMainWarehouse(warehouses)?.id,
-        status: data.status || 'ACTIVE',
+      });
+      const sent = response.data?.invitation?.sent === true;
+      setNotice({
+        tone: sent ? 'success' : 'warning',
+        text: response.data?.message
+          ?? (sent
+            ? 'User created. An activation invitation has been sent to their email.'
+            : 'User created, but the invitation email could not be sent. Use Resend Invitation to try again.'),
       });
       await fetchUsers();
       await fetchStatistics();
@@ -483,10 +499,24 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleEditUser = async (data: Partial<ApiUser> & { password?: string }) => {
+  const handleResendInvitation = async (user: ApiUser) => {
+    if (resendingId !== null) return;
+    setResendingId(user.id);
+    try {
+      const response = await apiClient.post(`/users/${user.id}/resend-invitation`);
+      setNotice({ tone: 'success', text: response.data?.message ?? `A new invitation has been sent to ${user.email}.` });
+      await fetchUsers();
+    } catch (e) {
+      setNotice({ tone: 'error', text: getApiErrorMessage(e) });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const handleEditUser = async (data: Partial<ApiUser>) => {
     if (!editUser) return;
     try {
-      const { password: _password, ...updatePayload } = data;
+      const { invited_at: _invitedAt, activated_at: _activatedAt, ...updatePayload } = data;
       await apiClient.put(`/users/${editUser.id}`, updatePayload);
       await fetchUsers();
       await fetchStatistics();
@@ -540,6 +570,22 @@ const UserManagement: React.FC = () => {
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 text-sm">
           {error}
+        </div>
+      )}
+      {notice && (
+        <div
+          role={notice.tone === 'success' ? 'status' : 'alert'}
+          aria-live="polite"
+          className={`flex items-start justify-between gap-3 rounded-xl border p-4 text-sm ${
+            notice.tone === 'success' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' :
+            notice.tone === 'warning' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
+            'border-red-500/20 bg-red-500/10 text-red-400'
+          }`}
+        >
+          <span>{notice.text}</span>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss message" className="shrink-0 opacity-70 transition-opacity hover:opacity-100">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
       {/* 1. PAGE HEADER */}
@@ -687,6 +733,18 @@ const UserManagement: React.FC = () => {
                           <button onClick={() => setViewUser(u)} className="p-1 hover:text-white transition"><Eye className="w-4 h-4" /></button>
                           <button onClick={() => setEditUser(u)} className="p-1 hover:text-white transition"><Edit className="w-4 h-4" /></button>
                           {u.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleResendInvitation(u)}
+                              disabled={resendingId !== null}
+                              className="p-1 hover:text-[#5B8CFF] transition disabled:cursor-not-allowed disabled:opacity-40"
+                              title={resendingId === u.id ? 'Sending invitation...' : 'Resend Invitation'}
+                              aria-label={`Resend invitation to ${u.email}`}
+                              aria-busy={resendingId === u.id}
+                            >
+                              <Send className={`w-4 h-4 ${resendingId === u.id ? 'animate-pulse' : ''}`} />
+                            </button>
+                          )}
+                          {u.status === 'PENDING' && !isAwaitingActivation(u) && (
                             <button onClick={() => handleApprove(u)} className="p-1 hover:text-green-400 transition" title="Approve"><Check className="w-4 h-4" /></button>
                           )}
                           {u.status === 'ACTIVE' && (
@@ -715,7 +773,7 @@ const UserManagement: React.FC = () => {
                 <article key={u.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                   <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-blue-600/20 text-xs font-bold text-blue-600 dark:text-blue-400">{initials}</div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</h3><p className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</p></div><span className={`admin-badge rounded-full border px-2.5 py-1 text-[10px] font-semibold ${u.status === 'ACTIVE' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : u.status === 'PENDING' ? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>{u.status}</span></div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500 dark:text-slate-400">Employee ID</dt><dd className="font-mono text-slate-900 dark:text-white">{u.employee_id}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Role</dt><dd className="text-slate-900 dark:text-white">{u.role?.slug || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Department</dt><dd className="text-slate-900 dark:text-white">{u.department?.name || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{u.warehouse?.code || '—'}</dd></div></dl>
-                  <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 text-slate-500 dark:border-slate-700 dark:text-slate-400"><button onClick={() => setViewUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button><button onClick={() => setEditUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="Edit"><Edit className="h-4 w-4" /></button>{u.status === 'PENDING' && <button onClick={() => handleApprove(u)} className="p-1 hover:text-green-500" title="Approve"><Check className="h-4 w-4" /></button>}{u.status === 'ACTIVE' && <button onClick={() => handleSuspend(u)} className="p-1 hover:text-red-500" title="Suspend"><UserX className="h-4 w-4" /></button>}{u.status === 'SUSPENDED' && <button onClick={() => handleActivate(u)} className="p-1 hover:text-green-500" title="Activate"><UserCheck className="h-4 w-4" /></button>}</div>
+                  <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 text-slate-500 dark:border-slate-700 dark:text-slate-400"><button onClick={() => setViewUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button><button onClick={() => setEditUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="Edit"><Edit className="h-4 w-4" /></button>{u.status === 'PENDING' && <button onClick={() => handleResendInvitation(u)} disabled={resendingId !== null} className="p-1 hover:text-[#5B8CFF] disabled:cursor-not-allowed disabled:opacity-40" title={resendingId === u.id ? 'Sending invitation...' : 'Resend Invitation'} aria-label={`Resend invitation to ${u.email}`} aria-busy={resendingId === u.id}><Send className={`h-4 w-4 ${resendingId === u.id ? 'animate-pulse' : ''}`} /></button>}{u.status === 'PENDING' && !isAwaitingActivation(u) && <button onClick={() => handleApprove(u)} className="p-1 hover:text-green-500" title="Approve"><Check className="h-4 w-4" /></button>}{u.status === 'ACTIVE' && <button onClick={() => handleSuspend(u)} className="p-1 hover:text-red-500" title="Suspend"><UserX className="h-4 w-4" /></button>}{u.status === 'SUSPENDED' && <button onClick={() => handleActivate(u)} className="p-1 hover:text-green-500" title="Activate"><UserCheck className="h-4 w-4" /></button>}</div>
                 </article>
               );
             })}
