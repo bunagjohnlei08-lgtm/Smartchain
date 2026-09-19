@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
 class QaInspectionController extends Controller
@@ -388,7 +389,8 @@ class QaInspectionController extends Controller
             if ($e instanceof ValidationException) {
                 throw $e;
             }
-            $status = $e->getCode();
+            // abort() keeps the HTTP status on the exception, not in getCode().
+            $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : null;
             if (in_array($status, [404, 422], true)) {
                 return response()->json(['message' => $e->getMessage()], $status);
             }
