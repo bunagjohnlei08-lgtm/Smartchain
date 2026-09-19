@@ -118,6 +118,7 @@ class StockOutController extends Controller
             if (!$record->items()->exists()) {
                 throw ValidationException::withMessages(['items' => 'The order must contain items before Stock Out can start.']);
             }
+            $this->assertOrderReady($record, $user->warehouse_id);
             $record->update(['status' => 'STOCK_OUT_IN_PROGRESS']);
             $record->histories()->create([
                 'previous_status' => 'READY_FOR_STOCK_OUT',
@@ -440,6 +441,7 @@ class StockOutController extends Controller
             'order_status' => $order->status,
             'order' => ['id' => $order->id, 'status' => $order->status],
             'order_item' => ['id' => $item->id, 'product_id' => $item->product_id],
+            'inventory_id' => $transaction->inventory_id,
             'inventory' => ['id' => $transaction->inventory_id, 'warehouse_id' => $transaction->warehouse_id],
         ];
     }
