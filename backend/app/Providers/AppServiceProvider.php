@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Mail\Transport\BrevoApiTransport;
+use App\Support\BrevoTransactionalMail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(BrevoTransactionalMail::class);
     }
 
     /**
@@ -22,6 +25,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Transactional email over the Brevo HTTPS API (MAIL_MAILER=brevo).
+        // Registering it as a mail driver keeps every Mailable, Blade template
+        // and Mail::to(...)->send(...) call site unchanged; only the transport
+        // differs, because Railway blocks outbound SMTP.
+        Mail::extend('brevo', fn (array $config) => new BrevoApiTransport(
+            $this->app->make(BrevoTransactionalMail::class),
+        ));
+
         // Public activation-link endpoints: per client IP.
         RateLimiter::for('invitations', fn (Request $request) => Limit::perMinute(10)->by('invitations:'.$request->ip()));
 

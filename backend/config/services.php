@@ -14,6 +14,15 @@ return [
     |
     */
 
+    // Transactional email transport. Railway's lower plans block outbound SMTP,
+    // so login OTP and invitation email go out over the Brevo HTTPS API
+    // (MAIL_MAILER=brevo). Values come from the environment only.
+    'brevo' => [
+        'api_key' => env('BREVO_API_KEY'),
+        'sender_email' => env('BREVO_SENDER_EMAIL'),
+        'sender_name' => env('BREVO_SENDER_NAME', 'SmartChain'),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
