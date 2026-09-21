@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Support\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class AuditLogController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
             'action' => ['nullable', 'string', 'max:64'],
             'module' => ['nullable', 'string', 'max:64'],
-            'status' => ['nullable', Rule::in([AuditLog::STATUS_SUCCESS, AuditLog::STATUS_FAILED])],
+            'status' => ['nullable', Rule::in(AuditLog::STATUSES)],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -63,7 +64,7 @@ class AuditLogController extends Controller
                 'details' => $log->details,
                 'ip_address' => $log->ip_address,
                 'user_agent' => $log->user_agent,
-                'metadata' => $log->metadata,
+                'metadata' => is_array($log->metadata) ? (AuditLogger::scrub($log->metadata) ?: null) : null,
             ]);
 
         return response()->json($logs);

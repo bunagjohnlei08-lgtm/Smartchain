@@ -16,6 +16,15 @@ class AuditLog extends Model
 
     public const STATUS_SUCCESS = 'SUCCESS';
     public const STATUS_FAILED = 'FAILED';
+    public const STATUS_BLOCKED = 'BLOCKED';
+    public const STATUS_EXPIRED = 'EXPIRED';
+
+    public const STATUSES = [
+        self::STATUS_SUCCESS,
+        self::STATUS_FAILED,
+        self::STATUS_BLOCKED,
+        self::STATUS_EXPIRED,
+    ];
 
     protected $fillable = [
         'actor_user_id',

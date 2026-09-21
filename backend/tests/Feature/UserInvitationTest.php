@@ -132,7 +132,14 @@ class UserInvitationTest extends TestCase
         $this->assertDatabaseMissing('user_invitations', ['token_hash' => $token]);
 
         $this->assertDatabaseHas('audit_logs', ['action' => 'USER_CREATED', 'actor_user_id' => $this->admin->id]);
-        $this->assertDatabaseHas('audit_logs', ['action' => 'USER_INVITED', 'status' => 'SUCCESS', 'actor_user_id' => $this->admin->id]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'INVITATION_SENT',
+            'module' => 'User Management',
+            'status' => 'SUCCESS',
+            'actor_user_id' => $this->admin->id,
+            'details' => 'Account invitation sent; expires in 48 hours',
+        ]);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'USER_INVITED']);
     }
 
     public function test_invitation_email_contains_activation_link_and_no_password(): void
@@ -215,7 +222,7 @@ class UserInvitationTest extends TestCase
         $this->assertSame('PENDING', $user->status);
         $this->assertNull($user->password);
         $this->assertDatabaseCount('user_invitations', 1);
-        $this->assertDatabaseHas('audit_logs', ['action' => 'USER_INVITED', 'status' => 'FAILED']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'INVITATION_SENT', 'status' => 'FAILED']);
 
         // A retry of the same create does not duplicate the account.
         $this->actingAs($this->admin)->postJson('/api/users', $this->payload())
@@ -387,7 +394,11 @@ class UserInvitationTest extends TestCase
 
         $this->accept($newToken)->assertOk();
         $this->assertSame('ACTIVE', $user->fresh()->status);
-        $this->assertDatabaseHas('audit_logs', ['action' => 'INVITATION_RESENT', 'status' => 'SUCCESS']);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'INVITATION_RESENT',
+            'status' => 'SUCCESS',
+            'details' => 'Account invitation resent; expires in 48 hours',
+        ]);
     }
 
     public function test_resend_for_active_user_is_rejected(): void
@@ -478,7 +489,7 @@ class UserInvitationTest extends TestCase
             $this->assertNoAuditRowContains($secret);
         }
         $this->assertSame(
-            ['USER_CREATED', 'USER_INVITED', 'INVITATION_RESENT', 'ACCOUNT_ACTIVATED'],
+            ['USER_CREATED', 'INVITATION_SENT', 'INVITATION_RESENT', 'ACCOUNT_ACTIVATED'],
             AuditLog::query()->orderBy('id')->pluck('action')->all(),
         );
     }

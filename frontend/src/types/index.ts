@@ -98,7 +98,7 @@ export interface ApiAuditLog {
   resource_type: string | null;
   resource_id: string | null;
   resource_label: string | null;
-  status: 'SUCCESS' | 'FAILED';
+  status: 'SUCCESS' | 'FAILED' | 'BLOCKED' | 'EXPIRED';
   details: string | null;
   ip_address: string | null;
   user_agent: string | null;

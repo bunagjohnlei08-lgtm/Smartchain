@@ -119,7 +119,7 @@ class AuditLogTest extends TestCase
         $this->assertSame($admin->id, $log->actor_user_id);
         $this->assertSame('EMP-9001', $log->resource_label);
         $this->assertSame('PENDING', $log->metadata['status']);
-        $this->assertDatabaseHas('audit_logs', ['action' => 'USER_INVITED', 'actor_user_id' => $admin->id]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'INVITATION_SENT', 'actor_user_id' => $admin->id]);
     }
 
     public function test_user_update_role_change_and_status_changes_are_audited(): void
@@ -135,7 +135,11 @@ class AuditLogTest extends TestCase
 
         $updated = AuditLog::query()->where('action', 'USER_UPDATED')->sole();
         $this->assertStringContainsString('Changed name from', $updated->details);
-        $this->assertStringContainsString('Reset password', $updated->details);
+        $this->assertStringNotContainsString('password', strtolower($updated->details));
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'PASSWORD_CHANGED', 'module' => 'User Management', 'status' => 'SUCCESS',
+            'details' => 'Password changed', 'resource_label' => 'EMP-0007', 'actor_user_id' => $admin->id,
+        ]);
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'ROLE_CHANGED',
             'details' => 'Changed role from QA_SUPERVISOR to PLANT_MANAGER',
@@ -145,10 +149,10 @@ class AuditLogTest extends TestCase
         $this->actingAs($admin)->postJson("/api/users/{$target->id}/activate")->assertOk();
 
         $this->assertDatabaseHas('audit_logs', [
-            'action' => 'ACCOUNT_SUSPENDED', 'details' => 'Changed status from ACTIVE to SUSPENDED', 'resource_label' => 'EMP-0007',
+            'action' => 'ACCOUNT_DISABLED', 'details' => 'Changed status from ACTIVE to SUSPENDED', 'resource_label' => 'EMP-0007',
         ]);
         $this->assertDatabaseHas('audit_logs', [
-            'action' => 'ACCOUNT_REACTIVATED', 'details' => 'Changed status from SUSPENDED to ACTIVE',
+            'action' => 'ACCOUNT_ENABLED', 'details' => 'Changed status from SUSPENDED to ACTIVE',
         ]);
         $this->assertNoAuditRowContains('brand-new-secret');
     }

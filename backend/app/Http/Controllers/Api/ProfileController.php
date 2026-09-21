@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -76,6 +77,14 @@ class ProfileController extends Controller
             $otherTokens->whereKeyNot($currentToken->getKey());
         }
         $otherTokens->delete();
+
+        AuditLogger::success('PASSWORD_CHANGED', AuditLogger::MODULE_AUTH, [
+            'actor' => $user,
+            'resource' => $user,
+            'resource_label' => $user->employee_id ?: $user->email,
+            'details' => 'Password changed',
+            'metadata' => ['method' => 'self_service'],
+        ]);
 
         return response()->json(['message' => 'Password changed successfully.']);
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\LoginChallenge;
 use App\Models\User;
 use App\Support\AuditLogger;
@@ -38,7 +39,7 @@ class AuthController extends Controller
                 ->map(fn (string $key) => RateLimiter::availableIn($key))
                 ->max();
 
-            $this->auditFailedLogin($email, 'RATE_LIMITED', 'Login blocked after too many attempts');
+            $this->auditFailedLogin($email, 'RATE_LIMITED', 'Login blocked after too many attempts', null, AuditLog::STATUS_BLOCKED);
 
             return response()->json([
                 'message' => 'Too many login attempts. Please try again later.',
@@ -86,7 +87,7 @@ class AuthController extends Controller
         $issueKey = 'login-otp-issue:'.$user->id;
         if (RateLimiter::tooManyAttempts($issueKey, LoginChallenges::maxChallengesPerWindow())) {
             $retryAfter = RateLimiter::availableIn($issueKey);
-            $this->auditFailedLogin($email, 'CODE_REQUEST_LIMITED', 'Login blocked: too many verification codes requested', $user);
+            $this->auditFailedLogin($email, 'CODE_REQUEST_LIMITED', 'Login blocked: too many verification codes requested', $user, AuditLog::STATUS_BLOCKED);
 
             return response()->json([
                 'message' => 'Too many verification codes requested. Please try again later.',
@@ -173,12 +174,20 @@ class AuthController extends Controller
         });
 
         if ($outcome !== 'VERIFIED') {
-            if ($user) {
+            if ($user && $outcome === 'EXPIRED') {
+                AuditLogger::log('LOGIN_OTP_EXPIRED', AuditLogger::MODULE_AUTH, [
+                    'status' => AuditLog::STATUS_EXPIRED,
+                    'actor' => $user,
+                    'actor_identifier' => $user->email,
+                    'resource' => $user,
+                    'resource_label' => $user->employee_id ?: $user->email,
+                    'details' => 'Login verification code expired',
+                ]);
+            } elseif ($user) {
                 $this->auditCodeFailure($user, $outcome, match ($outcome) {
                     'ACCOUNT_NOT_ACTIVE' => 'Login refused at code verification: account not active',
-                    'EXPIRED' => 'Expired verification code submitted',
                     'ATTEMPTS_EXHAUSTED' => 'Incorrect verification code; attempts exhausted',
-                    default => 'Incorrect verification code',
+                    default => 'Invalid login verification code',
                 });
             }
 
@@ -191,6 +200,14 @@ class AuthController extends Controller
 
             return response()->json(['message' => $message, 'reason' => $reason], 422);
         }
+
+        // Two distinct events: the code check, then session issuance.
+        AuditLogger::success('LOGIN_OTP_VERIFIED', AuditLogger::MODULE_AUTH, [
+            'actor' => $user,
+            'resource' => $user,
+            'resource_label' => $user->employee_id ?: $user->email,
+            'details' => 'Login verification code verified',
+        ]);
 
         AuditLogger::success('LOGIN', AuditLogger::MODULE_AUTH, [
             'actor' => $user,
@@ -348,9 +365,15 @@ class AuthController extends Controller
      * Failed attempts record the typed email and a reason category only -
      * the submitted password is never passed to the audit log.
      */
-    private function auditFailedLogin(string $email, string $reason, string $details, ?User $user = null): void
-    {
-        AuditLogger::failure('LOGIN_FAILED', AuditLogger::MODULE_AUTH, [
+    private function auditFailedLogin(
+        string $email,
+        string $reason,
+        string $details,
+        ?User $user = null,
+        string $status = AuditLog::STATUS_FAILED,
+    ): void {
+        AuditLogger::log('LOGIN_FAILED', AuditLogger::MODULE_AUTH, [
+            'status' => $status,
             'actor' => $user,
             'actor_identifier' => $email,
             'resource' => $user,

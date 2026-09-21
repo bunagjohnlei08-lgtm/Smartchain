@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Mail\UserInvitationMail;
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Models\UserInvitation;
 use Illuminate\Support\Facades\Mail;
@@ -65,7 +66,13 @@ class UserInvitations
         }
 
         $invitation = $query->first();
-        if (! $invitation || ! $invitation->isUsable()) {
+        if (! $invitation) {
+            return null;
+        }
+
+        if (! $invitation->isUsable()) {
+            self::recordExpiry($invitation);
+
             return null;
         }
 
@@ -104,6 +111,38 @@ class UserInvitations
 
             return false;
         }
+    }
+
+    /**
+     * Record INVITATION_EXPIRED the first time an expired (but otherwise
+     * outstanding) link is actually presented. Later presentations of the
+     * same link find the existing row and write nothing.
+     */
+    private static function recordExpiry(UserInvitation $invitation): void
+    {
+        if ($invitation->consumed_at !== null
+            || $invitation->revoked_at !== null
+            || $invitation->expires_at->isFuture()) {
+            return;
+        }
+
+        $alreadyRecorded = AuditLog::query()
+            ->where('action', 'INVITATION_EXPIRED')
+            ->where('resource_type', 'UserInvitation')
+            ->where('resource_id', (string) $invitation->getKey())
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
+        AuditLogger::log('INVITATION_EXPIRED', AuditLogger::MODULE_USERS, [
+            'status' => AuditLog::STATUS_EXPIRED,
+            'resource_type' => 'UserInvitation',
+            'resource_id' => $invitation->getKey(),
+            'resource_label' => User::query()->whereKey($invitation->user_id)->value('employee_id'),
+            'details' => 'Account invitation link expired',
+        ]);
     }
 
     public static function activationUrl(string $token): string

@@ -158,7 +158,7 @@ class UserController extends Controller
 
         // Mail goes out only after commit, so a rollback never leaves a live link.
         $sent = UserInvitations::send($user, $invitation, $token);
-        $this->auditInvitation('USER_INVITED', $user, $invitation, $sent);
+        $this->auditInvitation('INVITATION_SENT', $user, $invitation, $sent);
 
         return response()->json(array_merge(
             $user->fresh()->load(['role', 'department', 'branch', 'warehouse'])->toArray(),
@@ -276,7 +276,7 @@ class UserController extends Controller
 
         $previous = $user->status;
         $user->update(['status' => 'ACTIVE']);
-        $this->auditStatusChange('ACCOUNT_ACTIVATED', $user, $previous);
+        $this->auditStatusChange('ACCOUNT_ENABLED', $user, $previous);
 
         return response()->json($user->load(['role', 'department', 'branch', 'warehouse']));
     }
@@ -289,7 +289,7 @@ class UserController extends Controller
         $previous = $user->status;
         $user->update(['status' => 'SUSPENDED']);
         $user->tokens()->delete();
-        $this->auditStatusChange('ACCOUNT_SUSPENDED', $user, $previous);
+        $this->auditStatusChange('ACCOUNT_DISABLED', $user, $previous);
 
         return response()->json($user->load(['role', 'department', 'branch', 'warehouse']));
     }
@@ -305,7 +305,7 @@ class UserController extends Controller
 
         $previous = $user->status;
         $user->update(['status' => 'ACTIVE']);
-        $this->auditStatusChange('ACCOUNT_REACTIVATED', $user, $previous);
+        $this->auditStatusChange('ACCOUNT_ENABLED', $user, $previous);
 
         return response()->json($user->load(['role', 'department', 'branch', 'warehouse']));
     }
@@ -353,8 +353,8 @@ class UserController extends Controller
             'resource' => $user,
             'resource_label' => $user->employee_id,
             'details' => $sent
-                ? sprintf('Activation invitation emailed to %s', $user->name)
-                : sprintf('Activation invitation for %s could not be emailed', $user->name),
+                ? sprintf('Account invitation %s; expires in %d hours', $action === 'INVITATION_RESENT' ? 'resent' : 'sent', UserInvitations::expirationHours())
+                : 'Account invitation could not be emailed',
             'metadata' => [
                 'email_delivered' => $sent,
                 'expires_at' => $invitation->expires_at->toIso8601String(),
@@ -369,8 +369,10 @@ class UserController extends Controller
     }
 
     /**
-     * Records a summary of what changed (never the password value). A role
-     * change is also recorded as its own ROLE_CHANGED event.
+     * Records a summary of what changed (never the password value). Role,
+     * account-status and password changes are recorded as their own
+     * ROLE_CHANGED, ACCOUNT_ENABLED/ACCOUNT_DISABLED and PASSWORD_CHANGED
+     * events instead of being repeated in USER_UPDATED.
      */
     private function auditUserUpdate(User $user, array $before, array $validated, bool $passwordChanged): void
     {
@@ -383,6 +385,22 @@ class UserController extends Controller
             'branch_id' => 'branch',
             'warehouse_id' => 'warehouse',
         ]);
+
+        $statusAction = $this->statusChangeAction($before['status'] ?? null, $user->status);
+        if ($statusAction) {
+            unset($changes['status']);
+            $this->auditStatusChange($statusAction, $user, $before['status'] ?? null);
+        }
+
+        if ($passwordChanged) {
+            AuditLogger::success('PASSWORD_CHANGED', AuditLogger::MODULE_USERS, [
+                'resource' => $user,
+                'resource_label' => $user->employee_id,
+                'details' => 'Password changed',
+                'metadata' => ['method' => 'admin_reset'],
+            ]);
+        }
+
         $roleChange = AuditLogger::diff($before, $validated, ['role_id' => 'role'])['role'] ?? null;
 
         if ($roleChange) {
@@ -397,24 +415,35 @@ class UserController extends Controller
             ]);
         }
 
-        if ($changes === [] && ! $passwordChanged) {
+        if ($changes === []) {
             return;
-        }
-
-        $summary = AuditLogger::describeChanges($changes);
-        if ($passwordChanged) {
-            $summary = trim($summary.($summary !== '' ? '; ' : '').'Reset password');
         }
 
         AuditLogger::success('USER_UPDATED', AuditLogger::MODULE_USERS, [
             'resource' => $user,
             'resource_label' => $user->employee_id,
-            'details' => $summary,
+            'details' => AuditLogger::describeChanges($changes),
             'metadata' => [
                 'changed_fields' => array_keys($changes),
-                'credentials_changed' => $passwordChanged,
             ],
         ]);
+    }
+
+    /**
+     * Leaving ACTIVE (or being suspended) disables sign-in; returning to
+     * ACTIVE enables it. Other transitions stay in the USER_UPDATED summary.
+     */
+    private function statusChangeAction(?string $from, ?string $to): ?string
+    {
+        if ($from === $to) {
+            return null;
+        }
+
+        if ($to === 'ACTIVE') {
+            return 'ACCOUNT_ENABLED';
+        }
+
+        return $from === 'ACTIVE' || $to === 'SUSPENDED' ? 'ACCOUNT_DISABLED' : null;
     }
 
     private function auditStatusChange(string $action, User $user, ?string $previous): void

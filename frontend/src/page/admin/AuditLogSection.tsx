@@ -50,17 +50,33 @@ function targetLabel(log: ApiAuditLog): string {
   return log.resource_label || (log.resource_type ? `${log.resource_type}${log.resource_id ? ` #${log.resource_id}` : ''}` : '—');
 }
 
-const StatusBadge: React.FC<{ status: ApiAuditLog['status'] }> = ({ status }) => (
-  <span
-    className={`admin-badge inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${
-      status === 'SUCCESS'
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
-        : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-400'
-    }`}
-  >
-    {status === 'SUCCESS' ? 'Success' : 'Failed'}
-  </span>
-);
+const STATUS_BADGES: Record<ApiAuditLog['status'], { label: string; className: string }> = {
+  SUCCESS: {
+    label: 'Success',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400',
+  },
+  FAILED: {
+    label: 'Failed',
+    className: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-400',
+  },
+  BLOCKED: {
+    label: 'Blocked',
+    className: 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-400',
+  },
+  EXPIRED: {
+    label: 'Expired',
+    className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400',
+  },
+};
+
+const StatusBadge: React.FC<{ status: ApiAuditLog['status'] }> = ({ status }) => {
+  const badge = STATUS_BADGES[status] ?? STATUS_BADGES.FAILED;
+  return (
+    <span className={`admin-badge inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${badge.className}`}>
+      {STATUS_BADGES[status] ? badge.label : status}
+    </span>
+  );
+};
 
 const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <div className="min-w-0">
@@ -93,6 +109,8 @@ const AuditLogDetails: React.FC<{ log: ApiAuditLog; onClose: () => void }> = ({ 
         </button>
       </div>
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <DetailRow label="Event ID" value={`#${log.id}`} />
+        <DetailRow label="Date / Time" value={formatDateTime(log.created_at)} />
         <DetailRow label="User" value={actorLabel(log)} />
         <DetailRow label="Status" value={<StatusBadge status={log.status} />} />
         <DetailRow label="Target" value={targetLabel(log)} />
@@ -221,6 +239,8 @@ const AuditLogSection: React.FC = () => {
           <option value="">All Status</option>
           <option value="SUCCESS">Success</option>
           <option value="FAILED">Failed</option>
+          <option value="BLOCKED">Blocked</option>
+          <option value="EXPIRED">Expired</option>
         </select>
         <input type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(e) => updateFilter('dateFrom', e.target.value)} aria-label="From date" className={`${inputClass} min-w-[130px] flex-1`} />
         <input type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(e) => updateFilter('dateTo', e.target.value)} aria-label="To date" className={`${inputClass} min-w-[130px] flex-1`} />

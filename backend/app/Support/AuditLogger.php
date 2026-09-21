@@ -150,9 +150,10 @@ class AuditLogger
     }
 
     /**
-     * Recursively drop any key that looks like a credential or secret.
+     * Recursively drop any key that looks like a credential or secret. Also
+     * applied when records are read back, as defence in depth.
      */
-    private static function scrub(array $data): array
+    public static function scrub(array $data): array
     {
         $clean = [];
 
