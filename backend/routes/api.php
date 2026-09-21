@@ -151,6 +151,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/purchase-orders/approved', [PurchaseOrderController::class, 'approved']);
     Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
     Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+    Route::get('/purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf']);
     Route::patch('/purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send']);
 
     Route::get('/suppliers', [SupplierController::class, 'index']);

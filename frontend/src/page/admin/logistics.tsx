@@ -466,21 +466,23 @@ const Logistics: React.FC = () => {
    </div>
 
    {/* Filter Bar */}
-   <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-4 flex flex-wrap items-center gap-3">
+   <div className="admin-dtrs-toolbar bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-2xl p-4 flex flex-wrap items-center gap-3">
     <SearchInput value={search} onChange={setSearch} placeholder="Search shipment #, PO #, customer..." />
     <FilterSelect value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
     <FilterSelect value={warehouseFilter} onChange={setWarehouseFilter} options={warehouseOptions} />
     <FilterSelect value={logisticsFilter} onChange={setLogisticsFilter} options={[...logisticsOptions, 'Not Assigned']} />
-    <button className="px-3.5 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all flex items-center gap-1.5 text-sm">
+    <button className="admin-dtrs-more px-3.5 py-2.5 border border-gray-700 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all flex items-center justify-center gap-1.5 text-sm">
      <Filter className="w-4 h-4" /> More Filters
     </button>
-    <div className="ml-auto flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/50 p-1" aria-label="Shipment view">
-     <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
-     <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+    <div className="admin-dtrs-actions ml-auto flex items-center gap-3">
+     <div className="admin-dtrs-view flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/50 p-1" aria-label="Shipment view">
+      <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+      <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+     </div>
+     <button className="admin-dtrs-refresh p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all">
+      <RefreshCw className="w-4 h-4" />
+     </button>
     </div>
-    <button className="p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all">
-     <RefreshCw className="w-4 h-4" />
-    </button>
    </div>
 
    {/* Table */}

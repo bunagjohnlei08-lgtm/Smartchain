@@ -114,12 +114,12 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email',
-            'employee_id' => 'required|string|max:255|unique:users,employee_id',
             'role_id' => $this->roleAssignmentRules($request, true),
             'department_id' => 'nullable|exists:departments,id',
             'branch_id' => 'nullable|exists:branches,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
             // Server-controlled: never accepted from the client.
+            'employee_id' => 'prohibited',
             'password' => 'prohibited',
             'password_confirmation' => 'prohibited',
             'status' => 'prohibited',
@@ -134,6 +134,9 @@ class UserController extends Controller
         [$user, $invitation, $token] = DB::transaction(function () use ($validated, $request) {
             $user = new User($validated);
             $user->forceFill(['status' => 'PENDING'])->save();
+            // Derived from the database-assigned primary key, so concurrent
+            // creations can never compute the same value.
+            $user->forceFill(['employee_id' => $this->generateEmployeeId($user)])->save();
 
             [$invitation, $token] = UserInvitations::issue($user, $request->user());
 
@@ -169,6 +172,22 @@ class UserController extends Controller
                     : 'User created, but the invitation email could not be sent. Use Resend Invitation to try again.',
             ],
         ), 201);
+    }
+
+    /**
+     * EMP-<id zero-padded to 3>. Legacy IDs were typed by hand, so if one
+     * already holds the derived value a numeric suffix keeps it unique.
+     */
+    private function generateEmployeeId(User $user): string
+    {
+        $base = 'EMP-'.str_pad((string) $user->getKey(), 3, '0', STR_PAD_LEFT);
+        $candidate = $base;
+
+        for ($suffix = 2; User::query()->where('employee_id', $candidate)->whereKeyNot($user->getKey())->exists(); $suffix++) {
+            $candidate = $base.'-'.$suffix;
+        }
+
+        return $candidate;
     }
 
     public function resendInvitation(Request $request, $id)

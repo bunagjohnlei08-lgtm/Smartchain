@@ -6,6 +6,7 @@ import FormButton from '../components/auth/FormButton';
 import FormInput from '../components/auth/FormInput';
 import OtpVerificationForm, { type VerifiedLogin } from '../components/auth/OtpVerificationForm';
 import api from '../lib/api';
+import { FIRST_LOGIN_STORAGE_KEY } from '../lib/greeting';
 import type { AxiosError } from 'axios';
 import { Lock, LockKeyhole, LogIn, Mail } from 'lucide-react';
 
@@ -78,11 +79,12 @@ const LoginPage: React.FC = () => {
 
   const isLoginBusy = isSubmitting || isAuthenticating;
 
-  const completeLogin = ({ token, user }: VerifiedLogin) => {
+  const completeLogin = ({ token, user, is_first_login }: VerifiedLogin) => {
     sessionStorage.setItem('isAuthenticated', 'true');
     sessionStorage.setItem('userRole', user.role?.slug || '');
     sessionStorage.setItem('token', token);
     sessionStorage.setItem('user', JSON.stringify(user));
+    sessionStorage.setItem(FIRST_LOGIN_STORAGE_KEY, String(is_first_login === true));
     setChallenge(null);
 
     const role = user.role?.slug;
@@ -127,26 +129,26 @@ const LoginPage: React.FC = () => {
 
   return (
     <AuthLayout>
-      <div className="mb-5 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-blue-400/10 bg-blue-500/10 text-blue-400 shadow-[0_0_24px_rgba(37,99,235,0.12)]">
-          <LockKeyhole className="h-8 w-8" strokeWidth={1.8} />
+      <div className="mb-4 text-center">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/10 text-sky-400 shadow-[0_0_24px_rgba(56,189,248,0.18)] lg:h-11 lg:w-11">
+          <LockKeyhole className="h-[18px] w-[18px] lg:h-5 lg:w-5" strokeWidth={1.8} />
         </div>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight text-white md:text-[1.625rem] lg:text-[1.75rem] xl:text-[1.875rem]">
-          Sign in to <span className="text-blue-500">SmartChain</span>
+        <h2 className="mt-2.5 text-lg font-bold tracking-tight text-white sm:text-xl lg:text-[22px] xl:text-2xl">
+          Sign in to <span className="text-sky-400">SmartChain</span>
         </h2>
-        <p className="mt-2 text-sm text-slate-400 md:text-[15px] xl:text-base">
+        <p className="mt-1 text-[13px] leading-5 text-slate-400 lg:text-xs">
           Welcome back! Please enter your credentials.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-[18px]">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {notice && !loginErrors.form && (
-          <div role="status" aria-live="polite" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+          <div role="status" aria-live="polite" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-[13px] text-emerald-300 lg:text-xs">
             {notice}
           </div>
         )}
         {loginErrors.form && (
-          <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+          <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-300 lg:text-xs">
             {loginErrors.form}
           </div>
         )}
@@ -161,7 +163,7 @@ const LoginPage: React.FC = () => {
           onChange={(value) => updateLoginField('email', value)}
           error={errors.email || loginErrors.email}
           required
-          leadingIcon={<Mail className="h-5 w-5" />}
+          leadingIcon={<Mail className="h-4 w-4" />}
           disabled={isLoginBusy}
         />
 
@@ -176,47 +178,46 @@ const LoginPage: React.FC = () => {
           error={errors.password || loginErrors.password}
           required
           showPasswordToggle
-          leadingIcon={<Lock className="h-5 w-5" />}
+          leadingIcon={<Lock className="h-4 w-4" />}
           disabled={isLoginBusy}
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <label className="group flex min-h-11 cursor-pointer items-center rounded-lg focus-within:ring-2 focus-within:ring-blue-500/40">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+          <label className="group flex min-h-9 cursor-pointer items-center rounded-lg focus-within:ring-2 focus-within:ring-blue-500/40">
             <input
               type="checkbox"
               id="rememberMe"
               checked={formData.rememberMe}
               onChange={(e) => updateField('rememberMe', e.target.checked)}
               disabled={isLoginBusy}
-              className="h-5 w-5 cursor-pointer rounded border-2 border-slate-700 bg-[#091018] accent-blue-500 transition-colors group-hover:border-blue-400 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 checked:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-4 w-4 cursor-pointer rounded border-2 border-slate-700 bg-[#091018] accent-blue-500 transition-colors group-hover:border-blue-400 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 checked:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 accentColor: '#5B8CFF',
               }}
             />
-            <span className="ml-2 text-sm" style={{ color: '#A2AAB8' }}>
+            <span className="ml-2 text-xs" style={{ color: '#A2AAB8' }}>
               Remember me
             </span>
           </label>
           <button
             type="button"
             onClick={() => {}}
-            className="min-h-11 rounded-lg border-none bg-transparent px-1 text-sm font-medium text-blue-400 transition-colors hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="min-h-9 rounded-lg border-none bg-transparent px-1 text-xs font-medium text-blue-400 transition-colors hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
           >
             Forgot Password?
           </button>
         </div>
 
-        <div className="pt-3">
+        <div className="pt-1">
           <FormButton type="submit" variant="primary" isLoading={isLoginBusy} disabled={isLoginBusy}>
-            {!isLoginBusy && <LogIn className="h-5 w-5" />}
+            {!isLoginBusy && <LogIn className="h-4 w-4" />}
             {isLoginBusy ? 'Signing in...' : 'Sign In'}
           </FormButton>
         </div>
       </form>
 
-      <footer className="mt-6 border-t border-slate-700/60 pt-4 text-center text-sm leading-6 text-slate-500">
-        <p>&copy; 2026 Archon Nell Incorporated</p>
-        <p>All rights reserved.</p>
+      <footer className="mt-4 border-t border-slate-700/50 pt-3 text-center text-[10px] leading-4 text-slate-500 lg:mt-5 lg:pt-4">
+        <p>&copy; 2026 Archon Nell Incorporated. All rights reserved.</p>
       </footer>
     </AuthLayout>
   );

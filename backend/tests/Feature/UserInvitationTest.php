@@ -57,7 +57,6 @@ class UserInvitationTest extends TestCase
         return array_merge([
             'name' => 'Invited Person',
             'email' => 'invitee@example.com',
-            'employee_id' => 'EMP-5001',
             'role_id' => $this->qaRole->id,
         ], $overrides);
     }
@@ -183,6 +182,79 @@ class UserInvitationTest extends TestCase
         $this->assertNotSame(999999, $user->id);
         $this->assertDatabaseMissing('user_invitations', ['token_hash' => str_repeat('a', 64)]);
         $this->assertNull(UserInvitation::query()->where('user_id', $user->id)->sole()->consumed_at);
+    }
+
+    // ---- Employee ID generation ---------------------------------------------
+
+    public function test_employee_id_is_generated_from_primary_key_when_not_supplied(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/users', $this->payload())
+            ->assertCreated()
+            ->assertJsonPath('name', 'Invited Person')
+            ->assertJsonPath('email', 'invitee@example.com')
+            ->assertJsonPath('role_id', $this->qaRole->id)
+            ->assertJsonPath('department_id', null)
+            ->assertJsonPath('branch_id', null)
+            ->assertJsonPath('status', 'PENDING');
+
+        $user = User::findOrFail($response->json('id'));
+        $expected = 'EMP-'.str_pad((string) $user->id, 3, '0', STR_PAD_LEFT);
+        $this->assertSame($expected, $user->employee_id);
+        $response->assertJsonPath('employee_id', $expected);
+        $this->assertSame($expected, AuditLog::query()->where('action', 'USER_CREATED')->sole()->resource_label);
+    }
+
+    public function test_primary_key_remains_numeric_users_id(): void
+    {
+        [$user] = $this->invite();
+
+        $this->assertSame('id', $user->getKeyName());
+        $this->assertTrue($user->getIncrementing());
+        $this->assertIsInt($user->getKey());
+        $this->assertNotSame($user->employee_id, (string) $user->getKey());
+    }
+
+    public function test_generated_employee_ids_are_unique(): void
+    {
+        [$first] = $this->invite(['email' => 'first@example.com']);
+        [$second] = $this->invite(['email' => 'second@example.com']);
+
+        $this->assertNotSame($first->employee_id, $second->employee_id);
+        $this->assertSame(1, User::query()->where('employee_id', $first->employee_id)->count());
+        $this->assertSame(1, User::query()->where('employee_id', $second->employee_id)->count());
+    }
+
+    public function test_client_cannot_supply_employee_id(): void
+    {
+        $this->actingAs($this->admin)->postJson('/api/users', $this->payload(['employee_id' => 'EMP-CHOSEN']))
+            ->assertUnprocessable()->assertJsonValidationErrors('employee_id');
+
+        $this->assertDatabaseMissing('users', ['email' => 'invitee@example.com']);
+        $this->assertDatabaseMissing('users', ['employee_id' => 'EMP-CHOSEN']);
+        Mail::assertNothingSent();
+    }
+
+    public function test_existing_employee_ids_are_preserved(): void
+    {
+        $legacy = $this->user($this->qaRole, ['employee_id' => 'EMP-007']);
+
+        $this->invite();
+
+        $this->assertSame('EMP-007', $legacy->fresh()->employee_id);
+    }
+
+    public function test_generated_employee_id_skips_value_already_held_by_legacy_record(): void
+    {
+        // A hand-typed legacy ID that equals the next account's derived value.
+        $legacy = $this->user($this->qaRole);
+        $derived = 'EMP-'.str_pad((string) ($legacy->id + 1), 3, '0', STR_PAD_LEFT);
+        $legacy->forceFill(['employee_id' => $derived])->save();
+
+        [$user] = $this->invite();
+
+        $this->assertSame($legacy->id + 1, $user->id);
+        $this->assertSame($derived.'-2', $user->employee_id);
+        $this->assertSame($derived, $legacy->fresh()->employee_id);
     }
 
     public function test_non_admins_and_guests_cannot_create_accounts(): void

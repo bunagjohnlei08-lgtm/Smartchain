@@ -59,6 +59,7 @@ class BrevoTransactionalMail
      * @param  list<array{email: string, name?: string|null}>  $bcc
      * @param  array{email: string, name?: string|null}|null  $replyTo
      * @param  array{email: string, name?: string|null}|null  $sender
+     * @param  list<array{name: string, content: string}>  $attachments  base64 content
      *
      * @throws BrevoDeliveryException when the message was not accepted
      */
@@ -71,6 +72,7 @@ class BrevoTransactionalMail
         array $bcc = [],
         ?array $replyTo = null,
         ?array $sender = null,
+        array $attachments = [],
     ): string {
         $apiKey = (string) config('services.brevo.api_key');
 
@@ -100,6 +102,7 @@ class BrevoTransactionalMail
             'subject' => $subject,
             'htmlContent' => $htmlContent,
             'textContent' => $textContent ?: null,
+            'attachment' => $attachments ?: null,
         ], fn ($value) => $value !== null);
 
         try {

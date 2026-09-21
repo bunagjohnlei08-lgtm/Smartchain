@@ -133,7 +133,9 @@ class AuthController extends Controller
             'otp' => ['required', 'string', 'regex:/^[0-9]{6}$/'],
         ]);
 
-        [$outcome, $user, $token] = DB::transaction(function () use ($data) {
+        $isFirstLogin = false;
+
+        [$outcome, $user, $token] = DB::transaction(function () use ($data, &$isFirstLogin) {
             $challenge = LoginChallenge::query()
                 ->where('challenge_id', $data['challenge_id'])
                 ->lockForUpdate()
@@ -169,6 +171,13 @@ class AuthController extends Controller
 
             $now = now();
             $challenge->forceFill(['verified_at' => $now, 'consumed_at' => $now])->save();
+
+            // Only a fully verified login counts; the user row is locked above,
+            // so concurrent verifications cannot both claim the first login.
+            if ($user->first_login_at === null) {
+                $user->forceFill(['first_login_at' => $now])->save();
+                $isFirstLogin = true;
+            }
 
             return ['VERIFIED', $user, $user->createToken('api-token')->plainTextToken];
         });
@@ -220,6 +229,7 @@ class AuthController extends Controller
             'message' => 'Login successful',
             'token' => $token,
             'user' => $this->userPayload($user),
+            'is_first_login' => $isFirstLogin,
         ]);
     }
 

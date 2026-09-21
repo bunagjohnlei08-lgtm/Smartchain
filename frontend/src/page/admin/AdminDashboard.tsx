@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
+import { useDashboardGreeting } from '../../hooks/useDashboardGreeting';
 import { useNavigate } from 'react-router-dom';
 import {
   PackageCheck,
@@ -82,6 +83,7 @@ const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const greeting = useDashboardGreeting();
   const { theme } = useTheme();
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(true);
@@ -143,7 +145,7 @@ export default function AdminDashboard() {
       
       {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Operations Overview</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{greeting}</h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
           {dateLabel} — supply chain operations summary.
         </p>

@@ -107,7 +107,6 @@ class AuditLogTest extends TestCase
         $response = $this->actingAs($admin)->postJson('/api/users', [
             'name' => 'New Supervisor',
             'email' => 'new@example.com',
-            'employee_id' => 'EMP-9001',
             'role_id' => $this->qaRole->id,
         ])->assertCreated();
 
@@ -117,7 +116,7 @@ class AuditLogTest extends TestCase
 
         $log = AuditLog::query()->where('action', 'USER_CREATED')->sole();
         $this->assertSame($admin->id, $log->actor_user_id);
-        $this->assertSame('EMP-9001', $log->resource_label);
+        $this->assertSame($response->json('employee_id'), $log->resource_label);
         $this->assertSame('PENDING', $log->metadata['status']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'INVITATION_SENT', 'actor_user_id' => $admin->id]);
     }

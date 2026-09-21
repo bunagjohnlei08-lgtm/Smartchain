@@ -1,10 +1,12 @@
 import { apiClient } from './api';
+import { FIRST_LOGIN_STORAGE_KEY } from './greeting';
 
 export const clearAuthStorage = (): void => {
   sessionStorage.removeItem('isAuthenticated');
   sessionStorage.removeItem('userRole');
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('user');
+  sessionStorage.removeItem(FIRST_LOGIN_STORAGE_KEY);
 };
 
 /**

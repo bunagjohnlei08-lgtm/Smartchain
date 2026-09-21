@@ -1,5 +1,5 @@
 // src/page/admin/PurchaseOrders.tsx
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { apiClient } from '../../lib/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
@@ -20,6 +20,7 @@ import {
   Send,
   Clock,
   CheckCircle,
+  AlertCircle,
   Package,
   Calendar,
   Building,
@@ -93,6 +94,9 @@ const PurchaseOrders: React.FC = () => {
   useAdminDetailOverlay(showDetailsDrawer && selectedOrder !== null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
   const [showHistory, setShowHistory] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [newOrder, setNewOrder] = useState({
@@ -227,7 +231,7 @@ const PurchaseOrders: React.FC = () => {
 
   const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character] || character);
 
-  const openPrintablePo = (order: PurchaseOrder, saveAsPdf = false) => {
+  const openPrintablePo = (order: PurchaseOrder) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('Please allow pop-ups to print this Purchase Order.');
@@ -237,21 +241,59 @@ const PurchaseOrders: React.FC = () => {
     const rows = order.items.map((item) => `<tr><td>${escapeHtml(item.productName)}</td><td class="number">${item.quantity}</td><td class="number">₱${item.unitPrice.toLocaleString()}</td><td class="number">₱${item.amount.toLocaleString()}</td></tr>`).join('');
     printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(order.poNumber)}</title><style>body{font-family:Arial,sans-serif;color:#111827;margin:40px}header{display:flex;justify-content:space-between;border-bottom:2px solid #0891b2;padding-bottom:16px}h1{margin:0}.meta{margin:24px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px}.label{color:#64748b;font-size:12px;text-transform:uppercase}table{width:100%;border-collapse:collapse;margin-top:24px}th,td{border:1px solid #cbd5e1;padding:10px;text-align:left}th{background:#f1f5f9}.number{text-align:right}.total{text-align:right;font-size:18px;font-weight:700;margin-top:18px}.signature{margin-top:60px;width:260px;border-top:1px solid #111827;padding-top:8px}@media print{body{margin:20mm}}</style></head><body><header><div><h1>Purchase Order</h1><p>${escapeHtml(order.poNumber)}</p></div><strong>${escapeHtml(order.status)}</strong></header><section class="meta"><div><div class="label">Supplier</div>${escapeHtml(order.supplier)}</div><div><div class="label">Created Date</div>${escapeHtml(order.createdAt)}</div><div><div class="label">Expected Delivery</div>${escapeHtml(order.expectedDeliveryDate)}</div><div><div class="label">Delivery Details</div>${escapeHtml(order.deliveryDetails)}</div></section><table><thead><tr><th>Product</th><th class="number">Qty</th><th class="number">Unit Price</th><th class="number">Amount</th></tr></thead><tbody>${rows}</tbody></table><div class="total">Total Amount: ₱${order.totalAmount.toLocaleString()}</div><div class="signature">Approved by: ${escapeHtml(order.approvedBy || 'Electronic approval')}<br>${order.signatureData ? 'Signature recorded' : 'Electronically approved'}</div><script>window.onload=()=>{window.print();}</script></body></html>`);
     printWindow.document.close();
-    if (saveAsPdf) alert('In the print dialog, choose “Save as PDF” to download the Purchase Order.');
+  };
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    window.clearTimeout(toastTimer.current);
+    setToast({ type, message });
+    toastTimer.current = window.setTimeout(() => setToast(null), 5000);
+  };
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+
+  // Blob responses hide the JSON error body; read it back for a safe message.
+  const blobErrorMessage = async (requestError: any, fallback: string) => {
+    try {
+      const data = requestError?.response?.data;
+      const parsed = data instanceof Blob ? JSON.parse(await data.text()) : data;
+      return parsed?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  // The same server-rendered PDF that is emailed to the supplier.
+  const downloadPoPdf = async (order: PurchaseOrder) => {
+    if (downloadingId !== null) return;
+    setDownloadingId(order.id);
+    try {
+      const response = await apiClient.get(`/purchase-orders/${order.id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${order.poNumber.replace(/[^A-Za-z0-9._-]+/g, '_') || 'purchase-order'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (requestError: any) {
+      showToast('error', await blobErrorMessage(requestError, 'The Purchase Order PDF could not be downloaded.'));
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const handleSendToSupplier = async (order: PurchaseOrder) => {
-    if (order.status === 'Sent to Supplier') return;
+    if (sending) return;
     setSending(true);
-    setError('');
     try {
       const response = await apiClient.patch(`/purchase-orders/${order.id}/send`);
       const updated = { ...order, status: response.data.status as POStatus, sentAt: response.data.sent_at };
       setOrders((current) => current.map((value) => value.id === order.id ? updated : value));
       setSelectedOrder(updated);
-      alert(`${order.poNumber} successfully sent to supplier!`);
+      showToast('success', response.data?.message || 'Purchase order sent to supplier successfully.');
     } catch (requestError: any) {
-      setError(requestError?.response?.data?.message || 'Purchase Order could not be sent.');
+      showToast('error', requestError?.response?.data?.message || 'Purchase Order could not be sent.');
     } finally {
       setSending(false);
     }
@@ -322,8 +364,8 @@ const PurchaseOrders: React.FC = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center">
+        <div className="relative col-span-2 min-w-0 sm:flex-1 sm:min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -336,7 +378,7 @@ const PurchaseOrders: React.FC = () => {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as POStatus | 'All')}
-          className="bg-[#1e293b] border border-[#1f2937] rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          className="w-full min-w-0 bg-[#1e293b] border border-[#1f2937] rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:w-auto"
         >
           <option value="All">All Status</option>
           <option value="Pending Approval">Pending Approval</option>
@@ -345,21 +387,24 @@ const PurchaseOrders: React.FC = () => {
           <option value="Completed">Completed</option>
           <option value="Cancelled">Cancelled</option>
         </select>
-        <div className="flex items-center gap-2 bg-[#1e293b] border border-[#1f2937] rounded-xl px-3 py-2 text-sm text-slate-300">
-          <Calendar className="w-4 h-4 text-gray-400" />
-          <span>Date Range</span>
-          <ChevronRightIcon className="w-4 h-4 text-gray-400" />
+        <div className="flex min-w-0 items-center gap-2 bg-[#1e293b] border border-[#1f2937] rounded-xl px-3 py-2 text-sm text-slate-300">
+          <Calendar className="w-4 h-4 shrink-0 text-gray-400" />
+          <span className="truncate">Date Range</span>
+          <ChevronRightIcon className="w-4 h-4 shrink-0 text-gray-400 max-sm:ml-auto" />
         </div>
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#1e293b] p-1" aria-label="Purchase order view">
-          <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
-          <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+        {/* Mobile: the view toggle dissolves (display: contents) so List, Grid, Refresh and Download share one 4-column row. */}
+        <div className="admin-po-toolbar-actions col-span-2 grid grid-cols-4 gap-2 sm:ml-auto sm:flex sm:items-center sm:gap-3">
+          <div className="flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#1e293b] p-1 max-sm:contents" aria-label="Purchase order view">
+            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`admin-po-toolbar-view-button rounded-md border-[#1f2937] p-1.5 transition-colors max-sm:flex max-sm:items-center max-sm:justify-center max-sm:rounded-xl max-sm:border max-sm:aria-pressed:border-cyan-400/40 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`admin-po-toolbar-view-button rounded-md border-[#1f2937] p-1.5 transition-colors max-sm:flex max-sm:items-center max-sm:justify-center max-sm:rounded-xl max-sm:border max-sm:aria-pressed:border-cyan-400/40 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
+          </div>
+          <button onClick={() => void loadOrders()} disabled={loading} className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors disabled:opacity-50 max-sm:flex max-sm:h-11 max-sm:w-full max-sm:items-center max-sm:justify-center">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors max-sm:flex max-sm:h-11 max-sm:w-full max-sm:items-center max-sm:justify-center">
+            <Download className="w-4 h-4" />
+          </button>
         </div>
-        <button onClick={() => void loadOrders()} disabled={loading} className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-        <button className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors">
-          <Download className="w-4 h-4" />
-        </button>
       </div>
 
       {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
@@ -403,7 +448,8 @@ const PurchaseOrders: React.FC = () => {
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => openPrintablePo(order, true)}
+                        onClick={() => void downloadPoPdf(order)}
+                        disabled={downloadingId !== null}
                         className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         title="Download PO"
                       >
@@ -444,7 +490,7 @@ const PurchaseOrders: React.FC = () => {
                 <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{order.poNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.supplier}</p></div><StatusBadge status={order.status} /></div>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Created</dt><dd className="text-slate-900 dark:text-white">{order.createdAt}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.expectedDeliveryDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items / Qty</dt><dd className="text-slate-900 dark:text-white">{order.items.length} / {order.items.reduce((sum, item) => sum + item.quantity, 0)}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Total</dt><dd className="font-semibold text-slate-900 dark:text-white">₱{order.totalAmount.toLocaleString()}</dd></div></dl>
                 <p className="mt-3 truncate text-xs text-slate-500 dark:text-slate-400" title={order.deliveryDetails}>{order.deliveryDetails}</p>
-                <div className="mt-auto flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => handleViewDetails(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button><button onClick={() => openPrintablePo(order, true)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="Download PO"><Download className="h-4 w-4" /></button><button onClick={() => openPrintablePo(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="Print PO"><Printer className="h-4 w-4" /></button></div>
+                <div className="mt-auto flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => handleViewDetails(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button><button onClick={() => void downloadPoPdf(order)} disabled={downloadingId !== null} className="p-2 text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-white" title="Download PO"><Download className="h-4 w-4" /></button><button onClick={() => openPrintablePo(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="Print PO"><Printer className="h-4 w-4" /></button></div>
               </article>
             ))}
           </div>
@@ -543,11 +589,11 @@ const PurchaseOrders: React.FC = () => {
               <button onClick={() => openPrintablePo(selectedOrder)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-2 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
                 <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">Print PO</span>
               </button>
-              <button onClick={() => openPrintablePo(selectedOrder, true)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
-                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">Download PO (PDF)</span>
+              <button onClick={() => void downloadPoPdf(selectedOrder)} disabled={downloadingId !== null} aria-busy={downloadingId === selectedOrder.id} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{downloadingId === selectedOrder.id ? 'Preparing PDF…' : 'Download PO (PDF)'}</span>
               </button>
-              <button onClick={() => void handleSendToSupplier(selectedOrder)} disabled={sending || selectedOrder.status === 'Sent to Supplier'} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/50 px-2 py-2 text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
-                <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{sending ? 'Sending…' : selectedOrder.status === 'Sent to Supplier' ? 'Sent to Supplier' : 'Send PO to Supplier'}</span>
+              <button onClick={() => void handleSendToSupplier(selectedOrder)} disabled={sending} aria-busy={sending} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/50 px-2 py-2 text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+                <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{sending ? 'Sending…' : selectedOrder.status === 'Sent to Supplier' ? 'Resend PO to Supplier' : 'Send PO to Supplier'}</span>
               </button>
               <button onClick={() => setShowHistory((visible) => !visible)} aria-expanded={showHistory} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
                 <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{showHistory ? 'Hide History' : 'View History'}</span>
@@ -652,6 +698,16 @@ const PurchaseOrders: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          role={toast.type === 'error' ? 'alert' : 'status'}
+          className={`fixed bottom-6 right-6 z-[60] flex max-w-sm items-center gap-2 rounded-xl px-4 py-3 text-sm text-white shadow-lg ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}
+        >
+          {toast.type === 'success' ? <CheckCircle className="h-5 w-5 shrink-0" /> : <AlertCircle className="h-5 w-5 shrink-0" />}
+          {toast.message}
         </div>
       )}
     </div>

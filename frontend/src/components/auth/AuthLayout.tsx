@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  BarChart3,
-  Boxes,
-  Globe2,
-  PackageCheck,
-  ShoppingCart,
-  Truck,
-  Warehouse,
-} from 'lucide-react';
+import { BarChart3, ShoppingCart, Truck, Warehouse } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
 interface AuthLayoutProps {
@@ -21,64 +13,56 @@ const highlights = [
   { icon: ShoppingCart, title: 'E-commerce Ready', description: 'Built for modern e-commerce businesses' },
 ];
 
+// Extra spacing is applied only on taller viewports (min-height: 860px) so the card
+// fits without scrolling on common laptop heights such as 1366x768.
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   return (
-    <main className="auth-surface relative min-h-screen overflow-x-hidden bg-[#020914] px-3 py-3 text-slate-100 sm:px-4 sm:py-4 md:flex md:items-center md:justify-center lg:px-5 xl:px-8 xl:py-7">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(14,116,255,0.16),transparent_32%),radial-gradient(circle_at_84%_52%,rgba(37,99,235,0.08),transparent_34%)]" />
-      <div className="relative mx-auto grid w-full max-w-[1400px] overflow-hidden rounded-2xl border border-blue-400/15 bg-[#06101d]/95 shadow-[0_24px_80px_rgba(0,0,0,0.5)] md:grid-cols-[48%_52%]">
-        <section className="relative overflow-hidden border-b border-blue-300/15 bg-[linear-gradient(145deg,#071c37_0%,#06162d_52%,#061326_100%)] p-4 sm:p-5 md:border-b-0 md:border-r md:p-4 lg:p-7 xl:p-10">
-          <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(59,130,246,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.04)_1px,transparent_1px)] [background-size:32px_32px]" />
-          <div className="relative z-10 flex h-full min-w-0 flex-col">
-            <img
-              src={logo}
-              alt="Archon Nell Incorporated"
-              className="h-11 w-full max-w-[220px] shrink-0 object-contain object-left md:h-12 md:max-w-[230px] lg:h-14 lg:max-w-[270px] xl:h-16 xl:max-w-[300px]"
-            />
+    <main className="auth-surface relative flex min-h-dvh items-center justify-center overflow-x-hidden bg-[#030b17] px-3 py-3 text-slate-100 sm:px-6 sm:py-5 lg:py-4">
+      <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(96,165,250,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(96,165,250,0.035)_1px,transparent_1px)] [background-size:48px_48px]" />
 
-            <div className="mt-4 min-w-0 md:mt-5 lg:mt-6 xl:mt-8">
-              <div className="text-center">
-                <p className="whitespace-nowrap text-xs font-semibold tracking-[0.18em] text-blue-400 md:text-[13px] lg:text-sm xl:text-[15px]">WELCOME TO</p>
-                <h1 className="mt-1 whitespace-nowrap text-[1.75rem] font-extrabold leading-none tracking-tight text-white md:text-[clamp(2rem,3.4vw,2.25rem)] lg:mt-2 xl:text-[2.5rem]">
-                  SMART<span className="text-blue-500">CHAIN</span>
-                </h1>
-              </div>
-              <p className="mt-3 hidden max-w-[560px] text-xs leading-5 text-slate-300 md:block lg:mt-4 lg:text-sm lg:leading-6 xl:text-base xl:leading-7">
+      <div className="relative grid w-full max-w-[1300px] overflow-hidden rounded-2xl border border-slate-700/40 bg-[#07111f] shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:rounded-[24px] lg:w-[82vw] lg:grid-cols-2">
+        {/* Marketing panel */}
+        <section className="relative flex min-w-0 flex-col border-b border-slate-700/40 bg-[linear-gradient(180deg,#0a1d38_0%,#081629_55%,#07111f_100%)] px-4 pb-3.5 pt-3 sm:p-7 lg:border-b-0 lg:border-r lg:px-10 lg:py-7 xl:px-12 [@media(min-height:860px)]:xl:py-8">
+          <div className="inline-flex w-fit items-center justify-center self-start rounded-lg bg-cyan-400/10 px-2 py-0.5 shadow-[0_4px_18px_rgba(34,211,238,0.10)] ring-1 ring-cyan-300/20 backdrop-blur-sm sm:rounded-xl sm:px-3 sm:py-2">
+            <img src={logo} alt="Archon Nell Incorporated" className="h-auto w-[82px] object-contain sm:w-[100px] lg:w-[110px]" />
+          </div>
+
+          <div className="flex flex-1 flex-col justify-center">
+            <div className="mt-1.5 text-center sm:mt-4 sm:text-left [@media(min-height:860px)]:lg:mt-5">
+              <p className="hidden items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-300/80 sm:flex">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.8)]" aria-hidden="true" />
+                Enterprise Warehouse Platform
+              </p>
+              <h1 className="text-lg font-extrabold uppercase leading-[1.1] tracking-tight text-white sm:mt-2 sm:text-[30px] sm:leading-[1.08] 2xl:text-[32px]">
+                Welcome to
+                <span className="block text-sky-400">SmartChain</span>
+              </h1>
+              <p className="mt-2.5 hidden max-w-[460px] text-[13px] leading-5 text-slate-400 sm:block">
                 An integrated smart warehousing and supply chain management system with AI-Based Demand
                 Forecasting and shipment reports for E-commerce.
               </p>
             </div>
 
-            <div className="mt-4 hidden w-full max-w-[560px] space-y-2.5 md:block lg:mt-5 lg:space-y-3.5 xl:mt-7">
+            <ul className="mt-4 hidden gap-2.5 sm:grid sm:grid-cols-2 [@media(min-height:860px)]:lg:mt-5">
               {highlights.map(({ icon: Icon, title, description }) => (
-                <div key={title} className="flex min-w-0 items-center gap-2.5 lg:gap-3 xl:gap-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-400/15 bg-blue-500/10 text-blue-400 shadow-[0_0_24px_rgba(37,99,235,0.1)] lg:h-10 lg:w-10 xl:h-11 xl:w-11 xl:rounded-xl">
-                    <Icon className="h-4 w-4 lg:h-[18px] lg:w-[18px] xl:h-5 xl:w-5" />
+                <li
+                  key={title}
+                  className="rounded-xl border border-slate-700/50 bg-white/[0.03] p-3 transition-colors duration-200 hover:border-sky-400/25"
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md border border-sky-400/15 bg-sky-500/10 text-sky-400">
+                    <Icon className="h-[15px] w-[15px]" aria-hidden="true" />
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="whitespace-nowrap text-xs font-semibold text-slate-100 lg:text-sm">{title}</h2>
-                    <p className="mt-0.5 text-[11px] leading-4 text-slate-400 lg:text-xs lg:leading-5 xl:text-sm">{description}</p>
-                  </div>
-                </div>
+                  <h2 className="mt-2 text-[13px] font-semibold leading-5 text-slate-100">{title}</h2>
+                  <p className="mt-0.5 text-[11px] leading-4 text-slate-400">{description}</p>
+                </li>
               ))}
-            </div>
-
-            <div className="relative mt-3 hidden h-20 w-full overflow-hidden pt-3 md:block lg:mt-4 lg:h-28 lg:pt-4 xl:mt-5 xl:h-36 xl:pt-5">
-              <div className="absolute bottom-[-72px] right-[-30px] h-56 w-56 rounded-full border border-blue-400/15 opacity-70" />
-              <Globe2 className="absolute bottom-[-34px] right-4 h-48 w-48 text-blue-500/15" />
-              <div className="absolute bottom-4 left-2 flex h-20 w-32 items-center justify-center rounded-t-xl border border-blue-400/25 bg-blue-950/80 text-blue-400 shadow-[0_0_32px_rgba(37,99,235,0.18)]">
-                <Warehouse className="h-12 w-12" />
-              </div>
-              <Truck className="absolute bottom-3 left-36 h-14 w-14 text-blue-400/80" />
-              <Boxes className="absolute bottom-2 left-24 h-9 w-9 text-amber-300/80" />
-              <PackageCheck className="absolute bottom-16 left-36 h-7 w-7 text-cyan-300/70" />
-              <div className="absolute bottom-8 left-40 right-24 h-px bg-gradient-to-r from-blue-400/60 via-cyan-300/30 to-transparent" />
-              <span className="absolute bottom-[29px] right-20 h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee]" />
-            </div>
+            </ul>
           </div>
         </section>
 
-        <section className="flex min-w-0 items-center justify-center bg-[linear-gradient(145deg,#07111f_0%,#06101d_100%)] p-4 sm:p-5 md:p-3 lg:p-6 xl:p-10">
-          <div className="w-full min-w-0 max-w-[500px] rounded-2xl border border-slate-700/60 bg-[#081526]/80 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.3)] backdrop-blur-sm md:p-5 lg:p-7">
+        {/* Form panel */}
+        <section className="flex min-w-0 items-center justify-center bg-[#060f1c] px-4 py-4 sm:px-10 sm:py-7 lg:px-12 lg:py-7">
+          <div className="w-full min-w-0 max-w-[420px]">
             {children}
           </div>
         </section>

@@ -167,7 +167,6 @@ class AuditSecurityEventsTest extends TestCase
         $userId = $this->actingAs($admin)->postJson('/api/users', [
             'name' => 'Invited Person',
             'email' => 'invitee@example.com',
-            'employee_id' => 'EMP-5001',
             'role_id' => $this->qaRole->id,
         ])->assertCreated()->json('id');
 
@@ -191,7 +190,7 @@ class AuditSecurityEventsTest extends TestCase
         $this->assertSame('User Management', $expired->module);
         $this->assertSame('UserInvitation', $expired->resource_type);
         $this->assertSame((string) $invitation->id, $expired->resource_id);
-        $this->assertSame('EMP-5001', $expired->resource_label);
+        $this->assertSame(User::findOrFail($userId)->employee_id, $expired->resource_label);
         $this->assertSame('PENDING', User::findOrFail($userId)->status);
 
         foreach ([$token, UserInvitations::hashToken($token), 'Activate123'] as $secret) {

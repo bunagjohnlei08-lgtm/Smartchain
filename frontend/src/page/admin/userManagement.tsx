@@ -155,7 +155,6 @@ const UserModal: React.FC<{
   const initialFormData: Partial<ApiUser> = user ? { ...user } : {
     name: '',
     email: '',
-    employee_id: '',
     department_id: undefined,
     role_id: undefined,
     warehouse_id: undefined,
@@ -185,6 +184,24 @@ const UserModal: React.FC<{
     onSave(formData);
     onClose();
   };
+
+  const renderRoleSelect = (id?: string) => (
+    <select
+      id={id}
+      value={String(formData.role_id ?? '')}
+      onChange={(e) => {
+        const selected = roles.find((r) => String(r.id) === e.target.value);
+        setFormData({ ...formData, role_id: selected ? selected.id : undefined });
+      }}
+      className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
+      required
+    >
+      <option value="">Select role</option>
+      {roles.map((r) => (
+        <option key={r.id} value={String(r.id)}>{r.name}</option>
+      ))}
+    </select>
+  );
 
   if (!isOpen) return null;
 
@@ -233,102 +250,96 @@ const UserModal: React.FC<{
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-400">Employee ID *</label>
-              <input
-                type="text"
-                value={formData.employee_id || ''}
-                onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150"
-                required
-              />
-            </div>
-            {user ? (
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-400">Status *</label>
-                <select
-                  value={formData.status || 'ACTIVE'}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as ApiUser['status'] })}
-                  className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
-                >
-                  {statusOptions.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+          {user ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-400">Employee ID *</label>
+                  <input
+                    type="text"
+                    value={formData.employee_id || ''}
+                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                    className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-400">Status *</label>
+                  <select
+                    value={formData.status || 'ACTIVE'}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as ApiUser['status'] })}
+                    className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
+                  >
+                    {statusOptions.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            ) : (
-              <div>
-                <label htmlFor="create-user-status" className="block text-sm font-medium mb-2 text-gray-400">Status</label>
-                <input
-                  id="create-user-status"
-                  type="text"
-                  value="PENDING (until activated)"
-                  readOnly
-                  aria-readonly="true"
-                  className="w-full h-11 cursor-not-allowed bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-gray-400 focus:outline-none"
-                />
-              </div>
-            )}
-          </div>
 
-          {!user && (
-            <div className="flex items-start gap-3 rounded-lg border border-[#5B8CFF]/20 bg-[#5B8CFF]/10 p-3 text-xs text-gray-300">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[#5B8CFF]" aria-hidden="true" />
-              <p>
-                An activation invitation will be emailed to this address. The user sets their own
-                password through the single-use link before they can sign in.
-              </p>
-            </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-400">Role *</label>
+                  {renderRoleSelect()}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-400">Department</label>
+                  <select
+                    value={String(formData.department_id ?? '')}
+                    onChange={(e) => setFormData({ ...formData, department_id: e.target.value ? Number(e.target.value) : undefined })}
+                    className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
+                  >
+                    <option value="">Select department</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={String(d.id)}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Employee ID is generated by the server; admins never type it. */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="create-user-status" className="block text-sm font-medium mb-2 text-gray-400">Status</label>
+                  <input
+                    id="create-user-status"
+                    type="text"
+                    value="PENDING (until activated)"
+                    readOnly
+                    aria-readonly="true"
+                    className="w-full h-11 cursor-not-allowed bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-gray-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="create-user-role" className="block text-sm font-medium mb-2 text-gray-400">Role *</label>
+                  {renderRoleSelect('create-user-role')}
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="create-user-warehouse" className="block text-sm font-medium mb-2 text-gray-400">Warehouse</label>
+                  {/* Single-warehouse operation: every new account joins the Main Warehouse. */}
+                  <input
+                    id="create-user-warehouse"
+                    type="text"
+                    value={mainWarehouse?.name ?? 'Main Warehouse'}
+                    readOnly
+                    aria-readonly="true"
+                    className="w-full h-11 cursor-not-allowed bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-gray-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-lg border border-[#5B8CFF]/20 bg-[#5B8CFF]/10 p-3 text-xs text-gray-300">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[#5B8CFF]" aria-hidden="true" />
+                <p>
+                  An activation invitation will be emailed to this address. The user sets their own
+                  password through the single-use link before they can sign in. An Employee ID is
+                  assigned automatically.
+                </p>
+              </div>
+            </>
           )}
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-400">Role *</label>
-              <select
-                value={String(formData.role_id ?? '')}
-                onChange={(e) => {
-                  const selected = roles.find((r) => String(r.id) === e.target.value);
-                  setFormData({ ...formData, role_id: selected ? selected.id : undefined });
-                }}
-                className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
-                required
-              >
-                <option value="">Select role</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={String(r.id)}>{r.name}</option>
-                ))}
-              </select>
-            </div>
-            {user ? (
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-400">Department</label>
-                <select
-                  value={String(formData.department_id ?? '')}
-                  onChange={(e) => setFormData({ ...formData, department_id: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full h-11 bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/50 focus:border-[#3B82F6] transition-colors duration-150 appearance-none"
-                >
-                  <option value="">Select department</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={String(d.id)}>{d.name}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label htmlFor="create-user-warehouse" className="block text-sm font-medium mb-2 text-gray-400">Warehouse</label>
-                {/* Single-warehouse operation: every new account joins the Main Warehouse. */}
-                <input
-                  id="create-user-warehouse"
-                  type="text"
-                  value={mainWarehouse?.name ?? 'Main Warehouse'}
-                  readOnly
-                  aria-readonly="true"
-                  className="w-full h-11 cursor-not-allowed bg-gray-800/50 border-gray-700 rounded-lg px-4 text-sm text-gray-400 focus:outline-none"
-                />
-              </div>
-            )}
-          </div>
 
           {user && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -464,7 +475,7 @@ const UserManagement: React.FC = () => {
     const matchSearch =
       u.name.toLowerCase().includes(search) ||
       u.email.toLowerCase().includes(search) ||
-      u.employee_id.toLowerCase().includes(search);
+      (u.employee_id ?? '').toLowerCase().includes(search);
     const matchStatus = filters.status === 'All Status' || u.status === filters.status;
     const matchRole = filters.role === 'All Roles' || u.role?.slug === filters.role;
     return matchSearch && matchStatus && matchRole;
@@ -478,7 +489,6 @@ const UserManagement: React.FC = () => {
       const response = await apiClient.post('/users', {
         name: data.name,
         email: data.email,
-        employee_id: data.employee_id,
         role_id: data.role_id,
         // Omitted when unresolved: the API then assigns the Main Warehouse itself.
         warehouse_id: data.warehouse_id ?? findMainWarehouse(warehouses)?.id,
@@ -670,14 +680,12 @@ const UserManagement: React.FC = () => {
       <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden shadow-xl mt-6">
         {viewMode === 'list' ? (
         <div className="admin-table-scroll w-full">
-          <table className="admin-user-table admin-responsive-table admin-cols-8 admin-sticky-1 w-full table-auto text-left text-xs text-gray-300 border-collapse">
+          <table className="admin-user-table admin-responsive-table admin-cols-6 admin-sticky-1 w-full table-auto text-left text-xs text-gray-300 border-collapse">
             <thead className="bg-[#0b101d] border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               <tr>
                 <th className="text-left pl-4 py-4 whitespace-nowrap">USER</th>
                 <th className="text-left px-4 py-4 whitespace-nowrap">EMPLOYEE ID</th>
-                <th className="text-left px-4 py-4 whitespace-nowrap">DEPARTMENT</th>
                 <th className="text-left px-4 py-4 whitespace-nowrap">ROLE</th>
-                <th className="text-left px-4 py-4 whitespace-nowrap">BRANCH</th>
                 <th className="text-left px-4 py-4 whitespace-nowrap">WAREHOUSE</th>
                 <th className="text-left px-4 py-4 whitespace-nowrap">STATUS</th>
                 <th className="text-center px-4 pr-4 py-4 whitespace-nowrap">ACTIONS</th>
@@ -686,11 +694,11 @@ const UserManagement: React.FC = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading...</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Loading...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No users found</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No users found</td>
                 </tr>
               ) : (
                 paginatedUsers.map((u) => {
@@ -710,13 +718,11 @@ const UserManagement: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-gray-300 font-mono text-[11px]">{u.employee_id}</td>
-                      <td className="px-4 py-4 whitespace-nowrap text-gray-300">{u.department?.name || '-'}</td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className="admin-badge px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase">
                           {u.role?.slug || '-'}
                         </span>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-gray-300">{u.branch?.code || '-'}</td>
                       <td className="px-4 py-4 whitespace-nowrap text-gray-300">{u.warehouse?.code || '-'}</td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`admin-badge px-2.5 py-1 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${

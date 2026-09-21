@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SupplierController extends Controller
@@ -48,14 +50,26 @@ class SupplierController extends Controller
     public function store(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $supplier = Supplier::create($request->validate($this->rules()));
-        return response()->json(['data' => $supplier], 201);
+        $validated = $request->validate($this->rules());
+
+        $supplier = DB::transaction(function () use ($validated) {
+            // supplier_code is NOT NULL: hold a throwaway unique value until the
+            // database has assigned the id the real code is derived from. The
+            // placeholder never leaves this transaction.
+            $supplier = new Supplier($validated);
+            $supplier->forceFill(['supplier_code' => 'TMP-'.Str::uuid()])->save();
+            $supplier->forceFill(['supplier_code' => $this->generateSupplierCode($supplier)])->save();
+
+            return $supplier;
+        });
+
+        return response()->json(['data' => $supplier->fresh()], 201);
     }
 
     public function update(Request $request, Supplier $supplier): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $supplier->update($request->validate($this->rules($supplier)));
+        $supplier->update($request->validate($this->rules()));
         return response()->json(['data' => $supplier->fresh()]);
     }
 
@@ -73,14 +87,34 @@ class SupplierController extends Controller
         return response()->json(status: 204);
     }
 
-    private function rules(?Supplier $supplier = null): array
+    /**
+     * SUP-<id zero-padded to 3>. Derived from the database-assigned primary
+     * key, so concurrent creations never compute the same code. Older codes
+     * were typed by hand; if one already holds the value, a suffix keeps it
+     * unique.
+     */
+    private function generateSupplierCode(Supplier $supplier): string
+    {
+        $base = 'SUP-'.str_pad((string) $supplier->getKey(), 3, '0', STR_PAD_LEFT);
+        $candidate = $base;
+
+        for ($suffix = 2; Supplier::query()->where('supplier_code', $candidate)->whereKeyNot($supplier->getKey())->exists(); $suffix++) {
+            $candidate = $base.'-'.$suffix;
+        }
+
+        return $candidate;
+    }
+
+    private function rules(): array
     {
         return [
-            'supplier_code' => ['required', 'string', 'max:50', Rule::unique('suppliers')->ignore($supplier?->id)],
+            // Server-generated and immutable.
+            'supplier_code' => ['prohibited'],
             'name' => ['required', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            // Philippine numbers, digits only, kept as a string for the leading 0.
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:11'],
             'address' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(self::STATUSES)],
             'payment_terms' => ['nullable', 'string', 'max:100'],

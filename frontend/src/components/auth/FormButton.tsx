@@ -26,7 +26,7 @@ const FormButton: React.FC<FormButtonProps> = ({
   isLoading = false,
   disabled = false,
 }) => {
-  const baseClasses = 'w-full flex items-center justify-center gap-2 py-3 px-4 border text-sm font-semibold rounded-xl transition-all duration-200 min-h-12 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#081526] disabled:cursor-not-allowed disabled:opacity-60';
+  const baseClasses = 'w-full flex items-center justify-center gap-2 py-2.5 px-4 border text-[13px] font-semibold rounded-xl transition-all duration-200 min-h-[42px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#081526] disabled:cursor-not-allowed disabled:opacity-60';
 
   const variantClasses: Record<FormButtonVariant, string> = {
     primary: 'border-transparent hover:brightness-110 hover:shadow-[0_10px_30px_rgba(37,99,235,0.24)] active:brightness-95 active:shadow-none',

@@ -7,6 +7,7 @@ import api from '../../lib/api';
 export interface VerifiedLogin {
   token: string;
   user: { role?: { slug?: string } | null } & Record<string, unknown>;
+  is_first_login?: boolean;
 }
 
 interface OtpVerificationFormProps {

@@ -186,6 +186,48 @@ class LoginOtpTest extends TestCase
         $this->assertSame(1, $user->tokens()->count());
     }
 
+    public function test_only_the_first_verified_login_is_reported_as_first(): void
+    {
+        $user = $this->user();
+        $this->assertNull($user->first_login_at);
+
+        [$challengeId, $code] = $this->startLogin($user);
+        $this->verify($challengeId, $code)->assertOk()->assertJsonPath('is_first_login', true);
+
+        $firstLoginAt = $user->fresh()->first_login_at;
+        $this->assertNotNull($firstLoginAt);
+
+        $this->travel(5)->minutes();
+        [$challengeId, $code] = $this->startLogin($user);
+        $this->verify($challengeId, $code)->assertOk()->assertJsonPath('is_first_login', false);
+
+        $this->assertTrue($firstLoginAt->equalTo($user->fresh()->first_login_at));
+    }
+
+    public function test_unverified_login_steps_do_not_consume_the_first_login(): void
+    {
+        $user = $this->user();
+
+        // Password accepted and code emailed, then a wrong code.
+        [$challengeId, $code] = $this->startLogin($user);
+        $this->verify($challengeId, $this->wrongCode($code))->assertUnprocessable();
+        $this->assertNull($user->fresh()->first_login_at);
+
+        // Code left to expire.
+        $this->travel(6)->minutes();
+        $this->verify($challengeId, $code)->assertUnprocessable()->assertJsonPath('reason', 'expired');
+        $this->assertNull($user->fresh()->first_login_at);
+
+        // A replacement challenge revokes the old one.
+        [$revokedId, $revokedCode] = $this->startLogin($user);
+        [$challengeId, $code] = $this->startLogin($user);
+        $this->verify($revokedId, $revokedCode)->assertUnprocessable();
+        $this->assertNull($user->fresh()->first_login_at);
+
+        $this->verify($challengeId, $code)->assertOk()->assertJsonPath('is_first_login', true);
+        $this->assertNotNull($user->fresh()->first_login_at);
+    }
+
     public function test_wrong_codes_increment_attempts_and_exhaustion_revokes_challenge(): void
     {
         $user = $this->user();

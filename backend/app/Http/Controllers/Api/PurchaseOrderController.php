@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PurchaseOrderMail;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\ReplenishmentRequest;
+use App\Models\Supplier;
 use App\Support\AuditLogger;
+use App\Support\PurchaseOrderPdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class PurchaseOrderController extends Controller
 {
@@ -110,19 +116,86 @@ class PurchaseOrderController extends Controller
         return response()->json(['data' => $orders->map(fn (PurchaseOrder $order) => $this->present($order))]);
     }
 
-    public function send(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
+    /** The same document the supplier receives by email. */
+    public function pdf(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf): Response
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $filename = PurchaseOrderPdf::filename($purchaseOrder);
+
+        return response($pdf->render($purchaseOrder), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'no-store, private',
+        ]);
+    }
+
+    /**
+     * Email the PO PDF to its supplier. The recipient always comes from the
+     * supplier record, never from the request, so this endpoint cannot be
+     * used to mail arbitrary addresses. The PO is only marked sent once
+     * Brevo has accepted the message.
+     */
+    public function send(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
         abort_if(in_array($purchaseOrder->status, ['Completed', 'Cancelled'], true), 422, 'Completed or cancelled Purchase Orders cannot be sent.');
 
-        if ($purchaseOrder->status !== 'Sent to Supplier') {
-            $purchaseOrder->update([
-                'status' => 'Sent to Supplier',
-                'sent_at' => now(),
-            ]);
+        // POs reference their supplier by name; refuse to guess between duplicates.
+        $suppliers = Supplier::query()->where('name', $purchaseOrder->supplier_name)->limit(2)->get();
+        abort_if($suppliers->isEmpty(), 422, 'This Purchase Order is not linked to a registered supplier.');
+        abort_if($suppliers->count() > 1, 422, 'More than one supplier is registered under this name, so the recipient cannot be determined.');
+        $supplier = $suppliers->first();
+
+        $email = trim((string) $supplier->email);
+        abort_if($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false, 422, 'This supplier does not have a valid email address.');
+
+        try {
+            $document = $pdf->render($purchaseOrder);
+        } catch (Throwable $exception) {
+            report($exception);
+            abort(500, 'The Purchase Order PDF could not be generated.');
         }
 
-        return response()->json($this->present($purchaseOrder->load(['items', 'approver:id,name'])));
+        try {
+            Mail::to($email, $supplier->name)->send(new PurchaseOrderMail(
+                supplierName: $supplier->name,
+                poNumber: $purchaseOrder->po_number,
+                pdfFilename: PurchaseOrderPdf::filename($purchaseOrder),
+                pdf: $document,
+            ));
+        } catch (Throwable $exception) {
+            // Transport errors carry no PDF or API key (see BrevoTransactionalMail).
+            report($exception);
+            AuditLogger::failure('PO_SENT_TO_SUPPLIER', AuditLogger::MODULE_PURCHASE_ORDERS, [
+                'resource' => $purchaseOrder,
+                'resource_label' => $purchaseOrder->po_number,
+                'details' => sprintf('Could not email %s to %s', $purchaseOrder->po_number, $supplier->name),
+                'metadata' => ['supplier_id' => $supplier->id],
+            ]);
+
+            return response()->json(['message' => 'The Purchase Order could not be emailed to the supplier. Please try again.'], 502);
+        }
+
+        $purchaseOrder->update([
+            'status' => 'Sent to Supplier',
+            'sent_at' => now(),
+        ]);
+
+        AuditLogger::success('PO_SENT_TO_SUPPLIER', AuditLogger::MODULE_PURCHASE_ORDERS, [
+            'resource' => $purchaseOrder,
+            'resource_label' => $purchaseOrder->po_number,
+            'details' => sprintf('Emailed %s to %s', $purchaseOrder->po_number, $supplier->name),
+            'metadata' => [
+                'supplier_id' => $supplier->id,
+                'supplier_email' => $email,
+            ],
+        ]);
+
+        return response()->json(array_merge(
+            $this->present($purchaseOrder->load(['items', 'approver:id,name'])),
+            ['message' => 'Purchase order sent to supplier successfully.'],
+        ));
     }
 
     private function nextPoNumber(): string

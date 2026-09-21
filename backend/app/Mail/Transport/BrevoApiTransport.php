@@ -8,6 +8,7 @@ use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\MessageConverter;
+use Symfony\Component\Mime\Part\DataPart;
 
 /**
  * Laravel mail transport backed by the Brevo HTTPS API.
@@ -37,6 +38,7 @@ class BrevoApiTransport extends AbstractTransport
             bcc: $this->addresses($email->getBcc()),
             replyTo: $this->addresses($email->getReplyTo())[0] ?? null,
             sender: $this->sender($email),
+            attachments: $this->attachments($email),
         );
 
         if ($messageId !== '') {
@@ -76,6 +78,22 @@ class BrevoApiTransport extends AbstractTransport
                 fn (string $value) => $value !== '',
             ),
             $addresses,
+        ));
+    }
+
+    /**
+     * Brevo takes attachments inline as base64 in the JSON payload.
+     *
+     * @return list<array{name: string, content: string}>
+     */
+    private function attachments(Email $email): array
+    {
+        return array_values(array_map(
+            fn (DataPart $part) => [
+                'name' => $part->getFilename() ?? 'attachment',
+                'content' => base64_encode($part->getBody()),
+            ],
+            $email->getAttachments(),
         ));
     }
 
