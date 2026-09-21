@@ -31,3 +31,4 @@ Thumbs.db
 
 /.agents/
 /backend/public/storage
+.claude/
