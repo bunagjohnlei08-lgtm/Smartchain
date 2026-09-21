@@ -1349,17 +1349,11 @@
   }
 
   /* Admin Order Management details: compact, readable mobile drawer. */
-  .admin-main .admin-order-details-drawer {
-    gap: 14px;
-    padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-  }
   .admin-main .admin-order-details-header {
-    margin-inline: -14px;
-    margin-top: -12px;
-    padding: 12px 14px;
+    padding: 10px 14px;
+  }
+  .admin-main .admin-order-details-body {
+    padding: 12px 14px 16px;
   }
   .admin-main .admin-order-details-header h2 {
     font-size: 22px !important;
@@ -1384,15 +1378,15 @@
     flex-shrink: 0;
   }
   .admin-main .admin-order-details-header > button {
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
-    min-height: 30px;
-    padding: 7px !important;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 8px !important;
   }
   .admin-main .admin-order-details-header > button > svg {
-    width: 16px !important;
-    height: 16px !important;
+    width: 18px !important;
+    height: 18px !important;
   }
   .admin-main .admin-order-details-date {
     gap: 6px;
@@ -1450,43 +1444,27 @@
     font-size: 9px !important;
     line-height: 11px !important;
   }
-  .admin-main .admin-order-details-items-scroll {
-    max-width: 100%;
-    margin-top: 8px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
+  .admin-main .admin-order-details-item {
+    padding: 8px 10px;
   }
-  .admin-main .admin-order-details-items-table {
-    width: 395px;
-    min-width: 395px !important;
-    table-layout: fixed;
-  }
-  .admin-main .admin-order-details-items-table :is(th, td):nth-child(1) { width: 120px; min-width: 120px; max-width: 120px; }
-  .admin-main .admin-order-details-items-table :is(th, td):nth-child(2) { width: 80px; min-width: 80px; max-width: 80px; }
-  .admin-main .admin-order-details-items-table :is(th, td):nth-child(3) { width: 50px; min-width: 50px; max-width: 50px; }
-  .admin-main .admin-order-details-items-table :is(th, td):nth-child(4) { width: 70px; min-width: 70px; max-width: 70px; }
-  .admin-main .admin-order-details-items-table :is(th, td):nth-child(5) { width: 75px; min-width: 75px; max-width: 75px; }
-  .admin-main .admin-order-details-items-table th {
-    padding: 4px 6px !important;
-    font-size: 10px !important;
-    line-height: 14px !important;
-    white-space: normal !important;
-  }
-  .admin-main .admin-order-details-items-table td {
-    padding: 5px 6px !important;
-    font-size: 10px !important;
-    line-height: 14px !important;
-  }
-  .admin-main .admin-order-details-actions {
-    padding-top: 10px;
-  }
-  .admin-main .admin-order-details-actions button {
-    min-height: 36px;
-    height: 36px;
-    padding: 5px 10px !important;
+  .admin-main .admin-order-details-item > div > p {
     font-size: 12px !important;
     line-height: 16px !important;
+  }
+  .admin-main .admin-order-details-item dl {
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 11px !important;
+    line-height: 15px !important;
+  }
+  .admin-main .admin-order-details-actions {
+    padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+  .admin-main .admin-order-details-actions button {
+    min-height: 40px;
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+    line-height: 18px !important;
   }
 
   /* The table wrapper — and only the table wrapper — scrolls horizontally.

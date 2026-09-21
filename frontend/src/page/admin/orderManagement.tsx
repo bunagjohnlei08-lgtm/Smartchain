@@ -21,6 +21,15 @@ import {
   Check,
   LayoutGrid,
   LayoutList,
+  FilePlus,
+  UserCheck,
+  PackageOpen,
+  ClipboardCheck,
+  ArrowUpFromLine,
+  CircleCheck,
+  PackageCheck,
+  Send,
+  BadgeCheck,
 } from 'lucide-react';
 
 // ============================================
@@ -238,6 +247,19 @@ const statusConfigs: Record<OrderStatus, StatusConfig> = {
   },
 };
 
+const timelineStatusIcons: Partial<Record<OrderStatus, React.ReactNode>> = {
+  New: <FilePlus className="h-[18px] w-[18px]" aria-hidden="true" />,
+  Assigned: <UserCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
+  Preparing: <PackageOpen className="h-[18px] w-[18px]" aria-hidden="true" />,
+  'Ready for Stock Out': <ClipboardCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
+  'Stock Out In Progress': <ArrowUpFromLine className="h-[18px] w-[18px]" aria-hidden="true" />,
+  'Stock Out Completed': <CircleCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
+  'Ready for Shipment': <PackageCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
+  'Forwarded to Logistics': <Send className="h-[18px] w-[18px]" aria-hidden="true" />,
+  'In Transit': <Truck className="h-[18px] w-[18px]" aria-hidden="true" />,
+  Delivered: <BadgeCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
+};
+
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const normalizedStatus = normalizeOrderStatus(status);
   const config = statusConfigs[normalizedStatus as OrderStatus] ?? {
@@ -453,7 +475,7 @@ const OrderManagement: React.FC = () => {
   ];
 
   // Lifecycle steps for timeline
-  const lifecycleSteps: string[] = ['New', 'Assigned', 'Preparing', 'Ready for Stock Out', 'Stock Out In Progress', 'Stock Out Completed', 'Ready for Shipment', 'Forwarded to Logistics', 'In Transit', 'Delivered'];
+  const lifecycleSteps: OrderStatus[] = ['New', 'Assigned', 'Preparing', 'Ready for Stock Out', 'Stock Out In Progress', 'Stock Out Completed', 'Ready for Shipment', 'Forwarded to Logistics', 'In Transit', 'Delivered'];
 
   return (
     <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
@@ -635,34 +657,37 @@ const OrderManagement: React.FC = () => {
             <Clock className="w-4 h-4 text-cyan-400" />
             Recent Order Timeline
           </h3>
-          <div className="max-w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
-          <div className="relative flex min-w-[800px] items-start pb-2">
+          <div className="max-w-full overflow-x-auto overscroll-x-contain [scrollbar-color:theme(colors.slate.700)_transparent] [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+          <div className="relative flex min-w-[760px] items-start pb-2">
             {lifecycleSteps.map((step, idx) => {
-              const currentStatusIndex = lifecycleSteps.indexOf(selectedOrder?.status || 'New');
-              const isCompleted = idx <= currentStatusIndex;
+              const currentStatusIndex = lifecycleSteps.indexOf((selectedOrder?.status || 'New') as OrderStatus);
+              const isCompleted = idx < currentStatusIndex;
               const isCurrent = idx === currentStatusIndex;
               return (
-                <div key={step} className="relative flex min-w-20 flex-1 flex-col items-center">
-                  <div className="relative flex h-8 w-full shrink-0 items-center justify-center">
+                <div key={step} className="relative flex min-w-[76px] flex-1 flex-col items-center">
+                  <div className="relative flex h-9 w-full shrink-0 items-center justify-center">
                     {/* Connector Line */}
                     {idx < lifecycleSteps.length - 1 && (
-                      <div className={`absolute left-1/2 top-1/2 h-0.5 w-full -translate-y-1/2 ${isCompleted ? 'bg-cyan-500' : 'bg-slate-700'}`} />
+                      <div className={`absolute left-1/2 top-1/2 h-0.5 w-full -translate-y-1/2 ${idx < currentStatusIndex ? 'bg-cyan-500' : 'bg-slate-700'}`} />
                     )}
-                    {/* Dot */}
+                    {/* Status icon */}
                     <div
-                      className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${
+                      aria-label={`${step}${isCurrent ? ', current status' : isCompleted ? ', completed' : ', upcoming'}`}
+                      className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                         isCompleted
-                          ? 'border-cyan-500 bg-cyan-500/20 text-cyan-500'
+                          ? 'border-cyan-500/80 bg-cyan-500/20 text-cyan-300'
                           : isCurrent
-                          ? 'border-cyan-500 bg-cyan-500/10 text-cyan-500 animate-pulse'
-                          : 'border-slate-600 bg-slate-800/50 text-slate-600'
+                          ? 'border-cyan-300 bg-cyan-400/20 text-cyan-200 shadow-[0_0_0_3px_rgba(34,211,238,0.12),0_0_16px_rgba(34,211,238,0.3)]'
+                          : 'border-slate-700 bg-slate-900 text-slate-500'
                       }`}
                     >
-                      {isCompleted ? <Check className="w-4 h-4" /> : <span className="text-xs font-bold">{idx + 1}</span>}
+                      {timelineStatusIcons[step]}
                     </div>
                   </div>
                   {/* Label */}
-                  <p className={`mt-1.5 w-full px-1 text-center text-[10px] font-medium leading-3 sm:mt-2 sm:text-xs sm:leading-4 ${isCompleted ? 'text-white' : 'text-slate-500'}`}>
+                  <p className={`mt-2 w-full px-1 text-center text-[11px] font-medium leading-[14px] ${
+                    isCurrent ? 'text-cyan-200' : isCompleted ? 'text-slate-100' : 'text-slate-500'
+                  }`}>
                     {step}
                   </p>
                   <p className="mt-1 w-full px-1 text-center text-[10px] leading-3 text-slate-500">
@@ -713,105 +738,126 @@ const OrderManagement: React.FC = () => {
           {/* Backdrop */}
           <div className="min-w-0 flex-1 bg-black/60 backdrop-blur-sm" onClick={handleCloseDrawer}></div>
           {/* Drawer */}
-          <div className="admin-order-details-drawer flex h-full w-[96vw] shrink-0 flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-y-contain border-l border-slate-800 bg-[#0b101d] p-3 animate-in slide-in-from-right duration-300 min-[400px]:w-[92vw] sm:w-96 sm:gap-6 sm:p-6">
+          <div className="admin-order-details-drawer flex h-full w-full shrink-0 flex-col overflow-hidden border-l border-slate-800 bg-[#0b101d] shadow-2xl animate-in slide-in-from-right duration-300 min-[480px]:w-[94vw] sm:w-[460px] lg:w-[480px]">
             {/* Header */}
-            <div className="admin-order-details-header sticky top-0 z-10 -mx-3 -mt-3 flex items-start justify-between gap-2 bg-[#0b101d] px-3 py-3 sm:static sm:mx-0 sm:mt-0 sm:bg-transparent sm:p-0">
+            <div className="admin-order-details-header flex shrink-0 items-start justify-between gap-3 border-b border-slate-800 bg-[#0b101d] px-4 py-3 sm:px-5 sm:py-4">
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h2 className="whitespace-nowrap text-base font-bold leading-tight text-white sm:text-xl">
-                  {selectedOrder.orderNo}
-                </h2>
-                <StatusBadge status={selectedOrder.status} />
+                  <h2 className="min-w-0 break-all text-base font-bold leading-tight text-white sm:text-xl">
+                    {selectedOrder.orderNo}
+                  </h2>
+                  <StatusBadge status={selectedOrder.status} />
                 </div>
-                <p className="text-sm text-slate-400">{selectedOrder.refNo}</p>
+                <p className="mt-0.5 break-words text-sm text-slate-400">{selectedOrder.refNo}</p>
               </div>
-              <button aria-label="Close order details" onClick={handleCloseDrawer} className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:hover:bg-slate-700 dark:hover:text-white sm:min-h-0 sm:min-w-0 sm:p-1.5">
+              <button aria-label="Close order details" onClick={handleCloseDrawer} className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dark:hover:bg-slate-700 dark:hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Order Date */}
-            <div className="admin-order-details-date flex items-start gap-2 text-xs text-slate-400 sm:items-center sm:text-sm">
-              <Calendar className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
-              <span className="break-words">Order Date: {selectedOrder.orderDate}</span>
-            </div>
+            {/* Scrollable content */}
+            <div className="admin-order-details-body min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 py-4 sm:space-y-4 sm:px-5">
+              {/* Order Date */}
+              <div className="admin-order-details-date flex items-start gap-2 text-xs text-slate-400 sm:items-center sm:text-sm">
+                <Calendar className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
+                <span className="break-words">Order Date: {selectedOrder.orderDate}</span>
+              </div>
 
-            {/* Customer Info */}
-            <div className="admin-order-details-customer space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 sm:p-4">
-              <h4 className="text-sm font-semibold text-white">Customer Information</h4>
-              <p className="text-slate-200 font-medium">{selectedOrder.customer}</p>
-              <p className="text-slate-400 text-sm flex items-start gap-2">
-                <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
-                <span className="min-w-0 break-words">{selectedOrder.address}</span>
-              </p>
-              <p className="text-slate-400 text-sm flex items-center gap-2">
-                <User className="w-4 h-4" />
-                {selectedOrder.contact}
-              </p>
-            </div>
+              {/* Customer Info */}
+              <div className="admin-order-details-customer space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 sm:p-4">
+                <h4 className="text-sm font-semibold text-white">Customer Information</h4>
+                <p className="break-words text-slate-200 font-medium">{selectedOrder.customer}</p>
+                <p className="text-slate-400 text-sm flex items-start gap-2">
+                  <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="min-w-0 break-words">{selectedOrder.address}</span>
+                </p>
+                <p className="text-slate-400 text-sm flex items-start gap-2">
+                  <User className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="min-w-0 break-words">{selectedOrder.contact}</span>
+                </p>
+              </div>
 
-            {/* Order Summary */}
-            <div className="admin-order-details-summary space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 text-sm sm:p-4 sm:text-base">
-              <h4 className="text-sm font-semibold text-white">Order Summary</h4>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Items</span>
-                <span className="text-white font-medium">{selectedOrder.itemCount} items</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Total Amount</span>
-                <span className="text-white font-bold">₱{selectedOrder.totalAmount.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Required Delivery</span>
-                <span className="min-w-0 break-words text-right text-slate-200">{selectedOrder.requiredDelivery}</span>
-              </div>
-            </div>
-
-            {/* Status & Assignment */}
-            <div className="admin-order-details-assignment space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 text-sm sm:p-4 sm:text-base">
-              <h4 className="text-sm font-semibold text-white">Status & Assignment</h4>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Status</span>
-                <StatusBadge status={selectedOrder.status} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Assigned To</span>
-                <span className="text-white font-medium">{selectedOrder.assignedTo || 'Unassigned'}</span>
-              </div>
-              {selectedOrder.assignedDate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Assigned Date</span>
-                  <span className="text-slate-300">{selectedOrder.assignedDate}</span>
+              {/* Order Summary */}
+              <div className="admin-order-details-summary space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 text-sm sm:p-4">
+                <h4 className="text-sm font-semibold text-white">Order Summary</h4>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-400">Items</span>
+                  <span className="text-white font-medium">{selectedOrder.itemCount} items</span>
                 </div>
-              )}
-            </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-400">Total Amount</span>
+                  <span className="text-white font-bold">₱{selectedOrder.totalAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 text-slate-400">Required Delivery</span>
+                  <span className="min-w-0 break-words text-right text-slate-200">{selectedOrder.requiredDelivery}</span>
+                </div>
+              </div>
 
-            <div className="admin-order-details-items">
-              <h4 className="text-sm font-semibold text-white">Order Items</h4>
-              <div className="admin-order-details-items-scroll admin-table-scroll mt-3 rounded-xl border border-slate-700">
-                <table className="admin-order-details-items-table admin-responsive-table admin-cols-5 admin-sticky-1 w-full min-w-[620px] text-xs">
-                  <thead className="bg-[#070a12] text-slate-400"><tr><th className="px-3 py-2 text-left">Product</th><th className="px-3 py-2 text-right">Ordered Quantity</th><th className="px-3 py-2 text-left">Unit</th><th className="px-3 py-2 text-right">Unit Price</th><th className="px-3 py-2 text-right">Subtotal</th></tr></thead>
-                  <tbody className="divide-y divide-slate-800">{selectedOrder.items.map(item => <tr key={item.id}>
-                    <td className="px-3 py-3 text-slate-200">{item.name}</td>
-                    <td className="px-3 py-3 text-right text-white">{item.quantity}</td><td className="px-3 py-3 text-slate-300">{item.unit}</td><td className="px-3 py-3 text-right text-slate-300">₱{item.unitPrice.toLocaleString()}</td><td className="px-3 py-3 text-right text-white">₱{item.subtotal.toLocaleString()}</td>
-                  </tr>)}</tbody>
-                </table>
+              {/* Status & Assignment */}
+              <div className="admin-order-details-assignment space-y-2 rounded-xl border border-slate-700 bg-slate-800/30 p-3 text-sm sm:p-4">
+                <h4 className="text-sm font-semibold text-white">Status & Assignment</h4>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-400">Status</span>
+                  <StatusBadge status={selectedOrder.status} />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 text-slate-400">Assigned To</span>
+                  <span className="min-w-0 break-words text-right text-white font-medium">{selectedOrder.assignedTo || 'Unassigned'}</span>
+                </div>
+                {selectedOrder.assignedDate && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="shrink-0 text-slate-400">Assigned Date</span>
+                    <span className="min-w-0 break-words text-right text-slate-300">{selectedOrder.assignedDate}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Order Items */}
+              <div className="admin-order-details-items">
+                <h4 className="text-sm font-semibold text-white">Order Items</h4>
+                <ul className="admin-order-details-items-list mt-2 divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-800/30">
+                  {selectedOrder.items.map(item => (
+                    <li key={item.id} className="admin-order-details-item px-3 py-2.5 sm:px-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="min-w-0 break-words text-sm font-medium text-slate-200">{item.name}</p>
+                        <p className="shrink-0 text-right text-sm font-semibold text-white">
+                          <span className="sr-only">Subtotal: </span>₱{item.subtotal.toLocaleString()}
+                        </p>
+                      </div>
+                      <dl className="mt-1.5 grid grid-cols-3 gap-2 text-xs">
+                        <div className="min-w-0">
+                          <dt className="text-slate-500">Ordered Qty</dt>
+                          <dd className="break-words text-white">{item.quantity}</dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-slate-500">Unit</dt>
+                          <dd className="break-words text-slate-300">{item.unit}</dd>
+                        </div>
+                        <div className="min-w-0 text-right">
+                          <dt className="text-slate-500">Unit Price</dt>
+                          <dd className="break-words text-slate-300">₱{item.unitPrice.toLocaleString()}</dd>
+                        </div>
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="admin-order-details-actions mt-auto space-y-2 border-t border-slate-800 pt-3 sm:space-y-3 sm:pt-4">
+            {/* Actions (pinned to the bottom of the drawer) */}
+            <div className="admin-order-details-actions shrink-0 space-y-2 border-t border-slate-800 bg-[#0b101d] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:pb-4">
               <h4 className="text-sm font-semibold text-white">Actions</h4>
               <button
                 onClick={() => selectedOrder && void handleViewOrder(selectedOrder)}
-                className="min-h-11 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="min-h-11 w-full cursor-pointer rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 View Order Details
               </button>
               <button
                 onClick={() => void openAssignment()}
                 disabled={!['New', 'Assigned'].includes(selectedOrder.status)}
-                className="min-h-11 w-full rounded-lg border border-orange-500/50 px-3 py-2.5 text-sm font-medium text-orange-400 transition-colors hover:bg-orange-500/10 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-h-11 w-full cursor-pointer rounded-lg border border-orange-500/50 px-3 py-2.5 text-sm font-medium text-orange-400 transition-colors hover:bg-orange-500/10 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {selectedOrder.status === 'Assigned' ? 'Reassign Plant Manager' : 'Assign to Plant Manager'}
               </button>
