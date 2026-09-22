@@ -19,6 +19,7 @@ class Receiving extends Model
         'delivery_date',
         'status',
         'prepared_by_id',
+        'assigned_qa_user_id',
     ];
 
     protected function casts(): array
@@ -46,6 +47,11 @@ class Receiving extends Model
     public function preparedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'prepared_by_id');
+    }
+
+    public function assignedQa(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_qa_user_id');
     }
 
     public function qaInspection(): HasOne

@@ -1,5 +1,5 @@
 // src/page/plant-manager/Dashboard.tsx
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useDashboardGreeting } from '../../hooks/useDashboardGreeting';
@@ -12,7 +12,6 @@ import {
   ShieldAlert,
   ArrowDownCircle,
   ArrowUpCircle,
-  MoreVertical,
   Eye,
   User,
   Clock,
@@ -25,6 +24,7 @@ import {
   Sparkles,
   ExternalLink,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -154,12 +154,17 @@ const Dashboard: React.FC = () => {
   const [location] = useState('Central Distribution Center');
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshInFlight = useRef(false);
   const [error, setError] = useState('');
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   usePlantManagerDetailOverlay(transactionsOpen);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async (preserveCurrentData = false) => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    if (preserveCurrentData) setRefreshing(true);
+    else setLoading(true);
     try {
       const response = await apiClient.get('/plant-manager/dashboard');
       setDashboard(response.data?.data ?? emptyDashboard);
@@ -167,7 +172,9 @@ const Dashboard: React.FC = () => {
     } catch (requestError: any) {
       setError(requestError?.response?.data?.message || 'Unable to load dashboard data.');
     } finally {
-      setLoading(false);
+      if (preserveCurrentData) setRefreshing(false);
+      else setLoading(false);
+      refreshInFlight.current = false;
     }
   }, []);
 
@@ -262,8 +269,15 @@ const Dashboard: React.FC = () => {
               <h3 className="text-white font-semibold">Inventory Trend</h3>
               <p className="text-slate-400 text-sm">Stock units and availability trend across 7 months</p>
             </div>
-            <button className="text-slate-400 hover:text-slate-300 transition-colors">
-              <MoreVertical className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={() => void loadDashboard(true)}
+              disabled={loading || refreshing}
+              aria-label="Refresh inventory data"
+              title="Refresh inventory data"
+              className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
           <div className="flex h-[300px] w-full flex-col">
@@ -336,8 +350,15 @@ const Dashboard: React.FC = () => {
               <h3 className="text-white font-semibold">Stock Movement</h3>
               <p className="text-slate-400 text-sm">Stock In vs Stock Out this week</p>
             </div>
-            <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-              <MoreVertical className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={() => void loadDashboard(true)}
+              disabled={loading || refreshing}
+              aria-label="Refresh stock movement"
+              title="Refresh stock movement"
+              className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -365,8 +386,15 @@ const Dashboard: React.FC = () => {
               <h3 className="text-white font-semibold">Monthly Inventory Activity</h3>
               <p className="text-slate-400 text-sm">Receiving, release and transfers</p>
             </div>
-            <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-              <MoreVertical className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={() => void loadDashboard(true)}
+              disabled={loading || refreshing}
+              aria-label="Refresh monthly inventory activity"
+              title="Refresh monthly inventory activity"
+              className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
           <ResponsiveContainer width="100%" height={300}>

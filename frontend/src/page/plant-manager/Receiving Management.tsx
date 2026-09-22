@@ -9,7 +9,7 @@ import {
   XCircle,
   AlertCircle,
   Eye,
-  MoreHorizontal,
+  UserCheck,
   Search,
   Plus,
   Clock,
@@ -51,6 +51,16 @@ interface ApprovedPurchaseOrder {
   supplier_name: string;
   status: string;
   items: Array<{ id: number; product_name: string; ordered_quantity: number; received_quantity: number; remaining_quantity: number; unit: string | null }>;
+}
+
+interface QaAssignee {
+  id: number;
+  name: string;
+}
+
+interface AssignmentToast {
+  type: 'success' | 'error';
+  message: string;
 }
 
 // ============================================
@@ -426,6 +436,14 @@ const ReceivingManagement: React.FC = () => {
 
   const [selectedReceivingId, setSelectedReceivingId] = useState<number | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [qaAssignees, setQaAssignees] = useState<QaAssignee[]>([]);
+  const [qaAssigneesLoading, setQaAssigneesLoading] = useState(true);
+  const [qaAssigneesError, setQaAssigneesError] = useState<string | null>(null);
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentTarget, setAssignmentTarget] = useState<ApiReceiving | null>(null);
+  const [selectedQaUserId, setSelectedQaUserId] = useState<number | null>(null);
+  const [assignmentToast, setAssignmentToast] = useState<AssignmentToast | null>(null);
 
   const fetchReceivings = useCallback(async () => {
     setLoading(true);
@@ -443,6 +461,15 @@ const ReceivingManagement: React.FC = () => {
   useEffect(() => {
     fetchReceivings();
   }, [fetchReceivings]);
+
+  useEffect(() => {
+    let active = true;
+    apiClient.get<{ data: QaAssignee[] }>('/receivings/qa-assignees')
+      .then((response) => { if (active) setQaAssignees(response.data.data); })
+      .catch((error) => { if (active) setQaAssigneesError(getApiErrorMessage(error)); })
+      .finally(() => { if (active) setQaAssigneesLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (receivings.length === 0) {
@@ -512,6 +539,62 @@ const ReceivingManagement: React.FC = () => {
     setShowCreateModal(false);
     setCurrentPage(1);
   };
+
+  const openAssignmentModal = (receiving: ApiReceiving) => {
+    setAssignmentTarget(receiving);
+    setSelectedQaUserId(receiving.assigned_qa_user_id);
+    setAssignmentError(null);
+  };
+
+  const closeAssignmentModal = () => {
+    if (assignmentSaving) return;
+    setAssignmentTarget(null);
+    setSelectedQaUserId(null);
+    setAssignmentError(null);
+  };
+
+  const handleAssignQa = async () => {
+    if (!assignmentTarget || !selectedQaUserId) {
+      setAssignmentError('Select a QA Supervisor before continuing.');
+      return;
+    }
+    if (selectedQaUserId === assignmentTarget.assigned_qa_user_id) {
+      setAssignmentError('Select a different QA Supervisor to reassign this receiving.');
+      return;
+    }
+    setAssignmentSaving(true);
+    setAssignmentError(null);
+    try {
+      const response = await apiClient.patch<ApiReceiving>(`/receivings/${assignmentTarget.id}/assign-qa`, {
+        qa_user_id: selectedQaUserId,
+      });
+      setReceivings((current) => current.map((receiving) =>
+        receiving.id === response.data.id ? response.data : receiving
+      ));
+      setAssignmentTarget(null);
+      setSelectedQaUserId(null);
+      setAssignmentToast({ type: 'success', message: 'Receiving assigned to QA Supervisor successfully.' });
+    } catch (error) {
+      setAssignmentError(getApiErrorMessage(error));
+    } finally {
+      setAssignmentSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!assignmentToast) return;
+    const timeout = window.setTimeout(() => setAssignmentToast(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [assignmentToast]);
+
+  useEffect(() => {
+    if (!assignmentTarget) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !assignmentSaving) closeAssignmentModal();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [assignmentTarget, assignmentSaving]);
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#0b1220] p-4 text-slate-100 sm:p-6">
@@ -715,17 +798,31 @@ const ReceivingManagement: React.FC = () => {
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRowClick(record.id);
                           }}
-                          className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                          aria-label={`View receiving ${record.receiving_no}`}
+                          title="View Receiving"
+                          className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:hover:bg-slate-700 dark:hover:text-white"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
+                        {record.status === 'Pending QA' && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openAssignmentModal(record);
+                            }}
+                            aria-label={`${record.assigned_qa ? 'Reassign' : 'Assign'} QA for ${record.receiving_no}`}
+                            title={record.assigned_qa ? 'Reassign QA' : 'Assign QA'}
+                            className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-cyan-400 transition-colors hover:bg-cyan-500/10 hover:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <UserCheck className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -835,6 +932,16 @@ const ReceivingManagement: React.FC = () => {
                   <p className="text-slate-400">Prepared By</p>
                   <p className="text-white font-medium">{selectedReceiving.prepared_by || '-'}</p>
                 </div>
+                <div>
+                  <p className="text-slate-400">Assigned QA</p>
+                  <p className="font-medium text-white">{selectedReceiving.assigned_qa?.name ?? 'Unassigned'}</p>
+                  {selectedReceiving.status === 'Pending QA' && (
+                    <button type="button" onClick={() => openAssignmentModal(selectedReceiving)} className="mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-cyan-500/30 px-3 py-2 text-sm font-medium text-cyan-300 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                      <UserCheck className="h-4 w-4" />
+                      {selectedReceiving.assigned_qa ? 'Reassign QA' : 'Assign QA Supervisor'}
+                    </button>
+                  )}
+                </div>
                 <div className="col-span-2">
                   <p className="text-slate-400">Created At</p>
                   <p className="text-white font-medium">{formatCreatedAt(selectedReceiving.created_at)}</p>
@@ -920,6 +1027,78 @@ const ReceivingManagement: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {assignmentTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) closeAssignmentModal(); }}
+          role="presentation"
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="assign-qa-title" className="w-full max-w-md rounded-2xl border border-[#1f2937] bg-[#111827] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#1f2937] px-5 py-4">
+              <div>
+                <h2 id="assign-qa-title" className="text-lg font-semibold text-white">
+                  {assignmentTarget.assigned_qa ? 'Reassign QA Supervisor' : 'Assign QA Supervisor'}
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-400">Choose who will inspect this receiving.</p>
+              </div>
+              <button type="button" onClick={closeAssignmentModal} disabled={assignmentSaving} aria-label="Close assignment dialog" className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">
+                <X className="mx-auto h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 p-5">
+              <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] px-4 py-3">
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Receiving</p>
+                <p className="mt-1 font-semibold text-white">{assignmentTarget.receiving_no}</p>
+                {assignmentTarget.assigned_qa && <p className="mt-1 text-xs text-slate-400">Currently assigned to {assignmentTarget.assigned_qa.name}</p>}
+              </div>
+
+              <div>
+                <label htmlFor="qa-supervisor-select" className="mb-1.5 block text-sm font-medium text-slate-300">QA Supervisor</label>
+                <select
+                  id="qa-supervisor-select"
+                  autoFocus
+                  value={selectedQaUserId ?? ''}
+                  onChange={(event) => {
+                    setSelectedQaUserId(event.target.value ? Number(event.target.value) : null);
+                    setAssignmentError(null);
+                  }}
+                  disabled={qaAssigneesLoading || assignmentSaving}
+                  className="min-h-11 w-full cursor-pointer rounded-xl border border-[#1f2937] bg-[#0b1220] px-3 text-base text-white outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">{qaAssigneesLoading ? 'Loading QA Supervisors…' : 'Select QA Supervisor'}</option>
+                  {qaAssignees.map((qa) => <option key={qa.id} value={qa.id}>{qa.name}</option>)}
+                </select>
+                {!qaAssigneesLoading && !qaAssigneesError && qaAssignees.length === 0 && <p className="mt-2 text-sm text-amber-400">No active QA Supervisors are available.</p>}
+                {qaAssigneesError && <p role="alert" className="mt-2 text-sm text-red-400">{qaAssigneesError}</p>}
+                {assignmentError && <p role="alert" className="mt-2 text-sm text-red-400">{assignmentError}</p>}
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-[#1f2937] px-5 py-4 sm:flex-row sm:justify-end">
+              <button type="button" onClick={closeAssignmentModal} disabled={assignmentSaving} className="min-h-11 cursor-pointer rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">Cancel</button>
+              <button
+                type="button"
+                onClick={() => void handleAssignQa()}
+                disabled={assignmentSaving || qaAssigneesLoading || !selectedQaUserId || selectedQaUserId === assignmentTarget.assigned_qa_user_id}
+                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {assignmentSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
+                {assignmentSaving ? 'Assigning…' : assignmentTarget.assigned_qa ? 'Reassign QA' : 'Assign QA'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {assignmentToast && (
+        <div role="status" className="fixed bottom-4 left-4 right-4 z-50 flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-[#111827] px-4 py-3 text-white shadow-xl sm:left-auto sm:right-6 sm:max-w-md">
+          {assignmentToast.type === 'success' ? <CheckCircle className="h-5 w-5 shrink-0 text-emerald-400" /> : <XCircle className="h-5 w-5 shrink-0 text-red-400" />}
+          <span className="flex-1 text-sm">{assignmentToast.message}</span>
+          <button type="button" onClick={() => setAssignmentToast(null)} aria-label="Dismiss notification" className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="mx-auto h-4 w-4" /></button>
+        </div>
+      )}
 
       <CreateReceivingModal
         isOpen={showCreateModal}

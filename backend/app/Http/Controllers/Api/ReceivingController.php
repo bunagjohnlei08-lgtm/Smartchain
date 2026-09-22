@@ -11,6 +11,7 @@ use App\Models\ReceivingTimeline;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
 use App\Support\WorkflowNotificationSender;
+use App\Support\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -18,7 +19,7 @@ class ReceivingController extends Controller
 {
     private function present(Receiving $receiving): array
     {
-        $receiving->loadMissing(['items', 'timeline', 'preparedBy']);
+        $receiving->loadMissing(['items', 'timeline', 'preparedBy', 'assignedQa']);
 
         $items = $receiving->items;
         $productSummary = match (true) {
@@ -38,6 +39,11 @@ class ReceivingController extends Controller
             'delivery_date' => $receiving->delivery_date?->toDateString(),
             'status' => $receiving->status,
             'prepared_by' => $receiving->preparedBy?->name,
+            'assigned_qa_user_id' => $receiving->assigned_qa_user_id,
+            'assigned_qa' => $receiving->assignedQa ? [
+                'id' => $receiving->assignedQa->id,
+                'name' => $receiving->assignedQa->name,
+            ] : null,
             'product_summary' => $productSummary,
             'items_count' => $items->sum('delivered_quantity'),
             'items' => $items->map(fn (ReceivingItem $item) => [
@@ -65,7 +71,7 @@ class ReceivingController extends Controller
     {
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
-        $query = Receiving::query()->with(['items', 'timeline', 'preparedBy']);
+        $query = Receiving::query()->with(['items', 'timeline', 'preparedBy', 'assignedQa']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -204,18 +210,69 @@ class ReceivingController extends Controller
                 return $receiving;
             });
 
-        $qaSupervisors = User::query()
-            ->where('status', 'ACTIVE')
+        return response()->json($this->present($receiving), 201);
+    }
+
+    public function qaAssignees(Request $request)
+    {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
+        return response()->json(['data' => User::query()
+            ->select(['users.id', 'users.name'])
+            ->where('users.status', 'ACTIVE')
             ->whereHas('role', fn ($query) => $query->where('slug', 'QA_SUPERVISOR'))
-            ->get();
-        WorkflowNotificationSender::send($qaSupervisors, new WorkflowNotification(
-            'Pending QA Inspection',
-            "Receiving #{$receiving->receiving_no} is ready for QA.",
+            ->orderBy('users.name')
+            ->get()]);
+    }
+
+    public function assignQa(Request $request, Receiving $receiving)
+    {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
+        $validated = $request->validate(['qa_user_id' => ['required', 'integer', 'exists:users,id']]);
+        $qa = User::query()->with('role')->find($validated['qa_user_id']);
+
+        if (! $qa || $qa->status !== 'ACTIVE' || ! $qa->isQaSupervisor()) {
+            return response()->json([
+                'message' => 'The selected QA Supervisor is not active or is not eligible for assignment.',
+                'errors' => ['qa_user_id' => ['The selected QA Supervisor is not active or is not eligible for assignment.']],
+            ], 422);
+        }
+
+        if ($receiving->qaInspection?->completed_at) {
+            return response()->json(['message' => 'A completed inspection cannot be reassigned.'], 422);
+        }
+
+        $previousQaId = $receiving->assigned_qa_user_id;
+        $receiving->update(['assigned_qa_user_id' => $qa->id]);
+
+        ReceivingTimeline::create([
+            'receiving_id' => $receiving->id,
+            'status' => $previousQaId ? 'QA Reassigned' : 'QA Assigned',
+            'performed_by' => $request->user()->name,
+            'occurred_at' => now(),
+        ]);
+
+        AuditLogger::success('QA_ASSIGNED', AuditLogger::MODULE_RECEIVING, [
+            'resource' => $receiving,
+            'resource_label' => $receiving->receiving_no,
+            'details' => $previousQaId ? "Reassigned QA Supervisor to {$qa->name}" : "Assigned QA Supervisor {$qa->name}",
+            'metadata' => [
+                'receiving_id' => $receiving->id,
+                'assigned_qa_user_id' => $qa->id,
+                'assigned_qa_name' => $qa->name,
+                'previous_assigned_qa_user_id' => $previousQaId,
+            ],
+        ]);
+
+        WorkflowNotificationSender::send($qa, new WorkflowNotification(
+            'QA Inspection Assigned',
+            "Receiving #{$receiving->receiving_no} was assigned to you.",
             'info',
             $receiving->receiving_no,
             'Quality Inspection',
         ));
 
-        return response()->json($this->present($receiving), 201);
+        return response()->json($this->present($receiving->fresh()));
     }
 }

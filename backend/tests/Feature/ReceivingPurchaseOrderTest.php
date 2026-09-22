@@ -72,9 +72,11 @@ class ReceivingPurchaseOrderTest extends TestCase
         $this->assertDatabaseHas('receivings', ['id' => $response->json('id'), 'purchase_order_id' => $this->purchaseOrder->id]);
         $this->assertDatabaseHas('purchase_orders', ['id' => $this->purchaseOrder->id, 'status' => 'Completed']);
         $receivingNumber = $response->json('receiving_no');
+        Notification::assertNothingSent();
+        $this->patchJson("/api/receivings/{$response->json('id')}/assign-qa", ['qa_user_id' => $qa->id])->assertOk();
         Notification::assertSentTo($qa, WorkflowNotification::class, fn ($notification) =>
-            $notification->title === 'Pending QA Inspection'
-            && $notification->message === "Receiving #{$receivingNumber} is ready for QA."
+            $notification->title === 'QA Inspection Assigned'
+            && $notification->message === "Receiving #{$receivingNumber} was assigned to you."
             && $notification->type === 'info'
             && $notification->referenceId === $receivingNumber);
         Notification::assertNotSentTo($inactiveQa, WorkflowNotification::class);

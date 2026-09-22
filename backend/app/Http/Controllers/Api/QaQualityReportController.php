@@ -33,6 +33,10 @@ class QaQualityReportController extends Controller
             ->with(['receiving', 'items.receivingItem'])
             ->whereNotNull('completed_at')
             ->whereIn('status', self::FINAL_STATUSES)
+            ->when($user->isQaSupervisor(), fn ($query) => $query->whereHas(
+                'receiving',
+                fn ($receiving) => $receiving->where('assigned_qa_user_id', $user->id)
+            ))
             ->orderBy('completed_at')
             ->get();
 
@@ -48,11 +52,13 @@ class QaQualityReportController extends Controller
             : 0.0;
 
         $trendByDate = DB::table('qa_inspections')
+            ->join('receivings', 'receivings.id', '=', 'qa_inspections.receiving_id')
             ->join('qa_inspection_items', 'qa_inspection_items.qa_inspection_id', '=', 'qa_inspections.id')
             ->whereNotNull('completed_at')
             ->where('qa_inspections.completed_at', '>=', $trendStart)
             ->where('qa_inspections.completed_at', '<', $trendEnd)
             ->whereIn('qa_inspections.status', self::FINAL_STATUSES)
+            ->when($user->isQaSupervisor(), fn ($query) => $query->where('receivings.assigned_qa_user_id', $user->id))
             ->selectRaw('DATE(qa_inspections.completed_at) AS inspection_date')
             ->selectRaw('COALESCE(SUM(qa_inspection_items.accepted_quantity), 0) AS passed')
             ->selectRaw('COALESCE(SUM(qa_inspection_items.rejected_quantity), 0) AS rejected')

@@ -27,6 +27,7 @@ class QaRejectedItemsTest extends TestCase
             'supplier' => 'Existing Supplier',
             'delivery_date' => now()->toDateString(),
             'status' => 'Partial',
+            'assigned_qa_user_id' => $qa->id,
         ]);
         $receivingItem = ReceivingItem::create([
             'receiving_id' => $receiving->id,

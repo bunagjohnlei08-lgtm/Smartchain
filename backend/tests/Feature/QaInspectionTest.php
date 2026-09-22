@@ -22,6 +22,8 @@ class QaInspectionTest extends TestCase
 {
     use RefreshDatabase;
 
+    private ?User $currentQa = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -40,7 +42,7 @@ class QaInspectionTest extends TestCase
             'slug' => 'QA_SUPERVISOR',
         ]);
 
-        return User::factory()->create(['role_id' => $role->id]);
+        return $this->currentQa = User::factory()->create(['role_id' => $role->id]);
     }
 
     private function makeReceiving(array $items, string $status = 'Pending QA'): Receiving
@@ -52,6 +54,7 @@ class QaInspectionTest extends TestCase
             'reference_no' => 'REF-1',
             'delivery_date' => now()->toDateString(),
             'status' => $status,
+            'assigned_qa_user_id' => $this->currentQa?->id,
         ]);
 
         foreach ($items as $item) {

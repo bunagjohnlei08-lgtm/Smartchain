@@ -29,6 +29,10 @@ class QaInspectionHistoryController extends Controller
             ])
             ->whereNotNull('completed_at')
             ->whereIn('status', self::FINAL_STATUSES)
+            ->when($user->isQaSupervisor(), fn ($query) => $query->whereHas(
+                'receiving',
+                fn ($receiving) => $receiving->where('assigned_qa_user_id', $user->id)
+            ))
             ->orderByDesc('completed_at')
             ->orderByDesc('id')
             ->get();

@@ -162,6 +162,8 @@ export interface ApiReceiving {
   delivery_date: string;
   status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial';
   prepared_by: string | null;
+  assigned_qa_user_id: number | null;
+  assigned_qa: { id: number; name: string } | null;
   product_summary: string;
   items_count: number;
   items: ApiReceivingItem[];

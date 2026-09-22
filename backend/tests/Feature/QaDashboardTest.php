@@ -30,6 +30,7 @@ class QaDashboardTest extends TestCase
         $receiving = Receiving::create([
             'receiving_no' => 'RCV-DASH-1', 'purchase_order' => 'PO-DASH-1',
             'supplier' => 'Supplier', 'delivery_date' => today(), 'status' => 'Passed',
+            'assigned_qa_user_id' => $qa->id,
         ]);
         $item = ReceivingItem::create([
             'receiving_id' => $receiving->id, 'product_id' => $product->id, 'product_name' => 'Widget',
@@ -46,6 +47,7 @@ class QaDashboardTest extends TestCase
         Receiving::create([
             'receiving_no' => 'RCV-DASH-2', 'purchase_order' => 'PO-DASH-2',
             'supplier' => 'Supplier', 'delivery_date' => today(), 'status' => 'Pending QA',
+            'assigned_qa_user_id' => $qa->id,
         ]);
 
         $this->actingAs($qa)->getJson('/api/qa/dashboard')

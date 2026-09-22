@@ -19,7 +19,7 @@ class QaQualityReportTest extends TestCase
     private function completedInspection(User $qa, string $number, string $supplier, string $status, int $accepted, int $rejected, string $completedAt): void
     {
         $product = Product::firstOrCreate(['name' => 'Report Product'], ['unit' => 'pcs', 'cost_price' => 100]);
-        $receiving = Receiving::create(['receiving_no' => $number, 'purchase_order' => 'PO-1', 'supplier' => $supplier, 'delivery_date' => now()->toDateString(), 'status' => $status]);
+        $receiving = Receiving::create(['receiving_no' => $number, 'purchase_order' => 'PO-1', 'supplier' => $supplier, 'delivery_date' => now()->toDateString(), 'status' => $status, 'assigned_qa_user_id' => $qa->id]);
         $receivingItem = ReceivingItem::create(['receiving_id' => $receiving->id, 'product_id' => $product->id, 'product_name' => $product->name, 'delivered_quantity' => $accepted + $rejected, 'unit' => 'pcs', 'inspection_status' => $status]);
         $inspection = QaInspection::create(['receiving_id' => $receiving->id, 'status' => $status, 'started_at' => now()->subHour(), 'completed_at' => $completedAt, 'inspected_by_id' => $qa->id, 'submitted_by_id' => $qa->id]);
         QaInspectionItem::create(['qa_inspection_id' => $inspection->id, 'receiving_item_id' => $receivingItem->id, 'accepted_quantity' => $accepted, 'rejected_quantity' => $rejected, 'inspection_result' => $status]);

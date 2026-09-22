@@ -13,7 +13,6 @@ import {
   Check,
   AlertCircle,
   Plus,
-  MoreVertical,
   Eye,
   Filter,
   RefreshCw,
@@ -735,16 +734,13 @@ const StockIn: React.FC = () => {
                   </td>
                   <td className="px-2 py-2 text-right text-white sm:px-4 sm:py-3">₱{rec.receivedValue.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right sm:px-4 sm:py-3">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end">
                       <button
                         className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                         onClick={() => handleSelect(rec.id)}
                         aria-label={`View ${rec.receivingNo}`}
                       >
                         <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors" aria-label={`More options for ${rec.receivingNo}`}>
-                        <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -789,7 +785,6 @@ const StockIn: React.FC = () => {
                 </dl>
                 <div className="mt-auto flex justify-end gap-1 border-t border-slate-200 pt-4 dark:border-slate-700">
                   <button type="button" aria-label={`View ${rec.receivingNo}`} title="View receiving" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white" onClick={() => handleSelect(rec.id)}><Eye className="w-4 h-4" /></button>
-                  <button type="button" aria-label={`More options for ${rec.receivingNo}`} title="More options" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"><MoreVertical className="w-4 h-4" /></button>
                 </div>
               </article>
             ))}

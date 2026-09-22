@@ -36,6 +36,7 @@ class QaInspectionHistoryTest extends TestCase
             'supplier' => 'Test Supplier',
             'delivery_date' => now()->toDateString(),
             'status' => $status,
+            'assigned_qa_user_id' => $qa->id,
         ]);
         $receivingItem = ReceivingItem::create([
             'receiving_id' => $receiving->id,

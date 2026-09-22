@@ -26,6 +26,10 @@ class QaRejectedItemsController extends Controller
             ])
             ->where('rejected_quantity', '>', 0)
             ->whereHas('inspection', fn ($inspection) => $inspection->whereNotNull('completed_at'))
+            ->when($user->isQaSupervisor(), fn ($query) => $query->whereHas(
+                'inspection.receiving',
+                fn ($receiving) => $receiving->where('assigned_qa_user_id', $user->id)
+            ))
             ->get()
             ->sortByDesc(fn (QaInspectionItem $item) => $item->inspection?->completed_at?->getTimestamp() ?? 0)
             ->values()

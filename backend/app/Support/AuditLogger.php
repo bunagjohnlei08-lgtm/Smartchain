@@ -25,6 +25,7 @@ class AuditLogger
     public const MODULE_PURCHASE_ORDERS = 'Purchase Orders';
     public const MODULE_INVENTORY = 'Inventory';
     public const MODULE_ORDERS = 'Order Management';
+    public const MODULE_RECEIVING = 'Receiving';
 
     private const SENSITIVE_KEY_PATTERN = '/pass(word)?|secret|token|api[_-]?key|otp|authorization|cookie|session|signature|remember/i';
 

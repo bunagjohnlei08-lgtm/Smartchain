@@ -106,9 +106,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/stock-in/receivings/{id}', [StockInController::class, 'show']);
     Route::post('/stock-in/receivings/{id}/stock-in', [StockInController::class, 'performStockIn']);
 
+    Route::get('/receivings/qa-assignees', [ReceivingController::class, 'qaAssignees']);
     Route::get('/receivings', [ReceivingController::class, 'index']);
-    Route::get('/receivings/{id}', [ReceivingController::class, 'show']);
     Route::post('/receivings', [ReceivingController::class, 'store']);
+    Route::patch('/receivings/{receiving}/assign-qa', [ReceivingController::class, 'assignQa']);
+    Route::get('/receivings/{id}', [ReceivingController::class, 'show']);
 
     Route::put('/plant-manager/receivings/{receiving}/notes', [PlantManagerReceivingNoteController::class, 'update']);
 

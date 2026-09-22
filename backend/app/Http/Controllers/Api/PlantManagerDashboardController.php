@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 class PlantManagerDashboardController extends Controller
 {
     private const REORDER_LEVEL = 20;
+    private const BUSINESS_TIMEZONE = 'Asia/Manila';
 
     public function index(Request $request): JsonResponse
     {
@@ -24,6 +25,8 @@ class PlantManagerDashboardController extends Controller
 
         $today = now();
         $historyStart = $today->copy()->subMonths(7)->startOfMonth();
+        $trendToday = now(self::BUSINESS_TIMEZONE);
+        $trendHistoryStart = $trendToday->copy()->subMonths(7)->startOfMonth();
         $allStockInRows = ReceivingItem::query()
             ->leftJoin('qa_inspection_items', 'qa_inspection_items.receiving_item_id', '=', 'receiving_items.id')
             ->whereNotNull('receiving_items.stocked_in_at')
@@ -41,6 +44,10 @@ class PlantManagerDashboardController extends Controller
             ->get();
         $stockInRows = $allStockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)->gte($historyStart));
         $stockOutRows = $allStockOutRows->filter(fn ($row) => $row->created_at->gte($historyStart));
+        $trendStockInRows = $allStockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)
+            ->setTimezone(self::BUSINESS_TIMEZONE)->gte($trendHistoryStart));
+        $trendStockOutRows = $allStockOutRows->filter(fn ($row) => $row->created_at->copy()
+            ->setTimezone(self::BUSINESS_TIMEZONE)->gte($trendHistoryStart));
 
         $currentUnits = (int) Inventory::query()->sum('available_stock');
         $currentValue = (float) Inventory::query()
@@ -48,50 +55,75 @@ class PlantManagerDashboardController extends Controller
             ->selectRaw('COALESCE(SUM(inventories.available_stock * products.cost_price), 0) as total')
             ->value('total');
         $inventoryRecords = Inventory::query()->get(['product_id', 'warehouse_id', 'available_stock']);
-        $inventoryTrend = collect(range(6, 1))->map(function (int $monthsAgo) use ($today, $inventoryRecords, $stockInRows, $stockOutRows) {
-            $month = $today->copy()->subMonths($monthsAgo)->endOfMonth();
-            $balances = $inventoryRecords->map(function (Inventory $inventory) use ($month, $stockInRows, $stockOutRows) {
-                $stockedInAfter = $stockInRows->filter(fn ($row) => (int) $row->product_id === $inventory->product_id
-                    && (int) $row->warehouse_id === $inventory->warehouse_id
-                    && Carbon::parse($row->stocked_in_at)->gt($month))->sum('quantity');
-                $stockedOutAfter = $stockOutRows->filter(fn ($row) => (int) $row->product_id === $inventory->product_id
-                    && (int) $row->warehouse_id === $inventory->warehouse_id
-                    && $row->created_at->gt($month))->sum('quantity');
+        $totalProducts = Product::query()->count();
+        $availabilityFor = static function ($balances) use ($totalProducts): int {
+            if ($totalProducts === 0) {
+                return 0;
+            }
 
-                return max(0, (int) $inventory->available_stock - $stockedInAfter + $stockedOutAfter);
+            $availableProducts = $balances
+                ->groupBy('product_id')
+                ->filter(fn ($rows) => $rows->sum('balance') > 0)
+                ->count();
+
+            return (int) round(100 * $availableProducts / $totalProducts);
+        };
+        $inventoryTrend = collect(range(6, 1))->map(function (int $monthsAgo) use ($trendToday, $inventoryRecords, $trendStockInRows, $trendStockOutRows, $availabilityFor) {
+            $month = $trendToday->copy()->subMonths($monthsAgo)->endOfMonth();
+            $balances = $inventoryRecords->map(function (Inventory $inventory) use ($month, $trendStockInRows, $trendStockOutRows) {
+                $stockedInAfter = $trendStockInRows->filter(fn ($row) => (int) $row->product_id === $inventory->product_id
+                    && (int) $row->warehouse_id === $inventory->warehouse_id
+                    && Carbon::parse($row->stocked_in_at)->setTimezone(self::BUSINESS_TIMEZONE)->gt($month))->sum('quantity');
+                $stockedOutAfter = $trendStockOutRows->filter(fn ($row) => (int) $row->product_id === $inventory->product_id
+                    && (int) $row->warehouse_id === $inventory->warehouse_id
+                    && $row->created_at->copy()->setTimezone(self::BUSINESS_TIMEZONE)->gt($month))->sum('quantity');
+
+                return [
+                    'product_id' => $inventory->product_id,
+                    'balance' => max(0, (int) $inventory->available_stock - $stockedInAfter + $stockedOutAfter),
+                ];
             });
-            $units = (int) $balances->sum();
-            $availability = $balances->isEmpty() ? 0 : round(100 * $balances->filter(fn ($balance) => $balance > 0)->count() / $balances->count());
+            $units = (int) $balances->sum('balance');
 
-            return ['month' => $month->format('M'), 'stock' => $units, 'availability' => $availability];
+            return ['month' => $month->format('M'), 'stock' => $units, 'availability' => $availabilityFor($balances)];
         })->push([
-            'month' => $today->format('M'),
+            'month' => $trendToday->format('M'),
             'stock' => $currentUnits,
-            'availability' => $inventoryRecords->isEmpty() ? 0 : round(100 * $inventoryRecords->where('available_stock', '>', 0)->count() / $inventoryRecords->count()),
+            'availability' => $availabilityFor($inventoryRecords->map(fn (Inventory $inventory) => [
+                'product_id' => $inventory->product_id,
+                'balance' => (int) $inventory->available_stock,
+            ])),
         ]);
 
-        $weekStart = $today->copy()->subDays(6)->startOfDay();
-        $stockMovement = collect(range(0, 6))->map(function (int $offset) use ($weekStart, $stockInRows, $stockOutRows) {
+        $activityToday = now(self::BUSINESS_TIMEZONE);
+        $weekStart = $activityToday->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $stockMovement = collect(range(0, 6))->map(function (int $offset) use ($weekStart, $allStockInRows, $allStockOutRows) {
             $date = $weekStart->copy()->addDays($offset);
             return [
                 'day' => $date->format('D'),
-                'in' => $stockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)->isSameDay($date))->sum('quantity'),
-                'out' => $stockOutRows->filter(fn ($row) => $row->created_at->isSameDay($date))->sum('quantity'),
+                'in' => $allStockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)
+                    ->setTimezone(self::BUSINESS_TIMEZONE)->isSameDay($date))->sum('quantity'),
+                'out' => $allStockOutRows->filter(fn ($row) => $row->created_at->copy()
+                    ->setTimezone(self::BUSINESS_TIMEZONE)->isSameDay($date))->sum('quantity'),
             ];
         });
 
-        $monthlyActivity = collect(range(5, 0))->map(function (int $monthsAgo) use ($today, $stockInRows, $stockOutRows) {
-            $month = $today->copy()->subMonths($monthsAgo);
+        $monthlyActivity = collect(range(5, 1))->map(function (int $monthsAgo) use ($activityToday, $allStockInRows, $allStockOutRows) {
+            $month = $activityToday->copy()->subMonths($monthsAgo);
             return [
                 'month' => $month->format('M'),
-                'receiving' => $stockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)->isSameMonth($month))->sum('quantity'),
-                'release' => $stockOutRows->filter(fn ($row) => $row->created_at->isSameMonth($month))->sum('quantity'),
+                'receiving' => $allStockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)
+                    ->setTimezone(self::BUSINESS_TIMEZONE)->isSameMonth($month))->sum('quantity'),
+                'release' => $allStockOutRows->filter(fn ($row) => $row->created_at->copy()
+                    ->setTimezone(self::BUSINESS_TIMEZONE)->isSameMonth($month))->sum('quantity'),
                 'transfers' => 0,
             ];
         })->push([
-            'month' => $today->format('M'),
-            'receiving' => $stockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)->isSameMonth($today))->sum('quantity'),
-            'release' => $stockOutRows->filter(fn ($row) => $row->created_at->isSameMonth($today))->sum('quantity'),
+            'month' => $activityToday->format('M'),
+            'receiving' => $allStockInRows->filter(fn ($row) => Carbon::parse($row->stocked_in_at)
+                ->setTimezone(self::BUSINESS_TIMEZONE)->isSameMonth($activityToday))->sum('quantity'),
+            'release' => $allStockOutRows->filter(fn ($row) => $row->created_at->copy()
+                ->setTimezone(self::BUSINESS_TIMEZONE)->isSameMonth($activityToday))->sum('quantity'),
             'transfers' => 0,
         ]);
 

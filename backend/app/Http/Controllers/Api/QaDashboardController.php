@@ -20,6 +20,7 @@ class QaDashboardController extends Controller
         }
 
         $completed = QaInspection::query()
+            ->whereHas('receiving', fn ($query) => $query->where('assigned_qa_user_id', $request->user()->id))
             ->whereNotNull('completed_at')
             ->whereIn('status', self::FINAL_STATUSES);
 
@@ -28,6 +29,7 @@ class QaDashboardController extends Controller
 
         $quantities = QaInspectionItem::query()
             ->whereHas('inspection', fn ($query) => $query
+                ->whereHas('receiving', fn ($receiving) => $receiving->where('assigned_qa_user_id', $request->user()->id))
                 ->whereNotNull('completed_at')
                 ->whereIn('status', self::FINAL_STATUSES))
             ->selectRaw('COALESCE(SUM(accepted_quantity), 0) AS accepted_total')
@@ -35,6 +37,7 @@ class QaDashboardController extends Controller
             ->first();
 
         $pendingQuery = Receiving::query()
+            ->where('assigned_qa_user_id', $request->user()->id)
             ->where('status', 'Pending QA')
             ->where(function ($query) {
                 $query->whereDoesntHave('qaInspection')

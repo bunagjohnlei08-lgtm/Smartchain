@@ -47,6 +47,15 @@ class QaInspectionController extends Controller
         return null;
     }
 
+    private function scopeForUser($query, Request $request)
+    {
+        if ($request->user()?->isQaSupervisor()) {
+            $query->where('assigned_qa_user_id', $request->user()->id);
+        }
+
+        return $query;
+    }
+
     private function normalizeInspectionStatus(Receiving $receiving): string
     {
         $qaInspection = $receiving->qaInspection;
@@ -232,7 +241,7 @@ class QaInspectionController extends Controller
 
         try {
             $receiving = DB::transaction(function () use ($request, $validated, $receivingId, $user, $shouldSubmit, &$storedPath, &$previousPath) {
-                $receiving = Receiving::query()
+                $receiving = $this->scopeForUser(Receiving::query(), $request)
                     ->with(['items', 'qaInspection.items'])
                     ->lockForUpdate()
                     ->find($receivingId);
@@ -448,7 +457,13 @@ class QaInspectionController extends Controller
             return $response;
         }
 
-        $inspection = QaInspection::where('receiving_id', $receivingId)->first();
+        $inspection = QaInspection::query()
+            ->where('receiving_id', $receivingId)
+            ->when($request->user()?->isQaSupervisor(), fn ($query) => $query->whereHas(
+                'receiving',
+                fn ($receiving) => $receiving->where('assigned_qa_user_id', $request->user()->id)
+            ))
+            ->first();
         $path = $inspection?->attachment_path;
         if (! $path || ! Storage::disk('local')->exists($path)) {
             return response()->json(['message' => 'Attachment not found.'], 404);
@@ -466,7 +481,7 @@ class QaInspectionController extends Controller
             return $response;
         }
 
-        $query = Receiving::query()
+        $query = $this->scopeForUser(Receiving::query(), $request)
             ->with(['items', 'preparedBy', 'qaInspection'])
             ->where('status', 'Pending QA')
             ->where(function ($builder) {
@@ -512,14 +527,14 @@ class QaInspectionController extends Controller
             return $response;
         }
 
-        $receiving = Receiving::with([
+        $receiving = $this->scopeForUser(Receiving::with([
             'items',
             'preparedBy',
             'timeline',
             'qaInspection.items',
             'qaInspection.inspectedBy',
             'qaInspection.submittedBy',
-        ])->find($receivingId);
+        ]), $request)->find($receivingId);
 
         if (! $receiving) {
             return response()->json(['message' => 'Receiving not found.'], 404);
