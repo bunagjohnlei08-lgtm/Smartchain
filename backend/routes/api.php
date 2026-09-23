@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\PlantManagerWarehouseController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PasswordResetController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -40,6 +41,11 @@ Route::post('/login', [AuthController::class, 'login']);
 // a single-use challenge; a token is issued only by verify-otp.
 Route::post('/login/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:login-otp-verify');
 Route::post('/login/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:login-otp-resend');
+
+Route::post('/forgot-password', [PasswordResetController::class, 'requestCode'])->middleware('throttle:password-reset-request');
+Route::post('/forgot-password/resend', [PasswordResetController::class, 'resend'])->middleware('throttle:password-reset-resend');
+Route::post('/forgot-password/verify', [PasswordResetController::class, 'verify'])->middleware('throttle:password-reset-verify');
+Route::post('/forgot-password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:password-reset-complete');
 
 // Public activation-link endpoints. No token is issued by either.
 Route::middleware('throttle:invitations')->group(function () {
@@ -78,6 +84,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::post('/users', [UserController::class, 'store']);
     Route::put('/users/{id}', [UserController::class, 'update']);
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
     Route::post('/users/{id}/approve', [UserController::class, 'approve']);
     Route::post('/users/{id}/suspend', [UserController::class, 'suspend']);
     Route::post('/users/{id}/activate', [UserController::class, 'activate']);

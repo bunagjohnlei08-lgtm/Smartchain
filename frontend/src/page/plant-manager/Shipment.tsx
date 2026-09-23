@@ -177,7 +177,7 @@ const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
   const { color, bg, dotColor } = config[status];
   return (
     <span
-      className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
+      className={`plant-manager-badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {status}
@@ -779,7 +779,7 @@ const Shipments: React.FC = () => {
                   <td className="px-4 py-3.5 text-sm text-slate-300">
                     {shipment.items.length === 0 && '—'}
                     {shipment.items.slice(0, 2).map((item) => (
-                      <p key={item.id}>{item.name}</p>
+                      <p key={item.id} className="truncate" title={item.name}>{item.name}</p>
                     ))}
                     {shipment.items.length > 2 && (
                       <p className="text-xs text-slate-500">+{shipment.items.length - 2} more</p>

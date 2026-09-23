@@ -696,7 +696,7 @@ const StockIn: React.FC = () => {
         </div>
 
         {receivingsViewMode === 'list' ? (
-        <div className="max-w-full overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+        <div className="pm-table-scroll">
           <table className="pm-status-table pm-stock-in-receivings-table w-full min-w-[900px] table-fixed text-[11px] sm:text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
@@ -846,7 +846,7 @@ const StockIn: React.FC = () => {
                       <span className="font-mono text-cyan-300">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-white">{item.product}</td>
+                  <td className="truncate px-4 py-3 text-white" title={item.product}>{item.product}</td>
                   <td className="px-4 py-3 text-slate-300">{item.warehouse}</td>
                   <td className="px-4 py-3 text-center text-white">{item.quantity}</td>
                   <td className="px-4 py-3 text-slate-300">{formatDateTime(item.stockInDate)}</td>

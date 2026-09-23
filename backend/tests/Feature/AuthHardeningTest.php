@@ -183,7 +183,7 @@ class AuthHardeningTest extends TestCase
         $targetHeaders = $this->bearer($target);
 
         $this->asToken($this->bearer($admin))
-            ->putJson("/api/users/{$target->id}", ['password' => 'brand-new-password'])
+            ->putJson("/api/users/{$target->id}", ['password' => 'BrandNewPassword123'])
             ->assertOk();
 
         $this->assertSame(0, $target->tokens()->count());
@@ -198,8 +198,8 @@ class AuthHardeningTest extends TestCase
 
         $this->asToken($currentHeaders)->putJson('/api/profile/password', [
             'current_password' => 'correct-password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword123',
+            'password_confirmation' => 'NewPassword123',
         ])->assertOk();
 
         $this->assertSame(1, $user->tokens()->count());

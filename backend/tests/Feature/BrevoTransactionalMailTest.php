@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\BrevoDeliveryException;
 use App\Mail\LoginOtpMail;
+use App\Mail\PasswordResetOtpMail;
 use App\Mail\UserInvitationMail;
 use App\Support\BrevoTransactionalMail;
 use Illuminate\Http\Client\ConnectionException;
@@ -88,6 +89,26 @@ class BrevoTransactionalMailTest extends TestCase
             $this->assertStringContainsString('activate-account?token=opaque-token', $body['htmlContent']);
             $this->assertStringContainsString('Welcome to SmartChain', $body['htmlContent']);
 
+            return true;
+        });
+    }
+
+    public function test_password_reset_code_uses_the_brevo_https_transport(): void
+    {
+        Http::fake([BrevoTransactionalMail::ENDPOINT => Http::response(['messageId' => '<reset@brevo>'], 201)]);
+
+        Mail::to('dana@example.test')->send(new PasswordResetOtpMail(
+            name: 'Dana Cruz',
+            code: self::OTP,
+            expiresInMinutes: 5,
+        ));
+
+        Http::assertSent(function (Request $request) {
+            $body = $request->data();
+            $this->assertSame(BrevoTransactionalMail::ENDPOINT, $request->url());
+            $this->assertSame('SmartChain Password Reset Verification Code', $body['subject']);
+            $this->assertStringContainsString(self::OTP, $body['htmlContent']);
+            $this->assertStringContainsString('SmartChain password reset', $body['htmlContent']);
             return true;
         });
     }

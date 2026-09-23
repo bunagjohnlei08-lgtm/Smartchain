@@ -20,6 +20,9 @@ import {
   Users,
   LayoutGrid,
   LayoutList,
+  Loader2,
+  Trash2,
+  TriangleAlert,
 } from 'lucide-react';
 import type { ApiUser, ApiRole, ApiDepartment, ApiBranch, ApiWarehouse } from '../../types';
 import type { AxiosError } from 'axios';
@@ -416,6 +419,9 @@ const UserManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [resendingId, setResendingId] = useState<number | null>(null);
+  const [archiveUser, setArchiveUser] = useState<ApiUser | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -563,6 +569,22 @@ const UserManagement: React.FC = () => {
       await fetchStatistics();
     } catch (e) {
       alert(getApiErrorMessage(e));
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!archiveUser || isArchiving) return;
+    setIsArchiving(true);
+    setArchiveError(null);
+    try {
+      const response = await apiClient.delete(`/users/${archiveUser.id}`);
+      setArchiveUser(null);
+      setNotice({ tone: 'success', text: response.data?.message ?? 'User account deleted successfully.' });
+      await Promise.all([fetchUsers(), fetchStatistics()]);
+    } catch (e) {
+      setArchiveError(getApiErrorMessage(e));
+    } finally {
+      setIsArchiving(false);
     }
   };
 
@@ -759,6 +781,7 @@ const UserManagement: React.FC = () => {
                           {u.status === 'SUSPENDED' && (
                             <button onClick={() => handleActivate(u)} className="p-1 hover:text-green-400 transition" title="Activate"><UserCheck className="w-4 h-4" /></button>
                           )}
+                          <button onClick={() => { setArchiveError(null); setArchiveUser(u); }} className="p-1 hover:text-rose-400 transition" title="Delete user" aria-label={`Delete ${displayName}`}><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -779,7 +802,7 @@ const UserManagement: React.FC = () => {
                 <article key={u.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                   <div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-500/30 bg-blue-600/20 text-xs font-bold text-blue-600 dark:text-blue-400">{initials}</div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</h3><p className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</p></div><span className={`admin-badge rounded-full border px-2.5 py-1 text-[10px] font-semibold ${u.status === 'ACTIVE' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : u.status === 'PENDING' ? 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>{u.status}</span></div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500 dark:text-slate-400">Employee ID</dt><dd className="font-mono text-slate-900 dark:text-white">{u.employee_id}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Role</dt><dd className="text-slate-900 dark:text-white">{u.role?.slug || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Department</dt><dd className="text-slate-900 dark:text-white">{u.department?.name || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{u.warehouse?.code || '—'}</dd></div></dl>
-                  <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 text-slate-500 dark:border-slate-700 dark:text-slate-400"><button onClick={() => setViewUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button><button onClick={() => setEditUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="Edit"><Edit className="h-4 w-4" /></button>{u.status === 'PENDING' && <button onClick={() => handleResendInvitation(u)} disabled={resendingId !== null} className="p-1 hover:text-[#5B8CFF] disabled:cursor-not-allowed disabled:opacity-40" title={resendingId === u.id ? 'Sending invitation...' : 'Resend Invitation'} aria-label={`Resend invitation to ${u.email}`} aria-busy={resendingId === u.id}><Send className={`h-4 w-4 ${resendingId === u.id ? 'animate-pulse' : ''}`} /></button>}{u.status === 'PENDING' && !isAwaitingActivation(u) && <button onClick={() => handleApprove(u)} className="p-1 hover:text-green-500" title="Approve"><Check className="h-4 w-4" /></button>}{u.status === 'ACTIVE' && <button onClick={() => handleSuspend(u)} className="p-1 hover:text-red-500" title="Suspend"><UserX className="h-4 w-4" /></button>}{u.status === 'SUSPENDED' && <button onClick={() => handleActivate(u)} className="p-1 hover:text-green-500" title="Activate"><UserCheck className="h-4 w-4" /></button>}</div>
+                  <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-3 text-slate-500 dark:border-slate-700 dark:text-slate-400"><button onClick={() => setViewUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button><button onClick={() => setEditUser(u)} className="p-1 hover:text-slate-900 dark:hover:text-white" title="Edit"><Edit className="h-4 w-4" /></button>{u.status === 'PENDING' && <button onClick={() => handleResendInvitation(u)} disabled={resendingId !== null} className="p-1 hover:text-[#5B8CFF] disabled:cursor-not-allowed disabled:opacity-40" title={resendingId === u.id ? 'Sending invitation...' : 'Resend Invitation'} aria-label={`Resend invitation to ${u.email}`} aria-busy={resendingId === u.id}><Send className={`h-4 w-4 ${resendingId === u.id ? 'animate-pulse' : ''}`} /></button>}{u.status === 'PENDING' && !isAwaitingActivation(u) && <button onClick={() => handleApprove(u)} className="p-1 hover:text-green-500" title="Approve"><Check className="h-4 w-4" /></button>}{u.status === 'ACTIVE' && <button onClick={() => handleSuspend(u)} className="p-1 hover:text-red-500" title="Suspend"><UserX className="h-4 w-4" /></button>}{u.status === 'SUSPENDED' && <button onClick={() => handleActivate(u)} className="p-1 hover:text-green-500" title="Activate"><UserCheck className="h-4 w-4" /></button>}<button onClick={() => { setArchiveError(null); setArchiveUser(u); }} className="p-1 hover:text-rose-500" title="Delete user" aria-label={`Delete ${displayName}`}><Trash2 className="h-4 w-4" /></button></div>
                 </article>
               );
             })}
@@ -822,6 +845,32 @@ const UserManagement: React.FC = () => {
           branches={branches}
           warehouses={warehouses}
         />
+      )}
+
+      {archiveUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => !isArchiving && setArchiveUser(null)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="archive-user-title" className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#0d1322] p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-rose-500/10 p-2.5 text-rose-400"><TriangleAlert className="h-5 w-5" /></div>
+              <div className="min-w-0 flex-1">
+                <h2 id="archive-user-title" className="text-lg font-semibold text-white">Delete User?</h2>
+                <p className="mt-2 break-words text-sm leading-6 text-slate-300">Are you sure you want to delete this user ({archiveUser.name || 'Unnamed'})?</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">This account will no longer be able to sign in. Historical records will be preserved.</p>
+              </div>
+              <button type="button" disabled={isArchiving} onClick={() => setArchiveUser(null)} aria-label="Close archive confirmation" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50"><X className="h-4 w-4" /></button>
+            </div>
+            <dl className="mt-4 rounded-xl border border-slate-700/70 bg-slate-900/50 p-4 text-sm">
+              <div className="grid grid-cols-[90px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Name</dt><dd className="break-words font-medium text-white">{archiveUser.name || 'Unnamed'}</dd></div>
+              <div className="mt-2 grid grid-cols-[90px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Employee ID</dt><dd className="break-words font-mono text-white">{archiveUser.employee_id || '—'}</dd></div>
+              <div className="mt-2 grid grid-cols-[90px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Role</dt><dd className="break-words text-white">{archiveUser.role?.slug || '—'}</dd></div>
+            </dl>
+            {archiveError && <div role="alert" className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{archiveError}</div>}
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" disabled={isArchiving} onClick={() => setArchiveUser(null)} className="min-h-11 rounded-lg border border-slate-600 px-4 text-sm font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-50">Cancel</button>
+              <button type="button" disabled={isArchiving} onClick={handleArchive} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60" aria-busy={isArchiving}>{isArchiving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{isArchiving ? 'Deleting…' : 'Delete User'}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {viewUser && (

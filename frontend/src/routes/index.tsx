@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import LoginPage from '../page/LoginPage';
 import ActivateAccountPage from '../page/ActivateAccountPage';
+import ForgotPasswordPage from '../page/ForgotPasswordPage';
 
 import AdminLayout from '../components/layout/AdminLayout';
 import PlantManagerLayout from '../layouts/PlantManagerLayout';
@@ -50,6 +51,7 @@ import QANotifications from '../page/QA/Notifications';
 const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/login" replace /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/activate-account', element: <ActivateAccountPage /> },
   {
     path: '/dashboard',

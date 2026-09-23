@@ -6,11 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserInvitation;
 use App\Support\AuditLogger;
+use App\Support\PasswordPolicy;
 use App\Support\UserInvitations;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * Public (unauthenticated, throttled) endpoints behind the emailed
@@ -44,7 +44,7 @@ class InvitationController extends Controller
     {
         $validated = $request->validate([
             'token' => ['required', 'string', 'max:128'],
-            'password' => ['required', 'string', 'max:72', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => PasswordPolicy::rules(),
         ]);
 
         $user = DB::transaction(function () use ($validated): ?User {

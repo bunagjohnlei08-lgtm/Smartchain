@@ -225,23 +225,23 @@ class ProfileTest extends TestCase
 
         $this->putJson('/api/profile/password', [
             'current_password' => 'wrong-password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword123',
+            'password_confirmation' => 'NewPassword123',
         ])->assertUnprocessable()->assertJsonValidationErrors('current_password');
 
         $this->putJson('/api/profile/password', [
             'current_password' => 'old-password',
-            'password' => 'new-password',
+            'password' => 'NewPassword123',
             'password_confirmation' => 'different-password',
         ])->assertUnprocessable()->assertJsonValidationErrors('password');
 
         $this->putJson('/api/profile/password', [
             'current_password' => 'old-password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword123',
+            'password_confirmation' => 'NewPassword123',
         ])->assertOk();
 
-        $this->assertTrue(Hash::check('new-password', $user->fresh()->password));
+        $this->assertTrue(Hash::check('NewPassword123', $user->fresh()->password));
     }
 
     public function test_password_change_preserves_existing_token(): void
@@ -252,8 +252,8 @@ class ProfileTest extends TestCase
 
         $this->withHeaders($headers)->putJson('/api/profile/password', [
             'current_password' => 'old-password',
-            'password' => 'new-password',
-            'password_confirmation' => 'new-password',
+            'password' => 'NewPassword123',
+            'password_confirmation' => 'NewPassword123',
         ])->assertOk();
 
         $this->withHeaders($headers)->getJson('/api/profile')->assertOk();

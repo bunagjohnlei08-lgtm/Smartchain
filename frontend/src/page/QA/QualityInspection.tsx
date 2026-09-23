@@ -147,11 +147,10 @@ function resolveItemResult(deliveredQty: number, acceptedQty: number, rejectedQt
   return 'Pending';
 }
 
-function parseQuantityInput(value: string): number {
-  const normalized = value.replace(/^0+(?=\d)/, '');
-  const quantity = Number(normalized);
-
-  return Number.isFinite(quantity) ? Math.max(0, Math.trunc(quantity)) : 0;
+function normalizeQuantityInput(value: string): string | null {
+  if (value === '') return '';
+  if (!/^\d+$/.test(value)) return null;
+  return value.replace(/^0+(?=\d)/, '');
 }
 
 function formatDateOnly(dateString: string | null): string {
@@ -341,6 +340,8 @@ const QualityInspection: React.FC = () => {
   const [records, setRecords] = useState<ReceivingItem[]>([]);
   const [selectedReceivingId, setSelectedReceivingId] = useState<number | null>(null);
   const [selectedReceiving, setSelectedReceiving] = useState<ReceivingDetail | null>(null);
+  const [quantityInputs, setQuantityInputs] = useState<Record<number, { acceptedQty: string; rejectedQty: string }>>({});
+  const [quantityErrors, setQuantityErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'products' | 'summary' | 'notes' | 'attachments' | 'timeline'>('products');
   const [search, setSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('All Suppliers');
@@ -386,7 +387,13 @@ const QualityInspection: React.FC = () => {
     try {
       const response = await apiClient.get<QaInspectionDetailApi>(`/qa/inspections/${receivingId}`);
       if (requestId !== detailRequestId.current) return;
-      setSelectedReceiving(mapDetail(response.data));
+      const detail = mapDetail(response.data);
+      setSelectedReceiving(detail);
+      setQuantityInputs(Object.fromEntries(detail.products.map((product) => [product.id, {
+        acceptedQty: product.acceptedQty === 0 ? '' : String(product.acceptedQty),
+        rejectedQty: product.rejectedQty === 0 ? '' : String(product.rejectedQty),
+      }])));
+      setQuantityErrors({});
     } catch (error) {
       if (requestId !== detailRequestId.current) return;
       setDetailError(getApiErrorMessage(error));
@@ -404,6 +411,8 @@ const QualityInspection: React.FC = () => {
     setSelectedAttachment(null);
     setAttachmentError(null);
     setSelectedReceiving(null);
+    setQuantityInputs({});
+    setQuantityErrors({});
     if (selectedReceivingId === null) {
       setSelectedReceiving(null);
       return;
@@ -487,6 +496,41 @@ const QualityInspection: React.FC = () => {
     });
   };
 
+  const updateQuantityInput = (
+    product: ReceivingProduct,
+    field: 'acceptedQty' | 'rejectedQty',
+    rawValue: string,
+  ) => {
+    const normalized = normalizeQuantityInput(rawValue);
+    if (normalized === null) return;
+
+    const otherQuantity = field === 'acceptedQty' ? product.rejectedQty : product.acceptedQty;
+    const maximum = Math.max(0, product.deliveredQty - otherQuantity);
+    const numericValue = normalized === '' ? 0 : Number(normalized);
+    const errorKey = `${product.id}:${field}`;
+
+    if (!Number.isSafeInteger(numericValue) || numericValue > maximum) {
+      setQuantityErrors((current) => ({ ...current, [errorKey]: `Maximum allowed is ${maximum}.` }));
+      return;
+    }
+
+    setQuantityInputs((current) => ({
+      ...current,
+      [product.id]: {
+        acceptedQty: current[product.id]?.acceptedQty ?? (product.acceptedQty === 0 ? '' : String(product.acceptedQty)),
+        rejectedQty: current[product.id]?.rejectedQty ?? (product.rejectedQty === 0 ? '' : String(product.rejectedQty)),
+        [field]: normalized,
+      },
+    }));
+    setQuantityErrors((current) => {
+      if (!current[errorKey]) return current;
+      const next = { ...current };
+      delete next[errorKey];
+      return next;
+    });
+    updateProductField(product.id, { [field]: numericValue });
+  };
+
   const validateProducts = (submit: boolean): string | null => {
     if (!selectedReceiving) return 'Select a receiving record first.';
 
@@ -559,7 +603,13 @@ const QualityInspection: React.FC = () => {
       setAttachmentError(null);
       if (submit) {
         setSearchParams({ receiving: String(selectedReceiving.id) });
-        setSelectedReceiving(mapDetail(response.data));
+        const detail = mapDetail(response.data);
+        setSelectedReceiving(detail);
+        setQuantityInputs(Object.fromEntries(detail.products.map((product) => [product.id, {
+          acceptedQty: product.acceptedQty === 0 ? '' : String(product.acceptedQty),
+          rejectedQty: product.rejectedQty === 0 ? '' : String(product.rejectedQty),
+        }])));
+        setQuantityErrors({});
         await fetchList();
         setSelectedReceivingId(selectedReceiving.id);
       } else {
@@ -964,6 +1014,14 @@ const QualityInspection: React.FC = () => {
                             {selectedReceiving.products.map((product) => {
                               const quantityError = product.acceptedQty + product.rejectedQty > product.deliveredQty;
                               const readOnly = ['Passed', 'Rejected', 'Partial'].includes(selectedReceiving.inspectionStatus);
+                              const acceptedMaximum = Math.max(0, product.deliveredQty - product.rejectedQty);
+                              const rejectedMaximum = Math.max(0, product.deliveredQty - product.acceptedQty);
+                              const acceptedError = quantityErrors[`${product.id}:acceptedQty`];
+                              const rejectedError = quantityErrors[`${product.id}:rejectedQty`];
+                              const inputValues = quantityInputs[product.id] ?? {
+                                acceptedQty: product.acceptedQty === 0 ? '' : String(product.acceptedQty),
+                                rejectedQty: product.rejectedQty === 0 ? '' : String(product.rejectedQty),
+                              };
 
                               return (
                                 <tr key={product.id} className="border-b border-gray-800 hover:bg-gray-800/30">
@@ -972,27 +1030,33 @@ const QualityInspection: React.FC = () => {
                                   <td className="px-2 py-2 text-center text-white">{product.deliveredQty}</td>
                                   <td className="px-2 py-2 text-center">
                                     <input
-                                      type="number"
-                                      min={0}
-                                      max={product.deliveredQty}
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      max={acceptedMaximum}
                                       disabled={readOnly}
-                                      value={product.acceptedQty}
-                                      onFocus={(event) => { if (event.currentTarget.value === '0') event.currentTarget.select(); }}
-                                      onChange={(event) => updateProductField(product.id, { acceptedQty: parseQuantityInput(event.currentTarget.value) })}
-                                      className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
+                                      value={inputValues.acceptedQty}
+                                      placeholder="0"
+                                      aria-invalid={Boolean(acceptedError || quantityError)}
+                                      onChange={(event) => updateQuantityInput(product, 'acceptedQty', event.currentTarget.value)}
+                                      className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${acceptedError || quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
                                     />
+                                    {acceptedError && <p className="mt-1 text-[10px] leading-3 text-rose-400">{acceptedError}</p>}
                                   </td>
                                   <td className="px-2 py-2 text-center">
                                     <input
-                                      type="number"
-                                      min={0}
-                                      max={product.deliveredQty}
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      max={rejectedMaximum}
                                       disabled={readOnly}
-                                      value={product.rejectedQty}
-                                      onFocus={(event) => { if (event.currentTarget.value === '0') event.currentTarget.select(); }}
-                                      onChange={(event) => updateProductField(product.id, { rejectedQty: parseQuantityInput(event.currentTarget.value) })}
-                                      className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
+                                      value={inputValues.rejectedQty}
+                                      placeholder="0"
+                                      aria-invalid={Boolean(rejectedError || quantityError)}
+                                      onChange={(event) => updateQuantityInput(product, 'rejectedQty', event.currentTarget.value)}
+                                      className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${rejectedError || quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
                                     />
+                                    {rejectedError && <p className="mt-1 text-[10px] leading-3 text-rose-400">{rejectedError}</p>}
                                   </td>
                                   <td className="px-2 py-2 text-slate-300">{product.unit}</td>
                                   <td className="px-2 py-2">

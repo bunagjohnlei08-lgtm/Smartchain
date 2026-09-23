@@ -28,6 +28,18 @@ const EMPTY_FILTERS: AuditFilters = { search: '', action: '', module: '', status
 const inputClass =
   'h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 placeholder-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:placeholder-slate-400';
 
+const ACTION_LABELS: Record<string, string> = {
+  PASSWORD_RESET_REQUESTED: 'Password reset requested',
+  PASSWORD_RESET_OTP_SENT: 'Password reset code sent',
+  PASSWORD_RESET_OTP_FAILED: 'Password reset code failed',
+  PASSWORD_RESET_COMPLETED: 'Password reset completed',
+  USER_ARCHIVED: 'User archived',
+};
+
+function actionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? action.toLowerCase().split('_').map((word) => word[0]?.toUpperCase() + word.slice(1)).join(' ');
+}
+
 function errorMessage(error: unknown): string {
   const status = (error as AxiosError).response?.status;
   if (status === 401) return 'Session expired. Please log in again.';
@@ -96,7 +108,7 @@ const AuditLogDetails: React.FC<{ log: ApiAuditLog; onClose: () => void }> = ({ 
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 id="audit-log-details-title" className="text-base font-semibold text-slate-900 dark:text-white">{log.action}</h3>
+          <h3 id="audit-log-details-title" className="text-base font-semibold text-slate-900 dark:text-white">{actionLabel(log.action)}</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400">{formatDateTime(log.created_at)} · {log.module}</p>
         </div>
         <button
@@ -229,7 +241,7 @@ const AuditLogSection: React.FC = () => {
         </div>
         <select value={filters.action} onChange={(e) => updateFilter('action', e.target.value)} aria-label="Filter by action" className={`${inputClass} min-w-[130px] flex-1 cursor-pointer`}>
           <option value="">All Actions</option>
-          {options.actions.map((action) => <option key={action} value={action}>{action}</option>)}
+          {options.actions.map((action) => <option key={action} value={action}>{actionLabel(action)}</option>)}
         </select>
         <select value={filters.module} onChange={(e) => updateFilter('module', e.target.value)} aria-label="Filter by module" className={`${inputClass} min-w-[130px] flex-1 cursor-pointer`}>
           <option value="">All Modules</option>
@@ -298,7 +310,7 @@ const AuditLogSection: React.FC = () => {
                   <tr key={log.id} className={`border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800/40 dark:hover:bg-slate-800/20 ${isLoading ? 'opacity-60' : ''}`}>
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">{formatDateTime(log.created_at)}</td>
                     <td className="truncate px-3 py-2.5 font-medium text-slate-900 dark:text-white" title={actorLabel(log)}>{actorLabel(log)}</td>
-                    <td className="truncate px-3 py-2.5 font-mono text-[11px] font-semibold text-slate-800 dark:text-slate-200" title={log.action}>{log.action}</td>
+                    <td className="truncate px-3 py-2.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200" title={log.action}>{actionLabel(log.action)}</td>
                     <td className="truncate px-3 py-2.5" title={log.module}>{log.module}</td>
                     <td className="truncate px-3 py-2.5 font-mono text-[11px]" title={targetLabel(log)}>{targetLabel(log)}</td>
                     <td className="px-3 py-2.5"><StatusBadge status={log.status} /></td>

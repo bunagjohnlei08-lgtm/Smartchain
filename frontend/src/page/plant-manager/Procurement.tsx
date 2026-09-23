@@ -83,7 +83,7 @@ const StatusBadge: React.FC<{ status: RequestStatus | string }> = ({ status }) =
   const labels: Record<string, string> = { draft: 'Draft', pending: 'Pending Approval', approved: 'Approved', rejected: 'Rejected', for_purchase_order: 'For Purchase Order' };
   const { color, icon: Icon } = config[status] || config.draft;
   return (
-    <span className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
+    <span className={`plant-manager-badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
       <Icon className="w-3 h-3" />
       {labels[status] || status}
     </span>
@@ -542,15 +542,26 @@ const ReplenishmentPlanning: React.FC = () => {
       {/* Main Table */}
       <div className="w-full max-w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="pm-table-scroll w-full">
-          <table className="pm-status-table pm-procurement-status-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full min-w-[900px]">
+        <div className="pm-table-scroll pm-procurement-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+          <table className="pm-status-table pm-procurement-status-table pm-procurement-layout-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full table-fixed">
+            <colgroup>
+              <col className="w-48" />
+              <col className="w-40" />
+              <col className="w-40" />
+              <col className="w-52" />
+              <col className="w-[8.5rem]" />
+              <col className="w-28" />
+              <col className="w-[11.5rem]" />
+              <col className="w-32" />
+              <col className="w-22" />
+            </colgroup>
             <thead className="bg-[var(--bg-surface-alt)] border-b border-[var(--border-color)]">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
+                <th className="whitespace-nowrap px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
@@ -560,14 +571,14 @@ const ReplenishmentPlanning: React.FC = () => {
             <tbody>
               {paginatedRequests.map((req) => (
                 <tr key={req.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
-                  <td className="px-4 py-3.5 text-sm font-medium text-[var(--text-primary)]">{req.requestNo}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.requestedBy}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.warehouse}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.product}</td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.requestedQty.toLocaleString()}</td>
+                  <td className="overflow-hidden text-ellipsis whitespace-nowrap px-4 py-3.5 text-sm font-medium text-[var(--text-primary)]" title={req.requestNo}>{req.requestNo}</td>
+                  <td className="truncate px-4 py-3.5 text-sm text-[var(--text-secondary)]" title={req.requestedBy}>{req.requestedBy}</td>
+                  <td className="truncate px-4 py-3.5 text-sm text-[var(--text-secondary)]" title={req.warehouse}>{req.warehouse}</td>
+                  <td className="truncate px-4 py-3.5 text-sm text-[var(--text-secondary)]" title={req.product}>{req.product}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.requestedQty.toLocaleString()}</td>
                   <td className="px-4 py-3.5"><PriorityBadge priority={req.priority} /></td>
                   <td className="px-4 py-3.5"><StatusBadge status={req.status} /></td>
-                  <td className="px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.submittedDate}</td>
+                  <td className="whitespace-nowrap px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.submittedDate}</td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center justify-center gap-1">
                       <button
@@ -614,15 +625,26 @@ const ReplenishmentPlanning: React.FC = () => {
           </div>
           <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">View all</button>
         </div>
-        <div className="pm-table-scroll w-full">
-          <table className="pm-status-table pm-procurement-status-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full min-w-[900px]">
+        <div className="pm-table-scroll pm-procurement-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+          <table className="pm-status-table pm-procurement-status-table pm-procurement-layout-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full table-fixed">
+            <colgroup>
+              <col className="w-48" />
+              <col className="w-40" />
+              <col className="w-40" />
+              <col className="w-52" />
+              <col className="w-[8.5rem]" />
+              <col className="w-28" />
+              <col className="w-[11.5rem]" />
+              <col className="w-32" />
+              <col className="w-22" />
+            </colgroup>
             <thead className="border-b border-[var(--border-color)]">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
+                <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
@@ -632,14 +654,14 @@ const ReplenishmentPlanning: React.FC = () => {
             <tbody>
               {history.map((item) => (
                 <tr key={item.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
-                  <td className="px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]">{item.requestNo}</td>
-                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.requestedBy}</td>
-                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.warehouse}</td>
-                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.product}</td>
-                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.requestedQty.toLocaleString()}</td>
+                  <td className="overflow-hidden text-ellipsis whitespace-nowrap px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]" title={item.requestNo}>{item.requestNo}</td>
+                  <td className="truncate px-4 py-2.5 text-sm text-[var(--text-secondary)]" title={item.requestedBy}>{item.requestedBy}</td>
+                  <td className="truncate px-4 py-2.5 text-sm text-[var(--text-secondary)]" title={item.warehouse}>{item.warehouse}</td>
+                  <td className="truncate px-4 py-2.5 text-sm text-[var(--text-secondary)]" title={item.product}>{item.product}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.requestedQty.toLocaleString()}</td>
                   <td className="px-4 py-2.5"><PriorityBadge priority={item.priority} /></td>
                   <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
-                  <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.submittedDate}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.submittedDate}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-center gap-1">
                       <button

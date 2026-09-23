@@ -51,11 +51,15 @@ class UserPolicy
 
     public function resendInvitation(User $authUser, UserModel $user): bool
     {
-        return $authUser->isAdmin();
+        return $authUser->isAdmin() && $user->status !== 'ARCHIVED';
     }
 
     public function update(User $authUser, UserModel $user): bool
     {
+        if ($user->status === 'ARCHIVED') {
+            return false;
+        }
+
         if ($authUser->isAdmin()) {
             return true;
         }
@@ -71,6 +75,10 @@ class UserPolicy
 
     public function approve(User $authUser, UserModel $user): bool
     {
+        if ($user->status === 'ARCHIVED') {
+            return false;
+        }
+
         if ($authUser->isAdmin()) {
             return true;
         }
@@ -84,6 +92,10 @@ class UserPolicy
 
     public function suspend(User $authUser, UserModel $user): bool
     {
+        if ($user->status === 'ARCHIVED') {
+            return false;
+        }
+
         if ($authUser->isAdmin()) {
             return true;
         }
@@ -97,6 +109,10 @@ class UserPolicy
 
     public function activate(User $authUser, UserModel $user): bool
     {
+        if ($user->status === 'ARCHIVED') {
+            return false;
+        }
+
         if ($authUser->isAdmin()) {
             return true;
         }
@@ -106,5 +122,11 @@ class UserPolicy
         }
 
         return false;
+    }
+
+    /** Archival is deliberately stricter than ordinary user maintenance. */
+    public function delete(User $authUser, UserModel $user): bool
+    {
+        return $authUser->isAdmin();
     }
 }

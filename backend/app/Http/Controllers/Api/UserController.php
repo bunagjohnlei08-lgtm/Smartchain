@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\LoginChallenge;
+use App\Models\PasswordResetChallenge;
 use App\Models\User;
 use App\Models\UserInvitation;
 use App\Models\Role;
@@ -20,6 +22,7 @@ use Illuminate\Validation\ValidationException;
 use App\Policies\UserPolicy;
 use App\Support\AuditLogger;
 use App\Support\UserInvitations;
+use App\Support\PasswordPolicy;
 
 class UserController extends Controller
 {
@@ -31,6 +34,7 @@ class UserController extends Controller
         $this->authorize('viewAny', User::class);
 
         $query = User::query()
+            ->where('status', '!=', 'ARCHIVED')
             ->with(['role', 'department', 'branch', 'warehouse']);
 
         if ($user->isPlantManager()) {
@@ -69,7 +73,7 @@ class UserController extends Controller
         $user = $request->user();
         $this->authorize('viewAny', User::class);
 
-        $query = User::query();
+        $query = User::query()->where('status', '!=', 'ARCHIVED');
 
         if ($user->isPlantManager()) {
             $query->where('branch_id', $user->branch_id);
@@ -246,7 +250,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => 'sometimes|string|min:6',
+            'password' => PasswordPolicy::rules(confirmed: false, required: false),
             'employee_id' => ['sometimes', 'string', Rule::unique('users', 'employee_id')->ignore($user->id)],
             'role_id' => $this->roleAssignmentRules($request),
             'department_id' => ['sometimes', 'nullable', 'exists:departments,id'],
@@ -327,6 +331,71 @@ class UserController extends Controller
         $this->auditStatusChange('ACCOUNT_ENABLED', $user, $previous);
 
         return response()->json($user->load(['role', 'department', 'branch', 'warehouse']));
+    }
+
+    /**
+     * Preserve the user row and every historical foreign-key reference while
+     * permanently removing the account from active use.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $target = User::with('role')->findOrFail($id);
+        $this->authorize('delete', $target);
+
+        if ((int) $request->user()->getKey() === (int) $target->getKey()) {
+            return response()->json(['message' => 'You cannot archive your own account.'], 422);
+        }
+
+        $result = DB::transaction(function () use ($target) {
+            // Lock the ADMIN role first to serialize concurrent last-admin checks.
+            $adminRole = Role::query()->where('slug', 'ADMIN')->lockForUpdate()->first();
+            $locked = User::query()->with('role')->whereKey($target->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === 'ARCHIVED') {
+                return null;
+            }
+
+            if ($adminRole && $locked->role_id === $adminRole->id) {
+                $activeAdmins = User::query()
+                    ->where('role_id', $adminRole->id)
+                    ->where('status', 'ACTIVE')
+                    ->count();
+
+                if ($locked->status === 'ACTIVE' && $activeAdmins <= 1) {
+                    throw ValidationException::withMessages([
+                        'user' => 'The last active administrator cannot be archived.',
+                    ]);
+                }
+            }
+
+            $previousStatus = $locked->status;
+            $revokedAt = now();
+
+            $locked->forceFill(['status' => 'ARCHIVED'])->save();
+            $locked->tokens()->delete();
+            DB::table('sessions')->where('user_id', $locked->id)->delete();
+            LoginChallenge::query()->where('user_id', $locked->id)->outstanding()->update(['revoked_at' => $revokedAt]);
+            PasswordResetChallenge::query()->where('user_id', $locked->id)->outstanding()->update(['revoked_at' => $revokedAt]);
+            UserInvitation::query()->where('user_id', $locked->id)->outstanding()->update(['revoked_at' => $revokedAt]);
+
+            AuditLogger::success('USER_ARCHIVED', AuditLogger::MODULE_USERS, [
+                'resource' => $locked,
+                'resource_label' => $locked->employee_id,
+                'details' => sprintf('Archived account for %s', $locked->name),
+                'metadata' => [
+                    'previous_status' => $previousStatus,
+                    'role' => $locked->role?->slug,
+                ],
+            ]);
+
+            return $locked;
+        });
+
+        if (! $result) {
+            return response()->json(['message' => 'This account has already been archived.'], 409);
+        }
+
+        return response()->json(['message' => 'User account deleted successfully.']);
     }
 
     public function roles()

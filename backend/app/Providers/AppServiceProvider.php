@@ -49,6 +49,30 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(2)->by('login-otp-resend-challenge:'.hash('sha256', (string) $request->input('challenge_id'))),
         ]);
 
+        RateLimiter::for('password-reset-request', function (Request $request) {
+            $email = mb_strtolower(trim((string) $request->input('email')));
+            return [
+                Limit::perMinutes(15, 5)->by('password-reset-request-ip:'.$request->ip()),
+                Limit::perMinutes(15, 5)->by('password-reset-request-account:'.hash('sha256', $email)),
+                Limit::perMinutes(15, 5)->by('password-reset-request-client:'.hash('sha256', $email.'|'.$request->ip())),
+            ];
+        });
+
+        RateLimiter::for('password-reset-verify', fn (Request $request) => [
+            Limit::perMinute(10)->by('password-reset-verify-ip:'.$request->ip()),
+            Limit::perMinute(5)->by('password-reset-verify-flow:'.hash('sha256', (string) $request->input('flow_id'))),
+        ]);
+
+        RateLimiter::for('password-reset-resend', fn (Request $request) => [
+            Limit::perMinute(5)->by('password-reset-resend-ip:'.$request->ip()),
+            Limit::perMinute(2)->by('password-reset-resend-flow:'.hash('sha256', (string) $request->input('flow_id'))),
+        ]);
+
+        RateLimiter::for('password-reset-complete', fn (Request $request) => [
+            Limit::perMinute(10)->by('password-reset-complete-ip:'.$request->ip()),
+            Limit::perMinute(5)->by('password-reset-complete-token:'.hash('sha256', (string) $request->input('reset_token'))),
+        ]);
+
         // Admin resend: per admin, on top of the per-account cooldown.
         RateLimiter::for('invitation-resend', fn (Request $request) => Limit::perMinute(10)->by(
             'invitation-resend:'.($request->user()?->id ?: $request->ip())

@@ -388,7 +388,83 @@
   .admin-main .admin-inventory-table td:nth-child(9) > div { gap: 8px; }
 }
 
-/* Plant Manager operational tables: compact, contained mobile scrolling. */
+/* Plant Manager operational tables keep usable columns inside a contained scroller. */
+.pm-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+:is(.pm-stock-in-receivings-table, .pm-stock-in-recent-table, .pm-procurement-status-table, .pm-order-status-table, .pm-shipment-status-table) {
+  table-layout: fixed;
+}
+
+:is(.pm-stock-in-receivings-table, .pm-stock-in-recent-table, .pm-procurement-status-table, .pm-order-status-table, .pm-shipment-status-table) .plant-manager-badge {
+  width: fit-content;
+  max-width: none;
+  white-space: nowrap !important;
+}
+
+.pm-stock-in-receivings-table { min-width: 74rem !important; }
+.pm-stock-in-receivings-table :is(th, td):nth-child(2) { width: 17rem; }
+.pm-stock-in-receivings-table :is(th, td):nth-child(6) { width: 11rem; }
+
+.pm-stock-in-recent-table { min-width: 66rem !important; }
+.pm-stock-in-recent-table :is(th, td):nth-child(1) { width: 10rem; }
+.pm-stock-in-recent-table :is(th, td):nth-child(2) { width: 17rem; }
+.pm-stock-in-recent-table :is(th, td):nth-child(3) { width: 11rem; }
+.pm-stock-in-recent-table :is(th, td):nth-child(4) { width: 6rem; }
+.pm-stock-in-recent-table :is(th, td):nth-child(5) { width: 11rem; }
+.pm-stock-in-recent-table :is(th, td):nth-child(6) { width: 8.5rem; }
+.pm-stock-in-recent-table :is(th, td):nth-child(7) { width: 5.5rem; }
+
+.pm-procurement-status-table { min-width: 78.5rem !important; }
+.plant-manager-main .pm-procurement-layout-table {
+  /* Matches the nine colgroup widths so fixed-layout columns never compress. */
+  min-width: 85.5rem !important;
+}
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(1) { width: 12rem; max-width: 12rem; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(2) { width: 10rem; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(3) { width: 10rem; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(4) { width: 13rem; max-width: 13rem; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(5) { width: 8.5rem; white-space: nowrap; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(6) { width: 7rem; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(7) { width: 11.5rem; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(8) { width: 8rem; white-space: nowrap; }
+.plant-manager-main .pm-procurement-layout-table :is(th, td):nth-child(9) { width: 5.5rem; }
+.plant-manager-main .pm-procurement-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.plant-manager-main .pm-procurement-table-scroll::-webkit-scrollbar {
+  display: block;
+  height: 8px;
+}
+.pm-procurement-status-table :is(th, td):nth-child(1) { width: 9.5rem; }
+.pm-procurement-status-table :is(th, td):nth-child(2) { width: 10rem; }
+.pm-procurement-status-table :is(th, td):nth-child(3) { width: 9rem; }
+.pm-procurement-status-table :is(th, td):nth-child(4) { width: 14rem; }
+.pm-procurement-status-table :is(th, td):nth-child(5) { width: 7.5rem; }
+.pm-procurement-status-table :is(th, td):nth-child(6) { width: 7rem; }
+.pm-procurement-status-table :is(th, td):nth-child(7) { width: 11rem; }
+.pm-procurement-status-table :is(th, td):nth-child(8) { width: 8rem; }
+.pm-procurement-status-table :is(th, td):nth-child(9) { width: 5.5rem; }
+
+:is(.pm-order-status-table, .pm-shipment-status-table) { min-width: 76rem !important; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(1) { width: 9rem; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(2) { width: 16rem; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(3) { width: 17rem; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(4) { width: 6rem; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(5) { width: 9rem; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(6) { width: 9rem; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(7) { width: 11rem; }
+:is(.pm-order-status-table, .pm-shipment-status-table) :is(th, td):nth-child(8) { width: 6rem; }
+
+/* Compact mobile typography without collapsing operational columns. */
 @media (max-width: 639px) {
   .pm-table-scroll {
     max-width: 100%;
@@ -451,6 +527,12 @@
     white-space: normal !important;
   }
 
+  .plant-manager-main :is(.pm-stock-in-receivings-table, .pm-stock-in-recent-table, .pm-procurement-status-table, .pm-order-status-table, .pm-shipment-status-table) .plant-manager-badge {
+    width: fit-content;
+    max-width: none;
+    white-space: nowrap !important;
+  }
+
   .plant-manager-main .pm-status-table .plant-manager-badge > svg {
     width: 0.625rem !important;
     height: 0.625rem !important;
@@ -480,7 +562,7 @@
     height: 16px !important;
   }
 
-  .pm-order-status-table { min-width: 68.75rem !important; }
+  .pm-order-status-table { min-width: 76rem !important; }
   .pm-order-status-table :is(th, td):nth-child(7) { width: 10rem; }
   .pm-order-status-table :is(th, td):nth-child(8) { width: 5.5rem; }
 
@@ -495,8 +577,8 @@
   .pm-procurement-status-table :is(th, td):nth-child(8) { width: 8rem; white-space: nowrap; }
   .pm-procurement-status-table :is(th, td):nth-child(9) { width: 5.5rem; }
 
-  .pm-stock-in-receivings-table { min-width: 49rem !important; }
-  .pm-stock-in-receivings-table :is(th, td):nth-child(6) { width: 8.5rem; }
+  .pm-stock-in-receivings-table { min-width: 74rem !important; }
+  .pm-stock-in-receivings-table :is(th, td):nth-child(6) { width: 11rem; }
   .pm-stock-in-receivings-table :is(th, td):nth-child(9) { width: 7rem; }
   /* Match the Receiving Details badge: compact, single-line pill. */
   .plant-manager-main .pm-stock-in-receivings-table .plant-manager-badge {
@@ -506,15 +588,15 @@
     white-space: nowrap !important;
   }
 
-  .pm-stock-in-recent-table { min-width: 47.5rem !important; }
-  .pm-stock-in-recent-table :is(th, td):nth-child(6) { width: 8rem; }
+  .pm-stock-in-recent-table { min-width: 66rem !important; }
+  .pm-stock-in-recent-table :is(th, td):nth-child(6) { width: 8.5rem; }
   .pm-stock-in-recent-table :is(th, td):nth-child(7) { width: 5.5rem; }
 
   .pm-stock-in-history-table { min-width: 61.25rem !important; }
   .pm-stock-in-history-table :is(th, td):nth-child(9) { width: 8rem; }
 
-  .pm-shipment-status-table { min-width: 62.5rem !important; }
-  .pm-shipment-status-table :is(th, td):nth-child(7) { width: 10rem; }
+  .pm-shipment-status-table { min-width: 76rem !important; }
+  .pm-shipment-status-table :is(th, td):nth-child(7) { width: 11rem; }
   .pm-shipment-status-table :is(th, td):nth-child(8) { width: 7rem; }
 
   /* Inventory: explicit fixed-layout geometry so the 115px barcode fits its cell; table scrolls horizontally. */

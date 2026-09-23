@@ -129,7 +129,7 @@ class AuditLogTest extends TestCase
         $this->actingAs($admin)->putJson("/api/users/{$target->id}", [
             'name' => 'Renamed User',
             'role_id' => $this->plantManagerRole->id,
-            'password' => 'brand-new-secret',
+            'password' => 'BrandNewSecret123',
         ])->assertOk();
 
         $updated = AuditLog::query()->where('action', 'USER_UPDATED')->sole();
