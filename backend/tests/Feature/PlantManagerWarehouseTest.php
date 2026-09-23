@@ -44,6 +44,8 @@ class PlantManagerWarehouseTest extends TestCase
             ->assertJsonPath('utilized', 350)
             ->assertJsonPath('available', 650)
             ->assertJsonPath('utilization_percentage', 35)
+            ->assertJsonPath('capacity_state', 'normal')
+            ->assertJsonPath('capacity_warning', false)
             ->assertJsonPath('inventory.available_stock', 300)
             ->assertJsonPath('inventory.reserved_stock', 50)
             ->assertJsonPath('inventory.backload', 10);

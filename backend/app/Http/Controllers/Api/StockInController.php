@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
 use App\Support\WorkflowNotificationSender;
+use App\Support\WarehouseCapacity;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -288,6 +289,8 @@ class StockInController extends Controller
                     ['receiving_id' => $receiving->id, 'status' => 'Stock In Completed'],
                     ['performed_by' => $request->user()->name, 'occurred_at' => now()]
                 );
+
+                WarehouseCapacity::recordTransition($warehouse);
 
                 return $receiving->fresh(['items.product', 'items.warehouse', 'items.qaInspectionItem.inspection', 'timeline', 'preparedBy']);
             });

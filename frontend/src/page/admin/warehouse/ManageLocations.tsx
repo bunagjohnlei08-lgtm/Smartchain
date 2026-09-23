@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Edit, Loader2, MapPin, Save, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, Edit, Loader2, MapPin, Save, Warehouse, X } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import { apiClient } from '../../../lib/api';
 
@@ -15,6 +15,8 @@ interface WarehouseLocation {
   utilized: number;
   available: number | null;
   utilization_percentage: number | null;
+  capacity_state: 'normal' | 'warning' | 'full';
+  capacity_warning: boolean;
   status: 'Active' | 'Inactive';
 }
 
@@ -22,6 +24,13 @@ type WarehouseForm = Pick<WarehouseLocation, 'name' | 'code' | 'address' | 'lati
 
 const MAP_URL = 'https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d14717.63615355505!2d121.0884979!3d14.6352911!3m2!1i1024!1i768!4f13.1!3m3!1m2!1s0x3397b9485ea55b87%3A0x2e093784a1e3763b!2sArchon%20Nell%20Incorporated!5e1!3m2!1sen!2sph!4v1787998954055!5m2!1sen!2sph';
 const FIELD_CLASS = 'w-full rounded-xl border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30';
+
+type CapacitySeverity = 'normal' | 'warning' | 'critical';
+
+const capacitySeverity = (percentage: number | null): CapacitySeverity => {
+  if (percentage === null || percentage < 90) return 'normal';
+  return percentage >= 95 ? 'critical' : 'warning';
+};
 
 const ManageLocations: React.FC = () => {
   const [location, setLocation] = useState<WarehouseLocation | null>(null);
@@ -68,6 +77,7 @@ const ManageLocations: React.FC = () => {
   };
 
   const units = (value: number | null) => value === null ? 'Not configured' : `${value.toLocaleString()} units`;
+  const severity = capacitySeverity(location?.utilization_percentage ?? null);
 
   return (
     <PageContainer>
@@ -97,7 +107,8 @@ const ManageLocations: React.FC = () => {
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               {[['Total Capacity', units(location.capacity)], ['Utilized', units(location.utilized)], ['Available', units(location.available)]].map(([label, value]) => <div key={label} className="rounded-xl bg-gray-800/50 p-4"><p className="text-xs text-gray-400">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>)}
             </div>
-            <div className="mt-4"><div className="mb-2 flex justify-between text-sm"><span className="text-gray-400">Capacity utilization</span><span className="text-white">{location.utilization_percentage === null ? 'Not available' : `${location.utilization_percentage}%`}</span></div><div className="h-2 overflow-hidden rounded-full bg-gray-800"><div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${location.utilization_percentage ?? 0}%` }} /></div></div>
+            {severity !== 'normal' && <CapacityWarning location={location} severity={severity} />}
+            <div className="mt-4"><div className="mb-2 flex justify-between text-sm"><span className="text-gray-400">Capacity utilization</span><span className="text-white">{location.utilization_percentage === null ? 'Not available' : `${location.utilization_percentage}%`}</span></div><div className="h-2 overflow-hidden rounded-full bg-gray-800"><div className={`h-full rounded-full transition-all ${severity === 'critical' ? 'bg-red-500' : severity === 'warning' ? 'bg-amber-400' : 'bg-blue-500'}`} style={{ width: `${location.utilization_percentage ?? 0}%` }} /></div></div>
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-gray-800/50 bg-[#0d1322] shadow-sm">
@@ -128,6 +139,10 @@ const ManageLocations: React.FC = () => {
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <label className="block"><span className="mb-1.5 block text-sm text-gray-300">{label}</span>{children}</label>;
 const StatusBadge: React.FC<{ status: WarehouseLocation['status'] }> = ({ status }) => <span className={`admin-badge rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-green-400/20 bg-green-400/10 text-green-400' : 'border-gray-400/20 bg-gray-400/10 text-gray-400'}`}>{status}</span>;
+const CapacityWarning: React.FC<{ location: WarehouseLocation; severity: Exclude<CapacitySeverity, 'normal'> }> = ({ location, severity }) => {
+  const critical = severity === 'critical';
+  return <div className={`mt-5 flex min-w-0 items-start gap-3 rounded-xl border p-4 ${critical ? 'border-red-500/40 bg-red-500/10 text-red-100' : 'border-amber-400/30 bg-amber-400/10 text-amber-100'}`} role="alert"><AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${critical ? 'text-red-400' : 'text-amber-400'}`} /><div className="min-w-0"><p className="font-semibold">{location.capacity_state === 'full' ? 'Warehouse Full' : critical ? 'Critical Capacity Warning' : 'Warehouse Near Capacity'}</p><p className="mt-1 break-words text-sm leading-5 opacity-90">{location.name} is {location.utilization_percentage}% utilized. {location.available?.toLocaleString() ?? 0} units of capacity remain.</p></div></div>;
+};
 
 export { ManageLocations };
 export default ManageLocations;

@@ -24,6 +24,10 @@ const visualByType: Record<NotificationRecord['type'], NotificationVisual> = {
 };
 
 export function getNotificationVisual(notification: NotificationRecord): NotificationVisual {
+  if (notification.category === 'Warehouse Capacity') {
+    return { Icon: AlertTriangle, tone: visualByType.error.tone };
+  }
+
   if (notification.category === 'Quality Inspection' && notification.type === 'info') {
     return { Icon: ShieldCheck, tone: visualByType.warning.tone };
   }

@@ -7,11 +7,13 @@ const destinations: {
   path: string;
 }[] = [
   { role: 'ADMIN', category: 'Stock In', types: ['success'], path: '/admin/inventory' },
+  { role: 'ADMIN', category: 'Warehouse Capacity', types: ['warning', 'error'], path: '/admin/manage-locations' },
   { role: 'ADMIN', category: 'Procurement', types: ['info'], path: '/admin/procurement' },
   { role: 'ADMIN', category: 'Logistics', types: ['success'], path: '/admin/logistics' },
   { role: 'PLANT_MANAGER', category: 'Procurement', types: ['success', 'warning'], path: '/plant-manager/procurement' },
   { role: 'PLANT_MANAGER', category: 'Quality Inspection', types: ['success', 'warning', 'error'], path: '/plant-manager/receiving' },
   { role: 'PLANT_MANAGER', category: 'Order', types: ['info'], path: '/plant-manager/order-management' },
+  { role: 'PLANT_MANAGER', category: 'Warehouse Capacity', types: ['warning', 'error'], path: '/plant-manager/warehouse' },
   { role: 'QA_SUPERVISOR', category: 'Quality Inspection', types: ['info'], path: '/qa/inspection' },
 ];
 

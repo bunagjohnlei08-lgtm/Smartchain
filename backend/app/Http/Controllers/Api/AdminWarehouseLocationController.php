@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Warehouse;
+use App\Support\WarehouseCapacity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class AdminWarehouseLocationController extends Controller
 {
@@ -29,7 +31,11 @@ class AdminWarehouseLocationController extends Controller
             'capacity' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', Rule::in(['Active', 'Inactive'])],
         ]);
-        $warehouse->update($validated);
+        DB::transaction(function () use ($warehouse, $validated): void {
+            $locked = Warehouse::query()->lockForUpdate()->findOrFail($warehouse->id);
+            $locked->update($validated);
+            WarehouseCapacity::recordTransition($locked);
+        });
         return response()->json($this->present($warehouse->fresh()));
     }
 
@@ -41,17 +47,12 @@ class AdminWarehouseLocationController extends Controller
 
     private function present(Warehouse $warehouse): array
     {
-        $utilized = (int) $warehouse->inventories()
-            ->selectRaw('COALESCE(SUM(available_stock + reserved_stock), 0) AS aggregate')
-            ->value('aggregate');
-        $capacity = $warehouse->capacity;
-        $available = $capacity === null ? null : max(0, $capacity - $utilized);
+        $capacity = WarehouseCapacity::snapshot($warehouse);
         return [
             'id' => $warehouse->id, 'name' => $warehouse->name, 'code' => $warehouse->code,
             'address' => $warehouse->address, 'latitude' => $warehouse->latitude === null ? null : (float) $warehouse->latitude,
             'longitude' => $warehouse->longitude === null ? null : (float) $warehouse->longitude,
-            'capacity' => $capacity, 'utilized' => $utilized, 'available' => $available,
-            'utilization_percentage' => $capacity && $capacity > 0 ? round(min(100, $utilized / $capacity * 100), 1) : null,
+            ...$capacity,
             'status' => $warehouse->status,
         ];
     }

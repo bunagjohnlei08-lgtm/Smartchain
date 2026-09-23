@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Building2, Camera, CheckCircle2, GitBranch, IdCard, KeyRound, LoaderCircle, LockKeyhole, ShieldCheck, Trash2, UserRound, Warehouse } from 'lucide-react';
+import { Building2, Camera, CheckCircle2, GitBranch, IdCard, LoaderCircle, LockKeyhole, Trash2, UserRound, Warehouse } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { type AuthUser, updateStoredUser } from '../lib/authUser';
 import UserAvatar from './UserAvatar';
@@ -40,14 +40,10 @@ const accountStatusClass = (status: string): string => {
 const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [form, setForm] = useState({ name: '', email: '' });
-  const [passwords, setPasswords] = useState({ current_password: '', password: '', password_confirmation: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
   const [profileErrors, setProfileErrors] = useState<FieldErrors>({});
-  const [passwordErrors, setPasswordErrors] = useState<FieldErrors>({});
   const [profileSuccess, setProfileSuccess] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState('');
@@ -86,23 +82,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
       setProfile(data); setForm({ name: data.name, email: data.email }); updateStoredUser(data); setProfileSuccess('Profile updated successfully.');
     } catch (cause) { setProfileErrors(validationErrors(cause, 'Unable to update your profile. Please try again.')); }
     finally { setSaving(false); }
-  };
-
-  const changePassword = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const errors: FieldErrors = {};
-    if (!passwords.current_password) errors.current_password = 'Current password is required.';
-    if (!passwords.password) errors.password = 'New password is required.';
-    else if (passwords.password.length < 6) errors.password = 'New password must be at least 6 characters.';
-    if (!passwords.password_confirmation) errors.password_confirmation = 'Please confirm your new password.';
-    else if (passwords.password !== passwords.password_confirmation) errors.password_confirmation = 'Password confirmation does not match.';
-    if (Object.keys(errors).length) { setPasswordErrors(errors); return; }
-    setChangingPassword(true); setPasswordErrors({}); setPasswordSuccess('');
-    try {
-      await apiClient.put('/profile/password', passwords);
-      setPasswords({ current_password: '', password: '', password_confirmation: '' }); setPasswordSuccess('Password changed successfully.');
-    } catch (cause) { setPasswordErrors(validationErrors(cause, 'Unable to change your password. Please try again.')); }
-    finally { setChangingPassword(false); }
   };
 
   const selectPhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,7 +140,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
   if (loading) return <div className="flex min-h-[50vh] items-center justify-center gap-2 text-slate-500 dark:text-slate-400"><LoaderCircle className="h-5 w-5 animate-spin" /> Loading profile…</div>;
 
   return <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
-    <header><div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><span>{breadcrumbLabel}</span><span>/</span><span className="text-slate-900 dark:text-slate-100">Profile</span></div><h1 className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">Profile</h1><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage your account information and password.</p></header>
+    <header><div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><span>{breadcrumbLabel}</span><span>/</span><span className="text-slate-900 dark:text-slate-100">Profile</span></div><h1 className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">Profile</h1><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage your account information.</p></header>
     {profileErrors.form && !profile && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{profileErrors.form}</div>}
     {profile && <>
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
@@ -187,7 +166,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300"><UserRound className="h-5 w-5"/></span><div><h2 className="font-semibold text-slate-900 dark:text-white">Profile Information</h2><p className="text-xs text-slate-500 dark:text-slate-400">Update your personal account information.</p></div></div><form onSubmit={saveProfile} className="mt-6 space-y-5">{profileErrors.form && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{profileErrors.form}</div>}{profileSuccess && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4"/>{profileSuccess}</div>}<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={saving} autoComplete="name" className={inputClass}/><FieldError message={profileErrors.name}/></label><label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email Address<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={saving} autoComplete="email" className={inputClass}/><FieldError message={profileErrors.email}/></label><ReadOnlyField label="Employee ID" value={profile.employee_id || 'Not Assigned'} /><ReadOnlyField label="Role" value={relationshipName(profile.role)} /><ReadOnlyField label="Warehouse" value={relationshipName(profile.warehouse)} /><ReadOnlyField label="Department" value={relationshipName(profile.department)} /><ReadOnlyField label="Branch" value={relationshipName(profile.branch)} className="md:col-span-2" /></div><div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end dark:border-slate-700"><button type="button" onClick={() => setForm({ name: profile.name, email: profile.email })} disabled={saving} className="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</button><button type="submit" disabled={saving} className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{saving && <LoaderCircle className="h-4 w-4 animate-spin"/>}{saving ? 'Saving…' : 'Save Changes'}</button></div></form></section>
       </div>
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300"><KeyRound className="h-5 w-5"/></span><div><h2 className="font-semibold text-slate-900 dark:text-white">Change Password</h2><p className="text-xs text-slate-500 dark:text-slate-400">Update your password to keep your account secure.</p></div></div><form onSubmit={changePassword} className="mt-6 space-y-5">{passwordErrors.form && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{passwordErrors.form}</div>}{passwordSuccess && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"><ShieldCheck className="h-4 w-4"/>{passwordSuccess}</div>}<div className="grid grid-cols-1 md:grid-cols-3 gap-4"><label className="text-sm font-medium text-slate-700 dark:text-slate-300">Current Password<input type="password" value={passwords.current_password} onChange={(e) => setPasswords({ ...passwords, current_password: e.target.value })} disabled={changingPassword} autoComplete="current-password" className={inputClass}/><FieldError message={passwordErrors.current_password}/></label><label className="text-sm font-medium text-slate-700 dark:text-slate-300">New Password<input type="password" value={passwords.password} onChange={(e) => setPasswords({ ...passwords, password: e.target.value })} disabled={changingPassword} autoComplete="new-password" className={inputClass}/><FieldError message={passwordErrors.password}/></label><label className="text-sm font-medium text-slate-700 dark:text-slate-300">Confirm New Password<input type="password" value={passwords.password_confirmation} onChange={(e) => setPasswords({ ...passwords, password_confirmation: e.target.value })} disabled={changingPassword} autoComplete="new-password" className={inputClass}/><FieldError message={passwordErrors.password_confirmation}/></label></div><div className="flex justify-end border-t border-slate-200 pt-5 dark:border-slate-700"><button type="submit" disabled={changingPassword} className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{changingPassword && <LoaderCircle className="h-4 w-4 animate-spin"/>}{changingPassword ? 'Changing…' : 'Change Password'}</button></div></form></section>
     </>}
   </div>;
 };

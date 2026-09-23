@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Support\AuditLogger;
+use App\Support\WarehouseCapacity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
@@ -123,18 +126,18 @@ class InventoryController extends Controller
             'pending_receiving' => 'nullable|boolean',
         ]);
 
-        $product = $this->resolveProduct($validated);
-
-        $inventory = Inventory::create([
-            'barcode' => $validated['barcode'],
-            'product_id' => $product->id,
-            'warehouse_id' => $validated['warehouse_id'],
-            'available_stock' => $validated['available_stock'],
-            'reserved_stock' => $validated['reserved_stock'],
-            'backload' => $validated['backload'],
-            'status' => $validated['status'],
-            'pending_receiving' => $validated['pending_receiving'] ?? false,
-        ]);
+        $inventory = DB::transaction(function () use ($validated) {
+            $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($validated['warehouse_id']);
+            $product = $this->resolveProduct($validated);
+            $inventory = Inventory::create([
+                'barcode' => $validated['barcode'], 'product_id' => $product->id,
+                'warehouse_id' => $warehouse->id, 'available_stock' => $validated['available_stock'],
+                'reserved_stock' => $validated['reserved_stock'], 'backload' => $validated['backload'],
+                'status' => $validated['status'], 'pending_receiving' => $validated['pending_receiving'] ?? false,
+            ]);
+            WarehouseCapacity::recordTransition($warehouse);
+            return $inventory;
+        });
 
         return response()->json($this->present($inventory, $request->user()), 201);
     }
@@ -159,15 +162,18 @@ class InventoryController extends Controller
             'pending_receiving' => 'sometimes|boolean',
         ]);
 
-        if (array_key_exists('product', $validated)) {
-            $product = $this->resolveProduct($validated);
-            $inventory->product_id = $product->id;
-        }
-
         $before = $inventory->only(['available_stock', 'reserved_stock', 'backload', 'status', 'warehouse_id']);
-
-        $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray());
-        $inventory->save();
+        $inventory = DB::transaction(function () use ($inventory, $validated) {
+            $warehouseIds = collect([$inventory->warehouse_id, $validated['warehouse_id'] ?? $inventory->warehouse_id])->unique()->sort()->values();
+            $warehouses = Warehouse::query()->whereIn('id', $warehouseIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $inventory = Inventory::query()->lockForUpdate()->findOrFail($inventory->id);
+            if (array_key_exists('product', $validated)) {
+                $inventory->product_id = $this->resolveProduct($validated)->id;
+            }
+            $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray())->save();
+            foreach ($warehouses as $warehouse) WarehouseCapacity::recordTransition($warehouse);
+            return $inventory;
+        });
 
         $stockChanges = AuditLogger::diff($before, $validated, [
             'available_stock' => 'available stock',
@@ -192,8 +198,14 @@ class InventoryController extends Controller
     public function destroy(Request $request, $id)
     {
         $this->authorizeAdmin($request);
-        $inventory = Inventory::findOrFail($id);
-        $inventory->delete();
+        $inventory = DB::transaction(function () use ($id) {
+            $current = Inventory::findOrFail($id);
+            $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($current->warehouse_id);
+            $inventory = Inventory::query()->lockForUpdate()->findOrFail($id);
+            $inventory->delete();
+            WarehouseCapacity::recordTransition($warehouse);
+            return $inventory;
+        });
 
         AuditLogger::success('INVENTORY_DELETED', AuditLogger::MODULE_INVENTORY, [
             'resource' => $inventory,

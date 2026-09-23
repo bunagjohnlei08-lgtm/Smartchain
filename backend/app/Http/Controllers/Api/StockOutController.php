@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\StockOutTransaction;
 use App\Models\User;
+use App\Models\Warehouse;
+use App\Support\WarehouseCapacity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -177,6 +179,7 @@ class StockOutController extends Controller
             if (!$warehouseId) {
                 throw ValidationException::withMessages(['warehouse' => 'The assigned Plant Manager has no warehouse.']);
             }
+            $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($warehouseId);
 
             [$inventory, $item, $released, $remaining] = $this->resolveBarcode(
                 $record,
@@ -195,6 +198,7 @@ class StockOutController extends Controller
             $inventory->available_stock -= $quantity;
             if ($inventory->available_stock === 0) $inventory->status = 'Out of Stock';
             $inventory->save();
+            WarehouseCapacity::recordTransition($warehouse);
 
             $transaction = StockOutTransaction::create([
                 'reference_no' => (string) Str::uuid(),

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Warehouse;
+use App\Support\WarehouseCapacity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,8 +35,7 @@ class PlantManagerWarehouseController extends Controller
         $availableStock = (int) $inventory->available;
         $reservedStock = (int) $inventory->reserved;
         $backload = (int) $inventory->backload;
-        $utilized = $availableStock + $reservedStock;
-        $capacity = $warehouse->capacity;
+        $capacity = WarehouseCapacity::snapshot($warehouse);
 
         return response()->json([
             'id' => $warehouse->id,
@@ -44,16 +44,11 @@ class PlantManagerWarehouseController extends Controller
             'address' => $warehouse->address,
             'latitude' => $warehouse->latitude === null ? null : (float) $warehouse->latitude,
             'longitude' => $warehouse->longitude === null ? null : (float) $warehouse->longitude,
-            'capacity' => $capacity,
-            'utilized' => $utilized,
-            'available' => $capacity === null ? null : max(0, $capacity - $utilized),
-            'utilization_percentage' => $capacity && $capacity > 0
-                ? round(min(100, $utilized / $capacity * 100), 1)
-                : null,
+            ...$capacity,
             'status' => $warehouse->status,
             'map_embed_url' => self::MAP_EMBED_URL,
             'inventory' => [
-                'total_units' => $utilized,
+                'total_units' => $capacity['utilized'],
                 'available_stock' => $availableStock,
                 'reserved_stock' => $reservedStock,
                 'backload' => $backload,
