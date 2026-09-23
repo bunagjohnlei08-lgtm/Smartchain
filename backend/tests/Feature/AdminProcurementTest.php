@@ -33,6 +33,10 @@ class AdminProcurementTest extends TestCase
             'code' => 'MAIN-WH',
             'branch_id' => $branch->id,
         ]);
+        $this->requester->update([
+            'branch_id' => $branch->id,
+            'warehouse_id' => $this->warehouse->id,
+        ]);
     }
 
     private function userWithRole(string $slug): User

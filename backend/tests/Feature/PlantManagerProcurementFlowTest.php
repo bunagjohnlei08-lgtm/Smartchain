@@ -97,6 +97,50 @@ class PlantManagerProcurementFlowTest extends TestCase
         $this->assertDatabaseCount('replenishment_requests', 0);
     }
 
+    public function test_foreign_existing_warehouse_is_forbidden_and_creates_no_request(): void
+    {
+        $otherBranch = Branch::create(['name' => 'Other Branch', 'code' => 'OTHER']);
+        $otherWarehouse = Warehouse::create([
+            'name' => 'Other Warehouse', 'code' => 'WH-OTHER', 'branch_id' => $otherBranch->id,
+        ]);
+
+        $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [
+            'product_id' => $this->product->id, 'warehouse_id' => $otherWarehouse->id,
+            'requested_qty' => 15, 'priority' => 'Medium',
+        ])->assertForbidden();
+
+        $this->assertDatabaseCount('replenishment_requests', 0);
+    }
+
+    public function test_manager_without_assigned_warehouse_is_forbidden(): void
+    {
+        $this->manager->update(['warehouse_id' => null]);
+
+        $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [
+            'product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id,
+            'requested_qty' => 15, 'priority' => 'Medium',
+        ])->assertForbidden();
+
+        $this->assertDatabaseCount('replenishment_requests', 0);
+    }
+
+    public function test_qa_supervisor_and_guest_cannot_create_procurement_requests(): void
+    {
+        $qaRole = Role::create(['name' => 'QA Supervisor', 'slug' => 'QA_SUPERVISOR']);
+        $qa = User::factory()->create([
+            'role_id' => $qaRole->id, 'warehouse_id' => $this->warehouse->id, 'status' => 'ACTIVE',
+        ]);
+        $payload = [
+            'product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id,
+            'requested_qty' => 15, 'priority' => 'Medium',
+        ];
+
+        $this->actingAs($qa)->postJson('/api/plant-manager/procurement/requests', $payload)->assertForbidden();
+        $this->app['auth']->forgetGuards();
+        $this->postJson('/api/plant-manager/procurement/requests', $payload)->assertUnauthorized();
+        $this->assertDatabaseCount('replenishment_requests', 0);
+    }
+
     public function test_quantity_must_be_greater_than_zero(): void
     {
         $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [

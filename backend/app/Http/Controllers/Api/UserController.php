@@ -259,6 +259,8 @@ class UserController extends Controller
             'status' => ['sometimes', 'in:ACTIVE,PENDING,SUSPENDED'],
         ]);
 
+        $this->authorizeDestinationScope($request, $user, $validated);
+
         if ($this->awaitingActivation($user)
             && (isset($validated['password']) || ($validated['status'] ?? null) === 'ACTIVE')) {
             throw ValidationException::withMessages([
@@ -431,6 +433,31 @@ class UserController extends Controller
     private function awaitingActivation(User $user): bool
     {
         return $user->password === null;
+    }
+
+    /** Reject cross-scope or branch-inconsistent destinations before mutation. */
+    private function authorizeDestinationScope(Request $request, User $user, array $validated): void
+    {
+        if (! array_key_exists('branch_id', $validated) && ! array_key_exists('warehouse_id', $validated)) {
+            return;
+        }
+
+        $branchId = array_key_exists('branch_id', $validated) ? $validated['branch_id'] : $user->branch_id;
+        $warehouseId = array_key_exists('warehouse_id', $validated) ? $validated['warehouse_id'] : $user->warehouse_id;
+        $warehouseBranchId = $warehouseId ? Warehouse::query()->whereKey($warehouseId)->value('branch_id') : null;
+
+        abort_unless(! $warehouseId || ($branchId && (int) $warehouseBranchId === (int) $branchId), 403);
+
+        $authUser = $request->user();
+        if ($authUser->isPlantManager()) {
+            abort_unless(
+                $authUser->branch_id
+                && $authUser->warehouse_id
+                && (int) $branchId === (int) $authUser->branch_id
+                && (int) $warehouseId === (int) $authUser->warehouse_id,
+                403,
+            );
+        }
     }
 
     /** Never records the token or its hash; only delivery outcome and expiry. */

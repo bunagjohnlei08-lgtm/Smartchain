@@ -87,6 +87,10 @@ class PlantManagerProcurementController extends Controller
             'status' => ['nullable', Rule::in([self::STATUS_DRAFT, self::STATUS_PENDING])],
         ]);
 
+        $warehouseId = $request->user()->warehouse_id;
+        abort_unless($warehouseId && (int) $validated['warehouse_id'] === (int) $warehouseId, 403);
+        $validated['warehouse_id'] = $warehouseId;
+
         $status = $validated['status'] ?? self::STATUS_PENDING;
         $replenishmentRequest = ReplenishmentRequest::create([
             ...$validated,
