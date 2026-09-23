@@ -89,7 +89,7 @@ const Warehouse: React.FC = () => {
 
           <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 md:p-6">
             <div className="mb-2 flex justify-between text-sm"><span className="font-medium text-slate-300">Capacity utilization</span><span className="text-white">{warehouse.utilization_percentage === null ? 'Not available' : `${warehouse.utilization_percentage}%`}</span></div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label="Warehouse capacity utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={warehouse.utilization_percentage ?? 0}><div className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${warehouse.capacity_state === 'full' ? 'bg-red-500' : warehouse.capacity_state === 'warning' ? 'bg-amber-400' : 'bg-cyan-500'}`} style={{ width: `${warehouse.utilization_percentage ?? 0}%` }} /></div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label="Warehouse capacity utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={warehouse.utilization_percentage ?? 0}><div className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${warehouse.capacity_state === 'full' || warehouse.capacity_state === 'warning' ? 'bg-red-500' : 'bg-cyan-500'}`} style={{ width: `${warehouse.utilization_percentage ?? 0}%` }} /></div>
           </section>
 
           <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 md:p-6">
@@ -117,7 +117,7 @@ const InventoryValue: React.FC<{ label: string; value: number }> = ({ label, val
 const StatusBadge: React.FC<{ status: WarehouseOverview['status'] }> = ({ status }) => <span className={`plant-manager-badge rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-slate-600 bg-slate-700/30 text-slate-400'}`}>{status}</span>;
 const CapacityWarning: React.FC<{ warehouse: WarehouseOverview }> = ({ warehouse }) => {
   const full = warehouse.capacity_state === 'full';
-  return <section className={`flex min-w-0 items-start gap-3 rounded-2xl border p-5 ${full ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-amber-400/30 bg-amber-400/10 text-amber-100'}`} role="alert"><AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${full ? 'text-red-400' : 'text-amber-400'}`} /><div className="min-w-0"><h2 className="font-semibold">{full ? 'Warehouse Full' : 'Warehouse Near Capacity'}</h2><p className="mt-1 break-words text-sm opacity-90">{warehouse.name} is {warehouse.utilization_percentage}% utilized. {warehouse.available?.toLocaleString() ?? 0} units of capacity remain.</p></div></section>;
+  return <section className="flex min-w-0 items-start gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 p-5 text-red-900 dark:text-red-100" role="alert"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" /><div className="min-w-0"><h2 className="font-semibold">{full ? 'Warehouse Full' : 'Critical Capacity Warning'}</h2><p className="mt-1 break-words text-sm leading-5 opacity-90">{warehouse.name} is {warehouse.utilization_percentage}% utilized. {warehouse.available?.toLocaleString() ?? 0} units of capacity remain.</p></div></section>;
 };
 
 export default Warehouse;
