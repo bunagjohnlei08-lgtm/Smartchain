@@ -3,6 +3,7 @@ import type { AxiosError } from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
 import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus';
+import { EvidenceGallery, type QaAttachment } from './components/EvidenceGallery';
 import {
   Search,
   ChevronLeft,
@@ -74,6 +75,7 @@ interface QaInspectionDetailApi {
   }[];
   inspection: {
     attachment_path: string | null;
+    attachments: QaAttachment[];
     started_at: string | null;
     completed_at: string | null;
     inspected_by: string | null;
@@ -108,7 +110,7 @@ interface ReceivingItem {
 }
 
 interface ReceivingDetail extends ReceivingItem {
-  attachmentPath: string | null;
+  attachments: QaAttachment[];
   referenceNo: string;
   products: ReceivingProduct[];
   timeline: {
@@ -128,11 +130,9 @@ interface ReceivingDetail extends ReceivingItem {
 
 const statusOptions: Array<'All Status' | InspectionStatus> = ['All Status', 'Pending', 'In Progress', 'Passed', 'Rejected', 'Partial'];
 
-function validateAttachment(file: File): string | null {
-  if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type) || !/\.(jpe?g|png|pdf)$/i.test(file.name)) {
-    return 'Only JPG, PNG, or PDF files are allowed.';
-  }
-  if (file.size > 5 * 1024 * 1024) return 'Attachment must not exceed 5 MB.';
+function validateEvidenceFile(file: File): string | null {
+  if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type) || !/\.(jpe?g|png|pdf)$/i.test(file.name)) return 'Only JPG, PNG, or PDF files are allowed.';
+  if (file.size > 5 * 1024 * 1024) return `${file.name} exceeds the 5 MB limit.`;
   return null;
 }
 
@@ -312,7 +312,7 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
     inspectionStatus: detail.inspection_status,
     action: detail.action,
     referenceNo: detail.reference_no ?? '-',
-    attachmentPath: detail.inspection.attachment_path ?? null,
+    attachments: detail.inspection.attachments ?? [],
     products,
     timeline: detail.timeline.map((event) => ({
       status: event.status,
@@ -333,9 +333,9 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
 const QualityInspection: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedReceivingId = Number(searchParams.get('receiving')) || null;
-  const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
+  const [removedAttachmentIds, setRemovedAttachmentIds] = useState<number[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
   const detailRequestId = useRef(0);
   const [records, setRecords] = useState<ReceivingItem[]>([]);
   const [selectedReceivingId, setSelectedReceivingId] = useState<number | null>(null);
@@ -408,7 +408,8 @@ const QualityInspection: React.FC = () => {
   }, [fetchList]);
 
   useEffect(() => {
-    setSelectedAttachment(null);
+    setSelectedAttachments([]);
+    setRemovedAttachmentIds([]);
     setAttachmentError(null);
     setSelectedReceiving(null);
     setQuantityInputs({});
@@ -461,7 +462,8 @@ const QualityInspection: React.FC = () => {
     if (id !== selectedReceivingId) {
       detailRequestId.current += 1;
       setSelectedReceiving(null);
-      setSelectedAttachment(null);
+      setSelectedAttachments([]);
+      setRemovedAttachmentIds([]);
       setAttachmentError(null);
     }
     setSearchParams({ receiving: String(id) });
@@ -561,10 +563,11 @@ const QualityInspection: React.FC = () => {
       return;
     }
 
-    const fileError = selectedAttachment ? validateAttachment(selectedAttachment) : null;
+    const fileError = selectedAttachments.map(validateEvidenceFile).find(Boolean) ?? null;
+    const remainingEvidenceCount = selectedReceiving.attachments.filter((item) => !removedAttachmentIds.includes(item.id)).length + selectedAttachments.length;
     const proofError = submit && selectedReceiving.products.some((product) => product.rejectedQty > 0)
-      && !selectedAttachment && !selectedReceiving.attachmentPath
-      ? 'Proof of rejection is required. Please upload an attachment.' : null;
+      && remainingEvidenceCount === 0
+      ? 'Proof of rejection is required. Please upload at least one attachment.' : null;
     if (fileError || proofError) {
       setAttachmentError(fileError || proofError);
       setActionMessage({ type: 'error', text: (fileError || proofError)! });
@@ -595,11 +598,13 @@ const QualityInspection: React.FC = () => {
           formData.append(`items[${index}][${key}]`, value === null ? '' : String(value));
         });
       });
-      if (selectedAttachment) formData.append('attachment', selectedAttachment);
+      selectedAttachments.forEach((file) => formData.append('attachments[]', file));
+      removedAttachmentIds.forEach((id) => formData.append('remove_attachment_ids[]', String(id)));
       // PHP parses multipart POST; Laravel routes _method=PUT to the existing update action.
       if (method === 'put') formData.append('_method', 'PUT');
       const response = await apiClient.post<QaInspectionDetailApi>(`/qa/inspections/${selectedReceiving.id}`, formData);
-      setSelectedAttachment(null);
+      setSelectedAttachments([]);
+      setRemovedAttachmentIds([]);
       setAttachmentError(null);
       if (submit) {
         setSearchParams({ receiving: String(selectedReceiving.id) });
@@ -621,33 +626,15 @@ const QualityInspection: React.FC = () => {
         text: submit ? 'Inspection submitted successfully.' : 'Inspection draft saved.',
       });
     } catch (error) {
-      const validation = (error as AxiosError<{ errors?: { attachment?: string[] } }>).response;
-      if (validation?.status === 422 && validation.data.errors?.attachment?.[0]) {
-        setAttachmentError(validation.data.errors.attachment[0]);
+      const validation = (error as AxiosError<{ errors?: Record<string, string[]> }>).response;
+      const evidenceError = validation?.data.errors?.attachments?.[0] ?? validation?.data.errors?.['attachments.0']?.[0] ?? validation?.data.errors?.attachment?.[0];
+      if (validation?.status === 422 && evidenceError) {
+        setAttachmentError(evidenceError);
         setActiveTab('attachments');
       }
       setActionMessage({ type: 'error', text: getApiErrorMessage(error) });
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const downloadAttachment = async () => {
-    if (!selectedReceiving?.attachmentPath || isDownloading) return;
-    setIsDownloading(true);
-    setAttachmentError(null);
-    try {
-      const response = await apiClient.get(`/qa/inspections/${selectedReceiving.id}/attachment`, { responseType: 'blob' });
-      const url = URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = selectedReceiving.attachmentPath.split('/').pop() || 'qa-attachment';
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      setAttachmentError('Unable to download attachment. Please try again.');
-    } finally {
-      setIsDownloading(false);
     }
   };
 
@@ -1127,42 +1114,8 @@ const QualityInspection: React.FC = () => {
 
                     {activeTab === 'attachments' && (
                       <div className="space-y-3 rounded-lg border border-(--border-color-strong) bg-(--bg-surface-alt) p-4 text-sm text-(--text-primary)">
-                        <p id="attachment-help" className="text-(--text-secondary)">
-                          JPG, PNG, or PDF, up to 5 MB. One attachment per inspection.
-                          {selectedReceiving.totalRejected > 0 ? ' Proof of rejection is required before submission.' : ' Attachment is optional when no quantity is rejected.'}
-                        </p>
-                        {selectedReceiving.attachmentPath && (
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <p className="min-w-0 break-all">Saved attachment: {selectedReceiving.attachmentPath.split('/').pop()}</p>
-                            <button type="button" onClick={downloadAttachment} disabled={isDownloading} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-60">
-                              {isDownloading ? 'Downloading...' : 'Download attachment'}
-                            </button>
-                          </div>
-                        )}
-                        {!inspectionIsFinal && (
-                          <>
-                            <label htmlFor="qa-attachment" className="block font-medium">{selectedAttachment || selectedReceiving.attachmentPath ? 'Change attachment' : 'Select attachment'}</label>
-                            <input id="qa-attachment" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" disabled={isSaving} aria-describedby={`attachment-help${attachmentError ? ' attachment-error' : ''}`} aria-invalid={!!attachmentError}
-                              onChange={(event) => {
-                                const file = event.currentTarget.files?.[0];
-                                event.currentTarget.value = '';
-                                if (!file) return;
-                                const error = validateAttachment(file);
-                                setAttachmentError(error);
-                                if (!error) setSelectedAttachment(file);
-                              }}
-                              className="block min-h-11 w-full min-w-0 cursor-pointer rounded-lg border border-(--border-color-strong) bg-(--bg-input) p-2 text-(--text-primary) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-60"
-                            />
-                          </>
-                        )}
-                        {selectedAttachment && (
-                          <div className="flex flex-wrap items-center justify-between gap-3" aria-live="polite">
-                            <div className="min-w-0"><p className="break-all font-medium">{selectedAttachment.name}</p><p className="text-(--text-secondary)">{selectedAttachment.type} · {(selectedAttachment.size / 1024 / 1024).toFixed(2)} MB · Ready to upload on save or submit</p></div>
-                            <button type="button" disabled={isSaving} onClick={() => { setSelectedAttachment(null); setAttachmentError(null); }} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-60">Remove selected file</button>
-                          </div>
-                        )}
-                        {inspectionIsFinal && !selectedReceiving.attachmentPath && <p>No attachment was uploaded.</p>}
-                        {attachmentError && <p id="attachment-error" role="alert" className="text-red-700 dark:text-red-300">{attachmentError}</p>}
+                        <EvidenceGallery attachments={selectedReceiving.attachments} receivingId={selectedReceiving.id} editable={!inspectionIsFinal} selectedFiles={selectedAttachments} removedIds={removedAttachmentIds} onSelectedFilesChange={(files) => { setSelectedAttachments(files); setAttachmentError(null); }} onRemovedIdsChange={(ids) => { setRemovedAttachmentIds(ids); setAttachmentError(null); }} error={attachmentError} disabled={isSaving} />
+                        <p className="text-(--text-secondary)">{selectedReceiving.totalRejected > 0 ? 'At least one evidence file is required before submission.' : 'Evidence is optional when no quantity is rejected.'}</p>
                       </div>
                     )}
 

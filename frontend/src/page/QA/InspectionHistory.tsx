@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertCircle, Calendar, CheckCircle2, User, XCircle } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { formatStatusLabel, normalizeInspectionStatus } from './inspectionStatus';
+import { EvidenceGallery, type QaAttachment } from './components/EvidenceGallery';
 
 type DecisionStatus = 'Passed' | 'Partial' | 'Rejected';
 
@@ -19,6 +20,7 @@ interface InspectionHistoryApi {
   inspected_by: string | null;
   submitted_by: string | null;
   completed_at: string | null;
+  attachments: QaAttachment[];
 }
 
 interface InspectionRecord {
@@ -34,6 +36,7 @@ interface InspectionRecord {
   status: unknown;
   normalizedStatus: DecisionStatus | null;
   remarks: string;
+  attachments: QaAttachment[];
 }
 
 const timeFilters = ['Today', 'This Week', 'This Month'] as const;
@@ -128,6 +131,7 @@ const InspectionHistory: React.FC = () => {
           status: item.inspection_result,
           normalizedStatus: decisionStatus,
           remarks: item.remarks?.trim() || '-',
+          attachments: item.attachments ?? [],
         };
       });
 
@@ -227,6 +231,10 @@ const InspectionHistory: React.FC = () => {
                   <span className="text-slate-500 font-mono text-xs">{record.receivingNo}</span>
                 </div>
                 <div className="bg-[#090d16] border border-gray-800/60 rounded-xl p-3.5 text-sm text-gray-300">{record.remarks}</div>
+                <details className="rounded-xl border border-gray-800/60 bg-[#090d16] p-3.5">
+                  <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-slate-200 focus-visible:outline-2 focus-visible:outline-cyan-500">Attachments ({record.attachments.length})</summary>
+                  <div className="mt-3"><EvidenceGallery attachments={record.attachments} receivingId={record.receivingId} /></div>
+                </details>
                 <Link to={`../inspection?receiving=${record.receivingId}`} className="inline-flex min-h-11 items-center rounded-lg border border-gray-700 px-3 text-sm text-slate-300 hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-cyan-500">View inspection and attachments</Link>
               </div>
             </div>

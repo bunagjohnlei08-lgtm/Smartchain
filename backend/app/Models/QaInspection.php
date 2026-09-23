@@ -35,6 +35,11 @@ class QaInspection extends Model
         return $this->hasMany(QaInspectionItem::class);
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(QaInspectionAttachment::class)->orderBy('created_at')->orderBy('id');
+    }
+
     public function inspectedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'inspected_by_id');

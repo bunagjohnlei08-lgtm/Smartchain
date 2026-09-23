@@ -128,6 +128,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/qa/quality-reports', [QaQualityReportController::class, 'index']);
     Route::get('/qa/inspections/{receivingId}', [QaInspectionController::class, 'show']);
     Route::get('/qa/inspections/{receivingId}/attachment', [QaInspectionController::class, 'attachment']);
+    Route::get('/qa/inspections/{receivingId}/attachments/{attachmentId}', [QaInspectionController::class, 'attachment']);
+    Route::delete('/qa/inspections/{receivingId}/attachments/{attachmentId}', [QaInspectionController::class, 'destroyAttachment']);
     Route::post('/qa/inspections/{receivingId}', [QaInspectionController::class, 'store']);
     Route::put('/qa/inspections/{receivingId}', [QaInspectionController::class, 'update']);
 

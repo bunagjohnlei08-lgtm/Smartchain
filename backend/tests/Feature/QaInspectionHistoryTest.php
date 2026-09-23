@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Product;
 use App\Models\QaInspection;
+use App\Models\QaInspectionAttachment;
 use App\Models\QaInspectionItem;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class QaInspectionHistoryTest extends TestCase
@@ -70,7 +72,10 @@ class QaInspectionHistoryTest extends TestCase
     {
         $qa = $this->qaUser();
         $this->inspection($qa, 'RCV-OLD', 'Passed', now()->subDay()->toDateTimeString());
-        $this->inspection($qa, 'RCV-NEW', 'Partial', now()->toDateTimeString());
+        $newInspection = $this->inspection($qa, 'RCV-NEW', 'Partial', now()->toDateTimeString());
+        Storage::fake('local');
+        Storage::disk('local')->put('qa-attachments/history.pdf', '%PDF-1.4');
+        QaInspectionAttachment::create(['qa_inspection_id' => $newInspection->id, 'original_name' => 'history.pdf', 'stored_path' => 'qa-attachments/history.pdf', 'mime_type' => 'application/pdf', 'file_size' => 8, 'uploaded_by' => $qa->id]);
         $this->inspection($qa, 'RCV-DRAFT', 'In Progress', null);
 
         $response = $this->actingAs($qa)->getJson('/api/qa/inspection-history');
@@ -82,6 +87,8 @@ class QaInspectionHistoryTest extends TestCase
             ->assertJsonPath('data.0.accepted_qty', 3)
             ->assertJsonPath('data.0.rejected_qty', 2)
             ->assertJsonPath('data.0.remarks', 'Existing QA remarks.')
+            ->assertJsonPath('data.0.attachments.0.original_name', 'history.pdf')
+            ->assertJsonPath('data.0.attachments.0.view_url', '/qa/inspections/'.$newInspection->receiving_id.'/attachments/'.$newInspection->attachments()->first()->id)
             ->assertJsonPath('data.1.receiving_no', 'RCV-OLD');
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\QaInspection;
+use App\Models\QaInspectionAttachment;
 use App\Models\QaInspectionItem;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -127,6 +129,7 @@ class QaInspectionController extends Controller
             'preparedBy',
             'timeline',
             'qaInspection.items',
+            'qaInspection.attachments',
             'qaInspection.inspectedBy',
             'qaInspection.submittedBy',
         ]);
@@ -160,7 +163,13 @@ class QaInspectionController extends Controller
                 'occurred_at' => $event->occurred_at,
             ])->values(),
             'inspection' => [
-                'attachment_path' => $receiving->qaInspection?->attachment_path,
+                // Kept temporarily for old clients without exposing a storage path.
+                'attachment_path' => $receiving->qaInspection?->attachments?->first()?->id
+                    ? 'attachment-'.($receiving->qaInspection?->attachments?->first()?->id)
+                    : null,
+                'attachments' => $receiving->qaInspection?->attachments?->map(
+                    fn (QaInspectionAttachment $attachment) => $this->presentAttachment($attachment, $receiving->id)
+                )->values() ?? [],
                 'started_at' => $receiving->qaInspection?->started_at,
                 'completed_at' => $receiving->qaInspection?->completed_at,
                 'inspected_by' => $receiving->qaInspection?->inspectedBy?->name,
@@ -178,7 +187,46 @@ class QaInspectionController extends Controller
             'items.*.rejected_quantity' => 'required|integer|min:0',
             'items.*.inspection_result' => ['required', Rule::in(self::ITEM_STATUSES)],
             'items.*.remarks' => 'nullable|string|max:1000',
+            'attachments' => 'nullable|array|max:5',
+            'attachments.*' => [
+                'file', 'mimes:jpeg,jpg,png,pdf',
+                'mimetypes:image/jpeg,image/png,application/pdf',
+                'extensions:jpeg,jpg,png,pdf', 'max:5120',
+            ],
+            // Accept the former field during the compatibility window.
+            'attachment' => [
+                'nullable', 'file', 'mimes:jpeg,jpg,png,pdf',
+                'mimetypes:image/jpeg,image/png,application/pdf',
+                'extensions:jpeg,jpg,png,pdf', 'max:5120',
+            ],
+            'remove_attachment_ids' => 'nullable|array',
+            'remove_attachment_ids.*' => 'integer|distinct',
+        ], [
+            'attachments.max' => 'An inspection may contain no more than 5 attachments.',
+            'attachments.*.file' => 'Each attachment must be a JPG, PNG, or PDF file.',
+            'attachments.*.mimes' => 'Each attachment must be a JPG, PNG, or PDF file.',
+            'attachments.*.mimetypes' => 'Each attachment must be a JPG, PNG, or PDF file.',
+            'attachments.*.extensions' => 'Each attachment must be a JPG, PNG, or PDF file.',
+            'attachments.*.max' => 'Each attachment must not exceed 5 MB.',
+            'attachments.*.uploaded' => 'An attachment could not be uploaded. Use JPG, PNG, or PDF files up to 5 MB each.',
+            'attachment.file' => 'Attachment must be a JPG, PNG, or PDF file.',
+            'attachment.mimes' => 'Attachment must be a JPG, PNG, or PDF file.',
+            'attachment.mimetypes' => 'Attachment must be a JPG, PNG, or PDF file.',
+            'attachment.extensions' => 'Attachment must be a JPG, PNG, or PDF file.',
+            'attachment.max' => 'Attachment must not exceed 5 MB.',
         ]);
+    }
+
+    private function presentAttachment(QaInspectionAttachment $attachment, int $receivingId): array
+    {
+        return [
+            'id' => $attachment->id,
+            'original_name' => $attachment->original_name,
+            'mime_type' => $attachment->mime_type,
+            'file_size' => $attachment->file_size,
+            'view_url' => "/qa/inspections/{$receivingId}/attachments/{$attachment->id}",
+            'created_at' => $attachment->created_at,
+        ];
     }
 
     private function resolveOverallStatus(Collection $items): string
@@ -236,13 +284,13 @@ class QaInspectionController extends Controller
         $validated = $this->validatePayload($request);
         $shouldSubmit = $request->boolean('submit', true);
         $user = $request->user();
-        $storedPath = null;
-        $previousPath = null;
+        $storedPaths = [];
+        $pathsToDelete = [];
 
         try {
-            $receiving = DB::transaction(function () use ($request, $validated, $receivingId, $user, $shouldSubmit, &$storedPath, &$previousPath) {
+            $receiving = DB::transaction(function () use ($request, $validated, $receivingId, $user, $shouldSubmit, &$storedPaths, &$pathsToDelete) {
                 $receiving = $this->scopeForUser(Receiving::query(), $request)
-                    ->with(['items', 'qaInspection.items'])
+                    ->with(['items', 'qaInspection.items', 'qaInspection.attachments'])
                     ->lockForUpdate()
                     ->find($receivingId);
 
@@ -288,25 +336,6 @@ class QaInspectionController extends Controller
                     return $itemPayload;
                 });
 
-                $existingPath = $receiving->qaInspection?->attachment_path;
-                $hasStoredProof = $existingPath && Storage::disk('local')->exists($existingPath);
-                $request->validate([
-                    'attachment' => [
-                        Rule::requiredIf($shouldSubmit && $submittedItems->sum('rejected_quantity') > 0 && ! $hasStoredProof),
-                        'nullable', 'file', 'mimes:jpeg,jpg,png,pdf',
-                        'mimetypes:image/jpeg,image/png,application/pdf',
-                        'extensions:jpeg,jpg,png,pdf', 'max:5120',
-                    ],
-                ], [
-                    'attachment.required' => 'Proof of rejection is required. Please upload an attachment.',
-                    'attachment.file' => 'Attachment must be a JPG, PNG, or PDF file.',
-                    'attachment.mimes' => 'Attachment must be a JPG, PNG, or PDF file.',
-                    'attachment.mimetypes' => 'Attachment must be a JPG, PNG, or PDF file.',
-                    'attachment.extensions' => 'Attachment must be a JPG, PNG, or PDF file.',
-                    'attachment.max' => 'Attachment must not exceed 5 MB.',
-                    'attachment.uploaded' => 'Attachment could not be uploaded. Use a JPG, PNG, or PDF file up to 5 MB.',
-                ]);
-
                 $inspection = QaInspection::firstOrCreate(
                     ['receiving_id' => $receiving->id],
                     [
@@ -316,13 +345,47 @@ class QaInspectionController extends Controller
                     ]
                 );
 
+                $inspection->load('attachments');
+                $removeIds = collect($validated['remove_attachment_ids'] ?? [])->map(fn ($id) => (int) $id);
+                $attachmentsToRemove = $inspection->attachments->whereIn('id', $removeIds);
+                if ($attachmentsToRemove->count() !== $removeIds->count()) {
+                    abort(422, 'One or more attachments do not belong to this inspection.');
+                }
+
+                $uploads = collect($request->file('attachments', []));
                 if ($request->hasFile('attachment')) {
-                    $storedPath = Storage::disk('local')->putFile('qa-attachments', $request->file('attachment'));
+                    $uploads->push($request->file('attachment'));
+                }
+                $remainingCount = $inspection->attachments->count() - $attachmentsToRemove->count();
+                if ($remainingCount + $uploads->count() > 5) {
+                    throw ValidationException::withMessages([
+                        'attachments' => ['An inspection may contain no more than 5 attachments.'],
+                    ]);
+                }
+                if ($shouldSubmit && $submittedItems->sum('rejected_quantity') > 0 && $remainingCount + $uploads->count() < 1) {
+                    throw ValidationException::withMessages([
+                        'attachments' => ['Proof of rejection is required. Please upload at least one attachment.'],
+                    ]);
+                }
+
+                foreach ($attachmentsToRemove as $attachment) {
+                    $pathsToDelete[] = $attachment->stored_path;
+                    $attachment->delete();
+                }
+
+                foreach ($uploads as $upload) {
+                    $storedPath = Storage::disk('local')->putFile('qa-attachments', $upload);
                     if (! $storedPath) {
                         throw new \RuntimeException('QA attachment storage failed.');
                     }
-                    $previousPath = $inspection->attachment_path;
-                    $inspection->forceFill(['attachment_path' => $storedPath])->save();
+                    $storedPaths[] = $storedPath;
+                    $inspection->attachments()->create([
+                        'original_name' => Str::limit(basename($upload->getClientOriginalName()), 255, ''),
+                        'stored_path' => $storedPath,
+                        'mime_type' => $upload->getMimeType(),
+                        'file_size' => $upload->getSize(),
+                        'uploaded_by' => $user->id,
+                    ]);
                 }
 
                 if (! $inspection->started_at) {
@@ -387,13 +450,14 @@ class QaInspectionController extends Controller
                     'preparedBy',
                     'timeline',
                     'qaInspection.items',
+                    'qaInspection.attachments',
                     'qaInspection.inspectedBy',
                     'qaInspection.submittedBy',
                 ]);
             });
         } catch (Throwable $e) {
-            if ($storedPath) {
-                $this->deleteAttachment($storedPath);
+            foreach ($storedPaths as $storedPath) {
+                $this->deleteAttachmentFile($storedPath);
             }
             if ($e instanceof ValidationException) {
                 throw $e;
@@ -409,8 +473,8 @@ class QaInspectionController extends Controller
             return response()->json(['message' => 'Failed to save QA inspection.'], 500);
         }
 
-        if ($previousPath && $previousPath !== $storedPath) {
-            $this->deleteAttachment($previousPath);
+        foreach ($pathsToDelete as $pathToDelete) {
+            $this->deleteAttachmentFile($pathToDelete);
         }
 
         if ($shouldSubmit) {
@@ -436,7 +500,7 @@ class QaInspectionController extends Controller
         return response()->json($this->presentDetail($receiving));
     }
 
-    private function deleteAttachment(string $path): void
+    private function deleteAttachmentFile(string $path): void
     {
         // Only generated QA attachment paths may be cleaned up.
         if (! preg_match('~^qa-attachments/[A-Za-z0-9]+\.(?:jpe?g|png|pdf)$~', $path)) {
@@ -451,28 +515,63 @@ class QaInspectionController extends Controller
         }
     }
 
-    public function attachment(Request $request, int $receivingId): JsonResponse|StreamedResponse
+    private function authorizedAttachment(Request $request, int $receivingId, ?int $attachmentId = null): ?QaInspectionAttachment
     {
-        if ($response = $this->authorizeQa($request)) {
-            return $response;
-        }
-
         $inspection = QaInspection::query()
+            ->with('attachments')
             ->where('receiving_id', $receivingId)
             ->when($request->user()?->isQaSupervisor(), fn ($query) => $query->whereHas(
                 'receiving',
                 fn ($receiving) => $receiving->where('assigned_qa_user_id', $request->user()->id)
             ))
             ->first();
-        $path = $inspection?->attachment_path;
-        if (! $path || ! Storage::disk('local')->exists($path)) {
+
+        if (! $inspection) {
+            return null;
+        }
+
+        return $attachmentId
+            ? $inspection->attachments->firstWhere('id', $attachmentId)
+            : $inspection->attachments->first();
+    }
+
+    public function attachment(Request $request, int $receivingId, ?int $attachmentId = null): JsonResponse|StreamedResponse
+    {
+        if ($response = $this->authorizeQa($request)) {
+            return $response;
+        }
+
+        $attachment = $this->authorizedAttachment($request, $receivingId, $attachmentId);
+        if (! $attachment || ! Storage::disk('local')->exists($attachment->stored_path)) {
             return response()->json(['message' => 'Attachment not found.'], 404);
         }
 
-        return Storage::disk('local')->download($path, basename($path), [
+        return Storage::disk('local')->response($attachment->stored_path, $attachment->original_name, [
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'private, no-store',
+            'Content-Type' => $attachment->mime_type,
+            'Content-Disposition' => 'inline; filename="'.str_replace(['"', "\r", "\n"], '', $attachment->original_name).'"',
         ]);
+    }
+
+    public function destroyAttachment(Request $request, int $receivingId, int $attachmentId): JsonResponse
+    {
+        if ($response = $this->authorizeQaWrite($request)) {
+            return $response;
+        }
+
+        $attachment = $this->authorizedAttachment($request, $receivingId, $attachmentId);
+        if (! $attachment) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
+        }
+        if ($attachment->inspection->completed_at) {
+            return response()->json(['message' => 'Completed inspection evidence cannot be removed.'], 422);
+        }
+        $path = $attachment->stored_path;
+        $attachment->delete();
+        $this->deleteAttachmentFile($path);
+
+        return response()->json(['message' => 'Attachment removed.']);
     }
 
     public function index(Request $request): JsonResponse
@@ -532,6 +631,7 @@ class QaInspectionController extends Controller
             'preparedBy',
             'timeline',
             'qaInspection.items',
+            'qaInspection.attachments',
             'qaInspection.inspectedBy',
             'qaInspection.submittedBy',
         ]), $request)->find($receivingId);

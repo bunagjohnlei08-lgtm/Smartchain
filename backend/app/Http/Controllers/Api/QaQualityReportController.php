@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\QaInspection;
+use App\Models\QaInspectionAttachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -30,7 +31,7 @@ class QaQualityReportController extends Controller
         $trendEnd = now()->addDay()->startOfDay();
 
         $inspections = QaInspection::query()
-            ->with(['receiving', 'items.receivingItem'])
+            ->with(['receiving', 'items.receivingItem', 'attachments'])
             ->whereNotNull('completed_at')
             ->whereIn('status', self::FINAL_STATUSES)
             ->when($user->isQaSupervisor(), fn ($query) => $query->whereHas(
@@ -131,6 +132,26 @@ class QaQualityReportController extends Controller
                 ],
                 'top_rejected_products' => $topRejectedProducts,
                 'supplier_quality' => $supplierQuality,
+                'inspection_evidence' => $inspections->map(function (QaInspection $inspection) {
+                    $receiving = $inspection->receiving;
+
+                    return [
+                        'inspection_id' => $inspection->id,
+                        'receiving_id' => $receiving?->id,
+                        'receiving_no' => $receiving?->receiving_no,
+                        'supplier' => $receiving?->supplier,
+                        'status' => $inspection->status,
+                        'completed_at' => $inspection->completed_at,
+                        'attachments' => $inspection->attachments->map(fn (QaInspectionAttachment $attachment) => [
+                            'id' => $attachment->id,
+                            'original_name' => $attachment->original_name,
+                            'mime_type' => $attachment->mime_type,
+                            'file_size' => $attachment->file_size,
+                            'view_url' => "/qa/inspections/{$receiving?->id}/attachments/{$attachment->id}",
+                            'created_at' => $attachment->created_at,
+                        ])->values(),
+                    ];
+                })->values(),
             ],
         ]);
     }

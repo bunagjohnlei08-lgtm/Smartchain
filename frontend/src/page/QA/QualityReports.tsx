@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, Pr
 import { CartesianGrid, Cell, Legend as ChartLegend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useTheme } from '../../context/ThemeContext';
 import { apiClient } from '../../lib/api';
+import { EvidenceGallery, type QaAttachment } from './components/EvidenceGallery';
 
 interface QualityReportData {
   summary: {
@@ -17,6 +18,7 @@ interface QualityReportData {
   distribution: { name: 'Passed' | 'Rejected'; count: number; percentage: number }[];
   top_rejected_products: { product: string; quantity: number }[];
   supplier_quality: { name: string; inspections: number; accepted_quantity: number; rejected_quantity: number; pass_rate: number }[];
+  inspection_evidence: { inspection_id: number; receiving_id: number; receiving_no: string; supplier: string; status: string; completed_at: string; attachments: QaAttachment[] }[];
 }
 
 const distributionColors: Record<string, string> = { Passed: '#22C55E', Rejected: '#EF4444' };
@@ -126,6 +128,11 @@ const QualityReports: React.FC = () => {
 
         <div className="grid min-w-0 grid-cols-1 xl:grid-cols-2 gap-6"><div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none"><h3 className="text-lg font-semibold text-slate-900 dark:text-white">Top Rejected Products</h3><p className="mb-4 text-sm text-slate-600 dark:text-slate-400">Sum of actual rejected quantity by product.</p>{report.top_rejected_products.length === 0 ? <EmptyChart message="No rejected quantities recorded." /> : <div className="max-h-[320px] space-y-1 overflow-y-auto pr-2 custom-scrollbar">{report.top_rejected_products.map((item, index) => { const maximum = report.top_rejected_products[0]?.quantity || 1; const width = Math.max(4, (item.quantity / maximum) * 100); return <div key={item.product} className="border-b border-slate-200 px-1 py-3 last:border-b-0 dark:border-slate-800/80"><div className="mb-2 flex items-start justify-between gap-4"><div className="min-w-0 flex-1"><span className="mr-2 text-xs font-semibold text-slate-500">{index + 1}</span><span className="break-words text-sm leading-5 text-slate-700 dark:text-slate-200">{item.product}</span></div><span className="shrink-0 text-sm font-semibold tabular-nums text-cyan-600 dark:text-cyan-400">{item.quantity.toLocaleString()}</span></div><div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" role="img" aria-label={`${item.product}: ${item.quantity} rejected`}><div className="h-full rounded-full bg-cyan-500 transition-[width] duration-700" style={{ width: mounted ? `${width}%` : '0%' }} /></div></div>; })}</div>}</div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none"><h3 className="text-lg font-semibold text-slate-900 dark:text-white">Supplier Quality Rating</h3><p className="mb-4 text-sm text-slate-600 dark:text-slate-400">Accepted quantity as a share of inspected quantity.</p>{report.supplier_quality.length === 0 ? <EmptyChart message="No supplier inspection data." /> : <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">{report.supplier_quality.map((item) => <div key={item.name}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-slate-700 dark:text-slate-200 truncate">{item.name}</span><span className="text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">{item.pass_rate}% • {item.inspections} insp.</span></div><div className="w-full h-1.5 bg-slate-200 dark:bg-gray-800 rounded-full mt-1 overflow-hidden"><div className="h-full rounded-full bg-cyan-500" style={{ width: mounted ? `${item.pass_rate}%` : '0%', transition: 'width 1s ease-out 0.4s' }} /></div></div>)}</div>}</div></div>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Inspection Evidence</h3>
+          <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">Evidence retained with completed inspections.</p>
+          <div className="space-y-3">{report.inspection_evidence.map((inspection) => <details key={inspection.inspection_id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-800"><summary className="min-h-11 cursor-pointer py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-cyan-500"><span className="mr-2">{inspection.receiving_no}</span><span className="text-slate-500">{inspection.supplier} • Evidence: {inspection.attachments.length} files</span></summary><div className="mt-3"><EvidenceGallery attachments={inspection.attachments} receivingId={inspection.receiving_id} /></div></details>)}</div>
+        </section>
       </>}
     </div>
   );

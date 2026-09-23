@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\QaInspection;
 use App\Models\QaInspectionItem;
+use App\Models\QaInspectionAttachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,6 +27,7 @@ class QaInspectionHistoryController extends Controller
                 'items.receivingItem',
                 'inspectedBy',
                 'submittedBy',
+                'attachments',
             ])
             ->whereNotNull('completed_at')
             ->whereIn('status', self::FINAL_STATUSES)
@@ -62,6 +64,14 @@ class QaInspectionHistoryController extends Controller
                     'inspected_by' => $inspection->inspectedBy?->name,
                     'submitted_by' => $inspection->submittedBy?->name,
                     'completed_at' => $inspection->completed_at,
+                    'attachments' => $inspection->attachments->map(fn (QaInspectionAttachment $attachment) => [
+                        'id' => $attachment->id,
+                        'original_name' => $attachment->original_name,
+                        'mime_type' => $attachment->mime_type,
+                        'file_size' => $attachment->file_size,
+                        'view_url' => "/qa/inspections/{$receiving->id}/attachments/{$attachment->id}",
+                        'created_at' => $attachment->created_at,
+                    ])->values(),
                 ];
             });
         })->values();
