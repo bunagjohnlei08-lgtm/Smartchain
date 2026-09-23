@@ -293,7 +293,7 @@ const ReceivingStatusBadge: React.FC<{ status: ReceivingStatus | 'Stocked In' }>
     'Stocked In': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   };
   return (
-    <span className={`plant-manager-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
+    <span className={`plant-manager-badge inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border ${config[status]}`}>
       {status}
     </span>
   );
@@ -697,15 +697,15 @@ const StockIn: React.FC = () => {
 
         {receivingsViewMode === 'list' ? (
         <div className="max-w-full overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-          <table className="pm-status-table pm-stock-in-receivings-table w-full min-w-[752px] table-fixed text-[11px] sm:min-w-[900px] sm:table-auto sm:text-sm">
+          <table className="pm-status-table pm-stock-in-receivings-table w-full min-w-[900px] table-fixed text-[11px] sm:text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
                 <th className="w-20 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Receiving No.</th>
-                <th className="sticky left-0 z-20 w-28 border-r border-slate-200 bg-slate-50 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-600 shadow-[2px_0_4px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-[#070a12] dark:text-slate-400 sm:static sm:w-auto sm:border-r-0 sm:bg-transparent sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider sm:shadow-none dark:sm:bg-transparent">Product</th>
+                <th className="sticky left-0 z-20 w-48 border-r border-slate-200 bg-slate-50 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-600 shadow-[2px_0_4px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-[#070a12] dark:text-slate-400 sm:static sm:border-r-0 sm:bg-transparent sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider sm:shadow-none dark:sm:bg-transparent">Product</th>
                 <th className="w-24 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Supplier</th>
                 <th className="w-20 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Receiving Date</th>
                 <th className="w-16 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Ref. No.</th>
-                <th className="w-24 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Status</th>
+                <th className="w-40 px-2 py-2 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Status</th>
                 <th className="w-16 px-2 py-2 text-center text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Items</th>
                 <th className="w-20 px-2 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Received Value</th>
                 <th className="w-20 px-2 py-2 text-right text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:w-auto sm:px-4 sm:py-3 sm:text-xs sm:tracking-wider">Actions</th>
@@ -727,7 +727,7 @@ const StockIn: React.FC = () => {
                   <td className="truncate px-2 py-2 text-slate-300 sm:px-4 sm:py-3" title={rec.supplier}>{rec.supplier}</td>
                   <td className="px-2 py-2 text-slate-300 sm:px-4 sm:py-3">{rec.receivingDate}</td>
                   <td className="truncate px-2 py-2 text-slate-400 sm:px-4 sm:py-3">{rec.refNo}</td>
-                  <td className="px-2 py-2 sm:px-4 sm:py-3"><ReceivingStatusBadge status={rec.status} /></td>
+                  <td className="w-40 px-2 py-2 sm:px-4 sm:py-3"><ReceivingStatusBadge status={rec.status} /></td>
                   <td className="px-2 py-2 text-center text-white sm:px-4 sm:py-3">
                     <div>{rec.itemsCount} item{rec.itemsCount === 1 ? '' : 's'}</div>
                     <div className="text-xs text-slate-500">{rec.totalQuantity} units</div>
