@@ -88,7 +88,7 @@ const AdminLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="admin-main flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 dark:bg-transparent">
         {/* Top Bar */}
-        <header className="admin-topbar bg-white dark:bg-[#090d16]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/60 h-16 px-4 flex items-center justify-between flex-shrink-0 sticky top-0 z-30">
+        <header className="admin-topbar fixed inset-x-0 top-0 z-30 flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800/60 dark:bg-[#090d16] xl:relative xl:inset-auto xl:dark:bg-[#090d16]/80 xl:backdrop-blur-xl">
           {/* Mobile Hamburger */}
           {!isMobileMenuOpen && !isDetailOverlayOpen && <button
             type="button"
@@ -166,7 +166,7 @@ const AdminLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-transparent">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-slate-50 pt-14 dark:bg-transparent xl:pt-0">
           <Outlet />
         </main>
       </div>

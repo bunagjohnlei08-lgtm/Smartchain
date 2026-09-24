@@ -72,7 +72,7 @@ const QALayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#090d16]">
         {/* Top Bar */}
-        <header className="operations-topbar sticky top-0 z-40 flex h-16 min-h-16 max-h-16 flex-shrink-0 items-center border-b border-slate-800/80 bg-[#090d16] px-4 md:px-6">
+        <header className="operations-topbar fixed inset-x-0 top-0 z-30 flex h-16 min-h-16 max-h-16 flex-shrink-0 items-center border-b border-slate-800/80 bg-[#090d16] px-4 md:px-6 xl:relative xl:inset-auto xl:z-40">
           <div className="flex min-w-0 flex-1 items-center">
             <div className="operations-mobile-menu-spacer w-10 flex-shrink-0 xl:hidden" />
             <div className="hidden min-w-0 md:block">
@@ -110,7 +110,7 @@ const QALayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="qa-main flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16]">
+        <main className="qa-main flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16] pt-14 xl:pt-0">
           <Outlet />
         </main>
       </div>
