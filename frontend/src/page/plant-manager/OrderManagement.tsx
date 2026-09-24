@@ -1,5 +1,5 @@
 // src/pages/plant-manager/OrderManagement.tsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
 import {
@@ -34,6 +34,7 @@ type OrderStatus =
   | 'Ready for Stock Out'
   | 'Stock Out Completed'
   | 'Ready for Shipment'
+  | 'Forwarded to Logistics'
   | 'In Transit'
   | 'Delivered'
   | 'Cancelled';
@@ -67,7 +68,20 @@ interface Order {
   totalItems: number;
   totalAmount: number;
   allocationStatus: StockAllocationStatus;
+  createdAt: string;
+  timeline: OrderTimelineEvent[];
 }
+
+interface OrderTimelineEvent {
+  id: string;
+  action: string;
+  previousStatus: string | null;
+  newStatus: string | null;
+  performedBy: string | null;
+  createdAt: string;
+}
+
+type TimelineStepState = 'completed' | 'current' | 'pending' | 'cancelled';
 
 interface OrderSummary {
   assigned: number;
@@ -84,6 +98,7 @@ const statusLabels: Record<string, OrderStatus> = {
   READY_FOR_STOCK_OUT: 'Ready for Stock Out',
   STOCK_OUT_COMPLETED: 'Stock Out Completed',
   READY_FOR_SHIPMENT: 'Ready for Shipment',
+  FORWARDED_TO_LOGISTICS: 'Forwarded to Logistics',
   IN_TRANSIT: 'In Transit',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
@@ -118,7 +133,35 @@ const mapOrder = (order: any): Order => ({
   allocationStatus: order.allocation_status === 'FULLY_RESERVED' ? '100% Reserved'
     : order.allocation_status === 'PARTIAL' ? 'Partial Stock'
       : order.allocation_status === 'NO_STOCK' ? 'No Stock' : 'Not Tracked',
+  createdAt: order.created_at || order.order_date || '',
+  timeline: (order.timeline || []).map((event: any) => ({
+    id: String(event.id),
+    action: event.action,
+    previousStatus: event.previous_status,
+    newStatus: event.new_status,
+    performedBy: event.performed_by?.name || null,
+    createdAt: event.created_at,
+  })),
 });
+
+const workflowRank: Record<OrderStatus, number> = {
+  Assigned: 1,
+  Preparing: 2,
+  'Ready for Stock Out': 3,
+  'Stock Out Completed': 4,
+  'Ready for Shipment': 5,
+  'Forwarded to Logistics': 6,
+  'In Transit': 7,
+  Delivered: 8,
+  Cancelled: 0,
+};
+
+const formatTimelineDate = (value?: string | null) => value
+  ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  : null;
+
+const findTimelineEvent = (order: Order, statuses: string[]) =>
+  [...order.timeline].reverse().find(event => event.newStatus && statuses.includes(event.newStatus));
 
 // HELPER FUNCTIONS
 // ============================================
@@ -198,13 +241,16 @@ const OrderManagement: React.FC = () => {
   const [warehouseFilter, setWarehouseFilter] = useState<string>('All');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isSelectionLoading, setIsSelectionLoading] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   usePlantManagerDetailOverlay(isPanelOpen && selectedOrder !== null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<OrderSummary>({ assigned: 0, preparing: 0, readyForStockOut: 0, inTransit: 0, delivered: 0, cancelled: 0 });
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const selectionRequestRef = useRef(0);
 
   const loadOrders = useCallback(async () => {
     const [ordersResponse, summaryResponse] = await Promise.all([
@@ -243,6 +289,74 @@ const OrderManagement: React.FC = () => {
     });
   }, [orders, searchTerm, statusFilter, warehouseFilter, priorityFilter]);
 
+  const selectOrder = useCallback(async (order: Order, openPanel = false) => {
+    setActionError(null);
+    setSelectedOrderId(order.id);
+    setIsSelectionLoading(true);
+    const requestId = ++selectionRequestRef.current;
+
+    try {
+      const response = await apiClient.get(`/plant-manager/orders/${order.id}`);
+      if (requestId !== selectionRequestRef.current) return;
+      setSelectedOrder(mapOrder(response.data));
+      if (openPanel) setIsPanelOpen(true);
+    } catch (error) {
+      if (requestId !== selectionRequestRef.current) return;
+      setSelectedOrderId(null);
+      setSelectedOrder(null);
+      setIsPanelOpen(false);
+      setActionError('Unable to load the selected order details. Please try again.');
+    } finally {
+      if (requestId === selectionRequestRef.current) setIsSelectionLoading(false);
+    }
+  }, []);
+
+  const visibleSelectedOrder = selectedOrder?.id === selectedOrderId && filteredOrders.some(order => order.id === selectedOrderId)
+    ? selectedOrder
+    : null;
+
+  useEffect(() => {
+    if (filteredOrders.length === 0) {
+      selectionRequestRef.current += 1;
+      setSelectedOrderId(null);
+      setSelectedOrder(null);
+      setIsSelectionLoading(false);
+      setIsPanelOpen(false);
+      return;
+    }
+
+    if (!filteredOrders.some(order => order.id === selectedOrderId)) {
+      setIsPanelOpen(false);
+      void selectOrder(filteredOrders[0]);
+    }
+  }, [filteredOrders, selectOrder, selectedOrderId]);
+
+  const timelineSteps = useMemo(() => {
+    if (!visibleSelectedOrder) return [];
+
+    const order = visibleSelectedOrder;
+    const rank = workflowRank[order.status];
+    const cancelled = order.status === 'Cancelled';
+    const assignmentEvent = findTimelineEvent(order, ['ASSIGNED']);
+    const preparationEvent = findTimelineEvent(order, ['PREPARING', 'READY_FOR_STOCK_OUT']);
+    const packingEvent = findTimelineEvent(order, ['STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT']);
+    const pickupEvent = findTimelineEvent(order, ['READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED']);
+    const state = (completedAtRank: number, currentAtRank?: number): TimelineStepState => {
+      if (cancelled && rank < completedAtRank) return 'cancelled';
+      if (rank >= completedAtRank) return 'completed';
+      if (currentAtRank !== undefined && rank >= currentAtRank) return 'current';
+      return 'pending';
+    };
+
+    return [
+      { step: 'Import Order', icon: <FileText className="h-4 w-4" />, state: 'completed' as TimelineStepState, date: formatTimelineDate(order.createdAt) },
+      { step: 'Admin Assignment', icon: <User className="h-4 w-4" />, state: state(1), date: formatTimelineDate(assignmentEvent?.createdAt) || order.assignedDate },
+      { step: 'Picking & Preparation', icon: <Package className="h-4 w-4" />, state: state(3, 2), date: formatTimelineDate(preparationEvent?.createdAt) },
+      { step: 'Packing', icon: <Box className="h-4 w-4" />, state: state(5, 3), date: formatTimelineDate(packingEvent?.createdAt) },
+      { step: 'Ready for Pickup', icon: <Truck className="h-4 w-4" />, state: state(5), date: formatTimelineDate(pickupEvent?.createdAt) },
+    ];
+  }, [visibleSelectedOrder]);
+
   // KPI data
   const kpiData = [
     { label: 'Assigned to Me', status: 'Assigned' as OrderStatus, value: assignedCount, icon: <UserCheck className="w-5 h-5" />, colorClass: 'text-orange-500' },
@@ -255,15 +369,11 @@ const OrderManagement: React.FC = () => {
 
   // Handlers
   const handleViewOrder = async (order: Order) => {
-    setActionError(null);
-    const response = await apiClient.get(`/plant-manager/orders/${order.id}`);
-    setSelectedOrder(mapOrder(response.data));
-    setIsPanelOpen(true);
+    await selectOrder(order, true);
   };
 
   const handleClosePanel = () => {
     setIsPanelOpen(false);
-    setSelectedOrder(null);
     setActionError(null);
   };
 
@@ -426,7 +536,19 @@ const OrderManagement: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
               {filteredOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-slate-800/20 transition-colors">
+                <tr
+                  key={order.id}
+                  onClick={() => void selectOrder(order)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      void selectOrder(order);
+                    }
+                  }}
+                  tabIndex={0}
+                  aria-selected={selectedOrderId === order.id}
+                  className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500/60 ${selectedOrderId === order.id ? 'bg-cyan-500/10' : 'hover:bg-slate-800/20'}`}
+                >
                   <td className="px-4 py-3 font-mono font-medium text-white">{order.orderNumber}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
@@ -451,7 +573,10 @@ const OrderManagement: React.FC = () => {
                   <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => void handleViewOrder(order)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleViewOrder(order);
+                      }}
                       className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                       title="View / Process Order"
                     >
@@ -471,7 +596,7 @@ const OrderManagement: React.FC = () => {
           </table>
         </div>
         ) : filteredOrders.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{filteredOrders.map((order) => <article key={order.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-mono font-semibold text-slate-900 dark:text-white">{order.orderNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.customer}</p></div><StatusBadge status={order.status} /></div><p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Products</dt><dd className="text-slate-900 dark:text-white">{order.items[0]?.productName || 'No products'}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.totalItems}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned</dt><dd className="text-slate-900 dark:text-white">{order.assignedDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => void handleViewOrder(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View / Process Order"><Eye className="h-4 w-4" /></button></div></article>)}</div>
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{filteredOrders.map((order) => <article key={order.id} onClick={() => void selectOrder(order)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void selectOrder(order); } }} tabIndex={0} aria-selected={selectedOrderId === order.id} className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 dark:bg-slate-800 ${selectedOrderId === order.id ? 'border-cyan-500/60 ring-1 ring-cyan-500/30' : 'border-slate-200 dark:border-slate-700'}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-mono font-semibold text-slate-900 dark:text-white">{order.orderNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.customer}</p></div><StatusBadge status={order.status} /></div><p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Products</dt><dd className="text-slate-900 dark:text-white">{order.items[0]?.productName || 'No products'}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.totalItems}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned</dt><dd className="text-slate-900 dark:text-white">{order.assignedDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); void handleViewOrder(order); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View / Process Order"><Eye className="h-4 w-4" /></button></div></article>)}</div>
         ) : (
           <div className="px-4 py-8 text-center text-slate-400">No orders match your filters.</div>
         )}
@@ -485,34 +610,32 @@ const OrderManagement: React.FC = () => {
             <ListTodo className="w-4 h-4 text-cyan-400" />
             Fulfillment Steps & Timeline
           </h3>
-          <div className="space-y-4">
-            {[
-              { step: 'Import Order', icon: <FileText className="w-4 h-4" />, active: true },
-              { step: 'Admin Assignment', icon: <User className="w-4 h-4" />, active: true },
-              { step: 'Picking & Preparation', icon: <Package className="w-4 h-4" />, active: true },
-              { step: 'Packing', icon: <Box className="w-4 h-4" />, active: false },
-              { step: 'Ready for Pickup', icon: <Truck className="w-4 h-4" />, active: false },
-            ].map((item, idx) => (
+          {visibleSelectedOrder ? <div className="space-y-4">
+            <p className="-mt-2 text-xs text-slate-400">Showing {visibleSelectedOrder.orderNumber}</p>
+            {timelineSteps.map((item, idx) => {
+              const active = item.state === 'completed' || item.state === 'current';
+              const label = item.state === 'completed' ? 'Completed' : item.state === 'current' ? 'In progress' : item.state === 'cancelled' ? 'Not reached — order cancelled' : 'Pending';
+              return (
               <div key={idx} className="flex items-start gap-3">
                 <div className="relative flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${item.active ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800/50 text-slate-500'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${active ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800/50 text-slate-500'}`}>
                     {item.icon}
                   </div>
                   {idx < 4 && (
-                    <div className={`w-0.5 h-6 ${item.active ? 'bg-cyan-500/30' : 'bg-slate-700'}`} />
+                    <div className={`w-0.5 h-6 ${active ? 'bg-cyan-500/30' : 'bg-slate-700'}`} />
                   )}
                 </div>
                 <div>
-                  <p className={`text-sm font-medium ${item.active ? 'text-white' : 'text-slate-500'}`}>
+                  <p className={`text-sm font-medium ${active ? 'text-white' : 'text-slate-500'}`}>
                     {item.step}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {item.active ? 'Completed' : 'Pending'}
+                    {label}{item.date ? ` · ${item.date}` : ''}
                   </p>
                 </div>
               </div>
-            ))}
-          </div>
+            );})}
+          </div> : <p className="text-sm text-slate-400">{isSelectionLoading ? 'Loading selected order details…' : 'Select an order to view fulfillment details.'}</p>}
         </div>
 
         {/* Reserved Inventory Summary */}
@@ -521,43 +644,25 @@ const OrderManagement: React.FC = () => {
             <Layers className="w-4 h-4 text-cyan-400" />
             Assigned Inventory Reserved Summary
           </h3>
-          <div className="space-y-3">
-            {orders
-              .filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled')
-              .flatMap(o => o.items)
-              .reduce((acc, item) => {
-                const existing = acc.find(i => i.productName === item.productName && i.unit === item.unit);
-                if (existing) {
-                  existing.totalRequired += item.requiredQty;
-                  existing.totalAllocated += item.allocatedQty;
-                } else {
-                  acc.push({
-                    productName: item.productName,
-                    totalRequired: item.requiredQty,
-                    totalAllocated: item.allocatedQty,
-                    unit: item.unit,
-                  });
-                }
-                return acc;
-              }, [] as { productName: string; totalRequired: number; totalAllocated: number; unit: string; }[])
-              .slice(0, 5)
-              .map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+          {visibleSelectedOrder ? <div className="space-y-3">
+            <p className="-mt-2 text-xs text-slate-400">Showing {visibleSelectedOrder.orderNumber}</p>
+            {visibleSelectedOrder.items.map((item) => (
+                <div key={item.id} className="flex items-center justify-between border-b border-slate-800/60 pb-2">
                   <div>
                     <p className="text-sm text-slate-200">{item.productName}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-white">
-                      {item.totalAllocated} / {item.totalRequired} {item.unit}
+                      {item.allocatedQty} / {item.requiredQty} {item.unit}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {Math.round((item.totalAllocated / item.totalRequired) * 100)}% allocated
+                      {item.requiredQty > 0 ? Math.round((item.allocatedQty / item.requiredQty) * 100) : 0}% allocated
                     </p>
                   </div>
                 </div>
               ))}
-            <p className="text-xs text-slate-500 mt-2">Showing top 5 reserved products</p>
-          </div>
+            <p className="text-xs text-slate-500 mt-2">Reservation values are shown exactly as returned by the order detail API.</p>
+          </div> : <p className="text-sm text-slate-400">{isSelectionLoading ? 'Loading selected order inventory…' : 'Select an order to view its inventory summary.'}</p>}
         </div>
       </div>
 
