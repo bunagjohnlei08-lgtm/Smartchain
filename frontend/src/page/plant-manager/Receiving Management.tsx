@@ -1065,10 +1065,10 @@ const ReceivingManagement: React.FC = () => {
                     setAssignmentError(null);
                   }}
                   disabled={qaAssigneesLoading || assignmentSaving}
-                  className="min-h-11 w-full cursor-pointer rounded-xl border border-[#1f2937] bg-[#0b1220] px-3 text-base text-white outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none [color-scheme:light] transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#1f2937] dark:bg-[#0b1220] dark:text-slate-100 dark:[color-scheme:dark]"
                 >
-                  <option value="">{qaAssigneesLoading ? 'Loading QA Supervisors…' : 'Select QA Supervisor'}</option>
-                  {qaAssignees.map((qa) => <option key={qa.id} value={qa.id}>{qa.name}</option>)}
+                  <option value="" className="bg-white text-slate-600 dark:bg-[#0b1220] dark:text-slate-300">{qaAssigneesLoading ? 'Loading QA Supervisors…' : 'Select QA Supervisor'}</option>
+                  {qaAssignees.map((qa) => <option key={qa.id} value={qa.id} className="bg-white text-slate-900 dark:bg-[#0b1220] dark:text-slate-100">{qa.name}</option>)}
                 </select>
                 {!qaAssigneesLoading && !qaAssigneesError && qaAssignees.length === 0 && <p className="mt-2 text-sm text-amber-400">No active QA Supervisors are available.</p>}
                 {qaAssigneesError && <p role="alert" className="mt-2 text-sm text-red-400">{qaAssigneesError}</p>}

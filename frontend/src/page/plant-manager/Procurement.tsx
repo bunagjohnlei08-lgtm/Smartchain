@@ -17,6 +17,7 @@ import {
   FileText,
   RefreshCw,
   ChevronLeft,
+  ChevronDown,
   ChevronRight as ChevronRightIcon,
   LayoutGrid,
   LayoutList,
@@ -269,6 +270,9 @@ const ReplenishmentPlanning: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showNewRequestModal, setShowNewRequestModal] = useState(false);
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+  const [activeProductIndex, setActiveProductIndex] = useState(0);
+  const productDropdownRef = React.useRef<HTMLDivElement>(null);
   const [selectedRequest, setSelectedRequest] = useState<RequestHistory | null>(null);
   usePlantManagerDetailOverlay(showViewModal && selectedRequest !== null);
   const [reason, setReason] = useState('');
@@ -346,6 +350,27 @@ const ReplenishmentPlanning: React.FC = () => {
       : [],
     [catalogProducts, selectedCategory]
   );
+  const selectedCatalogProduct = useMemo(
+    () => categoryProducts.find((product) => String(product.id) === newRequest.product) ?? null,
+    [categoryProducts, newRequest.product],
+  );
+
+  useEffect(() => {
+    if (!productDropdownOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!productDropdownRef.current?.contains(event.target as Node)) setProductDropdownOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProductDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [productDropdownOpen]);
 
   // Filtered products
   const filteredRequests = useMemo(() => {
@@ -420,6 +445,8 @@ const ReplenishmentPlanning: React.FC = () => {
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
     setNewRequest((current) => ({ ...current, product: '' }));
+    setProductDropdownOpen(false);
+    setActiveProductIndex(0);
   };
 
   const handleNewRequestSubmit = async () => {
@@ -800,23 +827,82 @@ const ReplenishmentPlanning: React.FC = () => {
                     </select>
                   </div>
                   <div className="min-w-0">
-                    <label htmlFor="procurement-product" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
-                    <select
-                      id="procurement-product"
-                      value={newRequest.product}
-                      onChange={(e) => setNewRequest({ ...newRequest, product: e.target.value })}
-                      disabled={!selectedCategory || categoryProducts.length === 0}
-                      className="w-full cursor-pointer bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <option value="">
-                        {!selectedCategory
-                          ? 'Select a category first'
-                          : categoryProducts.length === 0
-                            ? 'No products available in this category'
-                            : 'Select Product'}
-                      </option>
-                      {categoryProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                    </select>
+                    <label id="procurement-product-label" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
+                    <div ref={productDropdownRef} className="relative min-w-0">
+                      <button
+                        id="procurement-product"
+                        type="button"
+                        aria-labelledby="procurement-product-label procurement-product"
+                        aria-haspopup="listbox"
+                        aria-expanded={productDropdownOpen}
+                        aria-controls="procurement-product-options"
+                        aria-activedescendant={productDropdownOpen && categoryProducts[activeProductIndex] ? `procurement-product-option-${categoryProducts[activeProductIndex].id}` : undefined}
+                        disabled={!selectedCategory || categoryProducts.length === 0}
+                        onClick={() => {
+                          setActiveProductIndex(Math.max(0, categoryProducts.findIndex((product) => String(product.id) === newRequest.product)));
+                          setProductDropdownOpen((open) => !open);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                            event.preventDefault();
+                            setProductDropdownOpen(true);
+                            setActiveProductIndex((current) => !productDropdownOpen
+                              ? (event.key === 'ArrowDown' ? 0 : categoryProducts.length - 1)
+                              : event.key === 'ArrowDown'
+                                ? Math.min(current + 1, categoryProducts.length - 1)
+                                : Math.max(current - 1, 0));
+                          }
+                          if (event.key === 'Enter' && productDropdownOpen && categoryProducts[activeProductIndex]) {
+                            event.preventDefault();
+                            setNewRequest((current) => ({ ...current, product: String(categoryProducts[activeProductIndex].id) }));
+                            setProductDropdownOpen(false);
+                          }
+                        }}
+                        className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-4 py-2.5 text-left text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        title={selectedCatalogProduct?.name}
+                      >
+                        <span className={`min-w-0 flex-1 break-words leading-5 ${selectedCatalogProduct ? '' : 'text-[var(--text-muted)]'}`}>
+                          {selectedCatalogProduct?.name
+                            ?? (!selectedCategory
+                              ? 'Select a category first'
+                              : categoryProducts.length === 0
+                                ? 'No products available in this category'
+                                : 'Select Product')}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform ${productDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {productDropdownOpen && (
+                        <div
+                          id="procurement-product-options"
+                          role="listbox"
+                          aria-labelledby="procurement-product-label"
+                          className="absolute inset-x-0 top-full z-[60] mt-1 max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1.5 shadow-2xl custom-scrollbar"
+                        >
+                          {categoryProducts.map((product, index) => {
+                            const selected = String(product.id) === newRequest.product;
+                            const active = index === activeProductIndex;
+                            return (
+                              <div
+                                id={`procurement-product-option-${product.id}`}
+                                key={product.id}
+                                role="option"
+                                aria-selected={selected}
+                                onMouseEnter={() => setActiveProductIndex(index)}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => {
+                                  setNewRequest((current) => ({ ...current, product: String(product.id) }));
+                                  setProductDropdownOpen(false);
+                                }}
+                                className={`cursor-pointer whitespace-normal break-words rounded-lg px-3 py-2.5 text-sm leading-5 text-[var(--text-primary)] transition-colors ${active ? 'bg-cyan-500/10' : 'hover:bg-[var(--bg-surface-alt)]'} ${selected ? 'font-semibold text-cyan-700 dark:text-cyan-300' : ''}`}
+                              >
+                                {product.name}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="min-w-0">
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Warehouse <span className="text-red-400">*</span></label>
