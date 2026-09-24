@@ -135,7 +135,7 @@ const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
     'Out of Stock': 'text-rose-400 bg-rose-500/10 border-rose-500/20',
   };
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.Healthy}`}>
+    <span className={`inline-flex items-center justify-center whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium border ${styles[status] || styles.Healthy}`}>
       {status}
     </span>
   );
