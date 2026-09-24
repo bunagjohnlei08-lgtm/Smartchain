@@ -8,6 +8,7 @@ use App\Models\QaInspectionAttachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -25,7 +26,16 @@ class QaQualityReportController extends Controller
 
         $validated = $request->validate([
             'days' => ['sometimes', 'integer', Rule::in(range(14, 30))],
+            'from_date' => ['nullable', 'date_format:Y-m-d'],
+            'to_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from_date'],
         ]);
+        $fromDate = filled($validated['from_date'] ?? null)
+            ? Carbon::createFromFormat('Y-m-d', $validated['from_date'])->startOfDay()
+            : null;
+        $toDate = filled($validated['to_date'] ?? null)
+            ? Carbon::createFromFormat('Y-m-d', $validated['to_date'])->addDay()->startOfDay()
+            : null;
+        $hasCustomRange = $fromDate !== null || $toDate !== null;
         $trendDays = (int) ($validated['days'] ?? 30);
         $trendStart = now()->startOfDay()->subDays($trendDays - 1);
         $trendEnd = now()->addDay()->startOfDay();
@@ -34,6 +44,8 @@ class QaQualityReportController extends Controller
             ->with(['receiving', 'items.receivingItem', 'attachments'])
             ->whereNotNull('completed_at')
             ->whereIn('status', self::FINAL_STATUSES)
+            ->when($fromDate, fn ($query) => $query->where('completed_at', '>=', $fromDate))
+            ->when($toDate, fn ($query) => $query->where('completed_at', '<', $toDate))
             ->when($user->isQaSupervisor(), fn ($query) => $query->whereHas(
                 'receiving',
                 fn ($receiving) => $receiving->where('assigned_qa_user_id', $user->id)
@@ -57,8 +69,11 @@ class QaQualityReportController extends Controller
             ->join('receivings', 'receivings.id', '=', 'qa_inspections.receiving_id')
             ->join('qa_inspection_items', 'qa_inspection_items.qa_inspection_id', '=', 'qa_inspections.id')
             ->whereNotNull('completed_at')
-            ->where('qa_inspections.completed_at', '>=', $trendStart)
-            ->where('qa_inspections.completed_at', '<', $trendEnd)
+            ->when($hasCustomRange && $fromDate, fn ($query) => $query->where('qa_inspections.completed_at', '>=', $fromDate))
+            ->when($hasCustomRange && $toDate, fn ($query) => $query->where('qa_inspections.completed_at', '<', $toDate))
+            ->when(! $hasCustomRange, fn ($query) => $query
+                ->where('qa_inspections.completed_at', '>=', $trendStart)
+                ->where('qa_inspections.completed_at', '<', $trendEnd))
             ->whereIn('qa_inspections.status', self::FINAL_STATUSES)
             ->when($user->isQaSupervisor(), fn ($query) => $query->where('receivings.assigned_qa_user_id', $user->id))
             ->selectRaw('DATE(qa_inspections.completed_at) AS inspection_date')
@@ -69,16 +84,22 @@ class QaQualityReportController extends Controller
             ->get()
             ->keyBy('inspection_date');
 
-        $trend = collect(range(0, $trendDays - 1))->map(function (int $offset) use ($trendStart, $trendByDate) {
-            $date = $trendStart->copy()->addDays($offset)->toDateString();
-            $daily = $trendByDate->get($date);
+        $trend = $hasCustomRange
+            ? $trendByDate->values()->map(fn ($daily) => [
+                'date' => $daily->inspection_date,
+                'passed' => (int) $daily->passed,
+                'rejected' => (int) $daily->rejected,
+            ])
+            : collect(range(0, $trendDays - 1))->map(function (int $offset) use ($trendStart, $trendByDate) {
+                $date = $trendStart->copy()->addDays($offset)->toDateString();
+                $daily = $trendByDate->get($date);
 
-            return [
-                'date' => $date,
-                'passed' => (int) ($daily->passed ?? 0),
-                'rejected' => (int) ($daily->rejected ?? 0),
-            ];
-        });
+                return [
+                    'date' => $date,
+                    'passed' => (int) ($daily->passed ?? 0),
+                    'rejected' => (int) ($daily->rejected ?? 0),
+                ];
+            });
 
         $topRejectedProducts = $inspectionItems
             ->filter(fn ($item) => $item->rejected_quantity > 0 && $item->receivingItem?->product_name)
@@ -113,6 +134,12 @@ class QaQualityReportController extends Controller
 
         return response()->json([
             'data' => [
+                'report_period' => [
+                    'from_date' => $fromDate?->toDateString(),
+                    'to_date' => $toDate?->copy()->subDay()->toDateString(),
+                    'label' => $this->periodLabel($fromDate, $toDate),
+                    'is_custom' => $hasCustomRange,
+                ],
                 'summary' => [
                     'completed_inspections' => $completed,
                     'passed_count' => $passed,
@@ -155,5 +182,24 @@ class QaQualityReportController extends Controller
                 })->values(),
             ],
         ]);
+    }
+
+    private function periodLabel(?Carbon $fromDate, ?Carbon $exclusiveToDate): string
+    {
+        $toDate = $exclusiveToDate?->copy()->subDay();
+
+        if ($fromDate && $toDate) {
+            return $fromDate->format('F j, Y').' – '.$toDate->format('F j, Y');
+        }
+
+        if ($fromDate) {
+            return 'From '.$fromDate->format('F j, Y');
+        }
+
+        if ($toDate) {
+            return 'Through '.$toDate->format('F j, Y');
+        }
+
+        return 'All completed inspections';
     }
 }
