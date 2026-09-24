@@ -141,7 +141,7 @@ const LoginPage: React.FC = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="mx-auto w-[90%] space-y-3 sm:w-full">
         {notice && !loginErrors.form && (
           <div role="status" aria-live="polite" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-[13px] text-emerald-300 lg:text-xs">
             {notice}
@@ -183,34 +183,34 @@ const LoginPage: React.FC = () => {
         />
 
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
-          <label className="group flex min-h-9 cursor-pointer items-center rounded-lg focus-within:ring-2 focus-within:ring-blue-500/40">
+          <label className="group flex min-h-11 cursor-pointer items-center rounded-lg focus-within:ring-2 focus-within:ring-blue-500/40">
             <input
               type="checkbox"
               id="rememberMe"
               checked={formData.rememberMe}
               onChange={(e) => updateField('rememberMe', e.target.checked)}
               disabled={isLoginBusy}
-              className="h-4 w-4 cursor-pointer rounded border-2 border-slate-700 bg-[#091018] accent-blue-500 transition-colors group-hover:border-blue-400 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 checked:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-3.5 w-3.5 cursor-pointer rounded border-2 border-slate-700 bg-[#091018] accent-blue-500 transition-colors group-hover:border-blue-400 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 checked:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 sm:h-4 sm:w-4"
               style={{
                 accentColor: '#5B8CFF',
               }}
             />
-            <span className="ml-2 text-xs" style={{ color: '#A2AAB8' }}>
+            <span className="ml-2 text-[11px] sm:text-xs" style={{ color: '#A2AAB8' }}>
               Remember me
             </span>
           </label>
           <button
             type="button"
             onClick={() => navigate('/forgot-password')}
-            className="min-h-9 rounded-lg border-none bg-transparent px-1 text-xs font-medium text-blue-400 transition-colors hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="min-h-11 rounded-lg border-none bg-transparent px-1 text-[11px] font-medium text-blue-400 transition-colors hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:text-xs"
           >
             Forgot Password?
           </button>
         </div>
 
-        <div className="pt-1">
+        <div className="mx-auto w-1/2 pt-1 [&>button]:!min-h-[37px] [&>button]:!gap-1.5 [&>button]:!rounded-[10px] [&>button]:!px-3 [&>button]:!py-0 [&>button]:!text-xs [&>button]:!font-medium sm:w-full sm:[&>button]:!min-h-[42px] sm:[&>button]:!gap-2 sm:[&>button]:!rounded-xl sm:[&>button]:!px-4 sm:[&>button]:!py-2.5 sm:[&>button]:!text-[13px] sm:[&>button]:!font-semibold">
           <FormButton type="submit" variant="primary" isLoading={isLoginBusy} disabled={isLoginBusy}>
-            {!isLoginBusy && <LogIn className="h-4 w-4" />}
+            {!isLoginBusy && <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
             {isLoginBusy ? 'Signing in...' : 'Sign In'}
           </FormButton>
         </div>
