@@ -11,6 +11,8 @@ import {
   RefreshCw,
   ScanLine,
   Search,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -72,6 +74,20 @@ interface Summary {
   valueReleased: number;
 }
 
+interface RecentScan {
+  barcode: string;
+  product: string | null;
+  message: string;
+  succeeded: boolean;
+}
+
+interface ScanToast {
+  message: string;
+  type: 'success' | 'error';
+}
+
+const SCAN_COOLDOWN_MS = 1500;
+
 const statusLabels: Record<string, StockOutStatus> = {
   READY_FOR_STOCK_OUT: 'Ready for Stock Out',
   STOCK_OUT_IN_PROGRESS: 'Stock Out In Progress',
@@ -126,6 +142,18 @@ const getError = (error: any) => {
   if (Array.isArray(errors)) return errors.map(item => item.reason || String(item)).join(' ');
   if (errors) return Object.values(errors).flat()[0] as string;
   return error?.response?.data?.message || 'The request could not be completed. Please try again.';
+};
+
+const getScanError = (error: any): string => {
+  const status = Number(error?.response?.status || 0);
+  const message = getError(error);
+  const normalized = message.toLowerCase();
+  if (normalized.includes('not included in this order')) return 'This barcode is not part of this order.';
+  if (normalized.includes('assigned warehouse') || normalized.includes('does not belong')) return 'This barcode belongs to a different warehouse.';
+  if (normalized.includes('fully released') || normalized.includes('exceeds remaining')) return 'The required quantity for this item is already completed.';
+  if (normalized.includes('barcode not found')) return 'Unknown barcode. No matching inventory item was found.';
+  if (status === 404 || normalized.includes('already been completed') || normalized.includes('not ready')) return 'This order is no longer in a valid Stock Out state.';
+  return message;
 };
 
 const StatusBadge = ({ status, compact = false }: { status: StockOutStatus; compact?: boolean }) => {
@@ -200,11 +228,67 @@ const StockOut: React.FC = () => {
   const [manualBarcode, setManualBarcode] = useState('');
   const [manualQuantity, setManualQuantity] = useState('1');
   const [scanSuccess, setScanSuccess] = useState('');
+  const [scanCooldown, setScanCooldown] = useState(false);
+  const [scannerFlash, setScannerFlash] = useState<'success' | 'error' | null>(null);
+  const [recentScan, setRecentScan] = useState<RecentScan | null>(null);
+  const [scanToast, setScanToast] = useState<ScanToast | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('stock-out-scanner-sound') !== 'off');
   const [, setCompletionNotice] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const scanBusyRef = useRef(false);
+  const cooldownUntilRef = useRef(0);
+  const cooldownTimerRef = useRef<number | null>(null);
+  const feedbackTimerRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const selectedOrderRef = useRef<StockOutOrder | null>(null);
   const lastDetectionRef = useRef({ value: '', at: 0 });
+
+  useEffect(() => { selectedOrderRef.current = selectedOrder; }, [selectedOrder]);
+  useEffect(() => { localStorage.setItem('stock-out-scanner-sound', soundEnabled ? 'on' : 'off'); }, [soundEnabled]);
+
+  const playTone = useCallback((type: 'success' | 'error') => {
+    if (!soundEnabled) return;
+    try {
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const context = new AudioContextClass();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = type === 'success' ? 'sine' : 'square';
+      oscillator.frequency.value = type === 'success' ? 880 : 220;
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + (type === 'success' ? 0.12 : 0.18));
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + (type === 'success' ? 0.13 : 0.19));
+      oscillator.addEventListener('ended', () => void context.close(), { once: true });
+    } catch {
+      // Visual feedback remains available when browser audio is blocked.
+    }
+  }, [soundEnabled]);
+
+  const showScanFeedback = useCallback((type: 'success' | 'error', message: string, barcode: string, product: string | null = null) => {
+    setScannerFlash(type);
+    setRecentScan({ barcode, product, message, succeeded: type === 'success' });
+    setScanToast({ type, message });
+    playTone(type);
+    if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    feedbackTimerRef.current = window.setTimeout(() => setScannerFlash(null), 450);
+    toastTimerRef.current = window.setTimeout(() => setScanToast(null), 3500);
+  }, [playTone]);
+
+  const beginScanCooldown = useCallback((barcode: string) => {
+    const now = Date.now();
+    cooldownUntilRef.current = now + SCAN_COOLDOWN_MS;
+    lastDetectionRef.current = { value: barcode, at: now };
+    setScanCooldown(true);
+    if (cooldownTimerRef.current) window.clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = window.setTimeout(() => setScanCooldown(false), SCAN_COOLDOWN_MS);
+  }, []);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -243,6 +327,7 @@ const StockOut: React.FC = () => {
   const loadDetails = useCallback(async (orderId: string) => {
     const response = await apiClient.get(`/stock-out/orders/${orderId}`);
     const order = mapOrder(response.data);
+    selectedOrderRef.current = order;
     setSelectedOrder(order);
     return order;
   }, []);
@@ -258,7 +343,12 @@ const StockOut: React.FC = () => {
     setCameraActive(false);
   }, []);
 
-  useEffect(() => () => stopCamera(), [stopCamera]);
+  useEffect(() => () => {
+    stopCamera();
+    if (cooldownTimerRef.current) window.clearTimeout(cooldownTimerRef.current);
+    if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+  }, [stopCamera]);
 
   const closeScanner = useCallback(() => {
     stopCamera();
@@ -268,16 +358,35 @@ const StockOut: React.FC = () => {
   }, [stopCamera]);
 
   const processScan = useCallback(async (barcode: string, quantity = 1, resetManualEntry = false) => {
-    if (!selectedOrder || scanBusyRef.current) return;
+    const order = selectedOrderRef.current;
+    const normalizedBarcode = barcode.trim();
+    if (!order || scanBusyRef.current || Date.now() < cooldownUntilRef.current || !normalizedBarcode) return;
+    const completedItem = order.items?.find(item => item.barcode === normalizedBarcode && item.remainingQty <= 0);
+    if (completedItem) {
+      const message = `${completedItem.product} is already complete (${completedItem.releasedQty} / ${completedItem.orderedQty}).`;
+      beginScanCooldown(normalizedBarcode);
+      setScannerError(message);
+      setScanSuccess('');
+      showScanFeedback('error', message, normalizedBarcode, completedItem.product);
+      return;
+    }
     scanBusyRef.current = true;
+    beginScanCooldown(normalizedBarcode);
     setActionBusy(true);
     setScannerError('');
+    setScanSuccess('');
     try {
-      const response = await apiClient.post(`/stock-out/orders/${selectedOrder.id}/release`, {
-        barcode: barcode.trim(),
+      const response = await apiClient.post(`/stock-out/orders/${order.id}/release`, {
+        barcode: normalizedBarcode,
         quantity,
       });
-      setScanSuccess(response.data.message || 'One unit stocked out successfully.');
+      const product = response.data.product || 'Inventory item';
+      const released = Number(response.data.released_quantity ?? response.data.quantity_released ?? quantity);
+      const required = Number(response.data.ordered_quantity ?? 0);
+      const releasedNow = Number(response.data.quantity_released ?? quantity);
+      const message = `${product}: ${releasedNow} ${releasedNow === 1 ? 'unit' : 'units'} released (${released} / ${required}).`;
+      setScanSuccess(message);
+      showScanFeedback('success', message, normalizedBarcode, product);
       if (resetManualEntry) {
         setManualBarcode('');
         setManualQuantity('1');
@@ -289,27 +398,31 @@ const StockOut: React.FC = () => {
       if (response.data?.order_status === 'READY_FOR_SHIPMENT') {
         stopCamera();
         setScannerOpen(false);
+        selectedOrderRef.current = null;
         setSelectedOrder(null);
-        setCompletionNotice(`${selectedOrder.orderNo} is fully released and moved to Ready for Shipment.`);
+        setCompletionNotice(`${order.orderNo} is fully released and moved to Ready for Shipment.`);
         await loadOrders();
         return;
       }
 
-      await loadDetails(selectedOrder.id);
+      await loadDetails(order.id);
       await loadOrders();
     } catch (error) {
-      setScannerError(getError(error));
+      const message = getScanError(error);
+      setScannerError(message);
+      showScanFeedback('error', message, normalizedBarcode);
     } finally {
       scanBusyRef.current = false;
       setActionBusy(false);
     }
-  }, [loadDetails, loadOrders, selectedOrder, stopCamera]);
+  }, [beginScanCooldown, loadDetails, loadOrders, showScanFeedback, stopCamera]);
 
   const startCamera = async () => {
     stopCamera();
     setScannerOpen(true);
     setScannerError('');
     setScanSuccess('');
+    setRecentScan(null);
     try {
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
       if (!videoRef.current) {
@@ -317,18 +430,12 @@ const StockOut: React.FC = () => {
       }
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('No camera is available in this browser. Please use manual barcode entry.');
 
-      // The decode loop runs its first frame before decodeFromConstraints resolves, so a
-      // detection can arrive before scannerControlsRef is set; stop via the callback's controls.
-      let detected = false;
-      const handleResult = (result: { getText: () => string } | undefined, _error: unknown, controls: IScannerControls) => {
+      const handleResult = (result: { getText: () => string } | undefined) => {
         const value = result ? String(result.getText()).trim() : '';
         const now = Date.now();
-        if (!value || detected || scanBusyRef.current || (lastDetectionRef.current.value === value && now - lastDetectionRef.current.at <= 2500)) return;
-        detected = true;
-        lastDetectionRef.current = { value, at: now };
+        if (!value || scanBusyRef.current || now < cooldownUntilRef.current) return;
+        if (lastDetectionRef.current.value === value && now - lastDetectionRef.current.at < SCAN_COOLDOWN_MS) return;
         if (import.meta.env.DEV) console.debug('[scanner] decoded CODE_128:', value);
-        controls.stop();
-        stopCamera();
         void processScan(value, 1);
       };
       const startDecoder = (constraints: MediaStreamConstraints) => {
@@ -346,10 +453,6 @@ const StockOut: React.FC = () => {
         if (!['NotFoundError', 'OverconstrainedError'].includes(getCameraErrorName(preferredCameraError))) throw preferredCameraError;
         stopCamera();
         controls = await startDecoder({ audio: false, video: true });
-      }
-      if (detected) {
-        controls.stop();
-        return;
       }
       scannerControlsRef.current = controls;
       setCameraActive(true);
@@ -471,9 +574,9 @@ const StockOut: React.FC = () => {
           <div><div className="flex justify-between text-sm"><span className="text-slate-400">Release progress</span><span className="font-medium text-white">{progress.released} / {progress.ordered} units</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress.percentage}%` }} /></div></div>
           <div className="pm-table-scroll max-w-full overflow-x-auto overscroll-x-contain">
             <table className="pm-responsive-table pm-cols-10 pm-sticky-2 w-full min-w-[1050px] text-xs">
-              <thead className="border-b border-slate-800 bg-[#070a12] text-slate-400"><tr>{['Barcode', 'Product', 'Ordered Qty', 'Released Qty', 'Remaining Qty', 'Unit', 'Batch / Lot', 'Expiry', 'Location', 'Status'].map(label => <th key={label} className="px-3 py-2 text-left font-medium">{label}</th>)}</tr></thead>
+              <thead className="border-b border-slate-800 bg-[#070a12] text-slate-400"><tr>{['Barcode', 'Product', 'Ordered Qty', 'Scanned / Required', 'Remaining Qty', 'Unit', 'Batch / Lot', 'Expiry', 'Location', 'Status'].map(label => <th key={label} className="px-3 py-2 text-left font-medium">{label}</th>)}</tr></thead>
               <tbody>{selectedOrder.items?.map(item => <tr key={item.id} className="border-b border-slate-800/60">
-                <td className="px-3 py-3 font-mono text-slate-300">{item.barcode || '—'}</td><td className="px-3 py-3 text-slate-200">{item.product}</td><td className="px-3 py-3 text-white">{item.orderedQty}</td><td className="px-3 py-3 text-white">{item.releasedQty}</td><td className="px-3 py-3 text-white">{item.remainingQty}</td><td className="px-3 py-3 text-slate-300">{item.unit}</td><td className="px-3 py-3 text-slate-400">{item.batchLot || '—'}</td><td className="px-3 py-3 text-slate-400">{item.expiryDate || '—'}</td><td className="px-3 py-3 text-slate-400">{item.location || '—'}</td><td className="px-3 py-3"><ItemStatusBadge status={item.status} /></td>
+                <td className="px-3 py-3 font-mono text-slate-300">{item.barcode || '—'}</td><td className="px-3 py-3 text-slate-200">{item.product}</td><td className="px-3 py-3 text-white">{item.orderedQty}</td><td className={`px-3 py-3 font-semibold ${item.remainingQty <= 0 ? 'text-emerald-400' : 'text-white'}`}>{item.releasedQty} / {item.orderedQty}{item.remainingQty <= 0 ? ' ✓' : ''}</td><td className="px-3 py-3 text-white">{item.remainingQty}</td><td className="px-3 py-3 text-slate-300">{item.unit}</td><td className="px-3 py-3 text-slate-400">{item.batchLot || '—'}</td><td className="px-3 py-3 text-slate-400">{item.expiryDate || '—'}</td><td className="px-3 py-3 text-slate-400">{item.location || '—'}</td><td className="px-3 py-3"><ItemStatusBadge status={item.status} /></td>
               </tr>)}</tbody>
             </table>
           </div>
@@ -494,16 +597,19 @@ const StockOut: React.FC = () => {
 
       {scannerOpen && selectedOrder && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
         <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl">
-          <div className="flex items-start justify-between gap-4"><div><h2 id="scanner-title" className="text-lg font-semibold text-white">Scan Inventory Barcode</h2><p className="mt-1 text-sm text-slate-400">{selectedOrder.orderNo} · releases are validated against this order and warehouse.</p></div><button onClick={closeScanner} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="h-5 w-5" /> Close Scanner</button></div>
+          <div className="flex items-start justify-between gap-4"><div><h2 id="scanner-title" className="text-lg font-semibold text-white">Scan Inventory Barcode</h2><p className="mt-1 text-sm text-slate-400">{selectedOrder.orderNo} · releases are validated against this order and warehouse.</p></div><div className="flex items-center gap-1"><button type="button" onClick={() => setSoundEnabled(value => !value)} aria-label={soundEnabled ? 'Mute scanner sounds' : 'Enable scanner sounds'} title={soundEnabled ? 'Mute scanner sounds' : 'Enable scanner sounds'} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">{soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button><button onClick={closeScanner} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="h-5 w-5" /> Close Scanner</button></div></div>
 
-          <div className="relative mt-5 aspect-video overflow-hidden rounded-xl border border-slate-700 bg-black">
+          <div className={`relative mt-5 aspect-video overflow-hidden rounded-xl border bg-black transition-colors duration-200 ${scannerFlash === 'success' ? 'border-emerald-400 ring-4 ring-emerald-500/30' : scannerFlash === 'error' ? 'border-rose-400 ring-4 ring-rose-500/30' : 'border-slate-700'}`}>
             <video ref={videoRef} muted playsInline autoPlay aria-label="Barcode scanner camera preview" className="h-full w-full object-cover" />
             {!cameraActive && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400"><Camera className="h-10 w-10" /><p className="text-sm">Camera is not active</p><button onClick={() => void startCamera()} className="min-h-11 cursor-pointer rounded-xl border border-cyan-500/40 px-4 py-2 text-sm font-medium text-cyan-400 hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500">Start Camera</button></div>}
             {cameraActive && <div className="pointer-events-none absolute inset-[18%] rounded-xl border-2 border-cyan-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]" />}
+            {scannerFlash && <div className={`pointer-events-none absolute inset-0 ${scannerFlash === 'success' ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`} />}
+            {cameraActive && <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center"><span className={`rounded-full border px-3 py-1 text-xs font-medium backdrop-blur ${actionBusy ? 'border-amber-400/40 bg-amber-950/70 text-amber-200' : scanCooldown ? 'border-slate-500/40 bg-slate-950/70 text-slate-300' : 'border-emerald-400/40 bg-emerald-950/70 text-emerald-200'}`}>{actionBusy ? 'Processing scan…' : scanCooldown ? 'Scanner cooldown…' : 'Ready to scan'}</span></div>}
           </div>
 
           {scannerError && <div role="alert" className="mt-4 flex gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{scannerError}</div>}
           {scanSuccess && <div role="status" className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4"><p className="flex items-center gap-2 font-semibold text-emerald-300"><CheckCircle2 className="h-5 w-5" /> {scanSuccess}</p></div>}
+          {recentScan && <div aria-live="polite" className={`mt-4 rounded-xl border p-3 text-sm ${recentScan.succeeded ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-200' : 'border-rose-500/20 bg-rose-500/5 text-rose-200'}`}><p className="font-medium">Most recent scan: {recentScan.succeeded ? 'Succeeded' : 'Failed'}</p><p className="mt-1 break-all text-xs opacity-90">{recentScan.product ? `${recentScan.product} · ` : ''}{recentScan.barcode}</p><p className="mt-1 text-xs opacity-80">{recentScan.message}</p></div>}
 
           <form onSubmit={event => {
             event.preventDefault();
@@ -518,11 +624,12 @@ const StockOut: React.FC = () => {
             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end">
               <label className="text-sm text-slate-300">Barcode<input value={manualBarcode} onChange={event => setManualBarcode(event.target.value)} required maxLength={100} autoComplete="off" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
               <label className="text-sm text-slate-300">Quantity<input type="number" min={1} step={1} value={manualQuantity} onChange={event => setManualQuantity(event.target.value)} required inputMode="numeric" className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-[#0b101d] px-3 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
-              <button type="submit" disabled={actionBusy || !manualBarcode.trim() || !Number.isInteger(Number(manualQuantity)) || Number(manualQuantity) < 1} className="min-h-11 cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{actionBusy ? 'Working…' : 'Submit'}</button>
+              <button type="submit" disabled={actionBusy || scanCooldown || !manualBarcode.trim() || !Number.isInteger(Number(manualQuantity)) || Number(manualQuantity) < 1} className="min-h-11 cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{actionBusy ? 'Working…' : scanCooldown ? 'Ready shortly…' : 'Submit'}</button>
             </div>
           </form>
         </div>
       </div>}
+      {scanToast && <div role={scanToast.type === 'error' ? 'alert' : 'status'} aria-live="polite" className={`fixed bottom-4 right-4 z-[60] max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur ${scanToast.type === 'success' ? 'border-emerald-400/30 bg-emerald-950/90 text-emerald-100' : 'border-rose-400/30 bg-rose-950/90 text-rose-100'}`}>{scanToast.message}</div>}
     </div>
   );
 };

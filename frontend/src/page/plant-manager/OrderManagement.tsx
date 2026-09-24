@@ -302,7 +302,7 @@ const OrderManagement: React.FC = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+    <div className="min-h-screen w-full min-w-0 max-w-full space-y-6 overflow-x-hidden bg-[#070a12] p-4 text-slate-100 sm:p-6 lg:p-8">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -403,9 +403,14 @@ const OrderManagement: React.FC = () => {
       </div>
 
       {/* ORDER TABLE */}
-      <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl overflow-hidden">
+      <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d]">
         {viewMode === 'list' ? (
-        <div className="pm-table-scroll">
+        <div
+          className="pm-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-1 [scrollbar-gutter:stable]"
+          role="region"
+          aria-label="Order management table"
+          tabIndex={0}
+        >
           <table className="pm-status-table pm-order-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1100px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
