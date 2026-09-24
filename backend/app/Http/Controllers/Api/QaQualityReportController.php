@@ -38,7 +38,8 @@ class QaQualityReportController extends Controller
                 'receiving',
                 fn ($receiving) => $receiving->where('assigned_qa_user_id', $user->id)
             ))
-            ->orderBy('completed_at')
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
             ->get();
 
         $completed = $inspections->count();

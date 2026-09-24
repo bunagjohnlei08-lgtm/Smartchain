@@ -24,6 +24,18 @@ interface QualityReportData {
 const distributionColors: Record<string, string> = { Passed: '#22C55E', Rejected: '#EF4444' };
 const escapeCsv = (value: string | number): string => `"${String(value).replace(/"/g, '""')}"`;
 const escapeHtml = (value: string | number): string => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+const evidenceFiles = (attachments: QaAttachment[]): string => attachments.map((item) => item.original_name).join('; ');
+const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob); });
+const printEvidence = async (attachments: QaAttachment[]): Promise<string> => {
+  if (attachments.length === 0) return '<span class="muted">No evidence</span>';
+  return (await Promise.all(attachments.map(async (attachment) => {
+    if (!attachment.mime_type.startsWith('image/')) return `<span class="file">PDF: ${escapeHtml(attachment.original_name)}</span>`;
+    try {
+      const response = await apiClient.get<Blob>(attachment.view_url, { responseType: 'blob' });
+      return `<figure><img src="${await blobToDataUrl(response.data)}" alt=""><figcaption>${escapeHtml(attachment.original_name)}</figcaption></figure>`;
+    } catch { return `<span class="file">Image: ${escapeHtml(attachment.original_name)}</span>`; }
+  }))).join('');
+};
 
 const KpiCard: React.FC<{ label: string; value: string | number; subtext: string; icon: React.ReactNode; iconBg: string; iconColor: string }> = ({ label, value, subtext, icon, iconBg, iconColor }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none">
@@ -75,6 +87,8 @@ const QualityReports: React.FC = () => {
       ...report.top_rejected_products.map((item) => [item.product, item.quantity]),
       [], ['Supplier Quality Rating', 'Inspections', 'Accepted Quantity', 'Rejected Quantity', 'Pass Rate'],
       ...report.supplier_quality.map((item) => [item.name, item.inspections, item.accepted_quantity, item.rejected_quantity, `${item.pass_rate}%`]),
+      [], ['Inspection Evidence', 'Supplier', 'Completed At', 'Evidence Count', 'Evidence Files'],
+      ...report.inspection_evidence.map((item) => [item.receiving_no, item.supplier, item.completed_at, item.attachments.length, evidenceFiles(item.attachments)]),
     ];
     const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -85,7 +99,7 @@ const QualityReports: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const printReport = () => {
+  const printReport = async () => {
     if (!report) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) { setError('The report window was blocked. Allow pop-ups and try again.'); return; }
@@ -93,7 +107,8 @@ const QualityReports: React.FC = () => {
     const trendRows = report.trend.map((item) => `<tr><td>${escapeHtml(item.date)}</td><td>${item.passed}</td><td>${item.rejected}</td></tr>`).join('');
     const productRows = report.top_rejected_products.map((item) => `<tr><td>${escapeHtml(item.product)}</td><td>${item.quantity}</td></tr>`).join('');
     const supplierRows = report.supplier_quality.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.inspections}</td><td>${item.accepted_quantity}</td><td>${item.rejected_quantity}</td><td>${item.pass_rate}%</td></tr>`).join('');
-    printWindow.document.write(`<!doctype html><html><head><title>QA Quality Report</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px}h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin-top:24px}p{color:#555}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border:1px solid #bbb;padding:7px;text-align:left}th{background:#eee}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card{border:1px solid #bbb;padding:10px}.value{font-size:18px;font-weight:bold}@media print{body{padding:0}}</style></head><body><h1>QA Quality Report</h1><p>Generated ${escapeHtml(new Date().toLocaleString())}</p><div class="summary"><div class="card">Completed<div class="value">${report.summary.completed_inspections}</div></div><div class="card">Passed<div class="value">${report.summary.passed_rate}%</div></div><div class="card">Rejected<div class="value">${report.summary.rejected_rate}%</div></div></div><h2>Inspection Trend</h2><table><thead><tr><th>Date</th><th>Passed</th><th>Rejected</th></tr></thead><tbody>${trendRows}</tbody></table><h2>Top Rejected Products</h2><table><thead><tr><th>Product</th><th>Rejected Quantity</th></tr></thead><tbody>${productRows}</tbody></table><h2>Supplier Quality Rating</h2><table><thead><tr><th>Supplier</th><th>Inspections</th><th>Accepted</th><th>Rejected</th><th>Pass Rate</th></tr></thead><tbody>${supplierRows}</tbody></table></body></html>`);
+    const evidenceRows = (await Promise.all(report.inspection_evidence.map(async (item) => `<tr><td>${escapeHtml(item.receiving_no)}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(new Date(item.completed_at).toLocaleString())}</td><td><strong>Evidence (${item.attachments.length})</strong><div class="evidence">${await printEvidence(item.attachments)}</div></td></tr>`))).join('');
+    printWindow.document.write(`<!doctype html><html><head><title>QA Quality Report</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px}h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin-top:24px}p{color:#555}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border:1px solid #bbb;padding:7px;text-align:left;vertical-align:top}th{background:#eee}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card{border:1px solid #bbb;padding:10px}.value{font-size:18px;font-weight:bold}.evidence{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.evidence figure{width:100px;margin:0}.evidence img{width:100px;height:70px;object-fit:contain;border:1px solid #ddd}.evidence figcaption,.file{display:block;max-width:120px;font-size:8px;overflow-wrap:anywhere}.muted{color:#666}@media print{body{padding:0}}</style></head><body><h1>QA Quality Report</h1><p>Generated ${escapeHtml(new Date().toLocaleString())}</p><div class="summary"><div class="card">Completed<div class="value">${report.summary.completed_inspections}</div></div><div class="card">Passed<div class="value">${report.summary.passed_rate}%</div></div><div class="card">Rejected<div class="value">${report.summary.rejected_rate}%</div></div></div><h2>Inspection Trend</h2><table><thead><tr><th>Date</th><th>Passed</th><th>Rejected</th></tr></thead><tbody>${trendRows}</tbody></table><h2>Top Rejected Products</h2><table><thead><tr><th>Product</th><th>Rejected Quantity</th></tr></thead><tbody>${productRows}</tbody></table><h2>Supplier Quality Rating</h2><table><thead><tr><th>Supplier</th><th>Inspections</th><th>Accepted</th><th>Rejected</th><th>Pass Rate</th></tr></thead><tbody>${supplierRows}</tbody></table><h2>Inspection Evidence</h2><table><thead><tr><th>Receiving No.</th><th>Supplier</th><th>Completed</th><th>Evidence</th></tr></thead><tbody>${evidenceRows}</tbody></table></body></html>`);
     printWindow.document.close(); printWindow.focus(); printWindow.print();
   };
 

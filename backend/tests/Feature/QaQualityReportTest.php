@@ -55,7 +55,23 @@ class QaQualityReportTest extends TestCase
             ->assertJsonPath('data.top_rejected_products.0.quantity', 7)
             ->assertJsonPath('data.supplier_quality.0.name', 'Supplier A')
             ->assertJsonPath('data.supplier_quality.0.pass_rate', 86.7)
-            ->assertJsonPath('data.inspection_evidence.2.receiving_no', 'RCV-REJECT')
-            ->assertJsonPath('data.inspection_evidence.2.attachments.0.original_name', 'damage.jpg');
+            ->assertJsonPath('data.inspection_evidence.0.receiving_no', 'RCV-REJECT')
+            ->assertJsonPath('data.inspection_evidence.0.attachments.0.original_name', 'damage.jpg')
+            ->assertJsonPath('data.inspection_evidence.1.receiving_no', 'RCV-PARTIAL')
+            ->assertJsonPath('data.inspection_evidence.2.receiving_no', 'RCV-PASS');
+    }
+
+    public function test_inspection_evidence_uses_id_as_a_deterministic_newest_first_tie_breaker(): void
+    {
+        $role = Role::create(['name' => 'QA Supervisor', 'slug' => 'QA_SUPERVISOR']);
+        $qa = User::factory()->create(['role_id' => $role->id]);
+        $olderId = $this->completedInspection($qa, 'RCV-SAME-1', 'Supplier A', 'Passed', 1, 0, '2026-08-24 10:00:00');
+        $newerId = $this->completedInspection($qa, 'RCV-SAME-2', 'Supplier A', 'Passed', 1, 0, '2026-08-24 10:00:00');
+
+        $response = $this->actingAs($qa)->getJson('/api/qa/quality-reports');
+
+        $response->assertOk()
+            ->assertJsonPath('data.inspection_evidence.0.inspection_id', $newerId->id)
+            ->assertJsonPath('data.inspection_evidence.1.inspection_id', $olderId->id);
     }
 }

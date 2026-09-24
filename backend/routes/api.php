@@ -125,6 +125,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/qa/dashboard', [QaDashboardController::class, 'index']);
     Route::get('/qa/inspection-history', [QaInspectionHistoryController::class, 'index']);
     Route::get('/qa/rejected-items', [QaRejectedItemsController::class, 'index']);
+    Route::get('/qa/rejected-items/export.xlsx', [QaRejectedItemsController::class, 'export']);
     Route::get('/qa/quality-reports', [QaQualityReportController::class, 'index']);
     Route::get('/qa/inspections/{receivingId}', [QaInspectionController::class, 'show']);
     Route::get('/qa/inspections/{receivingId}/attachment', [QaInspectionController::class, 'attachment']);
