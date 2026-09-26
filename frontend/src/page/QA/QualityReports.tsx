@@ -44,7 +44,7 @@ const printEvidence = async (attachments: QaAttachment[]): Promise<string> => {
 };
 
 const KpiCard: React.FC<{ label: string; value: string | number; subtext: string; icon: React.ReactNode; iconBg: string; iconColor: string }> = ({ label, value, subtext, icon, iconBg, iconColor }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none">
+  <div className="qa-kpi-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none">
     <div className="flex items-start justify-between"><div><p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">{label}</p><p className="mobile-kpi-value mt-1.5 text-2xl font-bold text-slate-900 dark:text-white">{value}</p><p className="mobile-kpi-helper mt-1 text-xs text-slate-500">{subtext}</p></div><div className={`p-2.5 rounded-full ${iconBg} ${iconColor}`}>{icon}</div></div>
   </div>
 );
@@ -164,7 +164,7 @@ const QualityReports: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full max-w-7xl mx-auto space-y-6 bg-slate-50 p-4 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 md:p-6">
+    <div className="qa-quality-reports min-h-screen w-full max-w-7xl mx-auto space-y-6 bg-slate-50 p-4 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 md:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quality Reports</h1><p className="text-sm text-slate-600 dark:text-slate-400">Aggregated quality performance from completed QA inspections.</p></div><div className="flex flex-wrap items-center gap-3"><button onClick={printReport} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileText className="w-4 h-4" /> Export PDF</button><button onClick={exportExcel} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileSpreadsheet className="w-4 h-4" /> Export Excel</button><button onClick={printReport} disabled={!report || loading} className="cursor-pointer bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"><Printer className="w-4 h-4" /> Print</button></div></div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none" aria-labelledby="quality-report-period-heading">
@@ -183,7 +183,7 @@ const QualityReports: React.FC = () => {
           </div>
         </div>
         {dateError && <p role="alert" className="mt-3 text-sm text-rose-600 dark:text-rose-400">{dateError}</p>}
-        {report?.report_period && <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Report Period: <span className="font-medium text-slate-700 dark:text-slate-200">{report.report_period.label}</span></p>}
+        {report?.report_period && <p className="qa-report-period-summary mt-3 text-xs text-slate-500 dark:text-slate-400"><span className="qa-report-period-label">Report Period:</span> <span className="qa-report-period-value font-medium text-slate-700 dark:text-slate-200">{report.report_period.label}</span></p>}
       </section>
 
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 flex items-center justify-between gap-3"><span className="flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</span><button onClick={() => void fetchReport(appliedRange)} className="cursor-pointer rounded-lg border border-rose-300 px-3 py-1.5 hover:bg-rose-100 dark:border-rose-400/30 dark:hover:bg-rose-500/10 focus:outline-none focus:ring-2 focus:ring-rose-400">Retry</button></div>}

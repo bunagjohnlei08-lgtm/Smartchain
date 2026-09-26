@@ -10,6 +10,7 @@ use App\Models\ReplenishmentRequest;
 use App\Models\Supplier;
 use App\Support\AuditLogger;
 use App\Support\PurchaseOrderPdf;
+use App\Support\PurchaseOrderSupplier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,12 +35,11 @@ class PurchaseOrderController extends Controller
         abort_unless($request->user()->isAdmin(), 403);
         $validated = $request->validate([
             'po_number' => ['nullable', 'string', 'max:50', 'unique:purchase_orders,po_number'],
-            'supplier_name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::exists('suppliers', 'name')->where(fn ($query) => $query->where('status', 'ACTIVE')),
+            'supplier_id' => [
+                'required', 'integer',
+                Rule::exists('suppliers', 'id')->where(fn ($query) => $query->where('status', 'ACTIVE')),
             ],
+            'supplier_name' => ['prohibited'],
             'delivery_details' => ['required', 'string', 'max:2000'],
             'expected_delivery_date' => ['required', 'date', 'after_or_equal:today'],
             'replenishment_request_id' => ['nullable', 'integer', 'exists:replenishment_requests,id', 'unique:purchase_orders,replenishment_request_id'],
@@ -52,6 +52,7 @@ class PurchaseOrderController extends Controller
         ]);
 
         $order = DB::transaction(function () use ($validated, $request) {
+            $supplier = Supplier::query()->where('status', 'ACTIVE')->findOrFail($validated['supplier_id']);
             $replenishmentRequest = null;
             if (!empty($validated['replenishment_request_id'])) {
                 $replenishmentRequest = ReplenishmentRequest::query()->lockForUpdate()->findOrFail($validated['replenishment_request_id']);
@@ -70,7 +71,8 @@ class PurchaseOrderController extends Controller
             $order = PurchaseOrder::create([
                 'po_number' => $validated['po_number'] ?? $this->nextPoNumber(),
                 'replenishment_request_id' => $replenishmentRequest?->id,
-                'supplier_name' => $validated['supplier_name'],
+                'supplier_id' => $supplier->id,
+                'supplier_name' => $supplier->name,
                 'delivery_details' => $validated['delivery_details'],
                 'expected_delivery_date' => $validated['expected_delivery_date'],
                 'total_amount' => $items->sum('total_price'),
@@ -136,16 +138,13 @@ class PurchaseOrderController extends Controller
      * used to mail arbitrary addresses. The PO is only marked sent once
      * Brevo has accepted the message.
      */
-    public function send(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf): JsonResponse
+    public function send(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf, PurchaseOrderSupplier $supplierResolver): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
         abort_if(in_array($purchaseOrder->status, ['Completed', 'Cancelled'], true), 422, 'Completed or cancelled Purchase Orders cannot be sent.');
 
-        // POs reference their supplier by name; refuse to guess between duplicates.
-        $suppliers = Supplier::query()->where('name', $purchaseOrder->supplier_name)->limit(2)->get();
-        abort_if($suppliers->isEmpty(), 422, 'This Purchase Order is not linked to a registered supplier.');
-        abort_if($suppliers->count() > 1, 422, 'More than one supplier is registered under this name, so the recipient cannot be determined.');
-        $supplier = $suppliers->first();
+        $supplier = $supplierResolver->resolve($purchaseOrder);
+        abort_if(! $supplier, 422, 'This Purchase Order is not linked to a registered supplier.');
 
         $email = trim((string) $supplier->email);
         abort_if($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false, 422, 'This supplier does not have a valid email address.');
@@ -212,6 +211,7 @@ class PurchaseOrderController extends Controller
             'id' => $order->id,
             'po_number' => $order->po_number,
             'supplier_name' => $order->supplier_name,
+            'supplier_id' => $order->supplier_id,
             'replenishment_request_id' => $order->replenishment_request_id,
             'delivery_details' => $order->delivery_details,
             'expected_delivery_date' => $order->expected_delivery_date?->toDateString(),

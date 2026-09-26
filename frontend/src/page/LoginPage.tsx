@@ -14,7 +14,11 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   // Success notice handed over by the account activation page.
-  const notice = (location.state as { notice?: string } | null)?.notice;
+  const stateNotice = (location.state as { notice?: string } | null)?.notice;
+  const idleNotice = new URLSearchParams(location.search).get('reason') === 'session-expired'
+    ? 'Your session expired due to inactivity. Please sign in again.'
+    : undefined;
+  const notice = idleNotice ?? stateNotice;
   const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   // Pending second step. Held in component state only - never stored or put in the URL.

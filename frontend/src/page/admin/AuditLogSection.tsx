@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { ChevronLeft, ChevronRight, Eye, Filter, Loader2, Search, ShieldCheck, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, Loader2, RotateCcw, Search, ShieldCheck, X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import type { ApiAuditLog } from '../../types';
 
@@ -26,7 +26,7 @@ interface AuditFilters {
 const EMPTY_FILTERS: AuditFilters = { search: '', action: '', module: '', status: '', dateFrom: '', dateTo: '' };
 
 const inputClass =
-  'h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 placeholder-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:placeholder-slate-400';
+  'admin-audit-control h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 placeholder:text-xs placeholder-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:placeholder-slate-400';
 
 const ACTION_LABELS: Record<string, string> = {
   PASSWORD_RESET_REQUESTED: 'Password reset requested',
@@ -228,15 +228,15 @@ const AuditLogSection: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322]">
-        <div className="relative min-w-[220px] flex-[2]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+        <div className="relative basis-full min-w-0 flex-[2] sm:basis-auto sm:min-w-[220px]">
+          <Search className="admin-audit-search-icon pointer-events-none absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-slate-500 dark:text-slate-400" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search user, action, or resource..."
             aria-label="Search audit logs"
-            className={`${inputClass} pl-8`}
+            className={`${inputClass} admin-audit-search pl-9`}
           />
         </div>
         <select value={filters.action} onChange={(e) => updateFilter('action', e.target.value)} aria-label="Filter by action" className={`${inputClass} min-w-[130px] flex-1 cursor-pointer`}>
@@ -259,9 +259,11 @@ const AuditLogSection: React.FC = () => {
         <button
           type="button"
           onClick={resetFilters}
-          className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:hover:bg-gray-800"
+          aria-label="Reset audit log filters"
+          title="Reset filters"
+          className="admin-audit-reset flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:hover:bg-gray-800"
         >
-          <Filter className="h-3.5 w-3.5" /> Reset
+          <RotateCcw className="h-[13px] w-[13px]" />
         </button>
       </div>
 

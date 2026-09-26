@@ -101,7 +101,7 @@ const PurchaseOrders: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [newOrder, setNewOrder] = useState({
     replenishmentRequestId: null as number | null,
-    requestNo: '', warehouseLocation: '', supplierName: '', expectedDeliveryDate: '',
+    requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '',
     deliveryDetails: '', signatureData: '', status: 'Approved' as POStatus,
     items: [{ productName: '', quantity: 1, unitPrice: 0 }],
   });
@@ -113,7 +113,7 @@ const PurchaseOrders: React.FC = () => {
       replenishmentRequestId: Number(linkedRequest.id),
       requestNo: linkedRequest.requestNo,
       warehouseLocation: linkedRequest.warehouseLocation,
-      supplierName: '',
+      supplierId: '',
       expectedDeliveryDate: '',
       deliveryDetails: `Deliver to ${linkedRequest.warehouseLocation}`,
       signatureData: '',
@@ -196,7 +196,7 @@ const PurchaseOrders: React.FC = () => {
     setError('');
     try {
       await apiClient.post('/purchase-orders', {
-        supplier_name: newOrder.supplierName,
+        supplier_id: Number(newOrder.supplierId),
         replenishment_request_id: newOrder.replenishmentRequestId,
         expected_delivery_date: newOrder.expectedDeliveryDate,
         delivery_details: newOrder.deliveryDetails,
@@ -206,7 +206,7 @@ const PurchaseOrders: React.FC = () => {
       });
       await loadOrders();
       setShowCreateModal(false);
-      setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierName: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', status: 'Approved', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
+      setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', status: 'Approved', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
     } catch (requestError: any) {
       setError(requestError?.response?.data?.message || 'Purchase order could not be created.');
     } finally {
@@ -214,7 +214,7 @@ const PurchaseOrders: React.FC = () => {
     }
   };
 
-  const resetNewOrder = () => setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierName: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', status: 'Approved', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
+  const resetNewOrder = () => setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', status: 'Approved', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
   const closeCreateModal = () => { setShowCreateModal(false); resetNewOrder(); };
 
   const handleViewDetails = (order: PurchaseOrder) => {
@@ -634,9 +634,9 @@ const PurchaseOrders: React.FC = () => {
               <div className="admin-create-po-form grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">Supplier *</label>
-                  <select required disabled={loadingSuppliers} value={newOrder.supplierName} onChange={(e) => setNewOrder({ ...newOrder, supplierName: e.target.value })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-wait disabled:opacity-60">
+                  <select required disabled={loadingSuppliers} value={newOrder.supplierId} onChange={(e) => setNewOrder({ ...newOrder, supplierId: e.target.value })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-wait disabled:opacity-60">
                     <option value="">{loadingSuppliers ? 'Loading active suppliers…' : 'Select an active supplier'}</option>
-                    {supplierOptions.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name} ({supplier.supplier_code})</option>)}
+                    {supplierOptions.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.supplier_code})</option>)}
                   </select>
                   {supplierError && <p role="alert" className="mt-1 text-xs text-red-400">{supplierError}</p>}
                   {!loadingSuppliers && !supplierError && supplierOptions.length === 0 && <p className="mt-1 text-xs text-amber-400">No active suppliers are available.</p>}
@@ -693,7 +693,7 @@ const PurchaseOrders: React.FC = () => {
             </div>
             <div className="admin-create-po-footer flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#1f2937]">
             <button onClick={closeCreateModal} className="admin-create-po-action px-4 py-2 border border-[#1f2937] rounded-xl text-sm font-medium text-gray-300 hover:bg-slate-800/50 transition-colors">Cancel</button>
-              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierName} className="admin-create-po-action px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierId} className="admin-create-po-action px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <Save className="w-4 h-4" /> Create PO
               </button>
             </div>

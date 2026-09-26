@@ -59,7 +59,8 @@ return [
 
     'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'X-Requested-With'],
 
-    'exposed_headers' => ['Retry-After'],
+    // Content-Disposition carries server-generated export filenames to the SPA.
+    'exposed_headers' => ['Retry-After', 'Content-Disposition', 'X-Report-Rows'],
 
     'max_age' => 600,
 

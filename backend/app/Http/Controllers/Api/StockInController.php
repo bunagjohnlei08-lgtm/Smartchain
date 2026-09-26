@@ -165,7 +165,8 @@ class StockInController extends Controller
     {
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
-        $query = Receiving::query()->with(['items.product', 'items.warehouse', 'items.qaInspectionItem.inspection', 'timeline', 'preparedBy']);
+        $query = Receiving::query()->with(['items.product', 'items.warehouse', 'items.qaInspectionItem.inspection', 'timeline', 'preparedBy'])
+            ->where('status', '<>', Receiving::STATUS_AWAITING_REPLACEMENT);
 
         if ($request->filled('qa_status')) {
             $query->where('status', $request->qa_status);

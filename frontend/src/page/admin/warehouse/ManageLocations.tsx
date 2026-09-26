@@ -95,14 +95,14 @@ const ManageLocations: React.FC = () => {
           <section className="rounded-2xl border border-gray-800/50 bg-[#0d1322] p-5 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex gap-3">
-                <div className="rounded-xl bg-blue-500/10 p-3 text-blue-400"><Warehouse className="h-6 w-6" /></div>
+                <div className="flex h-12 w-12 shrink-0 self-start items-center justify-center rounded-xl bg-blue-500/10 text-blue-400 sm:h-auto sm:w-auto sm:p-3"><Warehouse className="h-5 w-5 sm:h-6 sm:w-6" /></div>
                 <div>
-                  <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-white">{location.name}</h2><StatusBadge status={location.status} /></div>
-                  <p className="mt-1 text-sm text-gray-400">{location.code}</p>
-                  <p className="mt-2 flex items-start gap-2 text-sm text-gray-300"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />{location.address || 'Address not configured'}</p>
+                  <div className="flex flex-wrap items-center gap-2"><h2 className="text-[15px] font-semibold text-white sm:text-lg">{location.name}</h2><StatusBadge status={location.status} /></div>
+                  <p className="mt-1 text-[12px] text-gray-400 sm:text-sm">{location.code}</p>
+                  <p className="mt-2 flex items-start gap-2 text-[12px] text-gray-300 sm:text-sm"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500 sm:h-4 sm:w-4" />{location.address || 'Address not configured'}</p>
                 </div>
               </div>
-              <button type="button" onClick={openEditor} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-400"><Edit className="h-4 w-4" /> Edit Location</button>
+              <button type="button" onClick={openEditor} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 text-[12px] font-medium text-white transition hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-400 sm:min-h-11 sm:h-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"><Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Edit Location</button>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               {[['Total Capacity', units(location.capacity)], ['Utilized', units(location.utilized)], ['Available', units(location.available)]].map(([label, value]) => <div key={label} className="rounded-xl bg-gray-800/50 p-4"><p className="text-xs text-gray-400">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>)}
@@ -138,7 +138,7 @@ const ManageLocations: React.FC = () => {
 };
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => <label className="block"><span className="mb-1.5 block text-sm text-gray-300">{label}</span>{children}</label>;
-const StatusBadge: React.FC<{ status: WarehouseLocation['status'] }> = ({ status }) => <span className={`admin-badge rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-green-400/20 bg-green-400/10 text-green-400' : 'border-gray-400/20 bg-gray-400/10 text-gray-400'}`}>{status}</span>;
+const StatusBadge: React.FC<{ status: WarehouseLocation['status'] }> = ({ status }) => <span className={`admin-badge rounded-full border px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:py-1 sm:text-xs ${status === 'Active' ? 'border-green-400/20 bg-green-400/10 text-green-400' : 'border-gray-400/20 bg-gray-400/10 text-gray-400'}`}>{status}</span>;
 const CapacityWarning: React.FC<{ location: WarehouseLocation; severity: Exclude<CapacitySeverity, 'normal'> }> = ({ location, severity }) => {
   const critical = severity === 'critical';
   return <div className={`mt-5 flex min-w-0 items-start gap-3 rounded-xl border p-4 ${critical ? 'border-red-500/40 bg-red-500/10 text-red-900 dark:text-red-100' : 'border-amber-400/30 bg-amber-400/10 text-amber-900 dark:text-amber-100'}`} role="alert"><AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${critical ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} /><div className="min-w-0"><p className="font-semibold">{location.capacity_state === 'full' ? 'Warehouse Full' : critical ? 'Critical Capacity Warning' : 'Warehouse Near Capacity'}</p><p className="mt-1 break-words text-sm leading-5 opacity-90">{location.name} is {location.utilization_percentage}% utilized. {location.available?.toLocaleString() ?? 0} units of capacity remain.</p></div></div>;

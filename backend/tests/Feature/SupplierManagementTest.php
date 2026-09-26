@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\Supplier;
+use App\Models\SupplierAlias;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -123,6 +124,57 @@ class SupplierManagementTest extends TestCase
 
         $this->actingAs($manager)->postJson('/api/suppliers', $this->payload())->assertForbidden();
         $this->assertDatabaseCount('suppliers', 0);
+    }
+
+    public function test_admin_can_add_update_and_remove_normalized_aliases(): void
+    {
+        $response = $this->create(['aliases' => ['  Acme   Legacy Trading  ']])->assertCreated()
+            ->assertJsonPath('data.aliases.0.alias', 'Acme Legacy Trading');
+        $supplier = Supplier::findOrFail($response->json('data.id'));
+        $this->assertDatabaseHas('supplier_aliases', [
+            'supplier_id' => $supplier->id, 'normalized_alias' => 'acme legacy trading',
+        ]);
+
+        $this->actingAs($this->admin)->putJson('/api/suppliers/'.$supplier->id, $this->payload(['aliases' => ['Former Acme']]))
+            ->assertOk()->assertJsonPath('data.aliases.0.alias', 'Former Acme');
+        $this->assertDatabaseMissing('supplier_aliases', ['normalized_alias' => 'acme legacy trading']);
+
+        $this->actingAs($this->admin)->putJson('/api/suppliers/'.$supplier->id, $this->payload(['aliases' => []]))->assertOk();
+        $this->assertDatabaseCount('supplier_aliases', 0);
+    }
+
+    public function test_duplicate_and_cross_supplier_alias_conflicts_are_rejected(): void
+    {
+        $first = Supplier::findOrFail($this->create(['name' => 'First Supplier', 'aliases' => ['Legacy Name']])->assertCreated()->json('data.id'));
+        $this->create(['name' => 'Second Supplier', 'aliases' => [' legacy   NAME ']])
+            ->assertUnprocessable()->assertJsonValidationErrors('aliases');
+        $this->create(['name' => 'Third Supplier', 'aliases' => ['First Supplier']])
+            ->assertUnprocessable()->assertJsonValidationErrors('aliases');
+        $this->actingAs($this->admin)->putJson('/api/suppliers/'.$first->id, $this->payload([
+            'name' => 'First Supplier', 'aliases' => ['Duplicate', ' duplicate '],
+        ]))->assertUnprocessable()->assertJsonValidationErrors('aliases');
+        $this->assertSame(1, SupplierAlias::query()->count());
+    }
+
+    public function test_non_admins_and_guests_cannot_manage_aliases(): void
+    {
+        $supplier = Supplier::findOrFail($this->create()->assertCreated()->json('data.id'));
+        $qaRole = Role::create(['name' => 'QA Supervisor', 'slug' => 'QA_SUPERVISOR']);
+        $managerRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
+        $payload = $this->payload(['aliases' => ['Unauthorized Alias']]);
+
+        $this->actingAs(User::factory()->create(['role_id' => $qaRole->id, 'status' => 'ACTIVE']))
+            ->putJson('/api/suppliers/'.$supplier->id, $payload)->assertForbidden();
+        $this->actingAs(User::factory()->create(['role_id' => $managerRole->id, 'status' => 'ACTIVE']))
+            ->putJson('/api/suppliers/'.$supplier->id, $payload)->assertForbidden();
+        $this->assertDatabaseCount('supplier_aliases', 0);
+    }
+
+    public function test_guest_cannot_manage_aliases(): void
+    {
+        $supplier = Supplier::create(['supplier_code' => 'SUP-GUEST', 'name' => 'Guest Test', 'status' => 'ACTIVE']);
+        $this->putJson('/api/suppliers/'.$supplier->id, $this->payload(['aliases' => ['Unauthorized Alias']]))->assertUnauthorized();
+        $this->assertDatabaseCount('supplier_aliases', 0);
     }
 
     // ---- Phone ---------------------------------------------------------------

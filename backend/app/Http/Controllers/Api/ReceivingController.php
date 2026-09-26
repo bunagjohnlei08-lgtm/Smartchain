@@ -19,7 +19,7 @@ class ReceivingController extends Controller
 {
     private function present(Receiving $receiving): array
     {
-        $receiving->loadMissing(['items', 'timeline', 'preparedBy', 'assignedQa']);
+        $receiving->loadMissing(['items', 'timeline', 'preparedBy', 'assignedQa', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
 
         $items = $receiving->items;
         $productSummary = match (true) {
@@ -38,6 +38,8 @@ class ReceivingController extends Controller
             'notes' => $receiving->notes,
             'delivery_date' => $receiving->delivery_date?->toDateString(),
             'status' => $receiving->status,
+            'is_replacement' => $receiving->replacement_for_rejection_case_id !== null,
+            'replacement' => $this->presentReplacement($receiving),
             'prepared_by' => $receiving->preparedBy?->name,
             'assigned_qa_user_id' => $receiving->assigned_qa_user_id,
             'assigned_qa' => $receiving->assignedQa ? [
@@ -67,11 +69,27 @@ class ReceivingController extends Controller
         ];
     }
 
+    private function presentReplacement(Receiving $receiving): ?array
+    {
+        $case = $receiving->replacementForCase;
+        if (! $case) return null;
+        $original = $case->inspectionItem?->inspection?->receiving;
+
+        return [
+            'rejection_case_id' => $case->id,
+            'rejection_reference' => sprintf('RJ-%06d', $case->id),
+            'original_receiving_id' => $original?->id,
+            'original_receiving_no' => $original?->receiving_no,
+            'expected_quantity' => (int) $receiving->items->sum('ordered_quantity'),
+            'awaiting_delivery' => $receiving->status === Receiving::STATUS_AWAITING_REPLACEMENT,
+        ];
+    }
+
     public function index(Request $request)
     {
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
-        $query = Receiving::query()->with(['items', 'timeline', 'preparedBy', 'assignedQa']);
+        $query = Receiving::query()->with(['items', 'timeline', 'preparedBy', 'assignedQa', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -108,17 +126,7 @@ class ReceivingController extends Controller
 
     private function generateReceivingNo(): string
     {
-        $last = Receiving::query()
-            ->lockForUpdate()
-            ->orderByDesc('id')
-            ->value('receiving_no');
-
-        $nextNumber = 1;
-        if ($last && preg_match('/(\d+)$/', $last, $matches)) {
-            $nextNumber = (int) $matches[1] + 1;
-        }
-
-        return 'RCV-'.str_pad((string) $nextNumber, 5, '0', STR_PAD_LEFT);
+        return Receiving::nextReceivingNo();
     }
 
     public function store(Request $request)
@@ -143,7 +151,8 @@ class ReceivingController extends Controller
                 abort_unless($submitted->contains(fn ($item) => (int) $item['delivered_quantity'] > 0), 422, 'At least one product must have a delivered quantity greater than zero.');
 
                 $previouslyReceived = ReceivingItem::query()
-                    ->whereHas('receiving', fn ($query) => $query->where('purchase_order_id', $purchaseOrder->id))
+                    // Replacement deliveries re-supply rejected goods and do not consume the PO balance.
+                    ->whereHas('receiving', fn ($query) => $query->where('purchase_order_id', $purchaseOrder->id)->whereNull('replacement_for_rejection_case_id'))
                     ->selectRaw('product_name, SUM(delivered_quantity) as quantity')
                     ->groupBy('product_name')->pluck('quantity', 'product_name');
 
@@ -243,6 +252,10 @@ class ReceivingController extends Controller
             return response()->json(['message' => 'A completed inspection cannot be reassigned.'], 422);
         }
 
+        if ($receiving->status === Receiving::STATUS_AWAITING_REPLACEMENT) {
+            return response()->json(['message' => 'Confirm the replacement delivery before assigning QA.'], 422);
+        }
+
         $previousQaId = $receiving->assigned_qa_user_id;
         $receiving->update(['assigned_qa_user_id' => $qa->id]);
 
@@ -272,6 +285,62 @@ class ReceivingController extends Controller
             $receiving->receiving_no,
             'Quality Inspection',
         ));
+
+        return response()->json($this->present($receiving->fresh()));
+    }
+
+    public function confirmReplacementDelivery(Request $request, Receiving $receiving)
+    {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+
+        $validated = $request->validate([
+            'delivery_date' => 'required|date',
+            'reference_no' => 'nullable|string|max:255',
+            'items' => 'required|array|min:1',
+            'items.*.receiving_item_id' => 'required|integer|distinct',
+            'items.*.delivered_quantity' => 'required|integer|min:0',
+        ]);
+
+        $receiving = DB::transaction(function () use ($validated, $request, $receiving) {
+            $locked = Receiving::query()->with('items')->lockForUpdate()->findOrFail($receiving->id);
+            abort_unless($locked->replacement_for_rejection_case_id !== null, 422, 'Only replacement receivings can be confirmed this way.');
+            abort_unless($locked->status === Receiving::STATUS_AWAITING_REPLACEMENT, 422, 'This replacement delivery has already been confirmed.');
+
+            $submitted = collect($validated['items'])->keyBy('receiving_item_id');
+            abort_unless($submitted->keys()->sort()->values()->all() === $locked->items->pluck('id')->sort()->values()->all(), 422, 'Delivered items must exactly match the expected replacement items.');
+            abort_unless($submitted->contains(fn ($item) => (int) $item['delivered_quantity'] > 0), 422, 'At least one product must have a delivered quantity greater than zero.');
+
+            foreach ($locked->items as $item) {
+                $quantity = (int) $submitted[$item->id]['delivered_quantity'];
+                abort_if($quantity > (int) $item->ordered_quantity, 422, "Delivered quantity for {$item->product_name} exceeds the expected replacement quantity of {$item->ordered_quantity}.");
+            }
+            foreach ($locked->items as $item) {
+                $item->update(['delivered_quantity' => (int) $submitted[$item->id]['delivered_quantity'], 'inspection_status' => 'Pending QA']);
+            }
+
+            $locked->update([
+                'status' => 'Pending QA',
+                'delivery_date' => $validated['delivery_date'],
+                'reference_no' => $validated['reference_no'] ?? $locked->reference_no,
+            ]);
+            $now = now();
+            foreach (['Replacement Delivered' => $request->user()->name, 'Pending QA Inspection' => 'System'] as $status => $performedBy) {
+                ReceivingTimeline::create(['receiving_id' => $locked->id, 'status' => $status, 'performed_by' => $performedBy, 'occurred_at' => $now]);
+            }
+
+            AuditLogger::success('REPLACEMENT_DELIVERY_CONFIRMED', AuditLogger::MODULE_RECEIVING, [
+                'resource' => $locked,
+                'resource_label' => $locked->receiving_no,
+                'details' => "Confirmed replacement delivery for {$locked->receiving_no}",
+                'metadata' => [
+                    'receiving_id' => $locked->id,
+                    'rejection_case_id' => $locked->replacement_for_rejection_case_id,
+                    'delivered_quantity' => (int) $submitted->sum('delivered_quantity'),
+                ],
+            ]);
+
+            return $locked;
+        });
 
         return response()->json($this->present($receiving->fresh()));
     }

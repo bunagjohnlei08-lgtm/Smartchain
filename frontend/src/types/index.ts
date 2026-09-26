@@ -140,9 +140,11 @@ export interface ApiReceivingItem {
   id: number;
   product_id: number;
   product_name: string;
+  ordered_quantity?: number | null;
+  expected_quantity?: number | null;
   delivered_quantity: number;
   unit: string;
-  inspection_status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial';
+  inspection_status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial' | 'Awaiting Replacement';
   created_at: string;
   updated_at: string;
 }
@@ -153,6 +155,15 @@ export interface ApiReceivingTimelineEvent {
   occurred_at: string;
 }
 
+export interface ApiReceivingReplacement {
+  rejection_case_id: number;
+  rejection_reference: string;
+  original_receiving_id: number | null;
+  original_receiving_no: string | null;
+  expected_quantity: number;
+  awaiting_delivery: boolean;
+}
+
 export interface ApiReceiving {
   id: number;
   receiving_no: string;
@@ -160,7 +171,9 @@ export interface ApiReceiving {
   supplier: string;
   reference_no: string | null;
   delivery_date: string;
-  status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial';
+  status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial' | 'Awaiting Replacement';
+  is_replacement?: boolean;
+  replacement?: ApiReceivingReplacement | null;
   prepared_by: string | null;
   assigned_qa_user_id: number | null;
   assigned_qa: { id: number; name: string } | null;

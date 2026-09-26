@@ -11,6 +11,7 @@ use App\Models\ReceivingItem;
 use App\Models\ReceivingTimeline;
 use App\Notifications\WorkflowNotification;
 use App\Support\WorkflowNotificationSender;
+use App\Support\SupplierRejectionWorkflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -302,6 +303,10 @@ class QaInspectionController extends Controller
                     abort(422, 'Receiving has no products.');
                 }
 
+                if ($receiving->status === Receiving::STATUS_AWAITING_REPLACEMENT) {
+                    abort(422, 'The replacement delivery has not been confirmed in Receiving yet.');
+                }
+
                 if ($receiving->qaInspection?->completed_at) {
                     abort(422, 'This inspection has already been submitted and can no longer be changed.');
                 }
@@ -478,6 +483,8 @@ class QaInspectionController extends Controller
         }
 
         if ($shouldSubmit) {
+            app(SupplierRejectionWorkflow::class)->syncInspection($receiving->qaInspection, true);
+            app(SupplierRejectionWorkflow::class)->completeReplacement($receiving->qaInspection);
             $result = $receiving->status;
             $type = match ($result) {
                 'Passed' => 'success',

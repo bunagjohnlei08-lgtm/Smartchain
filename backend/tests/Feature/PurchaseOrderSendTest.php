@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\PurchaseOrderMail;
 use App\Models\AuditLog;
 use App\Models\PurchaseOrder;
+use App\Models\Product;
 use App\Models\Role;
 use App\Models\Supplier;
 use App\Models\User;
@@ -39,6 +40,7 @@ class PurchaseOrderSendTest extends TestCase
         $this->supplier = Supplier::create([
             'supplier_code' => 'SUP-900', 'name' => 'Acme Chemicals', 'email' => 'orders@acme.test', 'status' => 'ACTIVE',
         ]);
+        Product::create(['name' => 'TOMAHAWK EC', 'unit' => 'pcs', 'cost_price' => 250]);
         $this->order = $this->purchaseOrder('PO-2026-0019', 'Acme Chemicals');
     }
 
@@ -46,6 +48,7 @@ class PurchaseOrderSendTest extends TestCase
     {
         $order = PurchaseOrder::create([
             'po_number' => $number,
+            'supplier_id' => $supplierName === $this->supplier->name ? $this->supplier->id : null,
             'supplier_name' => $supplierName,
             'delivery_details' => 'Deliver to Main Warehouse',
             'expected_delivery_date' => now()->addWeek()->toDateString(),
@@ -132,6 +135,43 @@ class PurchaseOrderSendTest extends TestCase
             && ! $mail->hasTo('attacker@evil.test') && count($mail->to) === 1);
     }
 
+    public function test_new_purchase_order_stores_authoritative_supplier_id_and_name_snapshot(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/purchase-orders', [
+            'supplier_id' => $this->supplier->id,
+            'supplier_name' => 'Forged Supplier Name',
+            'delivery_details' => 'Main warehouse',
+            'expected_delivery_date' => now()->addDay()->toDateString(),
+            'items' => [['product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250]],
+        ]);
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('supplier_name');
+
+        $this->actingAs($this->admin)->postJson('/api/purchase-orders', [
+            'supplier_id' => $this->supplier->id,
+            'delivery_details' => 'Main warehouse',
+            'expected_delivery_date' => now()->addDay()->toDateString(),
+            'items' => [['product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250]],
+        ])->assertCreated()->assertJsonPath('supplier_id', $this->supplier->id)
+            ->assertJsonPath('supplier_name', 'Acme Chemicals');
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'supplier_id' => $this->supplier->id,
+            'supplier_name' => 'Acme Chemicals',
+        ]);
+    }
+
+    public function test_shared_resolver_uses_conservative_normalized_name_matching(): void
+    {
+        Mail::fake();
+        $this->order->update(['supplier_id' => null]);
+        $this->order->update(['supplier_name' => '  ACME   CHEMICALS  ']);
+
+        $this->send()->assertOk();
+
+        Mail::assertSent(PurchaseOrderMail::class, fn (PurchaseOrderMail $mail) => $mail->hasTo('orders@acme.test'));
+    }
+
     public function test_the_attachment_is_the_same_document_as_the_download(): void
     {
         $response = $this->actingAs($this->admin)->get('/api/purchase-orders/'.$this->order->id.'/pdf')
@@ -164,6 +204,7 @@ class PurchaseOrderSendTest extends TestCase
         $this->send($orphan)->assertUnprocessable()->assertJsonPath('message', 'This Purchase Order is not linked to a registered supplier.');
 
         Supplier::create(['supplier_code' => 'SUP-901', 'name' => 'Acme Chemicals', 'email' => 'other@acme.test', 'status' => 'ACTIVE']);
+        $this->order->update(['supplier_id' => null]);
         $this->send()->assertUnprocessable();
 
         Mail::assertNothingSent();

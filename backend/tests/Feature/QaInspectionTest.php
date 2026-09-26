@@ -192,9 +192,20 @@ class QaInspectionTest extends TestCase
             && $notification->type === 'warning'
             && $notification->referenceId === $receiving->receiving_no);
         Notification::assertSentToTimes($plantManager, WorkflowNotification::class, 1);
-        Notification::assertNotSentTo($admin, WorkflowNotification::class);
+        Notification::assertSentTo($admin, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'Rejected Items Need Review'
+            && $notification->message === "New rejected QA item requires review: {$receiving->receiving_no}"
+            && $notification->type === 'warning'
+            && $notification->referenceId === $receiving->receiving_no);
+        Notification::assertSentToTimes($admin, WorkflowNotification::class, 1);
+        Notification::assertNotSentTo($plantManager, WorkflowNotification::class, fn ($notification) =>
+            $notification->title === 'Rejected Items Need Review');
         Notification::assertNotSentTo($otherPlantManager, WorkflowNotification::class);
         Notification::assertNotSentTo($qa, WorkflowNotification::class);
+
+        $this->actingAs($admin)->getJson('/api/admin/rejected-items')->assertOk();
+        $this->assertDatabaseCount('supplier_rejection_cases', 1);
+        Notification::assertSentToTimes($admin, WorkflowNotification::class, 1);
     }
 
     public function test_partial_inspection_moves_only_accepted_quantity_to_stock_in(): void

@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import type { ApiUser } from '../types';
+import SessionIdleManager from './SessionIdleManager';
 
 const AUTH_KEY = 'isAuthenticated';
 const ROLE_KEY = 'userRole';
@@ -42,7 +43,7 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
     return <Navigate to={fallback} replace />;
   }
 
-  return <>{children}</>;
+  return <SessionIdleManager>{children}</SessionIdleManager>;
 };
 
 export default ProtectedRoute;

@@ -32,9 +32,10 @@ class AdminReportsDashboardTest extends TestCase
 
         $this->actingAs($this->user('ADMIN'))->getJson('/api/admin/reports/dashboard')
             ->assertOk()
-            ->assertJsonPath('metrics.exports_today', null)
-            ->assertJsonPath('metrics.pending_reports', null)
-            ->assertJsonPath('metrics.generated_today', null)
+            ->assertJsonPath('metrics.exports_today', 0)
+            ->assertJsonPath('metrics.pending_reports', 0)
+            ->assertJsonPath('metrics.generated_today', 0)
+            ->assertJsonPath('metrics.last_generated_at', null)
             ->assertJsonPath('metrics.ai_forecast_accuracy', null)
             ->assertJsonPath('metrics.warehouse_capacity.used', 16)
             ->assertJsonPath('metrics.warehouse_capacity.total', 100)
@@ -47,34 +48,35 @@ class AdminReportsDashboardTest extends TestCase
             ->assertJsonPath('stock_status_overview.1.value', 1)
             ->assertJsonPath('stock_status_overview.2.value', 0)
             ->assertJsonCount(0, 'recent_exports')
-            ->assertJsonCount(10, 'reports_list');
+            ->assertJsonPath('scheduler.last_run_at', null);
     }
 
     public function test_reports_dashboard_is_admin_only(): void
     {
         $plantManager = $this->user('PLANT_MANAGER');
         $this->getJson('/api/admin/reports/dashboard')->assertUnauthorized();
-        $this->postJson('/api/admin/reports/export', ['report_id' => 'inventory-summary', 'format' => 'CSV'])->assertUnauthorized();
+        $this->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'CSV'])->assertUnauthorized();
         $this->actingAs($plantManager)->getJson('/api/admin/reports/dashboard')->assertForbidden();
-        $this->actingAs($plantManager)->postJson('/api/admin/reports/export', ['report_id' => 'inventory-summary', 'format' => 'CSV'])->assertForbidden();
+        $this->actingAs($plantManager)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'CSV'])->assertForbidden();
     }
 
     public function test_admin_can_export_an_allowlisted_report_as_csv(): void
     {
         $response = $this->actingAs($this->user('ADMIN'))->postJson('/api/admin/reports/export', [
-            'report_id' => 'inventory-summary',
+            'report_key' => 'inventory.summary',
             'format' => 'CSV',
-            'name' => 'Inventory Summary',
+            'title' => 'Inventory Summary',
         ]);
 
-        $response->assertOk()->assertDownload('Inventory_Summary_'.now()->toDateString().'.csv');
-        $this->assertStringContainsString('available_stock', $response->streamedContent());
+        $response->assertOk();
+        $this->assertStringContainsString('Inventory_Summary_'.now()->toDateString(), $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('Available', file_get_contents($response->baseResponse->getFile()->getPathname()));
     }
 
     public function test_report_export_rejects_unknown_reports_and_formats(): void
     {
         $admin = $this->user('ADMIN');
-        $this->actingAs($admin)->postJson('/api/admin/reports/export', ['report_id' => '../users', 'format' => 'CSV'])->assertUnprocessable();
-        $this->actingAs($admin)->postJson('/api/admin/reports/export', ['report_id' => 'inventory-summary', 'format' => 'PDF'])->assertUnprocessable();
+        $this->actingAs($admin)->postJson('/api/admin/reports/export', ['report_key' => '../users', 'format' => 'CSV'])->assertUnprocessable();
+        $this->actingAs($admin)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'HTML'])->assertUnprocessable();
     }
 }

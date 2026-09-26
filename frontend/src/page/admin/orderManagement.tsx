@@ -6,7 +6,6 @@ import {
   RotateCw,
   Plus,
   Search,
-  Filter,
   Download,
   Eye,
   X,
@@ -143,10 +142,14 @@ const formatDate = (value: string | null) => value
   ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
   : '';
 
+const formatOrderDate = (value: string | null) => value
+  ? new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
+  : '';
+
 const mapOrder = (order: any): Order => ({
   id: String(order.id), orderNo: order.order_no, refNo: order.reference_no || '',
   customer: order.customer_name, address: order.customer_address || '', contact: order.customer_contact || '',
-  orderDate: formatDate(order.order_date), requiredDelivery: formatDate(order.required_delivery_date),
+  orderDate: formatOrderDate(order.order_date), requiredDelivery: formatOrderDate(order.required_delivery_date),
   items: (order.items || []).map((item: any) => ({ id: String(item.id), productId: item.product_id ? Number(item.product_id) : null, name: item.product_name || 'Unnamed product', quantity: Number(item.quantity), unit: item.unit, unitPrice: Number(item.unit_price), subtotal: Number(item.subtotal), productReferenceRequired: Boolean(item.product_reference_required || !item.product_id) })),
   itemCount: Number(order.items_count ?? order.items?.length ?? 0),
   totalAmount: Number(order.total_amount), status: normalizeOrderStatus(order.status),
@@ -526,7 +529,7 @@ const OrderManagement: React.FC = () => {
             />
           </div>
 
-          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Order status" className="admin-orders-toolbar-status col-span-2 h-11 w-full rounded-lg border border-slate-800 bg-[#070a12] px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:w-auto sm:px-3 sm:py-2 sm:text-sm">
+          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Order status" className="admin-orders-toolbar-status h-11 w-full min-w-0 rounded-lg border border-slate-800 bg-[#070a12] px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:w-auto sm:px-3 sm:py-2 sm:text-sm">
             <option value="">All Status</option>
             <option value="NEW">New</option>
             <option value="ASSIGNED">Assigned</option>
@@ -552,18 +555,13 @@ const OrderManagement: React.FC = () => {
             <Calendar className="admin-orders-toolbar-date-icon pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 sm:right-3 sm:h-4 sm:w-4" />
           </div>
 
-          <button className="admin-orders-toolbar-filter inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800/50 sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-sm">
-            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            Filter
-          </button>
-
-          <div className="col-span-2 flex items-center gap-4 sm:contents">
+          <div className="admin-orders-toolbar-row-three col-span-2 flex items-center justify-start gap-0 sm:contents">
             <div className="admin-orders-toolbar-view flex items-center justify-self-start gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1 sm:ml-auto" aria-label="Order view">
               <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`admin-orders-toolbar-view-button rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
               <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`admin-orders-toolbar-view-button rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
             </div>
 
-            <button className="admin-orders-toolbar-export inline-flex h-11 items-center justify-self-end gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:h-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-sm">
+            <button className="admin-orders-toolbar-export inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:h-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-sm">
               <Download className="h-4 w-4" />
               Export
             </button>
@@ -599,8 +597,8 @@ const OrderManagement: React.FC = () => {
                     <p className="text-slate-200 sm:whitespace-nowrap">{order.customer}</p>
                     <p className="text-xs text-slate-500">{order.address.split(',').slice(1).join(',').trim()}</p>
                   </td>
-                  <td className="py-3 px-3 text-slate-300 sm:whitespace-nowrap">{order.orderDate}</td>
-                  <td className="py-3 px-3 text-slate-300 sm:whitespace-nowrap">{order.requiredDelivery}</td>
+                  <td className="whitespace-nowrap py-3 px-3 text-slate-300">{order.orderDate}</td>
+                  <td className="whitespace-nowrap py-3 px-3 text-slate-300">{order.requiredDelivery}</td>
                   <td className="max-w-56 py-3 px-3 text-slate-300 sm:min-w-[200px] sm:max-w-64">
                     {order.products.length ? order.products.map(product => <p key={product} className="text-slate-200">{product}</p>) : <p className="text-slate-500">No products</p>}
                   </td>

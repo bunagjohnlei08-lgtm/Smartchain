@@ -22,7 +22,6 @@ import {
   Coins,
   Layers,
   Truck,
-  Filter,
   AlertTriangle,
   Info,
   Check,
@@ -305,13 +304,13 @@ const SearchInput: React.FC<{
   className?: string;
 }> = ({ value, onChange, placeholder = 'Search...', className = '' }) => (
   <div className={`relative flex-1 min-w-[160px] sm:min-w-[200px] ${className}`}>
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+    <Search className="admin-inventory-search-icon pointer-events-none absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-slate-500 sm:h-4 sm:w-4" />
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-[#101929] border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
+      className="admin-inventory-search h-10 w-full rounded-xl border border-slate-800 bg-[#101929] py-0 pl-9 pr-3 text-xs text-slate-200 placeholder:text-xs placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all sm:h-auto sm:py-2.5 sm:pr-4 sm:text-sm sm:placeholder:text-sm"
     />
   </div>
 );
@@ -1466,9 +1465,6 @@ export const InventoryList: React.FC = () => {
             options={sortOptions}
             className="min-w-[120px] sm:min-w-[140px]"
           />
-          <button className="p-2 sm:p-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-            <Filter className="w-4 h-4" />
-          </button>
           <button
             onClick={resetFilters}
             className="px-3 py-2 sm:px-3.5 sm:py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all text-xs sm:text-sm"

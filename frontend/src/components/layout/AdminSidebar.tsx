@@ -17,6 +17,7 @@ import {
   User,
   Bell,
   X,
+  PackageX,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
@@ -58,6 +59,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'procurement', icon: ShoppingCart, label: 'Procurement', path: '/admin/procurement' },
       { id: 'purchase-orders', icon: FileText, label: 'Purchase Orders', path: '/admin/purchase-orders' },
+      { id: 'rejected-items', icon: PackageX, label: 'Rejected Items', path: '/admin/rejected-items' },
       { id: 'barcode-center', icon: QrCode, label: 'Barcode Center', path: '/admin/barcode-center' },
       { id: 'suppliers', icon: Users, label: 'Suppliers', path: '/admin/suppliers' },
       { id: 'logistics', icon: Truck, label: 'Logistics (DTRS)', path: '/admin/logistics' },

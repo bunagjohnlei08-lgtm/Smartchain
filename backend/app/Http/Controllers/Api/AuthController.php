@@ -179,7 +179,10 @@ class AuthController extends Controller
                 $isFirstLogin = true;
             }
 
-            return ['VERIFIED', $user, $user->createToken('api-token')->plainTextToken];
+            $newToken = $user->createToken('api-token');
+            $newToken->accessToken->forceFill(['last_activity_at' => $now])->save();
+
+            return ['VERIFIED', $user, $newToken->plainTextToken];
         });
 
         if ($outcome !== 'VERIFIED') {

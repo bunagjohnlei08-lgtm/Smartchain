@@ -12,6 +12,7 @@ class Receiving extends Model
     protected $fillable = [
         'receiving_no',
         'purchase_order_id',
+        'replacement_for_rejection_case_id',
         'purchase_order',
         'supplier',
         'reference_no',
@@ -32,6 +33,22 @@ class Receiving extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ReceivingItem::class);
+    }
+
+    public const STATUS_AWAITING_REPLACEMENT = 'Awaiting Replacement';
+
+    // Callers must hold a transaction; the row lock serialises number allocation.
+    public static function nextReceivingNo(): string
+    {
+        $last = static::query()->lockForUpdate()->orderByDesc('id')->value('receiving_no');
+        $nextNumber = $last && preg_match('/(\d+)$/', $last, $matches) ? (int) $matches[1] + 1 : 1;
+
+        return 'RCV-'.str_pad((string) $nextNumber, 5, '0', STR_PAD_LEFT);
+    }
+
+    public function replacementForCase(): BelongsTo
+    {
+        return $this->belongsTo(SupplierRejectionCase::class, 'replacement_for_rejection_case_id');
     }
 
     public function purchaseOrder(): BelongsTo

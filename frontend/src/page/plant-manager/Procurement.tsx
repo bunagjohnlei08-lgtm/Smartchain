@@ -146,14 +146,14 @@ const SearchInput: React.FC<{
   onChange: (value: string) => void;
   placeholder?: string;
 }> = ({ value, onChange, placeholder }) => (
-  <div className="relative flex-1 min-w-[180px]">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+  <div className="relative w-full min-w-0 sm:min-w-[180px] sm:flex-1">
+    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)] sm:h-4 sm:w-4" />
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
+      className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] py-0 pl-10 pr-3 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all sm:h-auto sm:py-2.5 sm:pr-4 sm:text-sm"
     />
   </div>
 );
@@ -163,11 +163,11 @@ const FilterSelect: React.FC<{
   onChange: (value: string) => void;
   options: string[];
 }> = ({ value, onChange, options }) => (
-  <div className="min-w-[130px]">
+  <div className="min-w-0 flex-1 sm:min-w-[130px] sm:flex-none">
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3 py-2.5 text-sm text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer"
+      className="pm-procurement-toolbar-filter h-9 w-full cursor-pointer appearance-none rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-2.5 py-0 text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:px-3 sm:py-2.5 sm:text-sm"
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>
@@ -549,21 +549,33 @@ const ReplenishmentPlanning: React.FC = () => {
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 sm:flex-row sm:items-center sm:gap-3">
         <SearchInput value={search} onChange={setSearch} placeholder="Search request, requester, product, or warehouse..." />
-        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'draft', 'pending', 'approved', 'rejected', 'for_purchase_order']} />
-        <FilterSelect value={priorityFilter} onChange={setPriorityFilter} options={['All Priorities', 'Low', 'Medium', 'High', 'Critical']} />
-        <button
-          onClick={() => {
-            setSearch('');
-            setStatusFilter('All Status');
-            setPriorityFilter('All Priorities');
-          }}
-          className="px-4 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)] transition-all text-sm"
-        >
-          Reset
-        </button>
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-1" aria-label="Request view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+          <div className="order-1 flex h-[30px] shrink-0 items-center gap-0.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-0 sm:order-4 sm:ml-auto sm:h-9 sm:p-0.5" aria-label="Request view">
+            <button type="button" onClick={() => setViewMode('list')} aria-label="Table view" aria-pressed={viewMode === 'list'} title="Table view" className={`pm-procurement-toolbar-toggle-button flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors sm:h-8 sm:w-8 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutList className="h-3 w-3 sm:h-4 sm:w-4" /></button>
+            <button type="button" onClick={() => setViewMode('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} title="Grid view" className={`pm-procurement-toolbar-toggle-button flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors sm:h-8 sm:w-8 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4" /></button>
+          </div>
+          <div className="order-2 min-w-[88px] flex-1 sm:order-1 sm:flex-none">
+            <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'draft', 'pending', 'approved', 'rejected', 'for_purchase_order']} />
+          </div>
+          <div className="order-3 flex min-w-[148px] flex-1 items-center gap-2 sm:order-2 sm:flex-none">
+            <FilterSelect value={priorityFilter} onChange={setPriorityFilter} options={['All Priorities', 'Low', 'Medium', 'High', 'Critical']} />
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('All Status');
+                setPriorityFilter('All Priorities');
+              }}
+              aria-label="Reset procurement filters"
+              title="Reset filters"
+              className="pm-procurement-toolbar-reset flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-alt)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:order-3 sm:h-10 sm:w-10 sm:rounded-xl"
+            >
+              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Main Table */}

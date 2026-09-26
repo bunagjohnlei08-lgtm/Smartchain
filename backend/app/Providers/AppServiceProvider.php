@@ -3,12 +3,14 @@
 namespace App\Providers;
 
 use App\Mail\Transport\BrevoApiTransport;
+use App\Models\PersonalAccessToken;
 use App\Support\BrevoTransactionalMail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
         // Transactional email over the Brevo HTTPS API (MAIL_MAILER=brevo).
         // Registering it as a mail driver keeps every Mailable, Blade template
         // and Mail::to(...)->send(...) call site unchanged; only the transport
@@ -76,6 +80,18 @@ class AppServiceProvider extends ServiceProvider
         // Admin resend: per admin, on top of the per-account cooldown.
         RateLimiter::for('invitation-resend', fn (Request $request) => Limit::perMinute(10)->by(
             'invitation-resend:'.($request->user()?->id ?: $request->ip())
+        ));
+
+        RateLimiter::for('session-activity', fn (Request $request) => Limit::perMinute(12)->by(
+            'session-activity:'.($request->user()?->currentAccessToken()?->getKey() ?: $request->ip())
+        ));
+
+        RateLimiter::for('session-status', fn (Request $request) => Limit::perMinute(60)->by(
+            'session-status:'.($request->user()?->currentAccessToken()?->getKey() ?: $request->ip())
+        ));
+
+        RateLimiter::for('supplier-rejection-send', fn (Request $request) => Limit::perMinute(6)->by(
+            'supplier-rejection-send:'.($request->user()?->id ?: $request->ip())
         ));
     }
 }

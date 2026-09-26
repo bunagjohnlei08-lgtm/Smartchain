@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAuthStorage, SESSION_IDLE_TIMEOUT_EVENT } from './authSession';
 
 // Local development falls back to the Laravel dev server.
 // Railway (and any other deployed environment) supplies VITE_API_URL at build time.
@@ -35,6 +36,17 @@ const attachAuth = (config: any) => {
 
 api.interceptors.request.use(attachAuth);
 apiClient.interceptors.request.use(attachAuth);
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401 && error.response?.data?.code === 'SESSION_IDLE_TIMEOUT') {
+      clearAuthStorage();
+      window.dispatchEvent(new Event(SESSION_IDLE_TIMEOUT_EVENT));
+    }
+    return Promise.reject(error);
+  },
+);
 
 export default api;
 export { apiClient };

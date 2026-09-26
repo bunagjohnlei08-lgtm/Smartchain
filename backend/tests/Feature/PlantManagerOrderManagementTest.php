@@ -114,6 +114,21 @@ class PlantManagerOrderManagementTest extends TestCase
         ]);
     }
 
+    public function test_orders_are_sorted_by_latest_assignment_before_pagination_with_id_tie_breaker(): void
+    {
+        $oldest = $this->order($this->manager, overrides: ['assigned_at' => now()->subHours(2)]);
+        $sameTime = now()->subHour();
+        $olderTie = $this->order($this->manager, overrides: ['assigned_at' => $sameTime]);
+        $newerTie = $this->order($this->manager, overrides: ['assigned_at' => $sameTime]);
+
+        $this->actingAs($this->manager)->getJson('/api/plant-manager/orders?per_page=2')
+            ->assertOk()
+            ->assertJsonPath('total', 3)
+            ->assertJsonPath('data.0.id', $newerTie->id)
+            ->assertJsonPath('data.1.id', $olderTie->id)
+            ->assertJsonMissing(['id' => $oldest->id]);
+    }
+
     public function test_manager_cannot_view_or_process_another_managers_order(): void
     {
         $other = $this->order($this->otherManager);

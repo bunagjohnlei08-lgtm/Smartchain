@@ -57,8 +57,14 @@ class PlantManagerOrderController extends Controller
         }
         if (!empty($validated['priority'])) $this->applyPriorityFilter($query, $validated['priority']);
 
+        if (! empty($validated['sort_by'])) {
+            $query->orderBy($validated['sort_by'], $validated['sort_direction'] ?? 'asc');
+        } else {
+            $query->orderByDesc('assigned_at');
+        }
+
         $orders = $query
-            ->orderBy($validated['sort_by'] ?? 'required_delivery_date', $validated['sort_direction'] ?? 'asc')
+            ->orderByDesc('id')
             ->paginate($validated['per_page'] ?? 15)
             ->through(fn (Order $order) => $this->listData($order));
 

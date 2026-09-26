@@ -190,14 +190,14 @@ const SearchInput: React.FC<{
   onChange: (value: string) => void;
   placeholder?: string;
 }> = ({ value, onChange, placeholder = 'Search...' }) => (
-  <div className="relative flex-1 min-w-[180px]">
-    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+  <div className="relative min-w-0 flex-1">
+    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 sm:h-4 sm:w-4" aria-hidden="true" />
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-[#101929] border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
+      className="h-10 w-full rounded-xl border border-slate-800 bg-[#101929] pl-10 pr-3 text-xs text-slate-200 placeholder:text-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pr-4 sm:text-sm"
     />
   </div>
 );
@@ -725,13 +725,14 @@ const Shipments: React.FC = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-[#0d1322]/60 border border-slate-800/80 rounded-2xl p-4 flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap items-center gap-1 bg-slate-800/50 rounded-full p-1">
+      <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-slate-800/80 bg-[#0d1322]/60 p-3 sm:flex-row sm:items-center sm:gap-3 sm:rounded-2xl sm:p-4">
+        <div className="custom-scrollbar flex w-full min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain rounded-xl bg-slate-800/50 p-1 pb-1.5 whitespace-nowrap sm:w-auto sm:gap-1 sm:pb-1">
           {statusOptions.map((status) => (
             <button
+              type="button"
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors sm:rounded-full sm:px-4 sm:text-sm ${
                 statusFilter === status
                   ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
                   : 'text-slate-400 hover:text-slate-100'
@@ -741,13 +742,13 @@ const Shipments: React.FC = () => {
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:ml-auto sm:w-auto">
           <SearchInput
             value={search}
             onChange={setSearch}
             placeholder="Search Shipment #, PO #, Customer..."
           />
-          <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/50 p-1" aria-label="Shipment view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+          <div className="flex h-10 shrink-0 items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/50 p-1" aria-label="Shipment view"><button type="button" onClick={() => setViewMode('list')} aria-label="Show shipments as a list" aria-pressed={viewMode === 'list'} title="List view" className={`flex h-8 w-8 items-center justify-center rounded-md ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-label="Show shipments as a grid" aria-pressed={viewMode === 'grid'} title="Grid view" className={`flex h-8 w-8 items-center justify-center rounded-md ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
         </div>
       </div>
 

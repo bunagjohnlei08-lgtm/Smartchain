@@ -1,13 +1,7 @@
 import { apiClient } from './api';
-import { FIRST_LOGIN_STORAGE_KEY } from './greeting';
+import { clearAuthStorage } from './authSession';
 
-export const clearAuthStorage = (): void => {
-  sessionStorage.removeItem('isAuthenticated');
-  sessionStorage.removeItem('userRole');
-  sessionStorage.removeItem('token');
-  sessionStorage.removeItem('user');
-  sessionStorage.removeItem(FIRST_LOGIN_STORAGE_KEY);
-};
+export { clearAuthStorage } from './authSession';
 
 /**
  * Revokes the current Sanctum personal access token server side, then drops the

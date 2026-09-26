@@ -448,17 +448,17 @@ const OrderManagement: React.FC = () => {
       </div>
 
       {/* FILTERS & CONTROLS */}
-      <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-3 sm:p-4">
+        <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:gap-3">
           {/* Search */}
-          <div className="relative flex-1 min-w-[180px]">
+          <div className="relative col-span-2 min-w-0 sm:flex-1 sm:min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
               placeholder="Search Order #, Customer, or Product..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#070a12] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="h-10 w-full rounded-xl border border-slate-800 bg-[#070a12] pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:text-sm"
             />
           </div>
 
@@ -466,7 +466,7 @@ const OrderManagement: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'All')}
-            className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            className="h-10 min-w-0 w-full rounded-xl border border-slate-800 bg-[#070a12] px-2 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:w-auto sm:px-3 sm:text-sm"
           >
             <option value="All">All Status</option>
             <option value="Assigned">Assigned</option>
@@ -482,30 +482,32 @@ const OrderManagement: React.FC = () => {
           <select
             value={warehouseFilter}
             onChange={(e) => setWarehouseFilter(e.target.value)}
-            className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            className="h-10 min-w-0 w-full rounded-xl border border-slate-800 bg-[#070a12] px-2 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:w-auto sm:px-3 sm:text-sm"
           >
             <option value="All">All Warehouses</option>
             {warehouseOptions.map(warehouse => <option key={warehouse} value={warehouse}>{warehouse}</option>)}
           </select>
 
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value as Priority | 'All')}
-            className="bg-[#070a12] border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-          >
-            <option value="All">All Priorities</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
+          <div className="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_2.5rem_auto] items-center gap-2 sm:contents">
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value as Priority | 'All')}
+              className="h-10 min-w-0 w-full rounded-xl border border-slate-800 bg-[#070a12] px-2 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:w-auto sm:px-3 sm:text-sm"
+            >
+              <option value="All">All Priorities</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
 
-          <button className="px-3 py-2 border border-slate-800 rounded-xl text-sm text-slate-400 hover:bg-slate-800/50 transition-colors">
-            <Calendar className="w-4 h-4" />
-          </button>
+            <button type="button" aria-label="Filter orders by date" title="Date filter" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-800 text-slate-400 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+              <Calendar className="w-4 h-4" />
+            </button>
 
-          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1" aria-label="Order view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+            <div className="flex h-10 shrink-0 items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1 sm:ml-auto" aria-label="Order view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+          </div>
 
-          <button className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
+          <button className="col-span-2 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:col-span-1 sm:w-auto sm:justify-start sm:px-4 sm:text-sm">
             <FileText className="w-4 h-4" />
             Export Pick List
           </button>

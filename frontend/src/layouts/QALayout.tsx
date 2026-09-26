@@ -4,7 +4,6 @@ import {
   Moon,
   Sun,
   Menu,
-  X,
 } from 'lucide-react';
 import QASidebar from '../components/layout/QASidebar';
 import { useTheme } from '../context/ThemeContext';
@@ -40,15 +39,17 @@ const QALayout: React.FC = () => {
   return (
     <div className="operations-shell qa-shell flex h-screen overflow-hidden bg-[#090d16]">
       {/* Mobile Hamburger */}
-      <button
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="operations-mobile-menu-button xl:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white text-slate-900 shadow-lg dark:bg-slate-900 dark:text-white"
-        aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-        aria-expanded={isMobileMenuOpen}
-        aria-controls="qa-sidebar"
-      >
-        {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
+      {!isMobileMenuOpen && (
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="operations-mobile-menu-button xl:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white text-slate-900 shadow-lg dark:bg-slate-900 dark:text-white"
+          aria-label="Open navigation menu"
+          aria-expanded="false"
+          aria-controls="qa-sidebar"
+        >
+          <Menu size={24} />
+        </button>
+      )}
 
       {/* Sidebar */}
       <div
@@ -57,7 +58,7 @@ const QALayout: React.FC = () => {
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <QASidebar />
+        <QASidebar onClose={() => setIsMobileMenuOpen(false)} />
       </div>
 
       {/* Overlay for mobile */}

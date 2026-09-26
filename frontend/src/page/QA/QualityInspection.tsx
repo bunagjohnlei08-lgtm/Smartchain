@@ -8,7 +8,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  Filter,
   MoreHorizontal,
   CheckCircle,
   XCircle,
@@ -238,7 +237,7 @@ const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
 };
 
 const ViewModeToggle: React.FC<{ value: ViewMode; onChange: (value: ViewMode) => void }> = ({ value, onChange }) => (
-  <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1" role="group" aria-label="Quality inspection view">
+  <div className="qa-inspection-view-toggle flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1" role="group" aria-label="Quality inspection view">
     <button type="button" onClick={() => onChange('list')} aria-label="Show inspections as a list" aria-pressed={value === 'list'} title="List view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Table className="w-4 h-4" /></button>
     <button type="button" onClick={() => onChange('grid')} aria-label="Show inspections as a grid" aria-pressed={value === 'grid'} title="Grid view" className={`p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${value === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}><Grid className="w-4 h-4" /></button>
   </div>
@@ -251,7 +250,7 @@ const KPICard: React.FC<{
   subtitle: string;
   color?: string;
 }> = ({ label, value, icon, subtitle, color = 'text-blue-400' }) => (
-  <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-gray-700 transition-all duration-200">
+  <div className="qa-kpi-card bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 hover:border-gray-700 transition-all duration-200">
     <div className="flex items-start justify-between">
       <div>
         <p className="mobile-kpi-title text-slate-400 text-xs font-medium uppercase tracking-wider">{label}</p>
@@ -639,7 +638,7 @@ const QualityInspection: React.FC = () => {
   };
 
   const renderActionButton = (receiving: ReceivingItem) => {
-    const baseClass = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all';
+    const baseClass = 'qa-inspection-action px-3 py-1.5 rounded-lg text-xs font-medium transition-all';
 
     if (receiving.action === 'Start Inspection') {
       return (
@@ -685,7 +684,7 @@ const QualityInspection: React.FC = () => {
   const inspectionIsFinal = selectedReceiving !== null && ['Passed', 'Rejected', 'Partial'].includes(selectedReceiving.inspectionStatus);
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+    <div className="qa-quality-inspection w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Quality Inspection</h1>
@@ -701,21 +700,21 @@ const QualityInspection: React.FC = () => {
         <KPICard label="Partial Acceptance" value={partial} subtitle="Needs Review" icon={<AlertCircle className="w-5 h-5 text-purple-400" />} color="text-purple-400" />
       </div>
 
-      <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-4 flex flex-wrap items-center gap-3">
+      <div className="qa-inspection-toolbar bg-[#0d1322] border border-gray-800/50 rounded-2xl p-4 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="qa-inspection-search-icon absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search receiving no., PO no., supplier..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-full bg-[#090d16] border border-gray-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            className="qa-inspection-search w-full bg-[#090d16] border border-gray-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
           />
         </div>
         <select
           value={supplierFilter}
           onChange={(event) => setSupplierFilter(event.target.value)}
-          className="bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
+          className="qa-inspection-filter bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
         >
           {supplierOptions.map((option) => (
             <option key={option} value={option}>{option}</option>
@@ -724,7 +723,7 @@ const QualityInspection: React.FC = () => {
         <select
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value as 'All Status' | InspectionStatus)}
-          className="bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
+          className="qa-inspection-filter bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
         >
           {statusOptions.map((option) => (
             <option key={option} value={option}>{option}</option>
@@ -733,16 +732,13 @@ const QualityInspection: React.FC = () => {
         <select
           value={dateFilter}
           onChange={(event) => setDateFilter(event.target.value)}
-          className="bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
+          className="qa-inspection-filter bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
         >
           {['All Dates', 'Today', 'This Week', 'This Month'].map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
         </select>
-        <button className="px-3.5 py-2.5 border border-gray-700 rounded-xl text-slate-400 hover:text-white hover:bg-gray-800 transition-all flex items-center gap-1.5 text-sm">
-          <Filter className="w-4 h-4" /> Filters
-        </button>
-        <div className="ml-auto">
+        <div className="qa-inspection-toggle-row basis-full sm:ml-auto sm:basis-auto">
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </div>
       </div>
@@ -835,7 +831,7 @@ const QualityInspection: React.FC = () => {
         ) : currentItems.length === 0 ? (
           <div className="p-8 text-center text-slate-500 dark:text-slate-400">{listError ? 'Unable to load inspection records.' : 'No inspection records found.'}</div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="qa-inspection-grid grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
             {currentItems.map((receiving) => (
               <article key={receiving.id} onClick={() => handleRowClick(receiving.id)} className={`flex cursor-pointer flex-col rounded-2xl border bg-white p-5 shadow-sm transition-colors dark:bg-slate-800 dark:shadow-none ${selectedReceivingId === receiving.id ? 'border-cyan-500' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}>
                 <div className="flex items-start justify-between gap-3">

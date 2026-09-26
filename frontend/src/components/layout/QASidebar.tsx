@@ -9,6 +9,7 @@ import {
   BarChart3,
   User,
   Bell,
+  X,
 } from 'lucide-react';
 
 const navGroups = [
@@ -31,7 +32,11 @@ const navGroups = [
   },
 ];
 
-const QASidebar = () => {
+interface QASidebarProps {
+  onClose?: () => void;
+}
+
+const QASidebar = ({ onClose }: QASidebarProps) => {
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
@@ -46,6 +51,16 @@ const QASidebar = () => {
           <span className="text-sm font-bold text-white truncate">Archon Nell</span>
           <span className="text-[10px] font-medium tracking-wider text-slate-400 uppercase">QA SUPERVISOR</span>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-auto inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 xl:hidden"
+            aria-label="Close navigation menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto space-y-4 p-4 [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

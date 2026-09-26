@@ -2,158 +2,387 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Console\Commands\RunScheduledReports;
 use App\Http\Controllers\Controller;
+use App\Models\Product;
+use App\Models\ReportExport;
+use App\Models\ReportSchedule;
+use App\Models\Supplier;
+use App\Models\User;
+use App\Models\Warehouse;
+use App\Reports\ReportDefinition;
+use App\Reports\ReportGenerationFailed;
+use App\Reports\ReportInput;
+use App\Reports\ReportRegistry;
+use App\Reports\ReportRunner;
+use App\Support\AuditLogger;
+use App\Support\WarehouseCapacity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AdminReportController extends Controller
 {
     private const COLORS = ['#06b6d4', '#8b5cf6', '#f59e0b', '#10b981', '#3b82f6', '#ef4444'];
 
+    public function __construct(
+        private readonly ReportRegistry $registry,
+        private readonly ReportInput $input,
+        private readonly ReportRunner $runner,
+    ) {}
+
     public function dashboard(Request $request): JsonResponse
     {
-        abort_unless($request->user()?->isAdmin(), 403, 'Administrator access is required.');
+        $this->authorizeAdmin($request);
 
-        $warehouseCapacity = DB::table('warehouses')
-            ->leftJoin('inventories', 'inventories.warehouse_id', '=', 'warehouses.id')
-            ->where('warehouses.status', 'Active')
-            ->groupBy('warehouses.id', 'warehouses.name', 'warehouses.code', 'warehouses.capacity')
-            ->orderBy('warehouses.name')
-            ->get([
-                'warehouses.id', 'warehouses.name', 'warehouses.code', 'warehouses.capacity',
-                DB::raw('COALESCE(SUM(inventories.available_stock + inventories.reserved_stock), 0) as used'),
-            ])->values()->map(fn ($row, $index) => [
-                'name' => $row->name,
-                'code' => $row->code,
-                'used' => (int) $row->used,
-                'capacity' => $row->capacity === null ? null : (int) $row->capacity,
-                'utilization_percentage' => $row->capacity && (int) $row->capacity > 0
-                    ? round(min(100, (int) $row->used / (int) $row->capacity * 100), 1)
-                    : null,
-                'color' => self::COLORS[$index % count(self::COLORS)],
-            ]);
+        $warehouseCapacity = Warehouse::query()->where('status', 'Active')->orderBy('name')->orderBy('id')->get()
+            ->values()->map(function (Warehouse $warehouse, int $index) {
+                $snapshot = WarehouseCapacity::snapshot($warehouse);
 
+                return [
+                    'name' => $warehouse->name,
+                    'code' => $warehouse->code,
+                    'used' => $snapshot['utilized'],
+                    'capacity' => $snapshot['capacity'] === null ? null : (int) $snapshot['capacity'],
+                    'available' => $snapshot['available'],
+                    'utilization_percentage' => $snapshot['utilization_percentage'],
+                    'alert_level' => strtoupper($snapshot['capacity_state']),
+                    'color' => self::COLORS[$index % count(self::COLORS)],
+                ];
+            });
+
+        $status = ReportRegistry::STOCK_STATUS_SQL;
         $stock = DB::table('inventories')
             ->join('products', 'products.id', '=', 'inventories.product_id')
-            ->selectRaw('COALESCE(SUM(CASE WHEN inventories.available_stock > products.reorder_level THEN 1 ELSE 0 END), 0) as healthy')
-            ->selectRaw('COALESCE(SUM(CASE WHEN inventories.available_stock > 0 AND inventories.available_stock <= products.reorder_level THEN 1 ELSE 0 END), 0) as low_stock')
-            ->selectRaw('COALESCE(SUM(CASE WHEN inventories.available_stock = 0 THEN 1 ELSE 0 END), 0) as out_of_stock')
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$status} = 'Healthy' THEN 1 ELSE 0 END), 0) as healthy")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$status} = 'Low Stock' THEN 1 ELSE 0 END), 0) as low_stock")
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$status} = 'Out of Stock' THEN 1 ELSE 0 END), 0) as out_of_stock")
             ->first();
 
-        $reports = collect($this->reportDefinitions())->map(function (array $report) {
-            return [
-                'id' => $report['id'],
-                'name' => $report['name'],
-                'description' => $report['description'],
-                'category' => $report['category'],
-                'last_generated' => null,
-                'format' => $report['format'],
-                'status' => 'Available',
-                'file_size' => 'N/A',
-                'parameters' => $report['parameters'],
-            ];
-        });
-
-        $configuredWarehouses = $warehouseCapacity->filter(fn ($warehouse) => $warehouse['capacity'] !== null && $warehouse['capacity'] > 0);
-        $usedCapacity = (int) $configuredWarehouses->sum('used');
-        $totalCapacity = (int) $configuredWarehouses->sum('capacity');
-        $capacityPercentage = $totalCapacity > 0 ? round(min(100, $usedCapacity / $totalCapacity * 100), 1) : null;
+        $configured = $warehouseCapacity->filter(fn (array $warehouse) => $warehouse['capacity'] !== null && $warehouse['capacity'] > 0);
+        $usedCapacity = (int) $configured->sum('used');
+        $totalCapacity = (int) $configured->sum('capacity');
+        $today = now()->startOfDay();
+        $successToday = ReportExport::query()->where('status', ReportExport::STATUS_SUCCESS)->where('generated_at', '>=', $today);
+        $definitions = collect($this->registry->all());
 
         return response()->json([
             'metrics' => [
-                'total_reports_available' => $reports->count(),
-                'exports_today' => null,
-                'pending_reports' => null,
-                'generated_today' => null,
+                'total_reports_available' => $definitions->filter(fn (ReportDefinition $definition) => $definition->available())->count(),
+                'total_report_definitions' => $definitions->count(),
+                'exports_today' => (clone $successToday)->where('action', ReportExport::ACTION_EXPORT)->count(),
+                'generated_today' => (clone $successToday)->count(),
+                'pending_reports' => ReportSchedule::query()->where('status', 'ACTIVE')->count(),
+                'last_generated_at' => ReportExport::query()->where('status', ReportExport::STATUS_SUCCESS)
+                    ->orderByDesc('generated_at')->first(['generated_at'])?->generated_at?->toIso8601String(),
                 'warehouse_capacity' => [
                     'used' => $usedCapacity,
                     'total' => $totalCapacity > 0 ? $totalCapacity : null,
-                    'utilization_percentage' => $capacityPercentage,
+                    'utilization_percentage' => $totalCapacity > 0 ? round(min(100, $usedCapacity / $totalCapacity * 100), 1) : null,
                 ],
-                'total_stock_units' => (int) (DB::table('inventories')
-                    ->selectRaw('COALESCE(SUM(available_stock + reserved_stock), 0) as total')
-                    ->value('total') ?? 0),
+                'total_stock_units' => (int) (DB::table('inventories')->selectRaw('COALESCE(SUM(available_stock + reserved_stock), 0) as total')->value('total') ?? 0),
+                // No forecast results are persisted anywhere, so accuracy cannot be measured.
                 'ai_forecast_accuracy' => null,
             ],
-            'reports_list' => $reports->values(),
+            'reports_list' => $this->definitionList(),
             'warehouse_capacity_overview' => $warehouseCapacity,
             'stock_status_overview' => [
                 ['name' => 'Healthy', 'value' => (int) $stock->healthy, 'color' => '#10b981'],
                 ['name' => 'Low Stock', 'value' => (int) $stock->low_stock, 'color' => '#f59e0b'],
                 ['name' => 'Out of Stock', 'value' => (int) $stock->out_of_stock, 'color' => '#ef4444'],
             ],
-            'recent_exports' => [],
+            'recent_exports' => ReportExport::query()->with('user:id,name')
+                ->where('action', ReportExport::ACTION_EXPORT)
+                ->orderByDesc('generated_at')->orderByDesc('id')->limit(8)->get()
+                ->map(fn (ReportExport $export) => $this->presentHistory($export)),
+            'scheduler' => $this->schedulerState(),
         ]);
     }
 
-    public function export(Request $request): StreamedResponse
+    public function definitions(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        return response()->json(['data' => $this->definitionList()]);
+    }
+
+    public function options(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        return response()->json([
+            'categories' => collect(ReportRegistry::CATEGORIES)->map(fn ($label, $id) => ['id' => $id, 'label' => $label])->values(),
+            'formats' => collect(ReportRunner::FORMAT_LABELS)->map(fn ($label, $value) => ['value' => $value, 'label' => $label])->values(),
+            'warehouses' => Warehouse::query()->orderBy('name')->get(['id', 'name', 'code', 'status']),
+            'products' => Product::query()->orderBy('name')->get(['id', 'name', 'category']),
+            'product_categories' => Product::query()->whereNotNull('category')->where('category', '<>', '')->distinct()->orderBy('category')->pluck('category'),
+            'suppliers' => Supplier::query()->orderBy('name')->get(['id', 'supplier_code', 'name', 'status']),
+            'recipients' => $this->eligibleRecipients()->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email])->values(),
+            'schedule' => [
+                'frequencies' => ReportSchedule::FREQUENCIES,
+                'date_windows' => array_keys(ReportSchedule::DATE_WINDOWS),
+                'timezone' => config('app.timezone'),
+            ],
+        ]);
+    }
+
+    public function preview(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        [$definition, $filters, $extra] = $this->input->resolve($request->query(), [
+            'page' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+        ]);
+
+        return response()->json([
+            'report' => [
+                'key' => $definition->key,
+                'name' => $definition->name,
+                'category' => $definition->category,
+                'category_label' => $definition->categoryLabel(),
+                'formats' => $definition->formats,
+                'columns' => $definition->toArray()['columns'],
+            ],
+            ...$this->runner->preview($definition, $filters, (int) ($extra['page'] ?? 1), (int) ($extra['per_page'] ?? 25), $request->user()),
+        ]);
+    }
+
+    public function export(Request $request): BinaryFileResponse|JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        [$definition, $filters, $extra] = $this->input->resolve($request->all(), [
+            'format' => ['required', Rule::in(array_keys(ReportRunner::WRITERS))],
+            'source' => ['nullable', Rule::in(ReportExport::SOURCES)],
+            'title' => ['nullable', 'string', 'max:80', 'regex:/^[A-Za-z0-9 ,.()_\-]+$/'],
+        ]);
+        if (! $definition->supportsFormat($extra['format'])) {
+            throw ValidationException::withMessages(['format' => "{$definition->name} does not support {$extra['format']} export."]);
+        }
+
+        try {
+            $file = $this->runner->export(
+                $definition, $filters, $extra['format'], $request->user(),
+                $extra['source'] ?? ReportExport::SOURCE_STANDARD,
+                isset($extra['title']) ? trim($extra['title']) : null,
+            );
+        } catch (ReportGenerationFailed $exception) {
+            return response()->json(['message' => $exception->getMessage()], 500);
+        }
+
+        return response()->download($file['path'], $file['filename'], [
+            'Content-Type' => $file['mime'],
+            'X-Report-Rows' => (string) $file['row_count'],
+            'Cache-Control' => 'no-store',
+        ])->deleteFileAfterSend();
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $validated = $request->validate([
+            'action' => ['nullable', Rule::in([ReportExport::ACTION_EXPORT, ReportExport::ACTION_PREVIEW])],
+            'status' => ['nullable', Rule::in([ReportExport::STATUS_SUCCESS, ReportExport::STATUS_FAILED])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        return response()->json(ReportExport::query()->with('user:id,name')
+            ->when($validated['action'] ?? null, fn ($query, $action) => $query->where('action', $action))
+            ->when($validated['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->orderByDesc('generated_at')->orderByDesc('id')
+            ->paginate($validated['per_page'] ?? 10)
+            ->through(fn (ReportExport $export) => $this->presentHistory($export)));
+    }
+
+    public function schedules(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        return response()->json([
+            'data' => ReportSchedule::query()->with(['recipient:id,name,email', 'creator:id,name'])
+                ->orderByDesc('created_at')->orderByDesc('id')->get()
+                ->map(fn (ReportSchedule $schedule) => $this->presentSchedule($schedule)),
+            'scheduler' => $this->schedulerState(),
+        ]);
+    }
+
+    public function storeSchedule(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        [$definition, $filters, $extra] = $this->input->resolve($request->all(), [
+            'format' => ['required', Rule::in(array_keys(ReportRunner::WRITERS))],
+            'frequency' => ['required', Rule::in(ReportSchedule::FREQUENCIES)],
+            'run_time' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'day_of_week' => ['nullable', 'required_if:frequency,WEEKLY', 'integer', 'between:0,6'],
+            'day_of_month' => ['nullable', 'required_if:frequency,MONTHLY', 'integer', 'between:1,28'],
+            'date_window' => ['nullable', Rule::in(array_keys(ReportSchedule::DATE_WINDOWS))],
+            'recipient_user_id' => ['required', 'integer'],
+        ]);
+
+        $errors = [];
+        if (! $definition->supportsFormat($extra['format'])) $errors['format'] = "{$definition->name} does not support {$extra['format']} export.";
+        if ($filters->dateFrom || $filters->dateTo) $errors['date_from'] = 'Scheduled reports use a relative date window instead of fixed dates.';
+        $window = $extra['date_window'] ?? 'ALL';
+        if ($window !== 'ALL' && ! $definition->allows('date')) $errors['date_window'] = "{$definition->name} has no date filter.";
+        if (! $this->eligibleRecipients()->contains('id', (int) $extra['recipient_user_id'])) {
+            $errors['recipient_user_id'] = 'Scheduled reports can only be delivered to an active Admin account with a valid email.';
+        }
+        if ($errors !== []) throw ValidationException::withMessages($errors);
+
+        $schedule = new ReportSchedule([
+            'created_by' => $request->user()->id,
+            'report_key' => $definition->key,
+            'format' => $extra['format'],
+            'frequency' => $extra['frequency'],
+            'run_time' => $extra['run_time'],
+            'day_of_week' => $extra['frequency'] === 'WEEKLY' ? (int) $extra['day_of_week'] : null,
+            'day_of_month' => $extra['frequency'] === 'MONTHLY' ? (int) $extra['day_of_month'] : null,
+            'date_window' => $window,
+            'filters' => $filters->toArray() ?: null,
+            'recipient_user_id' => (int) $extra['recipient_user_id'],
+            'status' => 'ACTIVE',
+        ]);
+        $schedule->next_run_at = $schedule->computeNextRun();
+        $schedule->save();
+
+        AuditLogger::success('REPORT_SCHEDULE_CREATED', AuditLogger::MODULE_REPORTS, [
+            'resource' => $schedule, 'resource_label' => $definition->name,
+            'details' => "Scheduled {$definition->name} ({$schedule->frequency}, {$schedule->format})",
+            'metadata' => [
+                'report_key' => $definition->key, 'format' => $schedule->format, 'frequency' => $schedule->frequency,
+                'recipient_user_id' => $schedule->recipient_user_id, 'date_window' => $window,
+            ] + $filters->toArray(),
+        ]);
+
+        return response()->json([
+            'message' => 'Report schedule saved.',
+            'data' => $this->presentSchedule($schedule->load(['recipient:id,name,email', 'creator:id,name'])),
+            'scheduler' => $this->schedulerState(),
+        ], 201);
+    }
+
+    public function updateSchedule(Request $request, ReportSchedule $reportSchedule): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $validated = $request->validate(['status' => ['required', Rule::in(ReportSchedule::STATUSES)]]);
+
+        $reportSchedule->status = $validated['status'];
+        $reportSchedule->next_run_at = $validated['status'] === 'ACTIVE' ? $reportSchedule->computeNextRun() : null;
+        $reportSchedule->save();
+
+        AuditLogger::success($validated['status'] === 'ACTIVE' ? 'REPORT_SCHEDULE_RESUMED' : 'REPORT_SCHEDULE_PAUSED', AuditLogger::MODULE_REPORTS, [
+            'resource' => $reportSchedule, 'resource_label' => $this->registry->find($reportSchedule->report_key)?->name,
+            'metadata' => ['report_key' => $reportSchedule->report_key],
+        ]);
+
+        return response()->json(['data' => $this->presentSchedule($reportSchedule->load(['recipient:id,name,email', 'creator:id,name']))]);
+    }
+
+    public function destroySchedule(Request $request, ReportSchedule $reportSchedule): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $label = $this->registry->find($reportSchedule->report_key)?->name;
+        $reportSchedule->delete();
+
+        AuditLogger::success('REPORT_SCHEDULE_DELETED', AuditLogger::MODULE_REPORTS, [
+            'resource_type' => 'ReportSchedule', 'resource_id' => $reportSchedule->id, 'resource_label' => $label,
+            'metadata' => ['report_key' => $reportSchedule->report_key],
+        ]);
+
+        return response()->json(['message' => 'Report schedule deleted.']);
+    }
+
+    private function authorizeAdmin(Request $request): void
     {
         abort_unless($request->user()?->isAdmin(), 403, 'Administrator access is required.');
-
-        $definitions = collect($this->reportDefinitions())->keyBy('id');
-        $validated = $request->validate([
-            'report_id' => ['required', 'string', Rule::in($definitions->keys()->all())],
-            'format' => ['required', Rule::in(['CSV'])],
-            'name' => ['nullable', 'string', 'max:100'],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-        ]);
-        $definition = $definitions->get($validated['report_id']);
-        $table = $definition['table'];
-        $columns = Schema::getColumnListing($table);
-        $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '_', $validated['name'] ?? $definition['name']);
-        $filename = trim((string) $safeName, '_').'_'.now()->toDateString().'.csv';
-
-        return response()->streamDownload(function () use ($table, $columns, $validated): void {
-            $output = fopen('php://output', 'wb');
-            fputcsv($output, $columns);
-            $query = DB::table($table);
-            $orderColumn = 'id';
-            $dateColumn = 'created_at';
-            if ($validated['report_id'] === 'low-stock') {
-                $query->join('products', 'products.id', '=', 'inventories.product_id')
-                    ->whereColumn('inventories.available_stock', '<=', 'products.reorder_level')
-                    ->select('inventories.*');
-                $orderColumn = 'inventories.id';
-                $dateColumn = 'inventories.created_at';
-            } elseif ($validated['report_id'] === 'shipment') {
-                $query->whereIn('status', ['READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED']);
-            } elseif ($validated['report_id'] === 'warehouse') {
-                $query->where('status', 'Active');
-            }
-            if (! empty($validated['start_date'])) $query->whereDate($dateColumn, '>=', $validated['start_date']);
-            if (! empty($validated['end_date'])) $query->whereDate($dateColumn, '<=', $validated['end_date']);
-            $query->orderBy($orderColumn)->chunk(500, function ($rows) use ($output, $columns): void {
-                foreach ($rows as $row) {
-                    $values = array_map(function (string $column) use ($row) {
-                        $value = $row->{$column};
-                        if (is_string($value) && preg_match('/^[=+\-@\t\r]/', $value)) return "'".$value;
-                        return $value;
-                    }, $columns);
-                    fputcsv($output, $values);
-                }
-            });
-            fclose($output);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    private function reportDefinitions(): array
+    private function definitionList(): array
+    {
+        $lastGenerated = ReportExport::query()->where('status', ReportExport::STATUS_SUCCESS)
+            ->groupBy('report_key')->selectRaw('report_key, MAX(generated_at) as last_generated_at')
+            ->pluck('last_generated_at', 'report_key');
+        $scheduled = ReportSchedule::query()->where('status', 'ACTIVE')
+            ->groupBy('report_key')->selectRaw('report_key, COUNT(*) as schedules')
+            ->pluck('schedules', 'report_key');
+
+        return collect($this->registry->all())->map(fn (ReportDefinition $definition) => $definition->toArray() + [
+            'last_generated_at' => isset($lastGenerated[$definition->key]) ? Carbon::parse($lastGenerated[$definition->key])->toIso8601String() : null,
+            'active_schedules' => (int) ($scheduled[$definition->key] ?? 0),
+        ])->values()->all();
+    }
+
+    private function presentHistory(ReportExport $export): array
     {
         return [
-            ['id' => 'inventory-summary', 'name' => 'Inventory Summary Report', 'description' => 'Current inventory quantities and stock status by warehouse.', 'category' => 'Inventory Reports', 'table' => 'inventories', 'format' => 'CSV', 'parameters' => 'All warehouses'],
-            ['id' => 'low-stock', 'name' => 'Low Stock Alert Report', 'description' => 'Products at or below their reorder level.', 'category' => 'Inventory Reports', 'table' => 'inventories', 'format' => 'CSV', 'parameters' => 'Product reorder levels'],
-            ['id' => 'stock-movement', 'name' => 'Stock Movement Report', 'description' => 'Recorded stock-out transactions and inventory activity.', 'category' => 'Stock Movement Reports', 'table' => 'stock_out_transactions', 'format' => 'CSV', 'parameters' => 'All recorded movements'],
-            ['id' => 'receiving', 'name' => 'Receiving Report', 'description' => 'Incoming deliveries and receiving status.', 'category' => 'Receiving Reports', 'table' => 'receivings', 'format' => 'CSV', 'parameters' => 'All receiving records'],
-            ['id' => 'shipment', 'name' => 'Shipment Report', 'description' => 'Orders forwarded through shipment and logistics.', 'category' => 'Shipment Reports', 'table' => 'orders', 'format' => 'CSV', 'parameters' => 'Shipment-related order statuses'],
-            ['id' => 'order', 'name' => 'Order Report', 'description' => 'Customer order and fulfillment summary.', 'category' => 'Order Reports', 'table' => 'orders', 'format' => 'CSV', 'parameters' => 'All customer orders'],
-            ['id' => 'procurement', 'name' => 'Procurement Report', 'description' => 'Replenishment requests and approval activity.', 'category' => 'Procurement Reports', 'table' => 'replenishment_requests', 'format' => 'CSV', 'parameters' => 'All replenishment requests'],
-            ['id' => 'supplier', 'name' => 'Supplier Report', 'description' => 'Supplier master data and activity overview.', 'category' => 'Supplier Reports', 'table' => 'suppliers', 'format' => 'CSV', 'parameters' => 'All suppliers'],
-            ['id' => 'warehouse', 'name' => 'Warehouse Utilization Report', 'description' => 'Physical stock utilization across active warehouses.', 'category' => 'Warehouse Reports', 'table' => 'warehouses', 'format' => 'CSV', 'parameters' => 'Active warehouses'],
-            ['id' => 'forecast', 'name' => 'AI Demand Forecast Report', 'description' => 'Demand forecast availability summary.', 'category' => 'AI Forecast Reports', 'table' => 'products', 'format' => 'CSV', 'parameters' => 'Current product catalog'],
+            'id' => $export->id,
+            'action' => $export->action,
+            'source' => $export->source,
+            'report_key' => $export->report_key,
+            'report_name' => $export->report_name,
+            'category' => $export->category,
+            'format' => $export->format,
+            'filters' => $export->filters ?? (object) [],
+            'status' => $export->status,
+            'row_count' => $export->row_count,
+            'file_name' => $export->file_name,
+            'file_size' => $export->file_size,
+            'error_message' => $export->error_message,
+            'generated_at' => $export->generated_at?->toIso8601String(),
+            'generated_by' => $export->user?->name ?? ($export->source === ReportExport::SOURCE_SCHEDULED ? 'Scheduler' : null),
         ];
+    }
+
+    private function presentSchedule(ReportSchedule $schedule): array
+    {
+        $definition = $this->registry->find($schedule->report_key);
+
+        return [
+            'id' => $schedule->id,
+            'report_key' => $schedule->report_key,
+            'report_name' => $definition?->name ?? $schedule->report_key,
+            'category' => $definition?->category,
+            'format' => $schedule->format,
+            'frequency' => $schedule->frequency,
+            'run_time' => $schedule->run_time,
+            'day_of_week' => $schedule->day_of_week,
+            'day_of_month' => $schedule->day_of_month,
+            'date_window' => $schedule->date_window,
+            'filters' => $schedule->filters ?? (object) [],
+            'recipient' => $schedule->recipient ? ['id' => $schedule->recipient->id, 'name' => $schedule->recipient->name, 'email' => $schedule->recipient->email] : null,
+            'created_by' => $schedule->creator?->name,
+            'status' => $schedule->status,
+            'next_run_at' => $schedule->next_run_at?->toIso8601String(),
+            'last_run_at' => $schedule->last_run_at?->toIso8601String(),
+            'last_status' => $schedule->last_status,
+            'last_error' => $schedule->last_error,
+        ];
+    }
+
+    /** Heartbeat written by reports:run-scheduled; absent until the production scheduler actually runs. */
+    private function schedulerState(): array
+    {
+        $lastRun = Cache::get(RunScheduledReports::HEARTBEAT_KEY);
+        $overdue = ReportSchedule::query()->where('status', 'ACTIVE')->where('next_run_at', '<', now()->subMinutes(15))->count();
+
+        return [
+            'last_run_at' => $lastRun,
+            'running' => $lastRun !== null && Carbon::parse($lastRun)->gt(now()->subMinutes(15)),
+            'overdue_schedules' => $overdue,
+            'requirement' => 'Scheduled delivery requires the Laravel scheduler (php artisan schedule:run every minute) to be configured as a cron/worker in production.',
+        ];
+    }
+
+    private function eligibleRecipients()
+    {
+        return User::query()->where('status', 'ACTIVE')
+            ->whereHas('role', fn ($role) => $role->where('slug', 'ADMIN'))
+            ->orderBy('name')->get(['id', 'name', 'email', 'role_id'])
+            ->filter(fn (User $user) => filter_var((string) $user->email, FILTER_VALIDATE_EMAIL) !== false)
+            ->values();
     }
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class QaInspectionItem extends Model
 {
@@ -32,5 +33,10 @@ class QaInspectionItem extends Model
     public function receivingItem(): BelongsTo
     {
         return $this->belongsTo(ReceivingItem::class);
+    }
+
+    public function supplierRejectionCase(): HasOne
+    {
+        return $this->hasOne(SupplierRejectionCase::class);
     }
 }

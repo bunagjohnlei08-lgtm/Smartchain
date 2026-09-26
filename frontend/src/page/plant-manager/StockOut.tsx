@@ -162,7 +162,7 @@ const StatusBadge = ({ status, compact = false }: { status: StockOutStatus; comp
     : status === 'Stock Out In Progress'
       ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400'
       : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
-  return <span className={`plant-manager-badge inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${compact ? 'max-w-full items-center justify-center text-center !whitespace-normal !px-1.5 !py-0.5 !text-[9px] !leading-3 sm:!whitespace-nowrap sm:!px-2.5 sm:!py-1 sm:!text-xs sm:!leading-normal' : ''} ${color}`}>{status}</span>;
+  return <span className={`pm-stock-out-status-badge plant-manager-badge inline-flex min-h-[26px] items-center rounded-full border px-2 text-[10px] font-medium leading-3 sm:min-h-0 sm:px-2.5 sm:py-1 sm:text-xs sm:leading-normal ${compact ? 'max-w-full justify-center text-center whitespace-normal sm:whitespace-nowrap' : 'whitespace-nowrap'} ${color}`}>{status}</span>;
 };
 
 const ItemStatusBadge = ({ status }: { status: StockOutItem['status'] }) => {
@@ -514,23 +514,23 @@ const StockOut: React.FC = () => {
 
       {pageError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300"><AlertCircle className="h-4 w-4" />{pageError}</div>}
 
-      <section className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        {cards.map(card => <div key={card.label} className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-4">
-          <div className="flex items-center gap-2"><card.icon className={`h-5 w-5 ${card.color}`} /><span className="mobile-kpi-title text-xs font-semibold uppercase tracking-wider text-slate-400">{card.label}</span></div>
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+        {cards.map(card => <div key={card.label} className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-3 sm:p-4">
+          <div className="flex items-center gap-2"><card.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${card.color}`} /><span className="pm-stock-out-kpi-title mobile-kpi-title text-[10px] font-semibold uppercase tracking-wider text-slate-400 sm:text-xs">{card.label}</span></div>
           <p className="mobile-kpi-value mt-3 text-2xl font-bold text-white">{card.value}</p>
         </div>)}
       </section>
 
-      <section className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <label className="relative flex-1">
+      <section className="rounded-xl border border-slate-800/80 bg-[#0b101d] p-3 sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+          <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search Stock Out orders</span>
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search order, customer, product, or barcode..." className="min-h-11 w-full rounded-xl border border-slate-800 bg-[#070a12] py-2 pl-9 pr-4 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+            <Search className="pm-stock-out-search-icon pointer-events-none absolute left-3 top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-slate-500 sm:h-4 sm:w-4" aria-hidden="true" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search order, customer, product, or barcode..." className="pm-stock-out-search h-10 w-full rounded-xl border border-slate-800 bg-[#070a12] py-0 pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:min-h-11 sm:py-2 sm:pr-4 sm:text-sm" />
           </label>
-          <label>
+          <label className="w-full sm:w-auto">
             <span className="sr-only">Filter by Stock Out status</span>
-            <select value={status} onChange={event => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-slate-800 bg-[#070a12] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+            <select value={status} onChange={event => setStatus(event.target.value)} className="pm-stock-out-status-filter h-9 w-full cursor-pointer rounded-xl border border-slate-800 bg-[#070a12] px-2.5 py-0 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:min-h-11 sm:w-auto sm:px-3 sm:py-2 sm:text-sm">
               <option value="">All Stock Out Statuses</option>
               <option value="READY_FOR_STOCK_OUT">Ready for Stock Out</option>
               <option value="STOCK_OUT_IN_PROGRESS">Stock Out In Progress</option>
@@ -541,7 +541,7 @@ const StockOut: React.FC = () => {
 
       <section className="overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d]">
         <div className="pm-table-scroll">
-          <table className="pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1100px] text-sm">
+          <table className="pm-stock-out-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1100px] text-sm">
             <thead className="border-b border-slate-800 bg-[#070a12] text-xs uppercase tracking-wider text-slate-400">
               <tr>
                 {['Order No.', 'Customer / Destination', 'Products', 'Items', 'Assigned Date', 'Target Delivery', 'Status'].map(label => <th key={label} className={`${label === 'Status' ? 'w-28 px-1 sm:w-auto sm:px-4' : 'px-4'} py-3 text-left font-medium`}>{label}</th>)}
@@ -557,7 +557,7 @@ const StockOut: React.FC = () => {
                 <td className="px-4 py-3 text-slate-300">{order.assignedDate}</td>
                 <td className="px-4 py-3 text-slate-300">{order.requiredDelivery}</td>
                 <td className="w-28 px-1 py-3 sm:w-auto sm:px-4"><StatusBadge status={order.status} compact /></td>
-                <td className="w-16 px-1 py-3 text-center sm:w-auto sm:px-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-4 w-4" /></button></td>
+                <td className="w-16 px-1 py-3 text-center sm:w-auto sm:px-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-[13px] w-[13px] sm:h-4 sm:w-4" /></button></td>
               </tr>)}
               {!loading && orders.length === 0 && <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400">No eligible Stock Out orders found.</td></tr>}
             </tbody>
@@ -566,14 +566,14 @@ const StockOut: React.FC = () => {
       </section>
 
       {selectedOrder && <section className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="min-w-0 space-y-5 overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d] p-5 xl:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
-            <div><div className="flex items-center gap-3"><h2 className="text-lg font-semibold text-white">{selectedOrder.orderNo}</h2><StatusBadge status={selectedOrder.status} /></div><p className="mt-1 text-sm text-slate-400">{selectedOrder.customer} · {selectedOrder.warehouse}</p></div>
-            <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"><ScanLine className="h-4 w-4" /> Scan Barcode</button>
+        <div className="pm-stock-out-detail-card min-w-0 space-y-3 overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d] p-3 sm:space-y-5 sm:p-5 xl:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 sm:gap-3 sm:pb-4">
+            <div><div className="flex items-center gap-2 sm:gap-3"><h2 className="text-[15px] font-semibold text-white sm:text-lg">{selectedOrder.orderNo}</h2><StatusBadge status={selectedOrder.status} /></div><p className="mt-1 text-[12px] text-slate-400 sm:text-sm">{selectedOrder.customer} · {selectedOrder.warehouse}</p></div>
+            <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"><ScanLine className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Scan Barcode</button>
           </div>
           <div><div className="flex justify-between text-sm"><span className="text-slate-400">Release progress</span><span className="font-medium text-white">{progress.released} / {progress.ordered} units</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress.percentage}%` }} /></div></div>
           <div className="pm-table-scroll max-w-full overflow-x-auto overscroll-x-contain">
-            <table className="pm-responsive-table pm-cols-10 pm-sticky-2 w-full min-w-[1050px] text-xs">
+            <table className="pm-stock-out-table pm-responsive-table pm-cols-10 pm-sticky-2 w-full min-w-[1050px] text-xs">
               <thead className="border-b border-slate-800 bg-[#070a12] text-slate-400"><tr>{['Barcode', 'Product', 'Ordered Qty', 'Scanned / Required', 'Remaining Qty', 'Unit', 'Batch / Lot', 'Expiry', 'Location', 'Status'].map(label => <th key={label} className="px-3 py-2 text-left font-medium">{label}</th>)}</tr></thead>
               <tbody>{selectedOrder.items?.map(item => <tr key={item.id} className="border-b border-slate-800/60">
                 <td className="px-3 py-3 font-mono text-slate-300">{item.barcode || '—'}</td><td className="px-3 py-3 text-slate-200">{item.product}</td><td className="px-3 py-3 text-white">{item.orderedQty}</td><td className={`px-3 py-3 font-semibold ${item.remainingQty <= 0 ? 'text-emerald-400' : 'text-white'}`}>{item.releasedQty} / {item.orderedQty}{item.remainingQty <= 0 ? ' ✓' : ''}</td><td className="px-3 py-3 text-white">{item.remainingQty}</td><td className="px-3 py-3 text-slate-300">{item.unit}</td><td className="px-3 py-3 text-slate-400">{item.batchLot || '—'}</td><td className="px-3 py-3 text-slate-400">{item.expiryDate || '—'}</td><td className="px-3 py-3 text-slate-400">{item.location || '—'}</td><td className="px-3 py-3"><ItemStatusBadge status={item.status} /></td>

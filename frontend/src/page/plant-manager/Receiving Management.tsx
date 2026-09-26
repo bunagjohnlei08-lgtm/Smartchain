@@ -17,11 +17,13 @@ import {
   Printer,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
   Loader2,
   RefreshCw,
   LayoutGrid,
   LayoutList,
+  RotateCcw,
 } from 'lucide-react';
 
 // ============================================
@@ -172,6 +174,11 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       bg: 'bg-blue-500/10 border-blue-500/20',
       dotColor: 'bg-blue-400',
     },
+    'Awaiting Replacement': {
+      color: 'text-violet-400',
+      bg: 'bg-violet-500/10 border-violet-500/20',
+      dotColor: 'bg-violet-400',
+    },
   };
   const matchedConfig = config[status] || {
     color: 'text-gray-400',
@@ -181,13 +188,25 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const { color, bg, dotColor } = matchedConfig;
   return (
     <span
-      className={`plant-manager-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg}`}
+      className={`plant-manager-badge inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs ${color} ${bg}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
       {status}
     </span>
   );
 };
+
+const ReplacementBadge: React.FC<{ reference: string }> = ({ reference }) => (
+  <span
+    title={`Supplier replacement for rejected item ${reference}`}
+    className="pm-rcv-replacement-badge plant-manager-badge inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full border border-violet-500/30 bg-violet-500/10 px-2 text-[10px] font-semibold leading-none text-violet-400"
+  >
+    <RotateCcw className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" aria-hidden="true" />
+    Replacement
+  </span>
+);
+
+const replacementUnit = (receiving: ApiReceiving) => receiving.items[0]?.unit ?? '';
 
 const KPICard: React.FC<{
   label: string;
@@ -197,7 +216,7 @@ const KPICard: React.FC<{
   color?: string;
 }> = ({ label, value, icon, subtitle, color = 'text-blue-400' }) => {
   return (
-    <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-5 hover:border-[#3b82f6]/30 transition-all duration-200">
+    <div className="pm-rcv-kpi bg-[#111827] border border-[#1f2937] rounded-2xl p-5 hover:border-[#3b82f6]/30 transition-all duration-200">
       <div className="flex items-start justify-between">
         <div>
           <p className="mobile-kpi-title text-slate-400 text-xs font-medium uppercase tracking-wider">
@@ -206,7 +225,7 @@ const KPICard: React.FC<{
           <p className="mobile-kpi-value text-2xl font-bold text-white mt-1.5">{value}</p>
           {subtitle && <p className="mobile-kpi-helper text-slate-500 text-xs mt-1">{subtitle}</p>}
         </div>
-        <div className={`p-2.5 bg-[#0b1220] rounded-lg ${color}`}>{icon}</div>
+        <div className={`pm-rcv-kpi-icon p-2.5 bg-[#0b1220] rounded-lg ${color}`}>{icon}</div>
       </div>
     </div>
   );
@@ -444,6 +463,11 @@ const ReceivingManagement: React.FC = () => {
   const [assignmentTarget, setAssignmentTarget] = useState<ApiReceiving | null>(null);
   const [selectedQaUserId, setSelectedQaUserId] = useState<number | null>(null);
   const [assignmentToast, setAssignmentToast] = useState<AssignmentToast | null>(null);
+  const [replacementQuantities, setReplacementQuantities] = useState<Record<number, string>>({});
+  const [replacementDate, setReplacementDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [replacementReference, setReplacementReference] = useState('');
+  const [replacementSaving, setReplacementSaving] = useState(false);
+  const [replacementError, setReplacementError] = useState<string | null>(null);
 
   const fetchReceivings = useCallback(async () => {
     setLoading(true);
@@ -540,6 +564,38 @@ const ReceivingManagement: React.FC = () => {
     setCurrentPage(1);
   };
 
+  useEffect(() => {
+    setReplacementQuantities({});
+    setReplacementReference('');
+    setReplacementError(null);
+  }, [selectedReceivingId]);
+
+  const handleConfirmReplacement = async (receiving: ApiReceiving) => {
+    const items = receiving.items.map((item) => ({
+      receiving_item_id: item.id,
+      delivered_quantity: Number(replacementQuantities[item.id] ?? item.expected_quantity ?? 0),
+    }));
+    if (items.some((item) => !Number.isInteger(item.delivered_quantity) || item.delivered_quantity < 0)) {
+      setReplacementError('Enter a whole-number delivered quantity for each product.');
+      return;
+    }
+    setReplacementSaving(true);
+    setReplacementError(null);
+    try {
+      const response = await apiClient.post<ApiReceiving>(`/receivings/${receiving.id}/confirm-replacement`, {
+        delivery_date: replacementDate,
+        reference_no: replacementReference.trim() || null,
+        items,
+      });
+      setReceivings((current) => current.map((record) => (record.id === response.data.id ? response.data : record)));
+      setAssignmentToast({ type: 'success', message: 'Replacement delivery confirmed. Assign a QA Supervisor to inspect it.' });
+    } catch (error) {
+      setReplacementError(getApiErrorMessage(error));
+    } finally {
+      setReplacementSaving(false);
+    }
+  };
+
   const openAssignmentModal = (receiving: ApiReceiving) => {
     setAssignmentTarget(receiving);
     setSelectedQaUserId(receiving.assigned_qa_user_id);
@@ -597,7 +653,7 @@ const ReceivingManagement: React.FC = () => {
   }, [assignmentTarget, assignmentSaving]);
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#0b1220] p-4 text-slate-100 sm:p-6">
+    <div className="pm-receiving-page mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#0b1220] p-4 text-slate-100 sm:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -666,61 +722,78 @@ const ReceivingManagement: React.FC = () => {
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-4 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#1f2937] bg-[#111827] p-3 sm:gap-3 sm:p-4">
+        <div className="pm-rcv-search relative basis-full min-w-0 sm:basis-auto sm:flex-1 sm:min-w-[180px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500 sm:h-4 sm:w-4" aria-hidden="true" />
           <input
             type="text"
             placeholder="Search Receiving No., PO Number, Supplier..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#0b1220] border border-[#1f2937] rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            className="h-10 w-full rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-10 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pr-4 sm:text-sm"
           />
         </div>
-        <select
-          value={supplierFilter}
-          onChange={(e) => setSupplierFilter(e.target.value)}
-          className="bg-[#0b1220] border border-[#1f2937] rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
-        >
-          {supplierOptions.map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
+        <div className="pm-rcv-select relative min-w-[108px] flex-1 sm:min-w-[130px] sm:flex-none">
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            aria-label="Filter by supplier"
+            className="h-9 w-full cursor-pointer appearance-none rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-2.5 pr-7 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pl-3 sm:pr-8 sm:text-sm"
+          >
+            {supplierOptions.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+        </div>
+        <div className="pm-rcv-select relative min-w-[104px] flex-1 sm:min-w-[130px] sm:flex-none">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-[#0b1220] border border-[#1f2937] rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
+          aria-label="Filter by status"
+          className="h-9 w-full cursor-pointer appearance-none rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-2.5 pr-7 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pl-3 sm:pr-8 sm:text-sm"
         >
           <option>All Status</option>
           <option>Pending QA</option>
           <option>Passed</option>
           <option>Rejected</option>
           <option>Partial</option>
+          <option>Awaiting Replacement</option>
         </select>
-        <select
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="bg-[#0b1220] border border-[#1f2937] rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
-        >
-          <option>All Dates</option>
-          <option>Today</option>
-          <option>This Week</option>
-          <option>This Month</option>
-        </select>
-        <button
-          onClick={fetchReceivings}
-          className="p-2.5 rounded-xl border border-[#1f2937] hover:bg-slate-800/30 transition-colors text-slate-400 hover:text-slate-200"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#0b1220] p-1" aria-label="Receiving view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+        </div>
+        <div className="flex basis-full min-w-0 items-center gap-2 sm:basis-auto sm:gap-3">
+          <div className="pm-rcv-select relative min-w-[112px] flex-1 sm:min-w-[130px] sm:flex-none">
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            aria-label="Filter by date"
+            className="h-9 w-full cursor-pointer appearance-none rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-2.5 pr-7 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pl-3 sm:pr-8 sm:text-sm"
+          >
+            <option>All Dates</option>
+            <option>Today</option>
+            <option>This Week</option>
+            <option>This Month</option>
+          </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+          </div>
+          <button
+            onClick={fetchReceivings}
+            aria-label="Refresh receiving records"
+            title="Refresh"
+            className="pm-rcv-refresh flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[#1f2937] text-slate-400 transition-colors hover:bg-slate-800/30 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-10 sm:w-10"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="pm-rcv-toggle flex h-9 shrink-0 items-center gap-0.5 rounded-lg border border-[#1f2937] bg-[#0b1220] p-0.5 sm:h-auto sm:gap-1 sm:p-1" role="group" aria-label="Receiving view"><button type="button" onClick={() => setViewMode('list')} aria-label="List view" aria-pressed={viewMode === 'list'} title="List view" className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} title="Grid view" className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button></div>
+        </div>
       </div>
 
       {/* Full-width Table */}
       <div className="bg-[#111827] border border-[#1f2937] rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
         <div className="pm-table-scroll">
-          <table className="pm-responsive-table pm-cols-9 pm-sticky-1 w-full min-w-[900px]">
+          <table className="pm-receiving-table pm-rcv-main-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full min-w-[900px]">
             <thead className="bg-[#0b1220]/50 border-b border-[#1f2937]">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -772,25 +845,35 @@ const ReceivingManagement: React.FC = () => {
                     }`}
                   >
                     <td className="px-4 py-3.5 text-sm font-medium text-white">
-                      {record.receiving_no}
+                      <span className="block truncate">{record.receiving_no}</span>
+                      {record.replacement && (
+                        <span className="mt-1 block">
+                          <ReplacementBadge reference={record.replacement.rejection_reference} />
+                        </span>
+                      )}
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-300">
+                    <td className="px-4 py-3.5 text-sm text-slate-300 max-sm:whitespace-nowrap">
                       {record.purchase_order}
                     </td>
                     <td className="px-4 py-3.5 text-sm text-slate-300">
-                      {record.product_summary}
+                      <span className="block truncate" title={record.product_summary}>{record.product_summary}</span>
+                      {record.replacement && (
+                        <span className="pm-rcv-helper block text-[10px] text-violet-300 sm:text-xs">
+                          Expected {record.replacement.expected_quantity} {replacementUnit(record)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-sm text-slate-300">
-                      {record.supplier}
+                      <span className="block max-sm:truncate" title={record.supplier}>{record.supplier}</span>
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-300">
+                    <td className="px-4 py-3.5 text-sm text-slate-300 max-sm:whitespace-nowrap">
                       {formatDateOnly(record.delivery_date)}
                     </td>
                     <td className="px-4 py-3.5 text-center text-sm text-slate-300">
-                      {record.items_count}
+                      {record.replacement?.awaiting_delivery ? record.replacement.expected_quantity : record.items_count}
                     </td>
                     <td className="px-4 py-3.5 text-sm text-slate-300">
-                      {record.prepared_by || '—'}
+                      <span className="block max-sm:truncate" title={record.prepared_by || undefined}>{record.prepared_by || '—'}</span>
                     </td>
                     <td className="px-4 py-3.5">
                       <StatusBadge status={record.status} />
@@ -807,7 +890,7 @@ const ReceivingManagement: React.FC = () => {
                           title="View Receiving"
                           className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:hover:bg-slate-700 dark:hover:text-white"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="h-[13px] w-[13px] sm:h-4 sm:w-4" />
                         </button>
                         {record.status === 'Pending QA' && (
                           <button
@@ -820,7 +903,7 @@ const ReceivingManagement: React.FC = () => {
                             title={record.assigned_qa ? 'Reassign QA' : 'Assign QA'}
                             className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-cyan-400 transition-colors hover:bg-cyan-500/10 hover:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                           >
-                            <UserCheck className="w-4 h-4" />
+                            <UserCheck className="h-[13px] w-[13px] sm:h-4 sm:w-4" />
                           </button>
                         )}
                       </div>
@@ -840,13 +923,13 @@ const ReceivingManagement: React.FC = () => {
         ) : loading ? (
           <div className="px-4 py-8 text-center text-slate-400"><span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading receiving records…</span></div>
         ) : paginatedReceivings.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedReceivings.map((record) => <article key={record.id} onClick={() => handleRowClick(record.id)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{record.receiving_no}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{record.purchase_order}</p></div><StatusBadge status={record.status} /></div><p className="mt-4 font-medium text-slate-900 dark:text-white">{record.product_summary}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{record.supplier}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Delivery date</dt><dd className="text-slate-900 dark:text-white">{formatDateOnly(record.delivery_date)}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{record.items_count}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Prepared by</dt><dd className="text-slate-900 dark:text-white">{record.prepared_by || '—'}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); handleRowClick(record.id); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button></div></article>)}</div>
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedReceivings.map((record) => <article key={record.id} onClick={() => handleRowClick(record.id)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold text-slate-900 dark:text-white">{record.receiving_no}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{record.purchase_order}</p>{record.replacement && <span className="mt-1.5 block"><ReplacementBadge reference={record.replacement.rejection_reference} /></span>}</div><StatusBadge status={record.status} /></div><p className="mt-4 font-medium text-slate-900 dark:text-white">{record.product_summary}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{record.supplier}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Delivery date</dt><dd className="text-slate-900 dark:text-white">{formatDateOnly(record.delivery_date)}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{record.items_count}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Prepared by</dt><dd className="text-slate-900 dark:text-white">{record.prepared_by || '—'}</dd></div>{record.replacement && <div><dt className="text-slate-500 dark:text-slate-400">Expected replacement</dt><dd className="font-medium text-violet-600 dark:text-violet-300">{record.replacement.expected_quantity} {replacementUnit(record)}</dd></div>}</dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); handleRowClick(record.id); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button></div></article>)}</div>
         ) : (
           <div className="px-4 py-8 text-center text-slate-400">No receiving records found.</div>
         )}
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-white dark:bg-[#0b1220]/30">
+        <div className="pm-rcv-pagination flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-white dark:bg-[#0b1220]/30">
           <div className="text-sm text-slate-400">
             Showing {totalItems > 0 ? start : 0} to {end} of {totalItems} records
           </div>
@@ -854,6 +937,7 @@ const ReceivingManagement: React.FC = () => {
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
+              aria-label="Previous page"
               className="p-1.5 rounded-xl border border-[#1f2937] text-slate-400 hover:text-white hover:bg-slate-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -874,6 +958,7 @@ const ReceivingManagement: React.FC = () => {
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
+              aria-label="Next page"
               className="p-1.5 rounded-xl border border-[#1f2937] text-slate-400 hover:text-white hover:bg-slate-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
@@ -887,14 +972,15 @@ const ReceivingManagement: React.FC = () => {
         {/* Left Panel: Receiving Details (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
           {selectedReceiving ? (
-            <div className="bg-[#111827] border border-[#1f2937] rounded-2xl overflow-hidden">
+            <div className="pm-rcv-details bg-[#111827] border border-[#1f2937] rounded-2xl overflow-hidden">
               {/* Header */}
               <div className="p-5 border-b border-[#1f2937] flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-semibold text-white">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                  <h3 className="text-[15px] font-semibold text-white sm:text-base">
                     Receiving Details
                   </h3>
                   <StatusBadge status={selectedReceiving.status} />
+                  {selectedReceiving.replacement && <ReplacementBadge reference={selectedReceiving.replacement.rejection_reference} />}
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all">
@@ -907,33 +993,33 @@ const ReceivingManagement: React.FC = () => {
               </div>
 
               {/* Details Grid */}
-              <div className="grid grid-cols-1 gap-4 p-4 text-sm sm:grid-cols-2 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 p-4 text-[12px] sm:grid-cols-2 sm:p-5 sm:text-sm">
                 <div>
-                  <p className="text-slate-400">Receiving No.</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Receiving No.</p>
                   <p className="text-white font-medium">{selectedReceiving.receiving_no}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Purchase Order</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Purchase Order</p>
                   <p className="text-white font-medium">{selectedReceiving.purchase_order}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Supplier</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Supplier</p>
                   <p className="text-white font-medium">{selectedReceiving.supplier}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Reference No.</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Reference No.</p>
                   <p className="text-white font-medium">{selectedReceiving.reference_no || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Delivery Date</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Delivery Date</p>
                   <p className="text-white font-medium">{formatDateOnly(selectedReceiving.delivery_date)}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Prepared By</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Prepared By</p>
                   <p className="text-white font-medium">{selectedReceiving.prepared_by || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-slate-400">Assigned QA</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Assigned QA</p>
                   <p className="font-medium text-white">{selectedReceiving.assigned_qa?.name ?? 'Unassigned'}</p>
                   {selectedReceiving.status === 'Pending QA' && (
                     <button type="button" onClick={() => openAssignmentModal(selectedReceiving)} className="mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-cyan-500/30 px-3 py-2 text-sm font-medium text-cyan-300 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500">
@@ -943,16 +1029,55 @@ const ReceivingManagement: React.FC = () => {
                   )}
                 </div>
                 <div className="col-span-2">
-                  <p className="text-slate-400">Created At</p>
+                  <p className="text-[11px] text-slate-400 sm:text-sm">Created At</p>
                   <p className="text-white font-medium">{formatCreatedAt(selectedReceiving.created_at)}</p>
                 </div>
               </div>
 
+              {selectedReceiving.replacement && (
+                <div className="border-t border-[#1f2937] p-4 sm:p-5">
+                  <h4 className="text-[12px] font-medium text-slate-300 sm:text-sm">Rejected item replacement</h4>
+                  <dl className="mt-3 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4 sm:text-sm [&_dt]:text-[11px] sm:[&_dt]:text-sm">
+                    <div className="min-w-0"><dt className="text-slate-400">Related rejection</dt><dd className="truncate font-medium text-white">{selectedReceiving.replacement.rejection_reference}</dd></div>
+                    <div className="min-w-0"><dt className="text-slate-400">Original receiving</dt><dd className="truncate font-medium text-white">{selectedReceiving.replacement.original_receiving_no ?? '—'}</dd></div>
+                    <div className="min-w-0"><dt className="text-slate-400">Purchase Order</dt><dd className="truncate font-medium text-white">{selectedReceiving.purchase_order}</dd></div>
+                    <div className="min-w-0"><dt className="text-slate-400">Expected replacement</dt><dd className="font-medium text-violet-300">{selectedReceiving.replacement.expected_quantity} {replacementUnit(selectedReceiving)}</dd></div>
+                  </dl>
+                  {selectedReceiving.replacement.awaiting_delivery && (
+                    <form
+                      className="mt-4 space-y-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 sm:p-4"
+                      onSubmit={(event) => { event.preventDefault(); void handleConfirmReplacement(selectedReceiving); }}
+                    >
+                      <p className="text-xs text-slate-300 sm:text-sm">When the supplier's replacement arrives, record the quantity actually delivered. It then continues to QA inspection and Stock In as usual.</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="block text-xs text-slate-400 sm:text-sm">Delivery date
+                          <input type="date" required value={replacementDate} onChange={(event) => setReplacementDate(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#1f2937] bg-[#0b1220] px-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:text-sm" />
+                        </label>
+                        <label className="block text-xs text-slate-400 sm:text-sm">Reference No. <span className="text-slate-500">(optional)</span>
+                          <input type="text" maxLength={255} value={replacementReference} onChange={(event) => setReplacementReference(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-[#1f2937] bg-[#0b1220] px-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:text-sm" />
+                        </label>
+                        {selectedReceiving.items.map((item) => (
+                          <label key={item.id} className="block min-w-0 text-xs text-slate-400 sm:text-sm">
+                            <span className="block truncate" title={item.product_name}>{item.product_name} delivered (max {item.expected_quantity ?? 0} {item.unit})</span>
+                            <input type="number" inputMode="numeric" min={0} max={item.expected_quantity ?? undefined} step={1} required value={replacementQuantities[item.id] ?? String(item.expected_quantity ?? 0)} onChange={(event) => setReplacementQuantities((current) => ({ ...current, [item.id]: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-[#1f2937] bg-[#0b1220] px-3 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:text-sm" />
+                          </label>
+                        ))}
+                      </div>
+                      {replacementError && <p role="alert" className="text-xs text-red-400 sm:text-sm">{replacementError}</p>}
+                      <button type="submit" disabled={replacementSaving} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:text-sm">
+                        {replacementSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                        Confirm replacement delivery
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
               {/* Products */}
               <div className="border-t border-[#1f2937] p-5">
-                <h4 className="text-sm font-medium text-slate-300 mb-3">Products</h4>
+                <h4 className="mb-3 text-[12px] font-medium text-slate-300 sm:text-sm">Products</h4>
                 <div className="pm-table-scroll">
-                  <table className="pm-responsive-table pm-cols-4 pm-sticky-1 w-full min-w-[560px] text-sm">
+                  <table className="pm-receiving-table pm-responsive-table pm-cols-4 pm-sticky-1 w-full min-w-[560px] text-[12px] sm:text-sm">
                     <thead className="border-b border-[#1f2937]">
                       <tr className="text-left text-slate-400">
                         <th className="px-2 py-2 font-medium">Product</th>
@@ -965,7 +1090,7 @@ const ReceivingManagement: React.FC = () => {
                       {selectedReceiving.items.map((item) => (
                         <tr key={item.id} className="border-b border-[#1f2937] hover:bg-slate-800/30">
                           <td className="px-2 py-2 text-white">{item.product_name}</td>
-                          <td className="px-2 py-2 text-center text-white">{item.delivered_quantity}</td>
+                          <td className="px-2 py-2 text-center text-white">{selectedReceiving.replacement?.awaiting_delivery ? `0 / ${item.expected_quantity ?? 0}` : item.delivered_quantity}</td>
                           <td className="px-2 py-2 text-slate-300">{item.unit ?? '—'}</td>
                           <td className="px-2 py-2">
                             <StatusBadge status={item.inspection_status} />
@@ -993,7 +1118,7 @@ const ReceivingManagement: React.FC = () => {
 
         {/* Right Panel: Timeline (1/3 width) */}
         <div className="lg:col-span-1">
-          <div className="bg-[#111827] border border-[#1f2937] rounded-2xl p-5 sticky top-6">
+          <div className="pm-rcv-timeline bg-[#111827] border border-[#1f2937] rounded-2xl p-5 sticky top-6">
             <h3 className="text-lg font-semibold text-white mb-4">Timeline</h3>
             {selectedReceiving?.timeline && selectedReceiving.timeline.length > 0 ? (
               <div className="space-y-4 relative">

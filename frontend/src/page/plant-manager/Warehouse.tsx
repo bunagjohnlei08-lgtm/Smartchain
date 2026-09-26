@@ -56,7 +56,7 @@ const Warehouse: React.FC = () => {
             <h1 className="text-2xl font-bold text-white">Warehouse Overview</h1>
             <p className="mt-1 text-sm text-slate-400">Single-warehouse capacity, inventory, and location monitoring</p>
           </div>
-          <button type="button" onClick={() => void loadWarehouse()} disabled={loading} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/60 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="button" onClick={() => void loadWarehouse()} disabled={loading} className="hidden min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/60 disabled:cursor-not-allowed disabled:opacity-60 sm:inline-flex">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </header>

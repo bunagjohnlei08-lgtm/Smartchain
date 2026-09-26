@@ -24,6 +24,7 @@ import AdminUserManagement from '../page/admin/userManagement';
 import AdminOrderManagement from '../page/admin/orderManagement';
 import AdminProfile from '../page/admin/Profile';
 import AdminNotifications from '../page/admin/Notifications';
+import AdminRejectedItems from '../page/admin/RejectedItems';
 
 import PlantManagerDashboard from '../page/plant-manager/Dashboard';
 import PlantManagerProcurement from '../page/plant-manager/Procurement';
@@ -69,6 +70,7 @@ const router = createBrowserRouter([
       { path: 'procurement', element: <AdminProcurement /> },
       { path: 'barcode-center', element: <AdminBarcodeCenter /> },
       { path: 'purchase-orders', element: <AdminPurchaseOrders /> },
+      { path: 'rejected-items', element: <AdminRejectedItems /> },
       { path: 'suppliers', element: <AdminSuppliers /> },
       { path: 'logistics', element: <AdminLogistics /> },
       { path: 'ai-demand-forecasting', element: <AdminAIDemandForecasting /> },

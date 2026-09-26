@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\PlantManagerOrderController;
 use App\Http\Controllers\Api\StockOutController;
 use App\Http\Controllers\Api\AdminLogisticsController;
 use App\Http\Controllers\Api\AdminProcurementController;
+use App\Http\Controllers\Api\AdminSupplierRejectionController;
 use App\Http\Controllers\Api\PlantManagerShipmentController;
 use App\Http\Controllers\Api\PlantManagerReceivingNoteController;
 use App\Http\Controllers\Api\PlantManagerProcurementController;
@@ -34,6 +35,7 @@ use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\SessionController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -53,7 +55,9 @@ Route::middleware('throttle:invitations')->group(function () {
     Route::post('/invitations/accept', [InvitationController::class, 'accept']);
 });
 
-Route::middleware(['auth:sanctum', 'active'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
+    Route::get('/session/status', [SessionController::class, 'status'])->middleware('throttle:session-status');
+    Route::post('/session/activity', [SessionController::class, 'activity'])->middleware('throttle:session-activity');
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
@@ -65,8 +69,18 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::put('/notifications/read-all', [NotificationController::class, 'readAll']);
     Route::put('/notifications/{id}/read', [NotificationController::class, 'read'])->whereUuid('id');
     Route::get('/admin/dashboard', [DashboardController::class, 'index']);
-    Route::get('/admin/reports/dashboard', [AdminReportController::class, 'dashboard']);
-    Route::post('/admin/reports/export', [AdminReportController::class, 'export']);
+    Route::prefix('admin/reports')->group(function () {
+        Route::get('/dashboard', [AdminReportController::class, 'dashboard']);
+        Route::get('/definitions', [AdminReportController::class, 'definitions']);
+        Route::get('/options', [AdminReportController::class, 'options']);
+        Route::get('/preview', [AdminReportController::class, 'preview'])->middleware('throttle:120,1');
+        Route::post('/export', [AdminReportController::class, 'export'])->middleware('throttle:30,1');
+        Route::get('/history', [AdminReportController::class, 'history']);
+        Route::get('/schedules', [AdminReportController::class, 'schedules']);
+        Route::post('/schedules', [AdminReportController::class, 'storeSchedule']);
+        Route::patch('/schedules/{reportSchedule}', [AdminReportController::class, 'updateSchedule']);
+        Route::delete('/schedules/{reportSchedule}', [AdminReportController::class, 'destroySchedule']);
+    });
     Route::get('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'show']);
     Route::put('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'update']);
     Route::apiResource('/admin/products', ProductController::class);
@@ -117,6 +131,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/receivings', [ReceivingController::class, 'index']);
     Route::post('/receivings', [ReceivingController::class, 'store']);
     Route::patch('/receivings/{receiving}/assign-qa', [ReceivingController::class, 'assignQa']);
+    Route::post('/receivings/{receiving}/confirm-replacement', [ReceivingController::class, 'confirmReplacementDelivery']);
     Route::get('/receivings/{id}', [ReceivingController::class, 'show']);
 
     Route::put('/plant-manager/receivings/{receiving}/notes', [PlantManagerReceivingNoteController::class, 'update']);
@@ -151,6 +166,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/requests/{replenishmentRequest}', [AdminProcurementController::class, 'show']);
         Route::post('/requests/{replenishmentRequest}/approve', [AdminProcurementController::class, 'approve']);
         Route::post('/requests/{replenishmentRequest}/decline', [AdminProcurementController::class, 'decline']);
+    });
+
+    Route::prefix('admin/rejected-items')->group(function () {
+        Route::get('/', [AdminSupplierRejectionController::class, 'index']);
+        Route::get('/{supplierRejectionCase}', [AdminSupplierRejectionController::class, 'show']);
+        Route::post('/{supplierRejectionCase}/send', [AdminSupplierRejectionController::class, 'send'])->middleware('throttle:supplier-rejection-send');
+        Route::post('/{supplierRejectionCase}/resolve', [AdminSupplierRejectionController::class, 'resolve']);
     });
 
     Route::prefix('plant-manager/procurement')->group(function () {

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PurchaseOrder extends Model
 {
     protected $fillable = [
-        'po_number', 'replenishment_request_id', 'supplier_name', 'delivery_details',
+        'po_number', 'replenishment_request_id', 'supplier_id', 'supplier_name', 'delivery_details',
         'expected_delivery_date', 'total_amount',
         'status', 'approved_by', 'signature_data', 'sent_at',
     ];
@@ -22,5 +22,6 @@ class PurchaseOrder extends Model
     public function items(): HasMany { return $this->hasMany(PurchaseOrderItem::class); }
     public function approver(): BelongsTo { return $this->belongsTo(User::class, 'approved_by'); }
     public function replenishmentRequest(): BelongsTo { return $this->belongsTo(ReplenishmentRequest::class); }
+    public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function receivings(): HasMany { return $this->hasMany(Receiving::class); }
 }

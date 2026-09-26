@@ -3,12 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Receiving;
+use App\Models\User;
+use App\Models\Warehouse;
+use App\Support\WarehouseCapacity;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ReportsController extends Controller
 {
@@ -25,70 +31,108 @@ class ReportsController extends Controller
         'order-fulfillment' => 'Order Fulfillment Report',
     ];
 
+    /** The date each report's From/To filter applies to; null means a current-state report that ignores dates. */
+    private const REPORT_DATE_FIELDS = [
+        'inventory' => null,
+        'receiving' => 'Delivery date',
+        'stock-in' => 'Stocked in at',
+        'stock-out' => 'Released at',
+        'shipment' => 'Ready for shipment at',
+        'inventory-movement' => 'Movement date',
+        'warehouse-utilization' => null,
+        'low-stock' => null,
+        'damage-waste' => 'QA completed at',
+        'order-fulfillment' => 'Order date',
+    ];
+
+    /** Event timestamps are stored in the app timezone and shown to users in business time. */
+    private const TIMESTAMP_COLUMNS = ['stocked_in_at', 'created_at', 'completed_at', 'occurred_at', 'ready_for_shipment_at'];
+
+    /** Same business day convention as the Plant Manager Dashboard trends. */
+    private const BUSINESS_TIMEZONE = 'Asia/Manila';
+    private const DEFAULT_TREND_DAYS = 30;
+    private const DEFAULT_WEEKS = 5;
+    private const MAX_CHART_RANGE_DAYS = 366;
+    private const DAILY_GROUPING_MAX_DAYS = 14;
+
     public function dashboard(Request $request): JsonResponse
     {
         $this->authorizePlantManager($request);
+        [$from, $to] = $this->validatedRange($request);
 
-        $today = now()->startOfDay();
-        $tomorrow = $today->copy()->addDay();
-        $yesterday = $today->copy()->subDay();
+        $today = CarbonImmutable::now(self::BUSINESS_TIMEZONE)->startOfDay();
+        $yesterday = $today->subDay();
+        $custom = $from !== null || $to !== null;
 
-        $todayStockIn = $this->stockInQuantity($today, $tomorrow);
-        $yesterdayStockIn = $this->stockInQuantity($yesterday, $today);
-        $todayStockOut = $this->stockOutQuantity($today, $tomorrow);
-        $yesterdayStockOut = $this->stockOutQuantity($yesterday, $today);
-        $todayDeliveries = $this->deliveredCount($today, $tomorrow);
-        $yesterdayDeliveries = $this->deliveredCount($yesterday, $today);
-
-        $capacity = $this->warehouseCapacity();
-        $trendStart = $today->copy()->subDays(29);
-        $stockInByDate = $this->stockInByDate($trendStart, $tomorrow);
-        $stockOutByDate = $this->stockOutByDate($trendStart, $tomorrow);
-
-        $trend = collect(range(0, 29))->map(function (int $offset) use ($trendStart, $stockInByDate, $stockOutByDate) {
-            $date = $trendStart->copy()->addDays($offset)->toDateString();
-
-            return ['date' => $date, 'stock_in' => (int) ($stockInByDate[$date] ?? 0), 'stock_out' => (int) ($stockOutByDate[$date] ?? 0)];
-        });
-
-        $weekStart = $today->copy()->subWeeks(4)->startOfWeek();
-        $weeklyIn = $this->stockInByDate($weekStart, $tomorrow);
-        $weeklyOut = $this->stockOutByDate($weekStart, $tomorrow);
-        $weekly = collect(range(0, 4))->map(function (int $index) use ($weekStart, $today, $weeklyIn, $weeklyOut) {
-            $start = $weekStart->copy()->addWeeks($index);
-            $end = $start->copy()->endOfWeek()->min($today);
-            $dates = collect();
-            for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
-                $dates->push($date->toDateString());
+        if ($custom) {
+            // A partial range is anchored on the given side: From-only runs to today, To-only covers the default 30 days.
+            $rangeEnd = $to ?? $from->max($today);
+            $rangeStart = $from ?? $rangeEnd->subDays(self::DEFAULT_TREND_DAYS - 1);
+            if ($this->dayCount($rangeStart, $rangeEnd) > self::MAX_CHART_RANGE_DAYS) {
+                throw ValidationException::withMessages(['from' => 'The report date range cannot exceed '.self::MAX_CHART_RANGE_DAYS.' days.']);
             }
+            [$trendStart, $trendEnd, $weeklyStart, $weeklyEnd] = [$rangeStart, $rangeEnd, $rangeStart, $rangeEnd];
+        } else {
+            [$trendStart, $trendEnd] = [$today->subDays(self::DEFAULT_TREND_DAYS - 1), $today];
+            [$weeklyStart, $weeklyEnd] = [$today->subWeeks(self::DEFAULT_WEEKS - 1)->startOfWeek(), $today];
+        }
 
-            return [
-                'week' => 'Week '.($index + 1),
-                'stock_in' => (int) $dates->sum(fn (string $date) => $weeklyIn[$date] ?? 0),
-                'stock_out' => (int) $dates->sum(fn (string $date) => $weeklyOut[$date] ?? 0),
-            ];
-        });
+        $todayStockIn = $this->stockInQuantity($today, $today);
+        $yesterdayStockIn = $this->stockInQuantity($yesterday, $yesterday);
+        $todayStockOut = $this->stockOutQuantity($today, $today);
+        $yesterdayStockOut = $this->stockOutQuantity($yesterday, $yesterday);
+        $todayDeliveries = $this->deliveredCount($today, $today);
+        $yesterdayDeliveries = $this->deliveredCount($yesterday, $yesterday);
+
+        // One aggregation over the union of both chart periods keeps the two charts on the same numbers.
+        $movementStart = $trendStart->min($weeklyStart);
+        $movementEnd = $trendEnd->max($weeklyEnd);
+        $stockInByDate = $this->stockInByDate($movementStart, $movementEnd);
+        $stockOutByDate = $this->stockOutByDate($movementStart, $movementEnd);
+        $sum = fn (array $byDate, CarbonImmutable $start, CarbonImmutable $end) => (int) collect($this->dates($start, $end))
+            ->sum(fn (string $date) => $byDate[$date] ?? 0);
+
+        $trend = collect($this->dates($trendStart, $trendEnd))->map(fn (string $date) => [
+            'date' => $date,
+            'stock_in' => (int) ($stockInByDate[$date] ?? 0),
+            'stock_out' => (int) ($stockOutByDate[$date] ?? 0),
+        ])->values();
+
+        $daily = $custom && $this->dayCount($weeklyStart, $weeklyEnd) <= self::DAILY_GROUPING_MAX_DAYS;
+        $weekly = collect($this->buckets($weeklyStart, $weeklyEnd, $daily))->map(fn (array $bucket) => [
+            'week' => $bucket[0]->equalTo($bucket[1]) ? $bucket[0]->format('M j') : $bucket[0]->format('M j').' – '.$bucket[1]->format('M j'),
+            'start' => $bucket[0]->toDateString(),
+            'end' => $bucket[1]->toDateString(),
+            'stock_in' => $sum($stockInByDate, $bucket[0], $bucket[1]),
+            'stock_out' => $sum($stockOutByDate, $bucket[0], $bucket[1]),
+        ])->values();
 
         $inventory = DB::table('inventories')
             ->selectRaw('COALESCE(SUM(available_stock), 0) AS available')
             ->selectRaw('COALESCE(SUM(reserved_stock), 0) AS reserved')
-            ->selectRaw('COALESCE(SUM(backload), 0) AS in_transit')
+            ->selectRaw('COALESCE(SUM(backload), 0) AS backload')
             ->first();
+        $capacity = $this->warehouseCapacity($request->user());
+
         return response()->json([
+            'filters' => ['from' => $from?->toDateString(), 'to' => $to?->toDateString(), 'custom' => $custom, 'timezone' => self::BUSINESS_TIMEZONE],
             'kpis' => [
                 'todays_deliveries' => ['value' => $todayDeliveries, 'change_percentage' => $this->percentageChange($todayDeliveries, $yesterdayDeliveries)],
                 'todays_stock_in' => ['value' => $todayStockIn, 'change_percentage' => $this->percentageChange($todayStockIn, $yesterdayStockIn)],
                 'todays_stock_out' => ['value' => $todayStockOut, 'change_percentage' => $this->percentageChange($todayStockOut, $yesterdayStockOut)],
-                'pending_qa' => ['value' => DB::table('receivings')->where('status', 'Pending QA')->count()],
-                'pending_shipment' => ['value' => DB::table('orders')->where('status', 'READY_FOR_SHIPMENT')->count()],
-                'warehouse_utilization' => ['value' => $capacity['utilization_percentage'], 'change_percentage' => 0],
+                'pending_qa' => ['value' => $this->pendingQaCount()],
+                'pending_shipment' => ['value' => Order::query()->where('status', Order::SHIPMENT_STATUS)->count()],
+                // Capacity has no stored history, so there is no honest "vs yesterday" comparison.
+                'warehouse_utilization' => ['value' => $capacity['utilization_percentage']],
             ],
+            'stock_movement_period' => ['from' => $trendStart->toDateString(), 'to' => $trendEnd->toDateString()],
             'stock_movement_trend' => $trend,
+            'weekly_stock_period' => ['from' => $weeklyStart->toDateString(), 'to' => $weeklyEnd->toDateString(), 'grouping' => $daily ? 'daily' : 'weekly'],
             'weekly_stock' => $weekly,
             'inventory_status' => [
                 ['name' => 'Available', 'value' => (int) $inventory->available],
-                ['name' => 'In Transit', 'value' => (int) $inventory->in_transit],
                 ['name' => 'Reserved', 'value' => (int) $inventory->reserved],
+                ['name' => 'Backload', 'value' => (int) $inventory->backload],
             ],
             'warehouse_capacity' => $capacity,
         ]);
@@ -100,20 +144,20 @@ class ReportsController extends Controller
         $validated = $request->validate([
             'type' => ['required', Rule::in(array_keys(self::REPORTS))],
             'format' => ['required', Rule::in(['preview', 'print', 'pdf', 'excel'])],
-            'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
+        [$from, $to] = $this->validatedRange($request);
+        $dateField = self::REPORT_DATE_FIELDS[$validated['type']];
 
-        $from = isset($validated['from']) ? Carbon::createFromFormat('Y-m-d', $validated['from'])->startOfDay() : null;
-        $to = isset($validated['to']) ? Carbon::createFromFormat('Y-m-d', $validated['to'])->endOfDay() : null;
         [$columns, $rows, $summary] = $this->reportData($validated['type'], $from, $to);
+        $rows = array_map(fn (array $row) => $this->toBusinessTime($row), $rows);
 
         return response()->json(['report' => [
             'type' => $validated['type'],
             'title' => self::REPORTS[$validated['type']],
             'generated_at' => now()->toIso8601String(),
             'format' => $validated['format'],
-            'filters' => ['from' => $validated['from'] ?? null, 'to' => $validated['to'] ?? null],
+            'filters' => ['from' => $from?->toDateString(), 'to' => $to?->toDateString()],
+            'date_filter' => ['supported' => $dateField !== null, 'field' => $dateField, 'timezone' => self::BUSINESS_TIMEZONE],
             'columns' => $columns,
             'rows' => $rows,
             'summary' => $summary,
@@ -127,7 +171,30 @@ class ReportsController extends Controller
         return response()->json(['data' => []]);
     }
 
-    private function reportData(string $type, ?Carbon $from, ?Carbon $to): array
+    /**
+     * Validates From/To once for every endpoint. Both are optional business-day dates (Y-m-d);
+     * an inverted range is rejected rather than silently swapped.
+     *
+     * @return array{0: ?CarbonImmutable, 1: ?CarbonImmutable}
+     */
+    private function validatedRange(Request $request): array
+    {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $parse = fn (?string $date) => $date ? CarbonImmutable::createFromFormat('!Y-m-d', $date, self::BUSINESS_TIMEZONE) : null;
+        $from = $parse($validated['from'] ?? null);
+        $to = $parse($validated['to'] ?? null);
+
+        if ($from && $to && $from->gt($to)) {
+            throw ValidationException::withMessages(['to' => 'The To date must be the same as or after the From date.']);
+        }
+
+        return [$from, $to];
+    }
+
+    private function reportData(string $type, ?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
         return match ($type) {
             'inventory' => $this->inventoryReport(false),
@@ -157,7 +224,7 @@ class ReportsController extends Controller
         return [array_keys($rows[0] ?? ['barcode' => null, 'product' => null, 'category' => null, 'warehouse' => null, 'available_stock' => null, 'reserved_stock' => null, 'backload' => null, 'status' => null]), $rows, ['records' => count($rows), 'available_units' => array_sum(array_column($rows, 'available_stock'))]];
     }
 
-    private function receivingReport(?Carbon $from, ?Carbon $to): array
+    private function receivingReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
         $query = DB::table('receivings')->leftJoin('receiving_items', 'receiving_items.receiving_id', '=', 'receivings.id')->groupBy('receivings.id')->orderByDesc('receivings.delivery_date');
         $this->applyDateRange($query, 'receivings.delivery_date', $from, $to);
@@ -165,32 +232,42 @@ class ReportsController extends Controller
         return [['receiving_no', 'purchase_order', 'supplier', 'delivery_date', 'status', 'delivered_quantity'], $rows, ['records' => count($rows), 'delivered_quantity' => array_sum(array_column($rows, 'delivered_quantity'))]];
     }
 
-    private function stockInReport(?Carbon $from, ?Carbon $to): array
+    private function stockInReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
-        $query = DB::table('receiving_items')->join('receivings', 'receivings.id', '=', 'receiving_items.receiving_id')->leftJoin('qa_inspection_items', 'qa_inspection_items.receiving_item_id', '=', 'receiving_items.id')->whereNotNull('receiving_items.stocked_in_at')->orderByDesc('receiving_items.stocked_in_at');
-        $this->applyDateRange($query, 'receiving_items.stocked_in_at', $from, $to);
-        $rows = $query->get(['receivings.receiving_no', 'receiving_items.product_name as product', DB::raw('COALESCE(qa_inspection_items.accepted_quantity, receiving_items.delivered_quantity) as quantity'), 'receiving_items.unit', 'receiving_items.stocked_in_at'])->map(fn ($row) => (array) $row)->all();
+        $query = $this->stockInQuery()->join('receivings', 'receivings.id', '=', 'receiving_items.receiving_id')->orderByDesc('receiving_items.stocked_in_at');
+        $this->applyTimestampRange($query, 'receiving_items.stocked_in_at', $from, $to);
+        $rows = $query->get(['receivings.receiving_no', 'receiving_items.product_name as product', DB::raw($this->stockedQuantitySql().' as quantity'), 'receiving_items.unit', 'receiving_items.stocked_in_at'])->map(fn ($row) => (array) $row)->all();
         return [['receiving_no', 'product', 'quantity', 'unit', 'stocked_in_at'], $rows, ['records' => count($rows), 'quantity' => array_sum(array_column($rows, 'quantity'))]];
     }
 
-    private function stockOutReport(?Carbon $from, ?Carbon $to): array
+    private function stockOutReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
         $query = DB::table('stock_out_transactions')->join('orders', 'orders.id', '=', 'stock_out_transactions.order_id')->join('products', 'products.id', '=', 'stock_out_transactions.product_id')->join('warehouses', 'warehouses.id', '=', 'stock_out_transactions.warehouse_id')->orderByDesc('stock_out_transactions.created_at');
-        $this->applyDateRange($query, 'stock_out_transactions.created_at', $from, $to);
+        $this->applyTimestampRange($query, 'stock_out_transactions.created_at', $from, $to);
         $rows = $query->get(['stock_out_transactions.reference_no', 'orders.order_no', 'products.name as product', 'warehouses.name as warehouse', 'stock_out_transactions.quantity', 'stock_out_transactions.unit', 'stock_out_transactions.created_at'])->map(fn ($row) => (array) $row)->all();
         return [['reference_no', 'order_no', 'product', 'warehouse', 'quantity', 'unit', 'created_at'], $rows, ['records' => count($rows), 'quantity' => array_sum(array_column($rows, 'quantity'))]];
     }
 
-    private function shipmentReport(?Carbon $from, ?Carbon $to): array
+    private function shipmentReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
         $statuses = ['READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED'];
-        $query = DB::table('orders')->whereIn('status', $statuses)->orderByDesc('updated_at');
-        $this->applyDateRange($query, 'updated_at', $from, $to);
-        $rows = $query->get(['order_no', 'customer_name', 'required_delivery_date', 'status', 'total_amount', 'updated_at'])->map(fn ($row) => (array) $row)->all();
-        return [['order_no', 'customer_name', 'required_delivery_date', 'status', 'total_amount', 'updated_at'], $rows, ['records' => count($rows), 'delivered' => collect($rows)->where('status', 'DELIVERED')->count()]];
+        // The recorded Stock Out → Ready for Shipment transition, not the order's last-touched updated_at.
+        $readyAt = DB::table('order_status_histories')->selectRaw('MAX(order_status_histories.created_at)')
+            ->whereColumn('order_status_histories.order_id', 'orders.id')->where('order_status_histories.new_status', Order::SHIPMENT_STATUS);
+        $query = DB::table('orders')->whereIn('orders.status', $statuses)->orderByDesc('orders.updated_at')
+            ->select(['orders.order_no', 'orders.customer_name', 'orders.required_delivery_date', 'orders.status', 'orders.total_amount'])
+            ->selectSub($readyAt, 'ready_for_shipment_at');
+        if ($from) {
+            $query->where(clone $readyAt, '>=', $this->startOf($from));
+        }
+        if ($to) {
+            $query->where(clone $readyAt, '<', $this->endBefore($to));
+        }
+        $rows = $query->get()->map(fn ($row) => (array) $row)->all();
+        return [['order_no', 'customer_name', 'required_delivery_date', 'status', 'total_amount', 'ready_for_shipment_at'], $rows, ['records' => count($rows), 'delivered' => collect($rows)->where('status', 'DELIVERED')->count()]];
     }
 
-    private function movementReport(?Carbon $from, ?Carbon $to): array
+    private function movementReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
         [, $stockIn] = $this->stockInReport($from, $to);
         [, $stockOut] = $this->stockOutReport($from, $to);
@@ -202,32 +279,27 @@ class ReportsController extends Controller
 
     private function warehouseReport(): array
     {
-        $rows = DB::table('warehouses')
-            ->leftJoin('inventories', 'inventories.warehouse_id', '=', 'warehouses.id')
-            ->where('warehouses.code', 'WH-MAIN')
-            ->where('warehouses.status', 'Active')
-            ->groupBy('warehouses.id')
-            ->orderBy('warehouses.name')
-            ->get([
-            'warehouses.name', 'warehouses.code', 'warehouses.capacity', 'warehouses.status',
-            DB::raw('COALESCE(SUM(inventories.available_stock + inventories.reserved_stock), 0) as used'),
-        ])->map(function ($row) {
-            $used = (int) $row->used;
-            $total = $row->capacity === null ? null : (int) $row->capacity;
-            return ['name' => $row->name, 'code' => $row->code, 'status' => $row->status, 'used' => $used, 'free' => $total === null ? null : max(0, $total - $used), 'total' => $total, 'utilization_percentage' => $total && $total > 0 ? round(min(100, $used / $total * 100), 1) : null];
-        })->all();
+        $rows = Warehouse::query()
+            ->where('code', 'WH-MAIN')
+            ->where('status', 'Active')
+            ->orderBy('name')
+            ->get()
+            ->map(function (Warehouse $warehouse) {
+                $snapshot = WarehouseCapacity::snapshot($warehouse);
+                return ['name' => $warehouse->name, 'code' => $warehouse->code, 'status' => $warehouse->status, 'used' => $snapshot['utilized'], 'free' => $snapshot['available'], 'total' => $snapshot['capacity'], 'utilization_percentage' => $snapshot['utilization_percentage']];
+            })->all();
         return [['name', 'code', 'status', 'used', 'free', 'total', 'utilization_percentage'], $rows, ['warehouses' => count($rows), 'capacity' => array_sum(array_filter(array_column($rows, 'total'), fn ($value) => $value !== null))]];
     }
 
-    private function damageReport(?Carbon $from, ?Carbon $to): array
+    private function damageReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
         $query = DB::table('qa_inspection_items')->join('receiving_items', 'receiving_items.id', '=', 'qa_inspection_items.receiving_item_id')->join('qa_inspections', 'qa_inspections.id', '=', 'qa_inspection_items.qa_inspection_id')->join('receivings', 'receivings.id', '=', 'qa_inspections.receiving_id')->where('qa_inspection_items.rejected_quantity', '>', 0)->orderByDesc('qa_inspections.completed_at');
-        $this->applyDateRange($query, 'qa_inspections.completed_at', $from, $to);
+        $this->applyTimestampRange($query, 'qa_inspections.completed_at', $from, $to);
         $rows = $query->get(['receivings.receiving_no', 'receiving_items.product_name as product', 'qa_inspection_items.rejected_quantity', 'qa_inspection_items.inspection_result', 'qa_inspection_items.remarks', 'qa_inspections.completed_at'])->map(fn ($row) => (array) $row)->all();
-        return [['receiving_no', 'product', 'rejected_quantity', 'inspection_result', 'remarks', 'completed_at'], $rows, ['records' => count($rows), 'rejected_quantity' => array_sum(array_column($rows, 'rejected_quantity')), 'expired_quantity' => 0]];
+        return [['receiving_no', 'product', 'rejected_quantity', 'inspection_result', 'remarks', 'completed_at'], $rows, ['records' => count($rows), 'rejected_quantity' => array_sum(array_column($rows, 'rejected_quantity'))]];
     }
 
-    private function orderReport(?Carbon $from, ?Carbon $to): array
+    private function orderReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
         $query = DB::table('orders')->leftJoin('order_items', 'order_items.order_id', '=', 'orders.id')->groupBy('orders.id')->orderByDesc('orders.order_date');
         $this->applyDateRange($query, 'orders.order_date', $from, $to);
@@ -235,52 +307,190 @@ class ReportsController extends Controller
         return [['order_no', 'customer_name', 'order_date', 'required_delivery_date', 'status', 'total_amount', 'item_lines', 'quantity'], $rows, ['records' => count($rows), 'delivered' => collect($rows)->where('status', 'DELIVERED')->count()]];
     }
 
-    private function stockInQuantity(Carbon $from, Carbon $to): int
+    /** Completed Stock In lines. A receiving item has at most one QA line (one inspection per receiving). */
+    private function stockInQuery(): Builder
     {
-        return (int) DB::table('receiving_items')->leftJoin('qa_inspection_items', 'qa_inspection_items.receiving_item_id', '=', 'receiving_items.id')->whereBetween('receiving_items.stocked_in_at', [$from, $to])->sum(DB::raw('COALESCE(qa_inspection_items.accepted_quantity, receiving_items.delivered_quantity)'));
+        return DB::table('receiving_items')
+            ->leftJoin('qa_inspection_items', 'qa_inspection_items.receiving_item_id', '=', 'receiving_items.id')
+            ->whereNotNull('receiving_items.stocked_in_at');
     }
 
-    private function stockOutQuantity(Carbon $from, Carbon $to): int
+    /** Mirrors StockInController::resolveStockedQuantity — the quantity actually added to inventory. */
+    private function stockedQuantitySql(): string
     {
-        return (int) DB::table('stock_out_transactions')->whereBetween('created_at', [$from, $to])->sum('quantity');
+        return 'COALESCE(qa_inspection_items.accepted_quantity, receiving_items.delivered_quantity)';
     }
 
-    private function deliveredCount(Carbon $from, Carbon $to): int
+    private function stockInQuantity(CarbonImmutable $from, CarbonImmutable $to): int
     {
-        return DB::table('order_status_histories')->where('new_status', 'DELIVERED')->whereBetween('created_at', [$from, $to])->distinct('order_id')->count('order_id');
+        $query = $this->stockInQuery();
+        $this->applyTimestampRange($query, 'receiving_items.stocked_in_at', $from, $to);
+
+        return (int) $query->sum(DB::raw($this->stockedQuantitySql()));
     }
 
-    private function stockInByDate(Carbon $from, Carbon $to): array
+    private function stockOutQuantity(CarbonImmutable $from, CarbonImmutable $to): int
     {
-        return DB::table('receiving_items')->leftJoin('qa_inspection_items', 'qa_inspection_items.receiving_item_id', '=', 'receiving_items.id')->whereBetween('receiving_items.stocked_in_at', [$from, $to])->selectRaw('DATE(receiving_items.stocked_in_at) AS movement_date, COALESCE(SUM(COALESCE(qa_inspection_items.accepted_quantity, receiving_items.delivered_quantity)), 0) AS quantity')->groupByRaw('DATE(receiving_items.stocked_in_at)')->pluck('quantity', 'movement_date')->map(fn ($value) => (int) $value)->all();
+        $query = DB::table('stock_out_transactions');
+        $this->applyTimestampRange($query, 'created_at', $from, $to);
+
+        return (int) $query->sum('quantity');
     }
 
-    private function stockOutByDate(Carbon $from, Carbon $to): array
+    /** Orders currently Delivered whose latest recorded Delivered transition falls in the range. */
+    private function deliveredCount(CarbonImmutable $from, CarbonImmutable $to): int
     {
-        return DB::table('stock_out_transactions')->whereBetween('created_at', [$from, $to])->selectRaw('DATE(created_at) AS movement_date, COALESCE(SUM(quantity), 0) AS quantity')->groupByRaw('DATE(created_at)')->pluck('quantity', 'movement_date')->map(fn ($value) => (int) $value)->all();
+        $deliveries = DB::table('order_status_histories')
+            ->where('new_status', 'DELIVERED')
+            ->groupBy('order_id')
+            ->select('order_id')
+            ->selectRaw('MAX(created_at) AS delivered_at');
+
+        return DB::query()->fromSub($deliveries, 'deliveries')
+            ->join('orders', 'orders.id', '=', 'deliveries.order_id')
+            ->where('orders.status', 'DELIVERED')
+            ->where('deliveries.delivered_at', '>=', $this->startOf($from))
+            ->where('deliveries.delivered_at', '<', $this->endBefore($to))
+            ->count();
     }
 
-    private function warehouseCapacity(): array
+    /** Same eligibility as the QA inspection queue: Pending QA with no completed inspection. */
+    private function pendingQaCount(): int
     {
-        $row = DB::table('warehouses')->leftJoin('inventories', 'inventories.warehouse_id', '=', 'warehouses.id')->selectRaw('COALESCE(SUM(warehouses.capacity), 0) AS total')->selectRaw('COALESCE(SUM(inventories.available_stock + inventories.reserved_stock), 0) AS used')->first();
-        // The capacity value is repeated by the inventory join, so calculate it separately.
-        $total = (int) DB::table('warehouses')->sum('capacity');
-        $used = (int) $row->used;
-        return ['used' => $used, 'free' => max(0, $total - $used), 'total' => $total, 'utilization_percentage' => $total > 0 ? round(min(100, $used / $total * 100), 1) : 0];
+        return Receiving::query()
+            ->where('status', 'Pending QA')
+            ->where(function ($query) {
+                $query->whereDoesntHave('qaInspection')
+                    ->orWhereHas('qaInspection', fn ($inspection) => $inspection->whereNull('completed_at'));
+            })
+            ->count();
     }
 
-    private function percentageChange(int $today, int $yesterday): float
+    private function stockInByDate(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $day = $this->businessDateSql('receiving_items.stocked_in_at');
+        $query = $this->stockInQuery();
+        $this->applyTimestampRange($query, 'receiving_items.stocked_in_at', $from, $to);
+
+        return $this->keyedByDate($query->selectRaw("{$day} AS movement_date, COALESCE(SUM({$this->stockedQuantitySql()}), 0) AS quantity")->groupByRaw($day));
+    }
+
+    private function stockOutByDate(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $day = $this->businessDateSql('created_at');
+        $query = DB::table('stock_out_transactions');
+        $this->applyTimestampRange($query, 'created_at', $from, $to);
+
+        return $this->keyedByDate($query->selectRaw("{$day} AS movement_date, COALESCE(SUM(quantity), 0) AS quantity")->groupByRaw($day));
+    }
+
+    private function keyedByDate(Builder $query): array
+    {
+        return $query->get()->mapWithKeys(fn ($row) => [substr((string) $row->movement_date, 0, 10) => (int) $row->quantity])->all();
+    }
+
+    /**
+     * SQL for the business-timezone calendar date of a stored timestamp. Column names are
+     * internal constants and the zones come from code/config, never from the request.
+     */
+    private function businessDateSql(string $column): string
+    {
+        $source = config('app.timezone');
+        $target = self::BUSINESS_TIMEZONE;
+        $offsetMinutes = CarbonImmutable::now($target)->utcOffset() - CarbonImmutable::now($source)->utcOffset();
+
+        return match (DB::getDriverName()) {
+            'pgsql' => "DATE(({$column} AT TIME ZONE '{$source}') AT TIME ZONE '{$target}')",
+            'sqlite' => sprintf("DATE(%s, '%+d minutes')", $column, $offsetMinutes),
+            default => sprintf('DATE(DATE_ADD(%s, INTERVAL %d MINUTE))', $column, $offsetMinutes),
+        };
+    }
+
+    /** Snapshot of the Plant Manager's warehouse, identical to the Warehouse page. */
+    private function warehouseCapacity(User $user): array
+    {
+        $warehouse = ($user->warehouse_id ? Warehouse::query()->find($user->warehouse_id) : null)
+            ?? Warehouse::query()->where('code', 'WH-MAIN')->first();
+        if (! $warehouse) {
+            return ['used' => 0, 'free' => null, 'total' => null, 'utilization_percentage' => null];
+        }
+        $snapshot = WarehouseCapacity::snapshot($warehouse);
+
+        return [
+            'used' => $snapshot['utilized'],
+            'free' => $snapshot['available'],
+            'total' => $snapshot['capacity'],
+            'utilization_percentage' => $snapshot['utilization_percentage'],
+        ];
+    }
+
+    /** Null when yesterday had nothing to compare against, instead of a misleading 100%/Infinity. */
+    private function percentageChange(int $today, int $yesterday): ?float
     {
         if ($yesterday === 0) {
-            return $today === 0 ? 0 : 100;
+            return null;
         }
         return round((($today - $yesterday) / $yesterday) * 100, 1);
     }
 
-    private function applyDateRange(Builder $query, string $column, ?Carbon $from, ?Carbon $to): void
+    /** Inclusive business-day range on an event timestamp: [From 00:00, day after To 00:00). */
+    private function applyTimestampRange(Builder $query, string $column, ?CarbonImmutable $from, ?CarbonImmutable $to): void
     {
-        $query->when($from, fn (Builder $builder) => $builder->where($column, '>=', $from))
-            ->when($to, fn (Builder $builder) => $builder->where($column, '<=', $to));
+        $query->when($from, fn (Builder $builder) => $builder->where($column, '>=', $this->startOf($from)))
+            ->when($to, fn (Builder $builder) => $builder->where($column, '<', $this->endBefore($to)));
+    }
+
+    /** Inclusive range on a column that already stores a business calendar date. */
+    private function applyDateRange(Builder $query, string $column, ?CarbonImmutable $from, ?CarbonImmutable $to): void
+    {
+        $query->when($from, fn (Builder $builder) => $builder->whereDate($column, '>=', $from->toDateString()))
+            ->when($to, fn (Builder $builder) => $builder->whereDate($column, '<=', $to->toDateString()));
+    }
+
+    private function startOf(CarbonImmutable $day): CarbonImmutable
+    {
+        return $day->startOfDay()->setTimezone(config('app.timezone'));
+    }
+
+    private function endBefore(CarbonImmutable $day): CarbonImmutable
+    {
+        return $day->addDay()->startOfDay()->setTimezone(config('app.timezone'));
+    }
+
+    /** @return list<string> */
+    private function dates(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $dates = [];
+        for ($date = $from; $date->lte($to); $date = $date->addDay()) {
+            $dates[] = $date->toDateString();
+        }
+        return $dates;
+    }
+
+    /** @return list<array{0: CarbonImmutable, 1: CarbonImmutable}> Calendar-week (or single-day) buckets clipped to the range. */
+    private function buckets(CarbonImmutable $from, CarbonImmutable $to, bool $daily): array
+    {
+        $buckets = [];
+        for ($start = $from; $start->lte($to); $start = $end->addDay()) {
+            $end = $daily ? $start : $start->endOfWeek()->startOfDay()->min($to);
+            $buckets[] = [$start, $end];
+        }
+        return $buckets;
+    }
+
+    private function dayCount(CarbonImmutable $from, CarbonImmutable $to): int
+    {
+        return (int) round($from->diffInDays($to)) + 1;
+    }
+
+    private function toBusinessTime(array $row): array
+    {
+        foreach (self::TIMESTAMP_COLUMNS as $column) {
+            if (! empty($row[$column])) {
+                $row[$column] = CarbonImmutable::parse($row[$column], config('app.timezone'))->setTimezone(self::BUSINESS_TIMEZONE)->format('Y-m-d H:i:s');
+            }
+        }
+        return $row;
     }
 
     private function authorizePlantManager(Request $request): void

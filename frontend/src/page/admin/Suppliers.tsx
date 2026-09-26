@@ -40,6 +40,7 @@ interface Supplier {
   paymentTerms: string;
   status: 'Active' | 'On Hold' | 'Inactive';
   notes: string;
+  aliases: string[];
 }
 
 // ============================================
@@ -48,6 +49,17 @@ interface Supplier {
 
 const statusOptions = ['All', 'Active', 'On Hold', 'Inactive'];
 const PHONE_MAX_DIGITS = 11;
+
+const AliasEditor: React.FC<{ aliases: string[]; onChange: (aliases: string[]) => void }> = ({ aliases, onChange }) => (
+  <fieldset className="rounded-xl border border-[var(--border-color)] p-3">
+    <legend className="px-1 text-sm font-medium text-[var(--text-secondary)]">Recognized Supplier Names</legend>
+    <p className="mb-2 text-xs text-[var(--text-muted)]">Optional exact legacy names used on older Purchase Orders.</p>
+    <div className="space-y-2">
+      {aliases.map((alias, index) => <div key={index} className="flex min-w-0 gap-2"><input value={alias} onChange={(event) => onChange(aliases.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} aria-label={`Recognized supplier name ${index + 1}`} className="min-w-0 flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40" /><button type="button" onClick={() => onChange(aliases.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove recognized name ${alias || index + 1}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-rose-500"><X className="h-4 w-4" /></button></div>)}
+      <button type="button" onClick={() => onChange([...aliases, ''])} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-300"><Plus className="h-4 w-4" />Add name</button>
+    </div>
+  </fieldset>
+);
 
 // ============================================
 // HELPER COMPONENTS
@@ -96,6 +108,8 @@ const Suppliers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [addAliases, setAddAliases] = useState<string[]>([]);
+  const [editAliases, setEditAliases] = useState<string[]>([]);
 
   const apiStatus = (status: string) => status === 'On Hold' ? 'ON_HOLD' : status.toUpperCase();
   const uiStatus = (status: string): Supplier['status'] => status === 'ON_HOLD' ? 'On Hold' : status === 'INACTIVE' ? 'Inactive' : 'Active';
@@ -103,7 +117,7 @@ const Suppliers: React.FC = () => {
     id: String(supplier.id), code: supplier.supplier_code, name: supplier.name,
     contactPerson: supplier.contact_person || '', email: supplier.email || '', phone: supplier.phone || '',
     location: supplier.address || '', openPOs: 0, paymentTerms: supplier.payment_terms || '',
-    status: uiStatus(supplier.status), notes: supplier.notes || '',
+    status: uiStatus(supplier.status), notes: supplier.notes || '', aliases: (supplier.aliases ?? []).map((alias: any) => alias.alias),
   });
 
   const loadSuppliers = useCallback(async () => {
@@ -134,6 +148,7 @@ const Suppliers: React.FC = () => {
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
+    setEditAliases(supplier.aliases);
     setShowEditModal(true);
   };
 
@@ -153,7 +168,7 @@ const Suppliers: React.FC = () => {
     input.value = input.value.replace(/\D/g, '').slice(0, PHONE_MAX_DIGITS);
   };
 
-  const payloadFromForm = (form: HTMLFormElement) => {
+  const payloadFromForm = (form: HTMLFormElement, aliases: string[]) => {
     const data = new FormData(form);
     return {
       name: String(data.get('name') || '').trim(),
@@ -161,19 +176,20 @@ const Suppliers: React.FC = () => {
       email: String(data.get('email') || '').trim() || null, phone: String(data.get('phone') || '').trim() || null,
       address: String(data.get('address') || '').trim() || null, status: apiStatus(String(data.get('status') || 'Active')),
       payment_terms: String(data.get('payment_terms') || '').trim() || null, notes: String(data.get('notes') || '').trim() || null,
+      aliases: aliases.map((alias) => alias.trim()),
     };
   };
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSaving(true); setError('');
-    try { await apiClient.post('/suppliers', payloadFromForm(event.currentTarget)); setShowAddModal(false); await loadSuppliers(); }
+    try { await apiClient.post('/suppliers', payloadFromForm(event.currentTarget, addAliases)); setShowAddModal(false); setAddAliases([]); await loadSuppliers(); }
     catch (requestError: any) { setError(requestError?.response?.data?.message || 'Supplier could not be created.'); }
     finally { setSaving(false); }
   };
 
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!selectedSupplier) return; setSaving(true); setError('');
-    try { await apiClient.put(`/suppliers/${selectedSupplier.id}`, payloadFromForm(event.currentTarget)); setShowEditModal(false); setSelectedSupplier(null); await loadSuppliers(); }
+    try { await apiClient.put(`/suppliers/${selectedSupplier.id}`, payloadFromForm(event.currentTarget, editAliases)); setShowEditModal(false); setSelectedSupplier(null); await loadSuppliers(); }
     catch (requestError: any) { setError(requestError?.response?.data?.message || 'Supplier could not be updated.'); }
     finally { setSaving(false); }
   };
@@ -259,7 +275,7 @@ const Suppliers: React.FC = () => {
             {viewToggle}
           </div>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setAddAliases([]); setShowAddModal(true); }}
             className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-colors"
           >
             <Plus className="w-4 h-4" /> Add Supplier
@@ -632,6 +648,7 @@ const Suppliers: React.FC = () => {
                   <option>Inactive</option>
                 </select>
               </div>
+              <AliasEditor aliases={addAliases} onChange={setAddAliases} />
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Notes</label>
                 <textarea name="notes" rows={3} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40" placeholder="Optional supplier notes" />
@@ -778,6 +795,7 @@ const Suppliers: React.FC = () => {
                   <option>Inactive</option>
                 </select>
               </div>
+              <AliasEditor aliases={editAliases} onChange={setEditAliases} />
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Notes</label>
                 <textarea name="notes" rows={3} defaultValue={selectedSupplier.notes} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
@@ -807,4 +825,3 @@ const Suppliers: React.FC = () => {
 };
 
 export default Suppliers;
-
