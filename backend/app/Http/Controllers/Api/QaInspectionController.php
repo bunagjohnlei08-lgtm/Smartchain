@@ -92,7 +92,9 @@ class QaInspectionController extends Controller
             'id' => $item->id,
             'receiving_item_id' => $item->id,
             'product' => $item->product_name,
-            'ordered_qty' => $item->delivered_quantity,
+            // The PO quantity and the physical delivery are distinct facts. Legacy
+            // rows fall back to the immutable snapshot already stored on the item.
+            'ordered_qty' => $item->purchaseOrderItem?->ordered_quantity ?? $item->ordered_quantity ?? $item->delivered_quantity,
             'delivered_qty' => $item->delivered_quantity,
             'accepted_qty' => $accepted,
             'rejected_qty' => $rejected,
@@ -126,7 +128,7 @@ class QaInspectionController extends Controller
     private function presentDetail(Receiving $receiving): array
     {
         $receiving->loadMissing([
-            'items',
+            'items.purchaseOrderItem',
             'preparedBy',
             'timeline',
             'qaInspection.items',

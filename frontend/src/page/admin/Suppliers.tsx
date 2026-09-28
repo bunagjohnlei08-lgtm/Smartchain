@@ -428,7 +428,7 @@ const Suppliers: React.FC = () => {
       {viewMode === 'table' && (
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
           <div className="admin-table-scroll">
-            <table className="admin-responsive-table admin-cols-8 admin-sticky-1 w-full min-w-[900px]">
+            <table className="admin-suppliers-table admin-responsive-table admin-cols-8 admin-sticky-1 w-full min-w-[900px]">
               <thead className="bg-[var(--bg-hover)] border-b border-[var(--border-color)]">
                 <tr>
                   <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">

@@ -132,7 +132,7 @@ const InspectionHistory: React.FC = () => {
         <label className="min-w-0 md:col-span-2"><span className="sr-only">Product</span><select value={product} onChange={(event) => setProduct(event.target.value)} className={controlClass}>{productOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
         <div className="col-span-2 flex min-w-0 gap-2 md:col-span-2 md:gap-3">
           <label className="min-w-0 flex-1"><span className="sr-only">Status</span><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className={controlClass}>{statusOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
-          <button type="button" onClick={clearFilters} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-(--border-color-strong) text-(--text-secondary) transition-colors hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 md:h-10 md:w-10" aria-label="Clear all filters" title="Clear all filters"><RefreshCcw className="h-3 w-3 md:h-4 md:w-4" /></button>
+          <button type="button" onClick={clearFilters} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 text-(--text-secondary) transition-colors hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 md:h-10 md:w-10 md:border md:border-(--border-color-strong)" aria-label="Clear all filters" title="Clear all filters"><RefreshCcw className="h-3 w-3 md:h-4 md:w-4" /></button>
         </div>
       </div>
     </section>

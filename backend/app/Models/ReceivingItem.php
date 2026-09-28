@@ -10,6 +10,7 @@ class ReceivingItem extends Model
 {
     protected $fillable = [
         'receiving_id',
+        'purchase_order_item_id',
         'product_id',
         'warehouse_id',
         'product_name',
@@ -32,6 +33,11 @@ class ReceivingItem extends Model
     public function receiving(): BelongsTo
     {
         return $this->belongsTo(Receiving::class);
+    }
+
+    public function purchaseOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrderItem::class);
     }
 
     public function product(): BelongsTo

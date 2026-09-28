@@ -723,7 +723,7 @@ const QualityInspection: React.FC = () => {
         <select
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value as 'All Status' | InspectionStatus)}
-          className="qa-inspection-filter bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
+          className="qa-inspection-filter bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[145px] sm:min-w-[130px]"
         >
           {statusOptions.map((option) => (
             <option key={option} value={option}>{option}</option>
@@ -732,7 +732,7 @@ const QualityInspection: React.FC = () => {
         <select
           value={dateFilter}
           onChange={(event) => setDateFilter(event.target.value)}
-          className="qa-inspection-filter bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[130px]"
+          className="qa-inspection-filter bg-[#090d16] border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 appearance-none cursor-pointer min-w-[145px] sm:min-w-[130px]"
         >
           {['All Dates', 'Today', 'This Week', 'This Month'].map((option) => (
             <option key={option} value={option}>{option}</option>
@@ -985,7 +985,7 @@ const QualityInspection: React.FC = () => {
                           <thead className="border-b border-gray-800">
                             <tr className="text-left text-slate-400">
                               <th className="px-2 py-2 font-medium">Product</th>
-                              <th className="px-2 py-2 font-medium text-center">Ordered Qty</th>
+                              <th className="px-2 py-2 font-medium text-center">PO Ordered Qty</th>
                               <th className="px-2 py-2 font-medium text-center">Delivered Qty</th>
                               <th className="px-2 py-2 font-medium text-center">Accepted Qty</th>
                               <th className="px-2 py-2 font-medium text-center">Rejected Qty</th>
@@ -1054,7 +1054,8 @@ const QualityInspection: React.FC = () => {
                         <div className="mt-4 p-3 bg-[#090d16] border border-gray-800 rounded-lg flex flex-wrap items-center justify-between text-sm gap-3">
                           <span className="text-slate-400">Total Items: <span className="text-white font-medium">{selectedReceiving.products.length}</span></span>
                           <div className="flex flex-wrap gap-4">
-                            <span className="text-slate-400">Ordered: <span className="text-white font-medium">{selectedReceiving.totalOrdered}</span></span>
+                            <span className="text-slate-400">PO Ordered: <span className="text-white font-medium">{selectedReceiving.totalOrdered}</span></span>
+                            <span className="text-slate-400">Short: <span className="text-amber-400 font-medium">{Math.max(0, selectedReceiving.totalOrdered - selectedReceiving.totalDelivered)}</span></span>
                             <span className="text-slate-400">Delivered: <span className="text-white font-medium">{selectedReceiving.totalDelivered}</span></span>
                             <span className="text-slate-400">Accepted: <span className="text-emerald-400 font-medium">{selectedReceiving.totalAccepted}</span></span>
                             <span className="text-slate-400">Rejected: <span className="text-red-400 font-medium">{selectedReceiving.totalRejected}</span></span>

@@ -19,7 +19,7 @@ import { apiClient } from '../../lib/api';
 import { BrowserCodeReader, type IScannerControls } from '@zxing/browser';
 import { ChecksumException, Code128Reader, DecodeHintType, FormatException, NotFoundException, type BinaryBitmap, type Result } from '@zxing/library';
 
-type StockOutStatus = 'Ready for Stock Out' | 'Stock Out In Progress' | 'Ready for Shipment';
+type StockOutStatus = 'Ready for Stock Out' | 'Stock Out In Progress' | 'For Packing';
 
 interface StockOutOrder {
   id: string;
@@ -67,7 +67,7 @@ interface HistoryEvent {
 interface Summary {
   ordersReady: number;
   pickingToday: number;
-  readyForShipment: number;
+  forPacking: number;
   waitingLogistics: number;
   releasedToday: number;
   itemsReleased: number;
@@ -91,7 +91,7 @@ const SCAN_COOLDOWN_MS = 1500;
 const statusLabels: Record<string, StockOutStatus> = {
   READY_FOR_STOCK_OUT: 'Ready for Stock Out',
   STOCK_OUT_IN_PROGRESS: 'Stock Out In Progress',
-  READY_FOR_SHIPMENT: 'Ready for Shipment',
+  FOR_PACKING: 'For Packing',
 };
 
 const formatDate = (value?: string | null, withTime = false) => value
@@ -215,7 +215,7 @@ class Code128FrameReader extends Code128Reader {
 
 const StockOut: React.FC = () => {
   const [orders, setOrders] = useState<StockOutOrder[]>([]);
-  const [summary, setSummary] = useState<Summary>({ ordersReady: 0, pickingToday: 0, readyForShipment: 0, waitingLogistics: 0, releasedToday: 0, itemsReleased: 0, valueReleased: 0 });
+  const [summary, setSummary] = useState<Summary>({ ordersReady: 0, pickingToday: 0, forPacking: 0, waitingLogistics: 0, releasedToday: 0, itemsReleased: 0, valueReleased: 0 });
   const [selectedOrder, setSelectedOrder] = useState<StockOutOrder | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -311,7 +311,7 @@ const StockOut: React.FC = () => {
       setSummary({
         ordersReady: Number(summaryResponse.data.orders_ready),
         pickingToday: Number(summaryResponse.data.picking_today),
-        readyForShipment: Number(summaryResponse.data.ready_for_shipment),
+        forPacking: Number(summaryResponse.data.for_packing),
         waitingLogistics: Number(summaryResponse.data.waiting_logistics),
         releasedToday: Number(summaryResponse.data.released_today),
         itemsReleased: Number(summaryResponse.data.items_released),
@@ -392,15 +392,15 @@ const StockOut: React.FC = () => {
         setManualQuantity('1');
       }
 
-      // The backend flips the order to READY_FOR_SHIPMENT as soon as every item is
-      // released, which removes it from the Stock Out queue. Drop the selection instead
-      // of re-fetching a detail the queue no longer serves.
-      if (response.data?.order_status === 'READY_FOR_SHIPMENT') {
+      // The backend flips the order to FOR_PACKING as soon as every item is released,
+      // which moves it to the Shipment queue. Drop the selection instead of re-fetching
+      // a detail the Stock Out queue no longer serves.
+      if (response.data?.order_status === 'FOR_PACKING') {
         stopCamera();
         setScannerOpen(false);
         selectedOrderRef.current = null;
         setSelectedOrder(null);
-        setCompletionNotice(`${order.orderNo} is fully released and moved to Ready for Shipment.`);
+        setCompletionNotice(`${order.orderNo} is fully released and moved to Shipment for packing.`);
         await loadOrders();
         return;
       }
@@ -489,7 +489,7 @@ const StockOut: React.FC = () => {
   const cards = [
     { label: 'Orders Ready', value: summary.ordersReady, icon: Package, color: 'text-amber-400' },
     { label: 'Picking Today', value: summary.pickingToday, icon: Clock, color: 'text-cyan-400' },
-    { label: 'Ready for Shipment', value: summary.readyForShipment, icon: PackageCheck, color: 'text-emerald-400' },
+    { label: 'For Packing', value: summary.forPacking, icon: PackageCheck, color: 'text-emerald-400' },
     { label: 'Released Today', value: summary.releasedToday, icon: PackageCheck, color: 'text-green-400' },
     { label: 'Items Released', value: summary.itemsReleased, icon: PackageMinus, color: 'text-violet-400' },
     { label: 'Value Released', value: `₱${summary.valueReleased.toLocaleString()}`, icon: CheckCircle2, color: 'text-blue-400' },
@@ -506,7 +506,7 @@ const StockOut: React.FC = () => {
           <button onClick={() => void loadOrders()} disabled={loading} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
-          <button onClick={() => void startCamera()} disabled={!selectedOrder || selectedOrder.status === 'Ready for Shipment'} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
+          <button onClick={() => void startCamera()} disabled={!selectedOrder || selectedOrder.status === 'For Packing'} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
             <ScanLine className="h-4 w-4" /> Scan Barcode
           </button>
         </div>

@@ -35,6 +35,11 @@ class Receiving extends Model
         return $this->hasMany(ReceivingItem::class);
     }
 
+    public function discrepancy(): HasOne
+    {
+        return $this->hasOne(ReceivingDiscrepancy::class);
+    }
+
     public const STATUS_AWAITING_REPLACEMENT = 'Awaiting Replacement';
 
     // Callers must hold a transaction; the row lock serialises number allocation.

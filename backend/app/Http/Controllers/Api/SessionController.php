@@ -42,6 +42,8 @@ class SessionController extends Controller
             'warning_minutes' => IdleSession::warningMinutes(),
             'last_activity_at' => $lastActivityAt->toIso8601String(),
             'expires_at' => IdleSession::expiresAt($user, $token)->toIso8601String(),
+            // Lets the client measure expires_at against the server clock instead of its own.
+            'server_time' => now()->toIso8601String(),
         ]);
     }
 }

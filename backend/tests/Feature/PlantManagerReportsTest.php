@@ -212,15 +212,17 @@ class PlantManagerReportsTest extends TestCase
         $this->dashboard()->assertOk()->assertJsonPath('kpis.pending_qa.value', 3);
     }
 
-    public function test_pending_shipment_counts_only_ready_for_shipment_orders(): void
+    public function test_pending_shipment_counts_orders_in_the_shipment_stage_not_yet_forwarded(): void
     {
+        $this->order('FOR_PACKING');
+        $this->order('PACKING');
         $this->order('READY_FOR_SHIPMENT');
         $this->order('READY_FOR_SHIPMENT');
         foreach (['DELIVERED', 'CANCELLED', 'IN_TRANSIT', 'FORWARDED_TO_LOGISTICS', 'STOCK_OUT_IN_PROGRESS'] as $status) {
             $this->order($status);
         }
 
-        $this->dashboard()->assertOk()->assertJsonPath('kpis.pending_shipment.value', 2);
+        $this->dashboard()->assertOk()->assertJsonPath('kpis.pending_shipment.value', 4);
     }
 
     public function test_warehouse_utilization_matches_the_warehouse_page(): void
@@ -384,6 +386,19 @@ class PlantManagerReportsTest extends TestCase
 
         $this->assertSame([$inRange->order_no], array_column($rows, 'order_no'));
         $this->assertSame('2026-09-05 10:00:00', $rows[0]['ready_for_shipment_at']);
+    }
+
+    public function test_shipment_report_includes_packing_orders_by_shipment_entry_without_a_ready_time(): void
+    {
+        $packing = $this->order('PACKING', [['FOR_PACKING', '2026-09-04 02:00:00'], ['PACKING', '2026-09-04 03:00:00']]);
+        $ready = $this->order('READY_FOR_SHIPMENT', [['FOR_PACKING', '2026-09-03 02:00:00'], ['PACKING', '2026-09-03 03:00:00'], ['READY_FOR_SHIPMENT', '2026-09-12 02:00:00']]);
+        $this->order('FOR_PACKING', [['FOR_PACKING', '2026-09-20 02:00:00']]);
+
+        $rows = collect($this->generate('shipment', ['from' => '2026-09-01', 'to' => '2026-09-10'])->assertOk()->json('report.rows'))->keyBy('order_no');
+
+        $this->assertEqualsCanonicalizing([$packing->order_no, $ready->order_no], $rows->keys()->all());
+        $this->assertNull($rows[$packing->order_no]['ready_for_shipment_at']);
+        $this->assertSame('2026-09-12 10:00:00', $rows[$ready->order_no]['ready_for_shipment_at']);
     }
 
     public function test_current_state_reports_declare_that_dates_do_not_apply(): void

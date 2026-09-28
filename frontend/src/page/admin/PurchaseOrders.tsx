@@ -32,9 +32,11 @@ import {
 // TYPES
 // ============================================
 
-type POStatus = 'Pending Approval' | 'Approved' | 'Sent to Supplier' | 'Completed' | 'Cancelled';
+type POStatus = 'Pending Approval' | 'Approved' | 'Sent to Supplier' | 'Partially Received' | 'Completed' | 'Closed with Shortage' | 'Cancelled';
 
-interface PurchaseOrderItem { productName: string; quantity: number; unitPrice: number; amount: number; }
+interface PurchaseOrderItem { productName: string; quantity: number; receivedQuantity: number; remainingQuantity: number; unitPrice: number; amount: number; }
+interface ReceivingHistory { id: number; receivingNo: string; deliveryDate: string; deliveredQuantity: number; status: string; }
+interface ReceivingDiscrepancy { id: number; receivingId: number; type: string; shortQuantity: number; status: string; supplierResponse?: string; resolutionNotes?: string; }
 interface SupplierOption { id: number; supplier_code: string; name: string; }
 
 interface PurchaseOrder {
@@ -50,6 +52,8 @@ interface PurchaseOrder {
   approvedBy?: string;
   signatureData?: string;
   sentAt?: string;
+  receivingHistory: ReceivingHistory[];
+  discrepancies: ReceivingDiscrepancy[];
 }
 
 // ============================================
@@ -61,7 +65,9 @@ const StatusBadge: React.FC<{ status: POStatus }> = ({ status }) => {
     'Pending Approval': { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
     Approved: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
     'Sent to Supplier': { color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
+    'Partially Received': { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
     Completed: { color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
+    'Closed with Shortage': { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
     Cancelled: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
   };
   const { color, bg, border } = config[status] || config['Pending Approval'];
@@ -94,6 +100,7 @@ const PurchaseOrders: React.FC = () => {
   useAdminDetailOverlay(showDetailsDrawer && selectedOrder !== null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [resolvingDiscrepancyId, setResolvingDiscrepancyId] = useState<number | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
@@ -137,9 +144,11 @@ const PurchaseOrders: React.FC = () => {
         status: order.status as POStatus, createdAt: order.created_at,
         approvedBy: order.approved_by, signatureData: order.signature_data, sentAt: order.sent_at,
         items: (order.items ?? []).map((item: any) => ({
-          productName: item.product_name, quantity: Number(item.ordered_quantity),
+          productName: item.product_name, quantity: Number(item.ordered_quantity), receivedQuantity: Number(item.received_quantity ?? 0), remainingQuantity: Number(item.remaining_quantity ?? item.ordered_quantity),
           unitPrice: Number(item.unit_price), amount: Number(item.total_price),
         })),
+        receivingHistory: (order.receiving_history ?? []).map((receiving: any) => ({ id: Number(receiving.id), receivingNo: receiving.receiving_no, deliveryDate: receiving.delivery_date, deliveredQuantity: Number(receiving.delivered_quantity), status: receiving.status })),
+        discrepancies: (order.discrepancies ?? []).map((item: any) => ({ id: Number(item.id), receivingId: Number(item.receiving_id), type: item.type, shortQuantity: Number(item.short_quantity), status: item.status, supplierResponse: item.supplier_response, resolutionNotes: item.resolution_notes })),
       })));
       const inventoryItems = (inventoryResponse.data?.data ?? []) as Array<{ product?: string }>;
       setProductNames([...new Set(inventoryItems.map((item) => item.product).filter((name): name is string => Boolean(name)))]);
@@ -247,6 +256,33 @@ const PurchaseOrders: React.FC = () => {
     window.clearTimeout(toastTimer.current);
     setToast({ type, message });
     toastTimer.current = window.setTimeout(() => setToast(null), 5000);
+  };
+
+  const handleDiscrepancyAction = async (item: ReceivingDiscrepancy, action: 'CONTACT_SUPPLIER' | 'AWAIT_BALANCE' | 'CLOSE_SHORTAGE') => {
+    const promptLabel = action === 'CLOSE_SHORTAGE' ? 'Resolution notes (required)' : action === 'AWAIT_BALANCE' ? 'Record the supplier response (required)' : 'Supplier contact note (optional)';
+    const note = window.prompt(promptLabel, '');
+    if (note === null || ((action === 'CLOSE_SHORTAGE' || action === 'AWAIT_BALANCE') && !note.trim())) return;
+    setResolvingDiscrepancyId(item.id);
+    try {
+      const payload = action === 'CLOSE_SHORTAGE' ? { action, resolution_notes: note.trim() } : { action, supplier_response: note.trim() || undefined };
+      const response = await apiClient.patch(`/admin/receiving-discrepancies/${item.id}`, payload);
+      const updatedStatus = String(response.data?.status ?? item.status);
+      setSelectedOrder((current) => current ? {
+        ...current,
+        status: action === 'CLOSE_SHORTAGE' ? 'Closed with Shortage' : 'Partially Received',
+        discrepancies: current.discrepancies.map((value) => value.id === item.id ? { ...value, status: updatedStatus, supplierResponse: response.data?.supplier_response, resolutionNotes: response.data?.resolution_notes } : value),
+      } : current);
+      setOrders((current) => current.map((order) => order.id === selectedOrder?.id ? {
+        ...order,
+        status: action === 'CLOSE_SHORTAGE' ? 'Closed with Shortage' : 'Partially Received',
+        discrepancies: order.discrepancies.map((value) => value.id === item.id ? { ...value, status: updatedStatus } : value),
+      } : order));
+      showToast('success', action === 'CLOSE_SHORTAGE' ? 'Shortage case closed.' : 'Supplier response updated.');
+    } catch (requestError: any) {
+      showToast('error', requestError?.response?.data?.message || 'Unable to update the discrepancy.');
+    } finally {
+      setResolvingDiscrepancyId(null);
+    }
   };
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
@@ -562,7 +598,7 @@ const PurchaseOrders: React.FC = () => {
                   <thead className="border-b border-[#1f2937]">
                     <tr className="text-gray-400 text-xs uppercase">
                       <th className="w-[40%] px-2 py-2 text-left sm:px-3">Product</th>
-                      <th className="w-[12%] px-2 py-2 text-right sm:px-3">Qty</th>
+                      <th className="w-[12%] px-2 py-2 text-right sm:px-3">Ordered</th>
                       <th className="w-[24%] px-2 py-2 text-right sm:px-3">Unit Price</th>
                       <th className="w-[24%] px-2 py-2 text-right sm:px-3">Amount</th>
                     </tr>
@@ -571,7 +607,7 @@ const PurchaseOrders: React.FC = () => {
                     {selectedOrder.items.map((item, idx) => (
                       <tr key={idx} className="border-b border-[#1f2937]">
                         <td className="px-2 py-2 text-gray-300 sm:px-3">{item.productName}</td>
-                        <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">{item.quantity}</td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3"><span className="block">{item.quantity}</span><span className="block text-[10px] font-normal text-slate-400">Received {item.receivedQuantity} / Remaining {item.remainingQuantity}</span></td>
                         <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">₱{item.unitPrice.toLocaleString()}</td>
                         <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">₱{item.amount.toLocaleString()}</td>
                       </tr>
@@ -583,6 +619,23 @@ const PurchaseOrders: React.FC = () => {
                 </table>
               </div>
             </div>
+
+            {(selectedOrder.receivingHistory.length > 0 || selectedOrder.discrepancies.length > 0) && (
+              <div className="mb-4 grid gap-4 sm:mb-6 sm:grid-cols-2">
+                <section className="rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3 sm:p-4" aria-label="Receiving history">
+                  <h3 className="mb-3 text-xs font-semibold text-white sm:text-sm">Receiving History</h3>
+                  <ul className="space-y-2 text-xs">
+                    {selectedOrder.receivingHistory.map((receiving) => <li key={receiving.id} className="rounded-lg border border-slate-700 p-2"><div className="flex justify-between gap-2"><span className="font-medium text-cyan-300">{receiving.receivingNo}</span><span className="text-white">{receiving.deliveredQuantity} delivered</span></div><p className="mt-1 text-slate-400">{receiving.deliveryDate} · {receiving.status}</p></li>)}
+                  </ul>
+                </section>
+                <section className="rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3 sm:p-4" aria-label="Receiving discrepancies">
+                  <h3 className="mb-3 text-xs font-semibold text-white sm:text-sm">Receiving Discrepancies</h3>
+                  <ul className="space-y-2 text-xs">
+                    {selectedOrder.discrepancies.map((item) => <li key={item.id} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2"><div className="flex justify-between gap-2"><span className="font-medium text-amber-300">Short Delivery</span><span className="text-white">{item.shortQuantity} short</span></div><p className="mt-1 text-slate-400">{item.status.replaceAll('_', ' ')}</p>{!['RESOLVED', 'CLOSED_WITH_SHORTAGE'].includes(item.status) && <div className="mt-2 grid gap-2"><button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => void handleDiscrepancyAction(item, 'CONTACT_SUPPLIER')} className="min-h-11 cursor-pointer rounded-lg border border-slate-600 px-2 text-slate-200 transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50">Contact Supplier</button><button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => void handleDiscrepancyAction(item, 'AWAIT_BALANCE')} className="min-h-11 cursor-pointer rounded-lg border border-cyan-500/40 px-2 text-cyan-300 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50">Supplier Will Fulfill Balance</button><button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => void handleDiscrepancyAction(item, 'CLOSE_SHORTAGE')} className="min-h-11 cursor-pointer rounded-lg border border-orange-500/40 px-2 text-orange-300 transition-colors hover:bg-orange-500/10 focus:outline-none focus:ring-2 focus:ring-orange-500/50 disabled:cursor-not-allowed disabled:opacity-50">Close Case</button></div>}</li>)}
+                  </ul>
+                </section>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="admin-po-details-actions grid grid-cols-1 gap-2 border-t border-[#1f2937] pt-3 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:pt-4">

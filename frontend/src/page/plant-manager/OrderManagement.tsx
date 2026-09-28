@@ -33,6 +33,8 @@ type OrderStatus =
   | 'Preparing'
   | 'Ready for Stock Out'
   | 'Stock Out Completed'
+  | 'For Packing'
+  | 'Packing'
   | 'Ready for Shipment'
   | 'Forwarded to Logistics'
   | 'In Transit'
@@ -97,6 +99,8 @@ const statusLabels: Record<string, OrderStatus> = {
   PREPARING: 'Preparing',
   READY_FOR_STOCK_OUT: 'Ready for Stock Out',
   STOCK_OUT_COMPLETED: 'Stock Out Completed',
+  FOR_PACKING: 'For Packing',
+  PACKING: 'Packing',
   READY_FOR_SHIPMENT: 'Ready for Shipment',
   FORWARDED_TO_LOGISTICS: 'Forwarded to Logistics',
   IN_TRANSIT: 'In Transit',
@@ -149,10 +153,12 @@ const workflowRank: Record<OrderStatus, number> = {
   Preparing: 2,
   'Ready for Stock Out': 3,
   'Stock Out Completed': 4,
-  'Ready for Shipment': 5,
-  'Forwarded to Logistics': 6,
-  'In Transit': 7,
-  Delivered: 8,
+  'For Packing': 5,
+  Packing: 6,
+  'Ready for Shipment': 7,
+  'Forwarded to Logistics': 8,
+  'In Transit': 9,
+  Delivered: 10,
   Cancelled: 0,
 };
 
@@ -176,6 +182,10 @@ const getStatusColor = (status: OrderStatus) => {
       return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     case 'Stock Out Completed':
       return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
+    case 'For Packing':
+      return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+    case 'Packing':
+      return 'bg-sky-500/20 text-sky-400 border-sky-500/30';
     case 'Ready for Shipment':
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     case 'In Transit':
@@ -339,7 +349,7 @@ const OrderManagement: React.FC = () => {
     const cancelled = order.status === 'Cancelled';
     const assignmentEvent = findTimelineEvent(order, ['ASSIGNED']);
     const preparationEvent = findTimelineEvent(order, ['PREPARING', 'READY_FOR_STOCK_OUT']);
-    const packingEvent = findTimelineEvent(order, ['STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT']);
+    const packingEvent = findTimelineEvent(order, ['STOCK_OUT_COMPLETED', 'FOR_PACKING', 'PACKING', 'READY_FOR_SHIPMENT']);
     const pickupEvent = findTimelineEvent(order, ['READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED']);
     const state = (completedAtRank: number, currentAtRank?: number): TimelineStepState => {
       if (cancelled && rank < completedAtRank) return 'cancelled';
@@ -352,8 +362,8 @@ const OrderManagement: React.FC = () => {
       { step: 'Import Order', icon: <FileText className="h-4 w-4" />, state: 'completed' as TimelineStepState, date: formatTimelineDate(order.createdAt) },
       { step: 'Admin Assignment', icon: <User className="h-4 w-4" />, state: state(1), date: formatTimelineDate(assignmentEvent?.createdAt) || order.assignedDate },
       { step: 'Picking & Preparation', icon: <Package className="h-4 w-4" />, state: state(3, 2), date: formatTimelineDate(preparationEvent?.createdAt) },
-      { step: 'Packing', icon: <Box className="h-4 w-4" />, state: state(5, 3), date: formatTimelineDate(packingEvent?.createdAt) },
-      { step: 'Ready for Pickup', icon: <Truck className="h-4 w-4" />, state: state(5), date: formatTimelineDate(pickupEvent?.createdAt) },
+      { step: 'Packing', icon: <Box className="h-4 w-4" />, state: state(7, 3), date: formatTimelineDate(packingEvent?.createdAt) },
+      { step: 'Ready for Pickup', icon: <Truck className="h-4 w-4" />, state: state(7), date: formatTimelineDate(pickupEvent?.createdAt) },
     ];
   }, [visibleSelectedOrder]);
 
@@ -473,6 +483,8 @@ const OrderManagement: React.FC = () => {
             <option value="Preparing">Preparing</option>
             <option value="Ready for Stock Out">Ready for Stock Out</option>
             <option value="Stock Out Completed">Stock Out Completed</option>
+            <option value="For Packing">For Packing</option>
+            <option value="Packing">Packing</option>
             <option value="Ready for Shipment">Ready for Shipment</option>
             <option value="In Transit">In Transit</option>
             <option value="Delivered">Delivered</option>

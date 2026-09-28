@@ -21,12 +21,12 @@ use Throwable;
 
 class PurchaseOrderController extends Controller
 {
-    private const STATUSES = ['Pending Approval', 'Approved', 'Sent to Supplier', 'Completed', 'Cancelled'];
+    private const STATUSES = ['Pending Approval', 'Approved', 'Sent to Supplier', 'Partially Received', 'Completed', 'Closed with Shortage', 'Cancelled'];
 
     public function index(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $orders = PurchaseOrder::query()->with(['items', 'approver:id,name'])->latest()->get();
+        $orders = PurchaseOrder::query()->with(['items', 'approver:id,name', 'receivings.items', 'discrepancies'])->latest()->get();
         return response()->json(['data' => $orders->map(fn (PurchaseOrder $order) => $this->present($order))]);
     }
 
@@ -111,7 +111,7 @@ class PurchaseOrderController extends Controller
     {
         abort_unless($request->user()->isAdmin() || $request->user()->isPlantManager(), 403);
         $orders = PurchaseOrder::query()
-            ->whereIn('status', ['Approved', 'Sent to Supplier'])
+            ->whereIn('status', ['Approved', 'Sent to Supplier', 'Partially Received'])
             ->with(['items', 'approver:id,name', 'receivings.items'])
             ->latest()
             ->get();
@@ -141,7 +141,7 @@ class PurchaseOrderController extends Controller
     public function send(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf, PurchaseOrderSupplier $supplierResolver): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        abort_if(in_array($purchaseOrder->status, ['Completed', 'Cancelled'], true), 422, 'Completed or cancelled Purchase Orders cannot be sent.');
+        abort_if(in_array($purchaseOrder->status, ['Completed', 'Closed with Shortage', 'Cancelled'], true), 422, 'Completed or closed Purchase Orders cannot be sent.');
 
         $supplier = $supplierResolver->resolve($purchaseOrder);
         abort_if(! $supplier, 422, 'This Purchase Order is not linked to a registered supplier.');
@@ -222,7 +222,7 @@ class PurchaseOrderController extends Controller
             'signature_data' => $order->signature_data,
             'created_at' => $order->created_at?->toDateString(),
             'items' => $order->items->map(function ($item) use ($order) {
-                $received = (int) $order->receivings->flatMap->items
+                $received = (int) $order->receivings->whereNull('replacement_for_rejection_case_id')->flatMap->items
                     ->where('product_name', $item->product_name)->sum('delivered_quantity');
                 return [
                 'id' => $item->id,
@@ -235,6 +235,22 @@ class PurchaseOrderController extends Controller
                 'total_price' => (float) $item->total_price,
                 ];
             })->values(),
+            'receiving_history' => $order->relationLoaded('receivings') ? $order->receivings->map(fn ($receiving) => [
+                'id' => $receiving->id,
+                'receiving_no' => $receiving->receiving_no,
+                'delivery_date' => $receiving->delivery_date?->toDateString(),
+                'delivered_quantity' => (int) $receiving->items->sum('delivered_quantity'),
+                'status' => $receiving->status,
+            ])->values() : [],
+            'discrepancies' => $order->relationLoaded('discrepancies') ? $order->discrepancies->map(fn ($case) => [
+                'id' => $case->id,
+                'receiving_id' => $case->receiving_id,
+                'type' => $case->discrepancy_type,
+                'short_quantity' => $case->short_quantity,
+                'status' => $case->status,
+                'supplier_response' => $case->supplier_response,
+                'resolution_notes' => $case->resolution_notes,
+            ])->values() : [],
         ];
     }
 }

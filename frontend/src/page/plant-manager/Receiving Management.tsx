@@ -34,6 +34,7 @@ interface CreateReceivingItemInput {
   purchase_order_item_id: number;
   product: string;
   ordered_quantity: number;
+  previously_received: number;
   remaining_quantity: number;
   delivered_quantity: string;
   unit: string | null;
@@ -277,6 +278,7 @@ const CreateReceivingModal: React.FC<{
         purchase_order_item_id: item.id,
         product: item.product_name,
         ordered_quantity: item.ordered_quantity,
+        previously_received: item.received_quantity,
         remaining_quantity: item.remaining_quantity,
         delivered_quantity: String(item.remaining_quantity),
         unit: item.unit,
@@ -390,7 +392,7 @@ const CreateReceivingModal: React.FC<{
             <div className="space-y-3">
               {formData.items.map((item, index) => (
                 <div key={item.purchase_order_item_id} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-5"><p className="text-sm text-slate-200">{item.product}</p><p className="text-xs text-slate-500">Ordered: {item.ordered_quantity} · Remaining: {item.remaining_quantity} {item.unit ?? '—'}</p></div>
+                  <div className="col-span-5"><p className="text-sm text-slate-200">{item.product}</p><p className="text-xs text-slate-500">Ordered: {item.ordered_quantity} · Previously received: {item.previously_received} · Remaining: {item.remaining_quantity} {item.unit ?? '—'}</p>{Number(item.delivered_quantity) < item.remaining_quantity && <p className="mt-1 text-xs font-medium text-amber-400">Short delivery: {item.remaining_quantity - Number(item.delivered_quantity || 0)} {item.unit ?? ''}</p>}</div>
                   <input
                     type="number"
                     min="0"

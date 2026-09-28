@@ -42,13 +42,14 @@ class ReportRegistry
         'Passed' => 'Passed', 'Partial' => 'Partial', 'Rejected' => 'Rejected',
     ];
 
-    public const SHIPMENT_STATUSES = ['READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED'];
+    public const SHIPMENT_STATUSES = ['FOR_PACKING', 'PACKING', 'READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED'];
 
     /** Groups the existing order statuses into the Order Management workflow stages. */
     public const FULFILLMENT_STAGES = [
         'NEW' => 'Order Intake',
         'ASSIGNED' => 'Preparation', 'PREPARING' => 'Preparation',
         'READY_FOR_STOCK_OUT' => 'Stock Out', 'STOCK_OUT_IN_PROGRESS' => 'Stock Out',
+        'FOR_PACKING' => 'Packing', 'PACKING' => 'Packing',
         'STOCK_OUT_COMPLETED' => 'Ready for Shipment', 'READY_FOR_SHIPMENT' => 'Ready for Shipment',
         'FORWARDED_TO_LOGISTICS' => 'Logistics', 'IN_TRANSIT' => 'Logistics',
         'DELIVERED' => 'Delivered', 'CANCELLED' => 'Cancelled',
@@ -207,7 +208,7 @@ class ReportRegistry
             new ReportDefinition('shipment.summary', 'Shipment Summary', 'Orders that reached the shipment stage, with recorded status timestamps.', 'shipment',
                 $shipmentColumns, ['date', 'warehouse', 'status'], array_combine(self::SHIPMENT_STATUSES, self::SHIPMENT_STATUSES), dateLabel: 'Order date',
                 source: fn (ReportFilters $f) => $this->orderQuery($f)->whereIn('o.status', self::SHIPMENT_STATUSES)),
-            new ReportDefinition('shipment.ready', 'Ready for Shipment', 'Orders released by Stock Out and waiting to be forwarded to Logistics.', 'shipment',
+            new ReportDefinition('shipment.ready', 'Ready for Shipment', 'Orders packed and waiting to be forwarded to Logistics.', 'shipment',
                 $shipmentColumns, ['date', 'warehouse'], dateLabel: 'Order date',
                 source: fn (ReportFilters $f) => $this->orderQuery($f)->where('o.status', 'READY_FOR_SHIPMENT')),
             new ReportDefinition('shipment.in_transit', 'In Transit Shipments', 'Shipments currently marked In Transit.', 'shipment',
@@ -220,7 +221,7 @@ class ReportRegistry
                 $shipmentColumns + ['cancelled_at' => ['Cancelled Date', 'datetime']], ['date', 'warehouse'], dateLabel: 'Order date',
                 source: fn (ReportFilters $f) => $this->orderQuery($f)->where('o.status', 'CANCELLED')
                     ->whereExists(fn (Builder $q) => $q->selectRaw('1')->from('order_status_histories as h')
-                        ->whereColumn('h.order_id', 'o.id')->whereIn('h.new_status', ['READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT']))),
+                        ->whereColumn('h.order_id', 'o.id')->whereIn('h.new_status', ['FOR_PACKING', 'PACKING', 'READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT']))),
 
             // ---------------- Orders ----------------
             new ReportDefinition('orders.summary', 'Order Summary', 'All customer orders with assignment, target delivery and fulfillment stage.', 'order',

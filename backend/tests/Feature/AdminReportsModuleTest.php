@@ -398,6 +398,26 @@ class AdminReportsModuleTest extends TestCase
 
     // --------------------------------------------------- shipment and orders
 
+    public function test_packing_stages_are_shipment_stage_but_not_ready_for_shipment(): void
+    {
+        $this->order('ORD-FOR-PACK', 'FOR_PACKING', history: ['FOR_PACKING' => '2026-09-15 10:00:00']);
+        $this->order('ORD-PACKING', 'PACKING', history: ['FOR_PACKING' => '2026-09-15 10:00:00', 'PACKING' => '2026-09-15 11:00:00']);
+        $this->order('ORD-READY', 'READY_FOR_SHIPMENT', history: ['FOR_PACKING' => '2026-09-15 10:00:00', 'PACKING' => '2026-09-15 11:00:00', 'READY_FOR_SHIPMENT' => '2026-09-15 12:00:00']);
+
+        $this->assertSame(['ORD-READY'], array_column($this->rows('shipment.ready'), 'shipment_no'));
+        $this->assertEqualsCanonicalizing(['ORD-FOR-PACK', 'ORD-PACKING', 'ORD-READY'], array_column($this->rows('shipment.summary'), 'shipment_no'));
+
+        $summary = collect($this->rows('shipment.summary'))->keyBy('shipment_no');
+        $this->assertNull($summary['ORD-FOR-PACK']['ready_at']);
+        $this->assertNull($summary['ORD-PACKING']['ready_at']);
+        $this->assertStringStartsWith('2026-09-15T12:00:00', $summary['ORD-READY']['ready_at']);
+
+        $orders = collect($this->rows('orders.summary'))->keyBy('order_no');
+        $this->assertSame('Packing', $orders['ORD-FOR-PACK']['fulfillment_stage']);
+        $this->assertSame('Packing', $orders['ORD-PACKING']['fulfillment_stage']);
+        $this->assertSame('Ready for Shipment', $orders['ORD-READY']['fulfillment_stage']);
+    }
+
     public function test_shipment_reports_use_order_statuses_and_recorded_history(): void
     {
         $this->order('ORD-READY', 'READY_FOR_SHIPMENT', history: ['READY_FOR_SHIPMENT' => '2026-09-15 12:00:00']);

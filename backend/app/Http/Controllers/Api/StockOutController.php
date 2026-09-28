@@ -23,7 +23,7 @@ class StockOutController extends Controller
 {
     /**
      * Stock Out only owns orders that are still being picked. The moment every item is
-     * released the order becomes READY_FOR_SHIPMENT and leaves this module for good.
+     * released the order becomes FOR_PACKING and leaves this module for Plant Manager Shipment.
      */
     private const STATUSES = Order::STOCK_OUT_STATUSES;
 
@@ -89,6 +89,7 @@ class StockOutController extends Controller
             'orders_ready' => (int) ($counts['READY_FOR_STOCK_OUT'] ?? 0),
             'picking_today' => (clone $orders)->where('status', 'STOCK_OUT_IN_PROGRESS')
                 ->whereHas('histories', fn(Builder $history) => $history->where('action', 'STOCK_OUT_STARTED')->whereDate('created_at', today()))->count(),
+            'for_packing' => (int) ($counts[Order::FOR_PACKING_STATUS] ?? 0),
             'ready_for_shipment' => (int) ($counts[Order::SHIPMENT_STATUS] ?? 0),
             'waiting_logistics' => (int) ($counts[Order::LOGISTICS_STATUS] ?? 0),
             // Released today is a historical fact, so it must not depend on where the
@@ -215,10 +216,10 @@ class StockOutController extends Controller
             ]);
 
             if ($this->allItemsReleased($record)) {
-                $record->update(['status' => 'READY_FOR_SHIPMENT']);
+                $record->update(['status' => Order::FOR_PACKING_STATUS]);
                 $record->histories()->create([
                     'previous_status' => 'STOCK_OUT_IN_PROGRESS',
-                    'new_status' => 'READY_FOR_SHIPMENT',
+                    'new_status' => Order::FOR_PACKING_STATUS,
                     'action' => 'STOCK_OUT_COMPLETED',
                     'performed_by' => $user->id,
                 ]);

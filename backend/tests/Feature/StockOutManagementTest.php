@@ -125,7 +125,7 @@ class StockOutManagementTest extends TestCase
 
         $this->actingAs($this->manager)->postJson("/api/stock-out/orders/{$order->id}/release", [
             'barcode' => $inventory->barcode,
-        ])->assertOk()->assertJsonPath('released_quantity', 1)->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
+        ])->assertOk()->assertJsonPath('released_quantity', 1)->assertJsonPath('order_status', 'FOR_PACKING');
 
         $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 1]);
         $this->assertDatabaseHas('stock_out_transactions', ['order_item_id' => $item->id, 'inventory_id' => $inventory->id]);
@@ -223,7 +223,7 @@ class StockOutManagementTest extends TestCase
         $this->scan($order, $inventory->barcode, 20)->assertOk()
             ->assertJsonPath('quantity_released', 20)
             ->assertJsonPath('inventory_remaining_quantity', 5)
-            ->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
+            ->assertJsonPath('order_status', 'FOR_PACKING');
 
         $this->assertDatabaseHas('stock_out_transactions', [
             'order_id' => $order->id,
@@ -278,17 +278,17 @@ class StockOutManagementTest extends TestCase
 
         $this->scan($order, $first->barcode)->assertOk()->assertJsonPath('order_status', 'STOCK_OUT_IN_PROGRESS');
         $this->scan($order, $first->barcode)->assertOk()->assertJsonPath('order_status', 'STOCK_OUT_IN_PROGRESS');
-        $this->scan($order, $second->barcode, 1)->assertOk()->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
+        $this->scan($order, $second->barcode, 1)->assertOk()->assertJsonPath('order_status', 'FOR_PACKING');
 
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'READY_FOR_SHIPMENT']);
-        $this->assertDatabaseHas('order_status_histories', ['order_id' => $order->id, 'action' => 'STOCK_OUT_COMPLETED']);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'FOR_PACKING']);
+        $this->assertDatabaseHas('order_status_histories', ['order_id' => $order->id, 'action' => 'STOCK_OUT_COMPLETED', 'new_status' => 'FOR_PACKING']);
     }
 
     public function test_fully_released_item_and_completed_order_reject_further_scans(): void
     {
         $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 1);
         $inventory = $this->inventory($this->product, $this->warehouse, '2000000000008', 3);
-        $this->scan($order, $inventory->barcode)->assertOk()->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
+        $this->scan($order, $inventory->barcode)->assertOk()->assertJsonPath('order_status', 'FOR_PACKING');
         // Completion moves the order out of the Stock Out queue, so a further scan can no
         // longer resolve it. The guarantee that matters is that no extra stock is released.
         $this->scan($order, $inventory->barcode)->assertNotFound();
@@ -308,24 +308,74 @@ class StockOutManagementTest extends TestCase
 
     public function test_completed_stock_out_leaves_the_queue_and_is_forwarded_from_shipment(): void
     {
-        $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 1);
+        $order = $this->order('READY_FOR_STOCK_OUT', quantity: 1);
         $inventory = $this->inventory($this->product, $this->warehouse, 'submit-shipment', 1);
+        $shipment = "/api/plant-manager/shipments/{$order->id}";
 
         // Completion is automatic; there is no manual submit step in Stock Out.
-        $this->scan($order, $inventory->barcode)->assertOk()->assertJsonPath('order_status', 'READY_FOR_SHIPMENT');
+        $this->scan($order, $inventory->barcode)->assertOk()->assertJsonPath('order_status', 'FOR_PACKING');
+        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 0]);
         $this->actingAs($this->manager)->getJson("/api/stock-out/orders/{$order->id}")->assertNotFound();
         $this->actingAs($this->manager)->getJson('/api/stock-out/orders')
             ->assertOk()->assertJsonCount(0, 'data');
 
-        // Plant Manager Shipment owns it while it is READY_FOR_SHIPMENT.
+        // Plant Manager Shipment owns it from FOR_PACKING onward.
         $this->actingAs($this->manager)->getJson('/api/plant-manager/shipments')
-            ->assertOk()->assertJsonPath('data.0.order_no', $order->order_no);
+            ->assertOk()->assertJsonPath('data.0.order_no', $order->order_no)
+            ->assertJsonPath('data.0.status', 'FOR_PACKING');
 
-        $this->actingAs($this->manager)->postJson("/api/plant-manager/shipments/{$order->id}/forward-to-logistics")
+        // Packing cannot be skipped.
+        $this->actingAs($this->manager)->postJson("{$shipment}/forward-to-logistics")
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->actingAs($this->manager)->postJson("{$shipment}/mark-ready-for-shipment")
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+
+        $started = $this->actingAs($this->manager)->postJson("{$shipment}/start-packing")
+            ->assertOk()->assertJsonPath('status', 'PACKING')->assertJsonPath('packing_started_at', fn ($value) => $value !== null)
+            ->assertJsonPath('barcode_verified', true)->assertJsonPath('packing.package_id', fn ($value) => str_starts_with($value, 'PKG-'));
+        $packageId = $started->json('packing.package_id');
+        $this->actingAs($this->manager)->postJson("{$shipment}/start-packing")
+            ->assertOk()->assertJsonPath('packing.package_id', $packageId);
+        $this->actingAs($this->manager)->postJson("{$shipment}/forward-to-logistics")
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+
+        $this->actingAs($this->manager)->postJson("{$shipment}/mark-ready-for-shipment", [
+            'number_of_boxes' => 2, 'estimated_weight_kg' => 12.5, 'is_fragile' => true,
+            'packing_notes' => 'Keep upright', 'correct_product' => true,
+            'correct_quantity' => true, 'package_condition' => true, 'items_complete' => true,
+            'barcode_verified' => false,
+        ])->assertOk()->assertJsonPath('status', 'READY_FOR_SHIPMENT');
+
+        $this->assertDatabaseHas('shipment_packings', [
+            'order_id' => $order->id, 'package_id' => $packageId, 'number_of_boxes' => 2,
+            'estimated_weight_kg' => 12.5, 'is_fragile' => true, 'packing_notes' => 'Keep upright',
+            'packed_by_id' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager)->postJson("{$shipment}/forward-to-logistics")
             ->assertOk()->assertJsonPath('status', 'FORWARDED_TO_LOGISTICS');
 
+        $this->actingAs($this->admin)->getJson('/api/admin/logistics/shipments')
+            ->assertOk()->assertJsonPath('data.0.packing.package_id', $packageId)
+            ->assertJsonPath('data.0.packing.number_of_boxes', 2)
+            ->assertJsonPath('data.0.packing.is_fragile', true)
+            ->assertJsonPath('data.0.packing.barcode_verified', true);
+
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'FORWARDED_TO_LOGISTICS']);
-        $this->assertDatabaseHas('order_status_histories', ['order_id' => $order->id, 'action' => 'FORWARDED_TO_LOGISTICS']);
+        $this->assertSame(
+            [
+                ['STOCK_OUT_STARTED', 'READY_FOR_STOCK_OUT', 'STOCK_OUT_IN_PROGRESS'],
+                ['STOCK_OUT_COMPLETED', 'STOCK_OUT_IN_PROGRESS', 'FOR_PACKING'],
+                ['PACKING_STARTED', 'FOR_PACKING', 'PACKING'],
+                ['PACKING_COMPLETED', 'PACKING', 'READY_FOR_SHIPMENT'],
+                ['FORWARDED_TO_LOGISTICS', 'READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS'],
+            ],
+            $order->histories()->orderBy('id')->get()
+                ->map(fn ($history) => [$history->action, $history->previous_status, $history->new_status])->all(),
+        );
+        // Shipment stages never touch inventory again.
+        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 0]);
+        $this->assertDatabaseCount('stock_out_transactions', 1);
 
         // Forwarded orders leave the Shipment stage and cannot be forwarded twice.
         $this->actingAs($this->manager)->getJson('/api/plant-manager/shipments')

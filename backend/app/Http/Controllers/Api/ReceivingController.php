@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
+use App\Models\ReceivingDiscrepancy;
 use App\Models\ReceivingTimeline;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
@@ -19,7 +20,7 @@ class ReceivingController extends Controller
 {
     private function present(Receiving $receiving): array
     {
-        $receiving->loadMissing(['items', 'timeline', 'preparedBy', 'assignedQa', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
+        $receiving->loadMissing(['items', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
 
         $items = $receiving->items;
         $productSummary = match (true) {
@@ -48,6 +49,13 @@ class ReceivingController extends Controller
             ] : null,
             'product_summary' => $productSummary,
             'items_count' => $items->sum('delivered_quantity'),
+            'short_quantity' => (int) ($receiving->discrepancy?->short_quantity ?? 0),
+            'discrepancy' => $receiving->discrepancy ? [
+                'id' => $receiving->discrepancy->id,
+                'type' => $receiving->discrepancy->discrepancy_type,
+                'short_quantity' => $receiving->discrepancy->short_quantity,
+                'status' => $receiving->discrepancy->status,
+            ] : null,
             'items' => $items->map(fn (ReceivingItem $item) => [
                 'id' => $item->id,
                 'product_id' => $item->product_id,
@@ -89,7 +97,7 @@ class ReceivingController extends Controller
     {
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
-        $query = Receiving::query()->with(['items', 'timeline', 'preparedBy', 'assignedQa', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
+        $query = Receiving::query()->with(['items', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -144,7 +152,7 @@ class ReceivingController extends Controller
 
         $receiving = DB::transaction(function () use ($validated, $request) {
                 $purchaseOrder = PurchaseOrder::query()->with('items')->lockForUpdate()->findOrFail($validated['purchase_order_id']);
-                abort_unless(in_array($purchaseOrder->status, ['Approved', 'Sent to Supplier'], true), 422, 'This Purchase Order is not active for receiving.');
+                abort_unless(in_array($purchaseOrder->status, ['Approved', 'Sent to Supplier', 'Partially Received'], true), 422, 'This Purchase Order is not active for receiving.');
 
                 $submitted = collect($validated['items'])->keyBy('purchase_order_item_id');
                 abort_unless($submitted->keys()->sort()->values()->all() === $purchaseOrder->items->pluck('id')->sort()->values()->all(), 422, 'Receiving items must exactly match the selected Purchase Order.');
@@ -180,6 +188,7 @@ class ReceivingController extends Controller
 
                     ReceivingItem::create([
                         'receiving_id' => $receiving->id,
+                        'purchase_order_item_id' => $poItem->id,
                         'product_id' => $product->id,
                         'product_name' => $product->name,
                         'ordered_quantity' => $poItem->ordered_quantity,
@@ -214,7 +223,47 @@ class ReceivingController extends Controller
                     return (int) ($previouslyReceived[$poItem->product_name] ?? 0)
                         + (int) $submitted[$poItem->id]['delivered_quantity'] >= $poItem->ordered_quantity;
                 });
-                if ($receivedNow) $purchaseOrder->update(['status' => 'Completed']);
+                $expectedNow = $purchaseOrder->items->sum(fn ($poItem) => max(0, $poItem->ordered_quantity - (int) ($previouslyReceived[$poItem->product_name] ?? 0)));
+                $deliveredNow = (int) $submitted->sum('delivered_quantity');
+                $shortNow = max(0, $expectedNow - $deliveredNow);
+
+                if ($shortNow > 0) {
+                    ReceivingDiscrepancy::firstOrCreate(
+                        ['receiving_id' => $receiving->id],
+                        [
+                            'purchase_order_id' => $purchaseOrder->id,
+                            'supplier_id' => $purchaseOrder->supplier_id,
+                            'discrepancy_type' => ReceivingDiscrepancy::TYPE_SHORT_DELIVERY,
+                            'expected_quantity' => $expectedNow,
+                            'delivered_quantity' => $deliveredNow,
+                            'short_quantity' => $shortNow,
+                            'status' => ReceivingDiscrepancy::STATUS_REPORTED,
+                            'reported_by_id' => $request->user()->id,
+                            'reported_at' => $now,
+                        ]
+                    );
+                    ReceivingTimeline::create([
+                        'receiving_id' => $receiving->id,
+                        'status' => 'Short Delivery Reported',
+                        'performed_by' => $request->user()->name,
+                        'occurred_at' => $now,
+                    ]);
+                }
+
+                $purchaseOrder->update(['status' => $receivedNow ? 'Completed' : 'Partially Received']);
+                if ($receivedNow) {
+                    ReceivingDiscrepancy::query()
+                        ->where('purchase_order_id', $purchaseOrder->id)
+                        ->whereIn('status', [ReceivingDiscrepancy::STATUS_REPORTED, ReceivingDiscrepancy::STATUS_CONTACTED, ReceivingDiscrepancy::STATUS_AWAITING_BALANCE])
+                        ->update(['status' => ReceivingDiscrepancy::STATUS_RESOLVED, 'resolution_notes' => 'Outstanding balance was received.', 'resolved_at' => $now]);
+                }
+
+                AuditLogger::success($shortNow > 0 ? 'SHORT_DELIVERY_REPORTED' : 'RECEIVING_CREATED', AuditLogger::MODULE_RECEIVING, [
+                    'resource' => $receiving,
+                    'resource_label' => $receiving->receiving_no,
+                    'details' => $shortNow > 0 ? "Short delivery of {$shortNow} unit(s) reported" : "Created {$receiving->receiving_no}",
+                    'metadata' => ['purchase_order_id' => $purchaseOrder->id, 'delivered_quantity' => $deliveredNow, 'short_quantity' => $shortNow],
+                ]);
 
                 return $receiving;
             });

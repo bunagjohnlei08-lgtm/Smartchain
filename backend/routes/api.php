@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryHistoryController;
 use App\Http\Controllers\Api\StockInController;
 use App\Http\Controllers\Api\ReceivingController;
+use App\Http\Controllers\Api\ReceivingDiscrepancyController;
 use App\Http\Controllers\Api\QaInspectionController;
 use App\Http\Controllers\Api\QaInspectionHistoryController;
 use App\Http\Controllers\Api\QaRejectedItemsController;
@@ -187,6 +188,8 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
     Route::get('/purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf']);
     Route::patch('/purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send']);
+    Route::get('/admin/receiving-discrepancies', [ReceivingDiscrepancyController::class, 'index']);
+    Route::patch('/admin/receiving-discrepancies/{receivingDiscrepancy}', [ReceivingDiscrepancyController::class, 'update']);
 
     Route::get('/suppliers', [SupplierController::class, 'index']);
     Route::post('/suppliers', [SupplierController::class, 'store']);
@@ -216,6 +219,8 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
 
     Route::prefix('plant-manager/shipments')->group(function () {
         Route::get('/', [PlantManagerShipmentController::class, 'index']);
+        Route::post('/{order}/start-packing', [PlantManagerShipmentController::class, 'startPacking']);
+        Route::post('/{order}/mark-ready-for-shipment', [PlantManagerShipmentController::class, 'markReadyForShipment']);
         Route::post('/{order}/forward-to-logistics', [PlantManagerShipmentController::class, 'forwardToLogistics']);
     });
 });

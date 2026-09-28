@@ -13,14 +13,14 @@ use Illuminate\Validation\Rule;
  * Read-only view of the shipments prepared by Plant Manager Shipment.
  *
  * There is no separate shipment table: a shipment IS the existing order once
- * Stock Out has released every item and moved it to READY_FOR_SHIPMENT. This
+ * Stock Out has released every item and Plant Manager Shipment has packed it. This
  * controller only reads those existing orders/order items and never writes.
  */
 class AdminLogisticsController extends Controller
 {
     /**
-     * Strictly orders the Plant Manager has forwarded. Orders still sitting in
-     * READY_FOR_SHIPMENT belong to Plant Manager Shipment and must not appear here.
+     * Strictly orders the Plant Manager has forwarded. Orders still in FOR_PACKING,
+     * PACKING or READY_FOR_SHIPMENT belong to Plant Manager Shipment and must not appear here.
      */
     private const LOGISTICS_STATUSES = [Order::LOGISTICS_STATUS];
 
@@ -42,6 +42,7 @@ class AdminLogisticsController extends Controller
                 'assignee:id,name,employee_id,warehouse_id',
                 'assignee.warehouse:id,name,code',
                 'histories' => fn ($histories) => $histories->oldest(),
+                'shipmentPacking.packedBy:id,name,employee_id',
             ])
             ->withCount('items');
 
@@ -95,6 +96,29 @@ class AdminLogisticsController extends Controller
                 'new_status' => $history->new_status,
                 'occurred_at' => $history->created_at,
             ])->values(),
+            'packing' => $order->shipmentPacking ? [
+                'package_id' => $order->shipmentPacking->package_id,
+                'number_of_boxes' => $order->shipmentPacking->number_of_boxes,
+                'estimated_weight_kg' => $order->shipmentPacking->estimated_weight_kg,
+                'is_fragile' => $order->shipmentPacking->is_fragile,
+                'packing_notes' => $order->shipmentPacking->packing_notes,
+                'correct_product' => $order->shipmentPacking->correct_product,
+                'correct_quantity' => $order->shipmentPacking->correct_quantity,
+                'package_condition' => $order->shipmentPacking->package_condition,
+                'items_complete' => $order->shipmentPacking->items_complete,
+                'packed_by' => $order->shipmentPacking->packedBy?->only(['name', 'employee_id']),
+                'packed_at' => $order->shipmentPacking->packed_at,
+                'barcode_verified' => $this->barcodeVerified($order),
+            ] : null,
+            'legacy_packing' => $order->shipmentPacking === null,
         ];
+    }
+
+    private function barcodeVerified(Order $order): bool
+    {
+        if ($order->items->isEmpty()) return false;
+        return $order->items->every(fn ($item) =>
+            (int) $item->stockOutTransactions()->whereNotNull('barcode')->where('barcode', '<>', '')->sum('quantity') >= (int) $item->quantity
+        );
     }
 }

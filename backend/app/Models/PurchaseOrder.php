@@ -24,4 +24,5 @@ class PurchaseOrder extends Model
     public function replenishmentRequest(): BelongsTo { return $this->belongsTo(ReplenishmentRequest::class); }
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function receivings(): HasMany { return $this->hasMany(Receiving::class); }
+    public function discrepancies(): HasMany { return $this->hasMany(ReceivingDiscrepancy::class); }
 }

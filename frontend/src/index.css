@@ -525,7 +525,7 @@
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      gap: 0;
+      gap: 8px;
     }
 
     html body .admin-main .admin-orders-toolbar-view {
@@ -4960,6 +4960,29 @@ body {
 
     .admin-main .admin-suppliers .supplier-toolbar {
       padding: 12px;
+    }
+
+    .admin-main .admin-suppliers .admin-suppliers-table {
+      min-width: 57.5rem !important;
+    }
+
+    .admin-main .admin-suppliers .admin-suppliers-table :is(th, td):nth-child(2) {
+      width: 195px;
+    }
+
+    .admin-main .admin-suppliers .admin-suppliers-table :is(th, td):nth-child(3) {
+      width: 205px;
+    }
+
+    .admin-main .admin-suppliers .admin-suppliers-table :is(td:nth-child(2), td:nth-child(3)) p:first-child {
+      font-size: 12px !important;
+      line-height: 18px !important;
+    }
+
+    .admin-main .admin-suppliers .admin-suppliers-table :is(td:nth-child(2), td:nth-child(3)) p:last-child {
+      font-size: 10px !important;
+      line-height: 14px !important;
+      overflow-wrap: anywhere;
     }
 
     .admin-main .admin-suppliers .supplier-search-row {

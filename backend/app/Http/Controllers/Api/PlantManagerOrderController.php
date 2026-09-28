@@ -16,8 +16,8 @@ class PlantManagerOrderController extends Controller
 {
     private const VISIBLE_STATUSES = [
         'ASSIGNED', 'PREPARING', 'READY_FOR_STOCK_OUT',
-        'STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS',
-        'IN_TRANSIT', 'DELIVERED', 'CANCELLED',
+        'STOCK_OUT_COMPLETED', 'FOR_PACKING', 'PACKING', 'READY_FOR_SHIPMENT',
+        'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED',
     ];
 
     public function index(Request $request): JsonResponse
@@ -202,7 +202,7 @@ class PlantManagerOrderController extends Controller
         return match ($status) {
             'ASSIGNED' => 0,
             'PREPARING' => 50,
-            'READY_FOR_STOCK_OUT', 'STOCK_OUT_COMPLETED', 'READY_FOR_SHIPMENT',
+            'READY_FOR_STOCK_OUT', 'STOCK_OUT_COMPLETED', 'FOR_PACKING', 'PACKING', 'READY_FOR_SHIPMENT',
             'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED' => 100,
             default => 0,
         };

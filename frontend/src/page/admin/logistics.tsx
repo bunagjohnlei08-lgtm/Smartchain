@@ -44,7 +44,7 @@ interface Shipment {
  preparedDate: string;
  assignedLogistics: string | null;
  status: ShipmentStatus;
- items: { name: string; sku: string; qty: number; unit: string }[];
+ items: { name: string; qty: number; unit: string }[];
  totalItems: number;
  totalWeight: number;
  weightUnit: string;
@@ -54,6 +54,11 @@ interface Shipment {
   timestamp?: string;
  }[];
  barcodeVerified: boolean;
+ packing: null | {
+  packageId: string; boxes: number; weight: number; fragile: boolean;
+  notes: string | null; packedBy: string; packedAt?: string;
+  checklist: { label: string; complete: boolean }[];
+ };
  expectedDelivery?: string;
 }
 
@@ -64,7 +69,7 @@ interface Shipment {
 // A shipment is the existing order once Stock Out released it; there is no
 // separate shipment record to duplicate.
 // Only FORWARDED_TO_LOGISTICS orders reach this module; anything still in
-// READY_FOR_SHIPMENT belongs to Plant Manager Shipment.
+// FOR_PACKING, PACKING or READY_FOR_SHIPMENT belongs to Plant Manager Shipment.
 const orderStatusToShipmentStatus: Record<string, ShipmentStatus> = {
   FORWARDED_TO_LOGISTICS: 'Pending Approval',
   IN_TRANSIT: 'In Transit',
@@ -94,19 +99,33 @@ const mapShipment = (record: any): Shipment => ({
   status: orderStatusToShipmentStatus[record.status] ?? 'Pending Approval',
   items: (record.items || []).map((item: any) => ({
     name: item.product_name,
-    sku: '—',
     qty: Number(item.quantity) || 0,
     unit: item.unit,
   })),
   totalItems: Number(record.items_count ?? record.items?.length ?? 0),
-  totalWeight: 0,
+  totalWeight: Number(record.packing?.estimated_weight_kg) || 0,
   weightUnit: 'kg',
   timeline: (record.timeline || []).map((entry: any) => ({
     step: humanize(entry.action),
     completed: true,
     timestamp: formatTimestamp(entry.occurred_at),
   })),
-  barcodeVerified: true,
+  barcodeVerified: Boolean(record.packing?.barcode_verified),
+  packing: record.packing ? {
+    packageId: record.packing.package_id,
+    boxes: Number(record.packing.number_of_boxes),
+    weight: Number(record.packing.estimated_weight_kg),
+    fragile: Boolean(record.packing.is_fragile),
+    notes: record.packing.packing_notes,
+    packedBy: record.packing.packed_by?.name || '—',
+    packedAt: formatTimestamp(record.packing.packed_at),
+    checklist: [
+      ['Correct Product', record.packing.correct_product],
+      ['Correct Quantity', record.packing.correct_quantity],
+      ['Package Condition', record.packing.package_condition],
+      ['Items Complete', record.packing.items_complete],
+    ].map(([label, complete]) => ({ label: String(label), complete: Boolean(complete) })),
+  } : null,
   expectedDelivery: formatDate(record.required_delivery_date),
 });
 
@@ -644,6 +663,28 @@ const Logistics: React.FC = () => {
         <StatusBadge status={selectedShipment.status} />
        </div>
       </div>
+
+       <div className="mb-4 rounded-xl border border-gray-800/50 bg-gray-800/20 p-4">
+        <h4 className="mb-3 text-sm font-medium text-gray-300">Packing Information</h4>
+        {selectedShipment.packing ? (
+         <div className="space-y-4">
+          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+           <div><dt className="text-xs text-gray-400">Package ID</dt><dd className="text-white">{selectedShipment.packing.packageId}</dd></div>
+           <div><dt className="text-xs text-gray-400">Number of Boxes</dt><dd className="text-white">{selectedShipment.packing.boxes}</dd></div>
+           <div><dt className="text-xs text-gray-400">Estimated Weight</dt><dd className="text-white">{selectedShipment.packing.weight} kg</dd></div>
+           <div><dt className="text-xs text-gray-400">Fragile</dt><dd className="text-white">{selectedShipment.packing.fragile ? 'Yes' : 'No'}</dd></div>
+           <div><dt className="text-xs text-gray-400">Packed By</dt><dd className="text-white">{selectedShipment.packing.packedBy}</dd></div>
+           <div><dt className="text-xs text-gray-400">Packed At</dt><dd className="text-white">{selectedShipment.packing.packedAt || '—'}</dd></div>
+           <div className="sm:col-span-2"><dt className="text-xs text-gray-400">Packing Notes</dt><dd className="whitespace-pre-wrap text-white">{selectedShipment.packing.notes || 'None'}</dd></div>
+          </dl>
+          <div>
+           <p className="mb-2 text-xs text-gray-400">Packing Checklist</p>
+           <div className="grid gap-2 sm:grid-cols-2">{selectedShipment.packing.checklist.map((item) => <span key={item.label} className="flex items-center gap-2 text-sm text-gray-200"><CheckCircle className="h-4 w-4 text-emerald-400" />{item.label}</span>)}</div>
+          </div>
+          <p className="flex items-center gap-2 text-sm text-emerald-300"><CheckCircle className="h-4 w-4" /> Barcode verified during Stock Out</p>
+         </div>
+        ) : <p className="text-sm text-gray-400">Packing information unavailable (legacy shipment).</p>}
+       </div>
 
         <div className="admin-logistics-details-items mb-4">
         <h4 className="text-sm font-medium text-gray-300 mb-2">Items</h4>

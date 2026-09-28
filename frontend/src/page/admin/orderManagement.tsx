@@ -42,6 +42,8 @@ type OrderStatus =
   | 'Ready for Stock Out'
   | 'Stock Out In Progress'
   | 'Stock Out Completed'
+  | 'For Packing'
+  | 'Packing'
   | 'Ready for Shipment'
   | 'Forwarded to Logistics'
   | 'In Transit'
@@ -122,6 +124,7 @@ const emptyCreateOrderForm = (): CreateOrderForm => {
 const statusLabels: Record<string, OrderStatus> = {
   NEW: 'New', ASSIGNED: 'Assigned', PREPARING: 'Preparing',
   READY_FOR_STOCK_OUT: 'Ready for Stock Out', STOCK_OUT_IN_PROGRESS: 'Stock Out In Progress', STOCK_OUT_COMPLETED: 'Stock Out Completed',
+  FOR_PACKING: 'For Packing', PACKING: 'Packing',
   READY_FOR_SHIPMENT: 'Ready for Shipment', IN_TRANSIT: 'In Transit',
   FORWARDED_TO_LOGISTICS: 'Forwarded to Logistics',
   DELIVERED: 'Delivered', CANCELLED: 'Cancelled',
@@ -213,6 +216,20 @@ const statusConfigs: Record<OrderStatus, StatusConfig> = {
     border: 'border-violet-500/30',
     icon: <Check className="w-3 h-3 text-violet-400" />,
   },
+  'For Packing': {
+    label: 'For Packing',
+    color: 'text-orange-400',
+    bg: 'bg-orange-500/10',
+    border: 'border-orange-500/30',
+    icon: <Package className="w-3 h-3 text-orange-400" />,
+  },
+  Packing: {
+    label: 'Packing',
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/30',
+    icon: <Package className="w-3 h-3 text-blue-400" />,
+  },
   'Ready for Shipment': {
     label: 'Ready for Shipment',
     color: 'text-green-400',
@@ -257,6 +274,8 @@ const timelineStatusIcons: Partial<Record<OrderStatus, React.ReactNode>> = {
   'Ready for Stock Out': <ClipboardCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
   'Stock Out In Progress': <ArrowUpFromLine className="h-[18px] w-[18px]" aria-hidden="true" />,
   'Stock Out Completed': <CircleCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
+  'For Packing': <Package className="h-[18px] w-[18px]" aria-hidden="true" />,
+  Packing: <PackageOpen className="h-[18px] w-[18px]" aria-hidden="true" />,
   'Ready for Shipment': <PackageCheck className="h-[18px] w-[18px]" aria-hidden="true" />,
   'Forwarded to Logistics': <Send className="h-[18px] w-[18px]" aria-hidden="true" />,
   'In Transit': <Truck className="h-[18px] w-[18px]" aria-hidden="true" />,
@@ -478,7 +497,7 @@ const OrderManagement: React.FC = () => {
   ];
 
   // Lifecycle steps for timeline
-  const lifecycleSteps: OrderStatus[] = ['New', 'Assigned', 'Preparing', 'Ready for Stock Out', 'Stock Out In Progress', 'Stock Out Completed', 'Ready for Shipment', 'Forwarded to Logistics', 'In Transit', 'Delivered'];
+  const lifecycleSteps: OrderStatus[] = ['New', 'Assigned', 'Preparing', 'Ready for Stock Out', 'Stock Out In Progress', 'Stock Out Completed', 'For Packing', 'Packing', 'Ready for Shipment', 'Forwarded to Logistics', 'In Transit', 'Delivered'];
 
   return (
     <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
@@ -537,6 +556,8 @@ const OrderManagement: React.FC = () => {
             <option value="READY_FOR_STOCK_OUT">Ready for Stock Out</option>
             <option value="STOCK_OUT_IN_PROGRESS">Stock Out In Progress</option>
             <option value="STOCK_OUT_COMPLETED">Stock Out Completed</option>
+            <option value="FOR_PACKING">For Packing</option>
+            <option value="PACKING">Packing</option>
             <option value="READY_FOR_SHIPMENT">Ready for Shipment</option>
             <option value="FORWARDED_TO_LOGISTICS">Forwarded to Logistics</option>
             <option value="IN_TRANSIT">In Transit</option>
@@ -555,7 +576,7 @@ const OrderManagement: React.FC = () => {
             <Calendar className="admin-orders-toolbar-date-icon pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 sm:right-3 sm:h-4 sm:w-4" />
           </div>
 
-          <div className="admin-orders-toolbar-row-three col-span-2 flex items-center justify-start gap-0 sm:contents">
+          <div className="admin-orders-toolbar-row-three col-span-2 flex items-center justify-start gap-2 sm:contents">
             <div className="admin-orders-toolbar-view flex items-center justify-self-start gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1 sm:ml-auto" aria-label="Order view">
               <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`admin-orders-toolbar-view-button rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
               <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`admin-orders-toolbar-view-button rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>

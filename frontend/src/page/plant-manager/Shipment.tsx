@@ -13,6 +13,7 @@ import {
   Clipboard,
   ChevronLeft,
   Check,
+  Package,
   Truck,
   AlertTriangle,
   Loader2,
@@ -24,21 +25,23 @@ import {
 // TYPES
 // ============================================
 
+// Backend Shipment stage statuses (orders.status). Forwarded orders leave this stage.
 type ShipmentStatus =
-  | 'Preparing'
+  | 'For Packing'
   | 'Packing'
-  | 'Ready for Shipment'
-  | 'Picked Up'
-  | 'Delivered';
+  | 'Ready for Shipment';
+
+const shipmentStatusLabels: Record<string, ShipmentStatus> = {
+  FOR_PACKING: 'For Packing',
+  PACKING: 'Packing',
+  READY_FOR_SHIPMENT: 'Ready for Shipment',
+};
 
 interface ShipmentItem {
   id: string;
   name: string;
-  sku: string;
   requestedQty: number;
   availableQty: number;
-  barcode: string;
-  verified: boolean;
 }
 
 interface Shipment {
@@ -68,16 +71,13 @@ interface Shipment {
   checklist: {
     correctProduct: boolean;
     correctQty: boolean;
-    barcodeVerified: boolean;
     packageCondition: boolean;
     itemsComplete: boolean;
   };
   barcodeVerifiedAll: boolean;
-  timeline: {
-    step: string;
-    completed: boolean;
-    timestamp?: string;
-  }[];
+  queueEnteredAt: string | null;
+  packingStartedAt: string | null;
+  readyAt: string | null;
 }
 
 // ============================================
@@ -91,11 +91,8 @@ const mapOrderToShipment = (order: any): Shipment => {
   const items: ShipmentItem[] = (order.items || []).map((item: any) => ({
     id: String(item.id),
     name: item.product_name,
-    sku: '',
     requestedQty: Number(item.required_quantity) || 0,
     availableQty: Number(item.required_quantity) || 0,
-    barcode: '',
-    verified: true,
   }));
 
   return {
@@ -109,22 +106,32 @@ const mapOrderToShipment = (order: any): Shipment => {
     preparedDate: formatDate(order.assigned_at),
     assignedDate: formatDate(order.assigned_at),
     targetDelivery: formatDate(order.required_delivery_date),
-    status: 'Ready for Shipment',
+    status: shipmentStatusLabels[order.status],
     items,
     totalItems: Number(order.items_count ?? items.length),
     totalQuantity: items.reduce((sum, item) => sum + item.requestedQty, 0),
-    packing: { packageId: '', boxes: 0, weight: 0, fragile: false, notes: '' },
-    checklist: {
-      correctProduct: false,
-      correctQty: false,
-      barcodeVerified: false,
-      packageCondition: false,
-      itemsComplete: false,
+    packing: {
+      packageId: order.packing?.package_id || '',
+      boxes: Number(order.packing?.number_of_boxes) || 0,
+      weight: Number(order.packing?.estimated_weight_kg) || 0,
+      fragile: Boolean(order.packing?.is_fragile),
+      notes: order.packing?.packing_notes || '',
     },
-    barcodeVerifiedAll: false,
-    timeline: [],
+    checklist: {
+      correctProduct: Boolean(order.packing?.correct_product),
+      correctQty: Boolean(order.packing?.correct_quantity),
+      packageCondition: Boolean(order.packing?.package_condition),
+      itemsComplete: Boolean(order.packing?.items_complete),
+    },
+    barcodeVerifiedAll: Boolean(order.barcode_verified),
+    queueEnteredAt: order.shipment_queue_entered_at ?? null,
+    packingStartedAt: order.packing_started_at ?? null,
+    readyAt: order.ready_for_shipment_at ?? null,
   };
 };
+
+const isToday = (value: string | null) =>
+  value !== null && new Date(value).toDateString() === new Date().toDateString();
 
 // ============================================
 // CONSTANTS
@@ -132,11 +139,9 @@ const mapOrderToShipment = (order: any): Shipment => {
 
 const statusOptions = [
   'All',
-  'Preparing',
+  'For Packing',
   'Packing',
   'Ready for Shipment',
-  'Picked Up',
-  'Delivered',
 ];
 
 // ============================================
@@ -148,7 +153,7 @@ const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
     ShipmentStatus,
     { color: string; bg: string; dotColor: string }
   > = {
-    Preparing: {
+    'For Packing': {
       color: 'text-amber-400',
       bg: 'bg-amber-500/10 border-amber-500/20',
       dotColor: 'bg-amber-400',
@@ -162,16 +167,6 @@ const StatusBadge: React.FC<{ status: ShipmentStatus }> = ({ status }) => {
       color: 'text-cyan-400',
       bg: 'bg-cyan-500/10 border-cyan-500/20',
       dotColor: 'bg-cyan-400',
-    },
-    'Picked Up': {
-      color: 'text-purple-400',
-      bg: 'bg-purple-500/10 border-purple-500/20',
-      dotColor: 'bg-purple-400',
-    },
-    Delivered: {
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-500/10 border-emerald-500/20',
-      dotColor: 'bg-emerald-400',
     },
   };
   const { color, bg, dotColor } = config[status];
@@ -290,12 +285,9 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
   const [checklist, setChecklist] = useState({
     correctProduct: false,
     correctQty: false,
-    barcodeVerified: false,
     packageCondition: false,
     itemsComplete: false,
   });
-  const [barcodeInputs, setBarcodeInputs] = useState<Record<string, string>>({});
-  const [verificationStatus, setVerificationStatus] = useState<Record<string, 'idle' | 'success' | 'failed'>>({});
 
   if (!shipment) return null;
 
@@ -312,42 +304,18 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
       setChecklist({
         correctProduct: shipment.checklist?.correctProduct || false,
         correctQty: shipment.checklist?.correctQty || false,
-        barcodeVerified: shipment.checklist?.barcodeVerified || false,
         packageCondition: shipment.checklist?.packageCondition || false,
         itemsComplete: shipment.checklist?.itemsComplete || false,
       });
-      const initialInputs: Record<string, string> = {};
-      shipment.items.forEach(item => {
-        initialInputs[item.id] = '';
-      });
-      setBarcodeInputs(initialInputs);
-      const initialStatus: Record<string, 'idle' | 'success' | 'failed'> = {};
-      shipment.items.forEach(item => {
-        initialStatus[item.id] = item.verified ? 'success' : 'idle';
-      });
-      setVerificationStatus(initialStatus);
     }
   }, [shipment]);
 
-  const handleBarcodeChange = (itemId: string, value: string) => {
-    setBarcodeInputs(prev => ({ ...prev, [itemId]: value }));
-  };
-
-  const verifyBarcode = (itemId: string) => {
-    const item = shipment.items.find(i => i.id === itemId);
-    if (!item) return;
-    const input = barcodeInputs[itemId] || '';
-    const match = input === item.barcode;
-    setVerificationStatus(prev => ({ ...prev, [itemId]: match ? 'success' : 'failed' }));
-    // If successful, update the item's verified status in the shipment (we'll pass it up on submit)
-  };
-
-  const allItemsVerified = shipment.items.every(item => verificationStatus[item.id] === 'success');
   const checklistComplete = Object.values(checklist).every(v => v === true);
+  const packingComplete = packing.boxes >= 1 && packing.weight > 0;
 
   const handleSubmit = () => {
-    if (!allItemsVerified || !checklistComplete) {
-      alert('Please ensure all items are verified and checklist is complete.');
+    if (!shipment.barcodeVerifiedAll || !checklistComplete || !packingComplete) {
+      alert('Complete the packing information and checklist before continuing.');
       return;
     }
     // Mark the shipment as ready
@@ -391,42 +359,21 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
             </div>
           </div>
 
-          {/* Items with Barcode Verification */}
+          {/* Stock Out verification is historical and read-only here. */}
           <div>
-            <h3 className="text-sm font-medium text-slate-300 mb-2">Items & Barcode Verification</h3>
+            <h3 className="text-sm font-medium text-slate-300 mb-2">Product Verification</h3>
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+              <CheckCircle className="h-4 w-4" /> Barcode verified during Stock Out
+            </div>
             <div className="space-y-3">
               {shipment.items.map((item) => (
                 <div key={item.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-white text-sm font-medium">{item.name}</p>
-                      <p className="text-slate-400 text-xs">SKU: {item.sku}</p>
-                      <p className="text-slate-400 text-xs">Requested: {item.requestedQty} | Available: {item.availableQty}</p>
+                      <p className="text-slate-400 text-xs">Requested: {item.requestedQty} | Released: {item.availableQty}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {verificationStatus[item.id] === 'success' && (
-                        <span className="text-emerald-400 text-xs flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Verified</span>
-                      )}
-                      {verificationStatus[item.id] === 'failed' && (
-                        <span className="text-red-400 text-xs flex items-center gap-1"><AlertCircle className="w-4 h-4" /> Failed</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      type="text"
-                      placeholder="Scan barcode"
-                      value={barcodeInputs[item.id] || ''}
-                      onChange={(e) => handleBarcodeChange(item.id, e.target.value)}
-                      className="flex-1 bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                    />
-                    <button
-                      onClick={() => verifyBarcode(item.id)}
-                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg text-sm font-medium transition-all"
-                    >
-                      Verify
-                    </button>
-                    <span className="text-xs text-slate-500">Expected: {item.barcode}</span>
+                    <span className="text-emerald-400 text-xs flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Released</span>
                   </div>
                 </div>
               ))}
@@ -435,13 +382,12 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
 
           {/* Picking Checklist */}
           <div>
-            <h3 className="text-sm font-medium text-slate-300 mb-2">Picking Checklist</h3>
+            <h3 className="text-sm font-medium text-slate-300 mb-2">Packing Checklist</h3>
             <div className="space-y-2">
               {Object.entries(checklist).map(([key, value]) => {
                 const labelMap: Record<string, string> = {
                   correctProduct: 'Correct Product',
                   correctQty: 'Correct Quantity',
-                  barcodeVerified: 'Barcode Verified',
                   packageCondition: 'Package Condition',
                   itemsComplete: 'Items Complete',
                 };
@@ -469,10 +415,11 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                 <input
                   type="text"
                   value={packing.packageId}
-                  onChange={(e) => setPacking({ ...packing, packageId: e.target.value })}
-                  className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                  placeholder="e.g., PKG-001"
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300"
                 />
+                <p className="mt-1 text-xs text-slate-500">System generated</p>
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Number of Boxes</label>
@@ -481,7 +428,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                   value={packing.boxes}
                   onChange={(e) => setPacking({ ...packing, boxes: parseInt(e.target.value) || 0 })}
                   className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                  min="0"
+                  min="1"
                 />
               </div>
               <div>
@@ -492,7 +439,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                   onChange={(e) => setPacking({ ...packing, weight: parseFloat(e.target.value) || 0 })}
                   className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                   step="0.1"
-                  min="0"
+                  min="0.01"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -529,9 +476,9 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!allItemsVerified || !checklistComplete}
+              disabled={!shipment.barcodeVerifiedAll || !checklistComplete || !packingComplete}
               className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                allItemsVerified && checklistComplete
+                shipment.barcodeVerifiedAll && checklistComplete && packingComplete
                       ? 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950'
                   : 'bg-slate-700 text-slate-400 cursor-not-allowed'
               }`}
@@ -565,8 +512,9 @@ const Shipments: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirmForwardFor, setConfirmForwardFor] = useState<Shipment | null>(null);
   const [isForwarding, setIsForwarding] = useState(false);
+  const [transitioningId, setTransitioningId] = useState<string | null>(null);
 
-  // Strictly the orders sitting in the Shipment stage (status READY_FOR_SHIPMENT).
+  // Strictly the orders sitting in the Shipment stage (FOR_PACKING, PACKING, READY_FOR_SHIPMENT).
   // Forwarded orders move to FORWARDED_TO_LOGISTICS and drop out of this endpoint.
   useEffect(() => {
     let cancelled = false;
@@ -582,7 +530,7 @@ const Shipments: React.FC = () => {
         if (!cancelled) setShipments(records.map(mapOrderToShipment));
       } catch (error: any) {
         if (!cancelled) {
-          setLoadError(error?.response?.data?.message ?? 'Unable to load orders ready for shipment.');
+          setLoadError(error?.response?.data?.message ?? 'Unable to load the shipment queue.');
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -614,13 +562,13 @@ const Shipments: React.FC = () => {
     currentPage * itemsPerPage
   );
 
-  // KPI counts
-  const readyForPicking = shipments.filter((s) => s.status === 'Preparing').length;
+  // KPI counts, from the backend statuses and recorded stage timestamps
+  const forPacking = shipments.filter((s) => s.status === 'For Packing').length;
   const beingPacked = shipments.filter((s) => s.status === 'Packing').length;
   const readyForShipment = shipments.filter((s) => s.status === 'Ready for Shipment').length;
-  const pickedToday = shipments.filter((s) => s.status === 'Picked Up' && s.timeline.some(t => t.step === 'Picked Up' && t.timestamp?.startsWith('2026-08-02'))).length;
-  const packedToday = shipments.filter((s) => s.status === 'Ready for Shipment' && s.timeline.some(t => t.step === 'Ready for Shipment' && t.timestamp?.startsWith('2026-08-02'))).length;
-  const pendingPickup = shipments.filter((s) => s.status === 'Ready for Shipment').length;
+  const pickedToday = shipments.filter((s) => isToday(s.queueEnteredAt)).length;
+  const packedToday = shipments.filter((s) => s.status === 'Ready for Shipment' && isToday(s.readyAt)).length;
+  const pendingPickup = readyForShipment;
 
   // Handlers
   const handlePrepare = (shipment: Shipment) => {
@@ -628,14 +576,55 @@ const Shipments: React.FC = () => {
     setShowPrepareModal(true);
   };
 
-  const handleMarkReady = (shipmentId: string, _packingData: Partial<Shipment['packing']>, _checklist: Shipment['checklist']) => {
-    // In a real app, we would update the shipment status and data.
-    // For mock, we show a toast.
-    setToast({
-      message: `Shipment ${shipmentId} marked as Ready for Shipment.`,
-      type: 'success',
-    });
-    setTimeout(() => setToast(null), 5000);
+  const replaceShipment = (updated: Shipment) => {
+    setShipments((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    setSelectedShipment((prev) => (prev?.id === updated.id ? updated : prev));
+  };
+
+  // The backend validates every transition; the UI only offers the next valid step.
+  const transitionShipment = async (shipment: Shipment, endpoint: 'start-packing' | 'mark-ready-for-shipment', successMessage: string) => {
+    setTransitioningId(shipment.id);
+    try {
+      const response = await apiClient.post(`/plant-manager/shipments/${shipment.id}/${endpoint}`);
+      replaceShipment(mapOrderToShipment(response.data));
+      showToast(successMessage, 'success');
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        dropForwardedShipment(shipment.id);
+        showToast(`${shipment.orderNo} is no longer in the shipment queue.`, 'info');
+      } else {
+        showToast(
+          error?.response?.data?.errors?.status?.[0] ?? error?.response?.data?.message ?? `Unable to update ${shipment.orderNo}.`,
+          'error',
+        );
+      }
+    } finally {
+      setTransitioningId(null);
+    }
+  };
+
+  const handleStartPacking = (shipment: Shipment) =>
+    void transitionShipment(shipment, 'start-packing', `${shipment.orderNo} is now being packed.`);
+
+  const handleMarkReady = (shipmentId: string, packingData: Partial<Shipment['packing']>, checklist: Shipment['checklist']) => {
+    const shipment = shipments.find((item) => item.id === shipmentId);
+    if (!shipment) return;
+    setTransitioningId(shipment.id);
+    void apiClient.post(`/plant-manager/shipments/${shipment.id}/mark-ready-for-shipment`, {
+      number_of_boxes: packingData.boxes,
+      estimated_weight_kg: packingData.weight,
+      is_fragile: packingData.fragile,
+      packing_notes: packingData.notes || null,
+      correct_product: checklist.correctProduct,
+      correct_quantity: checklist.correctQty,
+      package_condition: checklist.packageCondition,
+      items_complete: checklist.itemsComplete,
+    }).then((response) => {
+      replaceShipment(mapOrderToShipment(response.data));
+      showToast(`${shipment.orderNo} is packed and Ready for Shipment.`, 'success');
+    }).catch((error: any) => {
+      showToast(error?.response?.data?.message ?? `Unable to update ${shipment.orderNo}.`, 'error');
+    }).finally(() => setTransitioningId(null));
   };
 
   // Forwarding moves the order to FORWARDED_TO_LOGISTICS, so it leaves this stage.
@@ -660,7 +649,7 @@ const Shipments: React.FC = () => {
       dropForwardedShipment(shipment.id);
       showToast(`${shipment.orderNo} forwarded to Admin Logistics (DTRS).`, 'success');
     } catch (error: any) {
-      // This stage serves only READY_FOR_SHIPMENT orders, so a 404 means the order was
+      // This stage serves only Shipment-queue orders, so a 404 means the order was
       // already forwarded elsewhere rather than a failure.
       if (error?.response?.status === 404) {
         dropForwardedShipment(shipment.id);
@@ -699,8 +688,8 @@ const Shipments: React.FC = () => {
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
-          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Ready for Picking</p>
-          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{readyForPicking}</p>
+          <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">For Packing</p>
+          <p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{forPacking}</p>
         </div>
         <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl p-4 text-center hover:border-slate-600 transition-colors">
           <p className="mobile-kpi-title text-xs text-slate-400 uppercase tracking-wider">Being Packed</p>
@@ -755,8 +744,8 @@ const Shipments: React.FC = () => {
       {/* Shipment Table */}
       <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="pm-table-scroll">
-          <table className="pm-status-table pm-shipment-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1000px]">
+        <div className="pm-table-scroll min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+          <table className="pm-status-table pm-shipment-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[76rem]">
             <thead className="bg-slate-50 dark:bg-[#0b0f19]/50 border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-slate-700 dark:text-slate-400">Order No.</th>
@@ -805,10 +794,21 @@ const Shipments: React.FC = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      {(shipment.status === 'Preparing' || shipment.status === 'Packing') && (
+                      {shipment.status === 'For Packing' && (
+                        <button
+                          onClick={() => handleStartPacking(shipment)}
+                          disabled={transitioningId === shipment.id}
+                          className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                          title="Start Packing"
+                        >
+                          {transitioningId === shipment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                        </button>
+                      )}
+                      {shipment.status === 'Packing' && (
                         <button
                           onClick={() => handlePrepare(shipment)}
-                          className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-all"
+                          disabled={transitioningId === shipment.id}
+                          className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
                           title="Prepare / Pack"
                         >
                           <Clipboard className="w-4 h-4" />
@@ -822,7 +822,7 @@ const Shipments: React.FC = () => {
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     {isLoading
-                      ? 'Loading orders ready for shipment...'
+                      ? 'Loading shipment queue...'
                       : loadError ?? 'No shipments found matching your criteria.'}
                   </td>
                 </tr>
@@ -831,9 +831,9 @@ const Shipments: React.FC = () => {
           </table>
         </div>
         ) : paginatedShipments.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedShipments.map((shipment) => <article key={shipment.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{shipment.orderNo}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{shipment.shipmentNo}</p></div><StatusBadge status={shipment.status} /></div><p className="mt-4 font-medium text-slate-900 dark:text-white">{shipment.customer}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{shipment.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{shipment.totalItems} / {shipment.totalQuantity} units</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target delivery</dt><dd className="text-slate-900 dark:text-white">{shipment.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => { setSelectedShipment(shipment); setIsViewDrawerOpen(true); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button>{(shipment.status === 'Preparing' || shipment.status === 'Packing') && <button onClick={() => handlePrepare(shipment)} className="p-2 text-cyan-600 dark:text-cyan-400" title="Prepare / Pack"><Clipboard className="h-4 w-4" /></button>}</div></article>)}</div>
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedShipments.map((shipment) => <article key={shipment.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{shipment.orderNo}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{shipment.shipmentNo}</p></div><StatusBadge status={shipment.status} /></div><p className="mt-4 font-medium text-slate-900 dark:text-white">{shipment.customer}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{shipment.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{shipment.totalItems} / {shipment.totalQuantity} units</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target delivery</dt><dd className="text-slate-900 dark:text-white">{shipment.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => { setSelectedShipment(shipment); setIsViewDrawerOpen(true); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button>{shipment.status === 'For Packing' && <button onClick={() => handleStartPacking(shipment)} disabled={transitioningId === shipment.id} className="p-2 text-cyan-600 disabled:opacity-40 dark:text-cyan-400" title="Start Packing"><Package className="h-4 w-4" /></button>}{shipment.status === 'Packing' && <button onClick={() => handlePrepare(shipment)} disabled={transitioningId === shipment.id} className="p-2 text-cyan-600 disabled:opacity-40 dark:text-cyan-400" title="Prepare / Pack"><Clipboard className="h-4 w-4" /></button>}</div></article>)}</div>
         ) : (
-          <div className="px-4 py-8 text-center text-slate-400">{isLoading ? 'Loading orders ready for shipment...' : loadError ?? 'No shipments found matching your criteria.'}</div>
+          <div className="px-4 py-8 text-center text-slate-400">{isLoading ? 'Loading shipment queue...' : loadError ?? 'No shipments found matching your criteria.'}</div>
         )}
         <Pagination
           currentPage={currentPage}
@@ -850,11 +850,11 @@ const Shipments: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-800/30 rounded-xl p-3">
             <p className="text-xs text-slate-400">Orders Ready Today</p>
-            <p className="text-xl font-bold text-white">{readyForPicking}</p>
+            <p className="text-xl font-bold text-white">{packedToday}</p>
           </div>
           <div className="bg-slate-800/30 rounded-xl p-3">
             <p className="text-xs text-slate-400">Pending Packing</p>
-            <p className="text-xl font-bold text-white">{beingPacked}</p>
+            <p className="text-xl font-bold text-white">{forPacking}</p>
           </div>
           <div className="bg-slate-800/30 rounded-xl p-3">
             <p className="text-xs text-slate-400">Ready for Shipment</p>
@@ -969,6 +969,27 @@ const Shipments: React.FC = () => {
 
               {/* Plant Manager Actions */}
               <div className="space-y-2 pt-4 border-t border-slate-800">
+                {selectedShipment.status === 'For Packing' && (
+                  <button
+                    onClick={() => handleStartPacking(selectedShipment)}
+                    disabled={transitioningId === selectedShipment.id}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {transitioningId === selectedShipment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                    Start Packing
+                  </button>
+                )}
+                {selectedShipment.status === 'Packing' && (
+                  <button
+                    onClick={() => handlePrepare(selectedShipment)}
+                    disabled={transitioningId === selectedShipment.id}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {transitioningId === selectedShipment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clipboard className="w-4 h-4" />}
+                    Complete Packing
+                  </button>
+                )}
+                {selectedShipment.status === 'Ready for Shipment' && (
                 <button
                   onClick={() => handleForwardToLogistics(selectedShipment)}
                   disabled={isForwarding}
@@ -981,6 +1002,7 @@ const Shipments: React.FC = () => {
                   {isForwarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
                   {isForwarding ? 'Forwarding...' : 'Forward to Logistics'}
                 </button>
+                )}
                 <button className="w-full px-4 py-2.5 border border-red-700/50 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all text-sm flex items-center justify-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   Flag Stock Issue

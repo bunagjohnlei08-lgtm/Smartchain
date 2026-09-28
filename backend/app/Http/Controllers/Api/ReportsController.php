@@ -121,7 +121,8 @@ class ReportsController extends Controller
                 'todays_stock_in' => ['value' => $todayStockIn, 'change_percentage' => $this->percentageChange($todayStockIn, $yesterdayStockIn)],
                 'todays_stock_out' => ['value' => $todayStockOut, 'change_percentage' => $this->percentageChange($todayStockOut, $yesterdayStockOut)],
                 'pending_qa' => ['value' => $this->pendingQaCount()],
-                'pending_shipment' => ['value' => Order::query()->where('status', Order::SHIPMENT_STATUS)->count()],
+                // Orders released by Stock Out that have not been handed to Logistics yet.
+                'pending_shipment' => ['value' => Order::query()->whereIn('status', Order::SHIPMENT_QUEUE_STATUSES)->count()],
                 // Capacity has no stored history, so there is no honest "vs yesterday" comparison.
                 'warehouse_utilization' => ['value' => $capacity['utilization_percentage']],
             ],
@@ -250,18 +251,22 @@ class ReportsController extends Controller
 
     private function shipmentReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
-        $statuses = ['READY_FOR_SHIPMENT', 'FORWARDED_TO_LOGISTICS', 'IN_TRANSIT', 'DELIVERED'];
-        // The recorded Stock Out → Ready for Shipment transition, not the order's last-touched updated_at.
+        $statuses = [...Order::SHIPMENT_QUEUE_STATUSES, Order::LOGISTICS_STATUS, 'IN_TRANSIT', 'DELIVERED'];
+        // The recorded Packing → Ready for Shipment transition, not the order's last-touched updated_at.
         $readyAt = DB::table('order_status_histories')->selectRaw('MAX(order_status_histories.created_at)')
             ->whereColumn('order_status_histories.order_id', 'orders.id')->where('order_status_histories.new_status', Order::SHIPMENT_STATUS);
+        // The range applies to when the order entered Shipment after Stock Out: FOR_PACKING,
+        // or READY_FOR_SHIPMENT for orders that entered before the packing stages existed.
+        $enteredAt = DB::table('order_status_histories')->selectRaw('MIN(order_status_histories.created_at)')
+            ->whereColumn('order_status_histories.order_id', 'orders.id')->whereIn('order_status_histories.new_status', Order::SHIPMENT_QUEUE_STATUSES);
         $query = DB::table('orders')->whereIn('orders.status', $statuses)->orderByDesc('orders.updated_at')
             ->select(['orders.order_no', 'orders.customer_name', 'orders.required_delivery_date', 'orders.status', 'orders.total_amount'])
             ->selectSub($readyAt, 'ready_for_shipment_at');
         if ($from) {
-            $query->where(clone $readyAt, '>=', $this->startOf($from));
+            $query->where(clone $enteredAt, '>=', $this->startOf($from));
         }
         if ($to) {
-            $query->where(clone $readyAt, '<', $this->endBefore($to));
+            $query->where(clone $enteredAt, '<', $this->endBefore($to));
         }
         $rows = $query->get()->map(fn ($row) => (array) $row)->all();
         return [['order_no', 'customer_name', 'required_delivery_date', 'status', 'total_amount', 'ready_for_shipment_at'], $rows, ['records' => count($rows), 'delivered' => collect($rows)->where('status', 'DELIVERED')->count()]];
