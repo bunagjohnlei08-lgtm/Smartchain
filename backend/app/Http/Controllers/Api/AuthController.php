@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -135,14 +136,22 @@ class AuthController extends Controller
 
         $isFirstLogin = false;
 
-        [$outcome, $user, $token] = DB::transaction(function () use ($data, &$isFirstLogin) {
+        [$outcome, $user, $token, $challenge] = DB::transaction(function () use ($data, &$isFirstLogin) {
             $challenge = LoginChallenge::query()
                 ->where('challenge_id', $data['challenge_id'])
                 ->lockForUpdate()
                 ->first();
 
-            if (! $challenge || ! $challenge->isOpen() || $challenge->last_sent_at === null) {
-                return ['CHALLENGE_INVALID', null, null];
+            if (! $challenge) {
+                return ['CHALLENGE_INVALID', null, null, $challenge];
+            }
+
+            if ($challenge->consumed_at !== null) {
+                return ['ALREADY_USED', null, null, $challenge];
+            }
+
+            if (! $challenge->isOpen() || $challenge->last_sent_at === null) {
+                return ['CHALLENGE_INVALID', null, null, $challenge];
             }
 
             $user = User::query()->whereKey($challenge->user_id)->lockForUpdate()->first();
@@ -150,11 +159,11 @@ class AuthController extends Controller
             if (! $user || $user->status !== 'ACTIVE') {
                 $challenge->forceFill(['revoked_at' => now()])->save();
 
-                return ['ACCOUNT_NOT_ACTIVE', $user, null];
+                return ['ACCOUNT_NOT_ACTIVE', $user, null, $challenge];
             }
 
             if (! $challenge->expires_at->isFuture()) {
-                return ['EXPIRED', $user, null];
+                return ['EXPIRED', $user, null, $challenge];
             }
 
             if (! Hash::check($data['otp'], $challenge->otp_hash)) {
@@ -166,7 +175,7 @@ class AuthController extends Controller
                     'revoked_at' => $exhausted ? now() : null,
                 ])->save();
 
-                return [$exhausted ? 'ATTEMPTS_EXHAUSTED' : 'INVALID_CODE', $user, null];
+                return [$exhausted ? 'ATTEMPTS_EXHAUSTED' : 'INVALID_CODE', $user, null, $challenge];
             }
 
             $now = now();
@@ -182,10 +191,12 @@ class AuthController extends Controller
             $newToken = $user->createToken('api-token');
             $newToken->accessToken->forceFill(['last_activity_at' => $now])->save();
 
-            return ['VERIFIED', $user, $newToken->plainTextToken];
+            return ['VERIFIED', $user, $newToken->plainTextToken, $challenge];
         });
 
         if ($outcome !== 'VERIFIED') {
+            $this->logOtpVerifyFailure($outcome, $challenge);
+
             if ($user && $outcome === 'EXPIRED') {
                 AuditLogger::log('LOGIN_OTP_EXPIRED', AuditLogger::MODULE_AUTH, [
                     'status' => AuditLog::STATUS_EXPIRED,
@@ -205,6 +216,7 @@ class AuthController extends Controller
 
             [$reason, $message] = match ($outcome) {
                 'EXPIRED' => ['expired', 'This verification code has expired. Request a new code.'],
+                'ALREADY_USED' => ['already_used', 'This verification code has already been used. Please sign in again.'],
                 'INVALID_CODE' => ['invalid_code', 'The verification code is incorrect.'],
                 'ATTEMPTS_EXHAUSTED' => ['attempts_exhausted', 'Too many incorrect codes. Please sign in again.'],
                 default => ['challenge_invalid', 'This verification session is no longer valid. Please sign in again.'],
@@ -317,6 +329,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'A new verification code has been sent to your email.',
+            'challenge_id' => $challenge->challenge_id,
             'expires_in' => LoginChallenges::expirationMinutes() * 60,
             'resend_available_in' => LoginChallenges::resendCooldownSeconds(),
         ]);
@@ -410,6 +423,34 @@ class AuthController extends Controller
             'resource_label' => $user->employee_id ?: $user->email,
             'details' => $details,
             'metadata' => ['reason' => $reason],
+        ]);
+    }
+
+    /**
+     * Safe operational context for diagnosing challenge/code mismatches. Never
+     * include the submitted code, its hash, credentials, or issued tokens.
+     */
+    private function logOtpVerifyFailure(string $outcome, ?LoginChallenge $challenge): void
+    {
+        $latestChallengeId = $challenge?->user_id
+            ? LoginChallenge::query()
+                ->where('user_id', $challenge->user_id)
+                ->outstanding()
+                ->whereNotNull('last_sent_at')
+                ->latest('id')
+                ->value('challenge_id')
+            : null;
+
+        Log::warning('Login OTP verification failed', [
+            'reason' => $outcome,
+            'challenge_id' => $challenge?->challenge_id,
+            'user_id' => $challenge?->user_id,
+            'created_at' => $challenge?->created_at?->toIso8601String(),
+            'expires_at' => $challenge?->expires_at?->toIso8601String(),
+            'used_at' => $challenge?->consumed_at?->toIso8601String(),
+            'attempts' => $challenge?->attempt_count,
+            'is_latest_active_challenge' => $challenge !== null
+                && $latestChallengeId === $challenge->challenge_id,
         ]);
     }
 

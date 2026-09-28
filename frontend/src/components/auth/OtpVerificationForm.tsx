@@ -14,6 +14,7 @@ interface OtpVerificationFormProps {
   challengeId: string;
   email: string;
   initialResendIn: number;
+  expiresIn: number;
   onVerified: (result: VerifiedLogin) => void;
   onBack: () => void;
 }
@@ -26,7 +27,7 @@ type OtpErrorResponse = {
 };
 
 // Reasons after which this challenge can never succeed; the user must sign in again.
-const TERMINAL_REASONS = new Set(['attempts_exhausted', 'challenge_invalid', 'resend_limit', 'delivery_failed']);
+const TERMINAL_REASONS = new Set(['attempts_exhausted', 'challenge_invalid', 'already_used', 'resend_limit', 'delivery_failed']);
 
 const maskEmail = (email: string): string => {
   const [local, domain] = email.split('@');
@@ -43,6 +44,7 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
   challengeId,
   email,
   initialResendIn,
+  expiresIn,
   onVerified,
   onBack,
 }) => {
@@ -83,6 +85,8 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
         return 'Too many incorrect codes. Please go back and sign in again.';
       case 'challenge_invalid':
         return 'This verification session has ended. Please go back and sign in again.';
+      case 'already_used':
+        return 'This code has already been used. Please go back and sign in again.';
       case 'resend_limit':
         return 'No more codes can be sent for this sign-in. Please go back and sign in again.';
       case 'delivery_failed':
@@ -201,7 +205,9 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
             className="block min-h-14 w-full appearance-none rounded-xl border border-slate-700 px-4 py-3 text-center font-mono text-2xl tracking-[0.5em] transition-[border-color,box-shadow] duration-200 placeholder:text-slate-600 hover:border-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
             style={{ backgroundColor: '#050e1b', color: '#F5F7FA' }}
           />
-          <p className="mt-1.5 text-xs text-slate-500">The code expires in a few minutes. Never share it with anyone.</p>
+          <p className="mt-1.5 text-xs text-slate-500">
+            The code expires in {Math.ceil(expiresIn / 60)} minutes. Never share it with anyone.
+          </p>
         </div>
 
         <FormButton type="submit" variant="primary" isLoading={isVerifying} disabled={busy || isTerminal || code.length !== 6}>

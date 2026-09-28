@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
   const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   // Pending second step. Held in component state only - never stored or put in the URL.
-  const [challenge, setChallenge] = useState<{ id: string; email: string; resendIn: number } | null>(null);
+  const [challenge, setChallenge] = useState<{ id: string; email: string; resendIn: number; expiresIn: number } | null>(null);
   const {
     formData,
     errors,
@@ -48,6 +48,7 @@ const LoginPage: React.FC = () => {
             id: response.data.challenge_id,
             email: data.email.trim(),
             resendIn: Number(response.data.resend_available_in) || 60,
+            expiresIn: Number(response.data.expires_in) || 300,
           });
           return;
         }
@@ -111,6 +112,7 @@ const LoginPage: React.FC = () => {
           challengeId={challenge.id}
           email={challenge.email}
           initialResendIn={challenge.resendIn}
+          expiresIn={challenge.expiresIn}
           onVerified={completeLogin}
           onBack={() => {
             setChallenge(null);

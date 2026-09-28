@@ -180,7 +180,7 @@ class LoginOtpTest extends TestCase
         $this->verify($challengeId, $code)->assertOk();
         $this->verify($challengeId, $code)
             ->assertUnprocessable()
-            ->assertJsonPath('reason', 'challenge_invalid')
+            ->assertJsonPath('reason', 'already_used')
             ->assertJsonMissingPath('token');
 
         $this->assertSame(1, $user->tokens()->count());
@@ -342,6 +342,7 @@ class LoginOtpTest extends TestCase
 
         $this->postJson('/api/login/resend-otp', ['challenge_id' => $challengeId])
             ->assertOk()
+            ->assertJsonPath('challenge_id', $challengeId)
             ->assertJsonPath('expires_in', 300)
             ->assertJsonMissingPath('otp');
         Mail::assertSentCount(2);
