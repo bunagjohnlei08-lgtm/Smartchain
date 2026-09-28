@@ -8,6 +8,8 @@ use App\Models\PersonalAccessToken;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Laravel\Sanctum\Sanctum;
 use Tests\Concerns\CompletesOtpLogin;
 use Tests\TestCase;
 
@@ -141,6 +143,110 @@ class SessionIdleTimeoutTest extends TestCase
 
         $this->assertTrue($current->fresh()->last_activity_at->greaterThan($current->last_activity_at));
         $this->assertTrue($other->fresh()->last_activity_at->eq($otherBefore));
+    }
+
+    public function test_concurrent_role_sessions_track_activity_independently(): void
+    {
+        [$adminHeaders, $adminToken] = $this->tokenSession($this->user('ADMIN'), 15);
+        [$pmHeaders, $pmToken] = $this->tokenSession($this->user('PLANT_MANAGER'), 25);
+        [$qaHeaders, $qaToken] = $this->tokenSession($this->user('QA_SUPERVISOR'), 25);
+        $pmBefore = $pmToken->last_activity_at;
+        $qaBefore = $qaToken->last_activity_at;
+
+        $this->asToken($adminHeaders)->postJson('/api/session/activity')->assertOk()->assertJsonPath('timeout_minutes', 20);
+        $this->assertTrue($adminToken->fresh()->last_activity_at->greaterThan($adminToken->last_activity_at));
+        $this->assertTrue($pmToken->fresh()->last_activity_at->eq($pmBefore));
+        $this->assertTrue($qaToken->fresh()->last_activity_at->eq($qaBefore));
+
+        $adminAfter = $adminToken->fresh()->last_activity_at;
+        $this->asToken($pmHeaders)->postJson('/api/session/activity')->assertOk()->assertJsonPath('timeout_minutes', 30);
+        $this->assertTrue($pmToken->fresh()->last_activity_at->greaterThan($pmBefore));
+        $this->assertTrue($adminToken->fresh()->last_activity_at->eq($adminAfter));
+        $this->assertTrue($qaToken->fresh()->last_activity_at->eq($qaBefore));
+
+        // Admin and Plant Manager keep working; only the idle QA session expires.
+        $this->travel(10)->minutes();
+        $this->asToken($adminHeaders)->getJson('/api/profile')->assertOk();
+        $this->asToken($pmHeaders)->getJson('/api/profile')->assertOk();
+        $this->asToken($qaHeaders)->getJson('/api/profile')->assertUnauthorized()->assertJsonPath('code', 'SESSION_IDLE_TIMEOUT');
+
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $qaToken->id]);
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $adminToken->id]);
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $pmToken->id]);
+    }
+
+    public function test_qa_activity_refreshes_only_qa_token(): void
+    {
+        [$qaHeaders, $qaToken] = $this->tokenSession($this->user('QA_SUPERVISOR'), 20);
+        [, $pmToken] = $this->tokenSession($this->user('PLANT_MANAGER'), 20);
+        $pmBefore = $pmToken->last_activity_at;
+
+        $this->asToken($qaHeaders)->postJson('/api/session/activity')->assertOk()->assertJsonPath('timeout_minutes', 30);
+
+        $this->assertTrue($qaToken->fresh()->last_activity_at->greaterThan($qaToken->last_activity_at));
+        $this->assertTrue($pmToken->fresh()->last_activity_at->eq($pmBefore));
+    }
+
+    public function test_idle_admin_expiry_does_not_end_active_plant_manager_or_qa_sessions(): void
+    {
+        [$adminHeaders, $adminToken] = $this->tokenSession($this->user('ADMIN'), 21);
+        [$pmHeaders, $pmToken] = $this->tokenSession($this->user('PLANT_MANAGER'), 1);
+        [$qaHeaders, $qaToken] = $this->tokenSession($this->user('QA_SUPERVISOR'), 1);
+
+        $this->asToken($adminHeaders)->getJson('/api/session/status')->assertUnauthorized()->assertJsonPath('code', 'SESSION_IDLE_TIMEOUT');
+
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $adminToken->id]);
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $pmToken->id]);
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $qaToken->id]);
+        $this->asToken($pmHeaders)->getJson('/api/profile')->assertOk();
+        $this->asToken($qaHeaders)->getJson('/api/profile')->assertOk();
+    }
+
+    public function test_active_session_does_not_time_out_with_repeated_activity(): void
+    {
+        [$pmHeaders, $pmToken] = $this->tokenSession($this->user('PLANT_MANAGER'));
+        [$qaHeaders, $qaToken] = $this->tokenSession($this->user('QA_SUPERVISOR'));
+
+        // Interleaved activity from two sessions over 60 minutes, well past either timeout.
+        foreach (range(1, 6) as $step) {
+            $this->travel(10)->minutes();
+            $this->asToken($pmHeaders)->postJson('/api/session/activity')->assertOk();
+            $this->asToken($qaHeaders)->postJson('/api/session/activity')->assertOk();
+            $this->asToken($pmHeaders)->postJson('/api/session/activity')->assertOk();
+        }
+
+        $this->asToken($pmHeaders)->getJson('/api/profile')->assertOk();
+        $this->asToken($qaHeaders)->getJson('/api/profile')->assertOk();
+        $this->assertTrue($pmToken->fresh()->last_activity_at->greaterThan(now()->subMinute()));
+        $this->assertTrue($qaToken->fresh()->last_activity_at->greaterThan(now()->subMinute()));
+    }
+
+    public function test_status_reports_the_current_token_only(): void
+    {
+        $user = $this->user('PLANT_MANAGER');
+        [$recentHeaders, $recent] = $this->tokenSession($user, 2);
+        [$olderHeaders, $older] = $this->tokenSession($user, 20);
+        $recent = $recent->fresh();
+        $older = $older->fresh();
+
+        $recentStatus = $this->asToken($recentHeaders)->getJson('/api/session/status')->assertOk()->json();
+        $olderStatus = $this->asToken($olderHeaders)->getJson('/api/session/status')->assertOk()->json();
+
+        $this->assertTrue(Carbon::parse($recentStatus['last_activity_at'])->eq($recent->last_activity_at));
+        $this->assertTrue(Carbon::parse($recentStatus['expires_at'])->eq($recent->last_activity_at->copy()->addMinutes(30)));
+        $this->assertTrue(Carbon::parse($olderStatus['last_activity_at'])->eq($older->last_activity_at));
+        $this->assertTrue(Carbon::parse($olderStatus['expires_at'])->eq($older->last_activity_at->copy()->addMinutes(30)));
+        $this->assertNotNull($recentStatus['server_time'] ?? null);
+
+        // Reading status is not activity.
+        $this->assertTrue($recent->fresh()->last_activity_at->eq($recent->last_activity_at));
+    }
+
+    public function test_transient_acting_as_token_is_not_idle_processed(): void
+    {
+        Sanctum::actingAs($this->user('ADMIN'));
+
+        $this->getJson('/api/profile')->assertOk();
     }
 
     public function test_background_protected_request_does_not_update_human_activity(): void
