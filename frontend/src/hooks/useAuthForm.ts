@@ -9,7 +9,6 @@ type FormState = {
   email: string;
   password: string;
   confirmPassword: string;
-  rememberMe: boolean;
   role: string;
 };
 
@@ -20,9 +19,9 @@ type Action =
 
 const getInitialState = (mode: AuthMode): FormState => {
   if (mode === 'login') {
-    return { mode: 'login', name: '', email: '', password: '', confirmPassword: '', rememberMe: false, role: '' };
+    return { mode: 'login', name: '', email: '', password: '', confirmPassword: '', role: '' };
   }
-  return { mode: 'signup', name: '', email: '', password: '', confirmPassword: '', rememberMe: false, role: '' };
+  return { mode: 'signup', name: '', email: '', password: '', confirmPassword: '', role: '' };
 };
 
 const validate = (state: FormState): FieldErrors => {
@@ -127,7 +126,6 @@ export const useAuthForm = ({
             mode: 'login',
             email: state.email,
             password: state.password,
-            rememberMe: state.rememberMe,
           });
         } else if (state.mode === 'signup' && onSignup) {
           onSignup({

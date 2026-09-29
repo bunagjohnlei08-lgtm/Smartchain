@@ -188,23 +188,7 @@ const LoginPage: React.FC = () => {
           disabled={isLoginBusy}
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
-          <label className="group flex min-h-11 cursor-pointer items-center rounded-lg focus-within:ring-2 focus-within:ring-blue-500/40">
-            <input
-              type="checkbox"
-              id="rememberMe"
-              checked={formData.rememberMe}
-              onChange={(e) => updateField('rememberMe', e.target.checked)}
-              disabled={isLoginBusy}
-              className="h-3.5 w-3.5 cursor-pointer rounded border-2 border-slate-700 bg-[#091018] accent-blue-500 transition-colors group-hover:border-blue-400 focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-0 checked:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 sm:h-4 sm:w-4"
-              style={{
-                accentColor: '#5B8CFF',
-              }}
-            />
-            <span className="ml-2 text-[11px] sm:text-xs" style={{ color: '#A2AAB8' }}>
-              Remember me
-            </span>
-          </label>
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => navigate('/forgot-password')}

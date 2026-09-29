@@ -90,6 +90,7 @@ class ReceivingDiscrepancyTest extends TestCase
         $this->assertSame(5, (int) $this->order->receivings()->with('items')->get()->flatMap->items->sum('delivered_quantity'));
         $this->assertDatabaseHas('receiving_discrepancies', [
             'receiving_id' => $first, 'short_quantity' => 2, 'status' => ReceivingDiscrepancy::STATUS_RESOLVED,
+            'resolved_by_receiving_id' => $second,
         ]);
         $this->assertDatabaseCount('receiving_discrepancies', 1);
 
@@ -108,6 +109,16 @@ class ReceivingDiscrepancyTest extends TestCase
             'action' => 'CLOSE_SHORTAGE', 'resolution_notes' => 'Supplier cannot fulfill.',
         ])->assertForbidden();
         $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'CLOSE_SHORTAGE', 'resolution_notes' => 'Supplier cannot fulfill.',
+        ])->assertUnprocessable();
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'CONTACT_SUPPLIER', 'contact_method' => 'EMAIL',
+        ])->assertOk();
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'RECORD_RESPONSE', 'supplier_response_code' => ReceivingDiscrepancy::RESPONSE_WILL_NOT_FULFILL,
+            'response_notes' => 'Supplier confirmed the item is unavailable.',
+        ])->assertOk()->assertJsonPath('status', ReceivingDiscrepancy::STATUS_UNDER_RESOLUTION);
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
             'action' => 'CLOSE_SHORTAGE',
         ])->assertUnprocessable()->assertJsonValidationErrors('resolution_notes');
         $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
@@ -116,5 +127,61 @@ class ReceivingDiscrepancyTest extends TestCase
 
         $this->assertSame('Closed with Shortage', $this->order->fresh()->status);
         $this->assertDatabaseCount('supplier_rejection_cases', 0);
+    }
+
+    public function test_contact_and_fulfillment_response_are_separate_audited_events_without_fake_receiving(): void
+    {
+        $receivingId = $this->receive(3, 'DEL-1');
+        $case = ReceivingDiscrepancy::firstOrFail();
+
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'CONTACT_SUPPLIER',
+            'contact_method' => 'PHONE',
+            'contact_note' => 'Called about the remaining two units.',
+        ])->assertOk()
+            ->assertJsonPath('status', ReceivingDiscrepancy::STATUS_AWAITING_RESPONSE)
+            ->assertJsonPath('supplier_response_code', null)
+            ->assertJsonPath('contacted_by.id', $this->admin->id);
+
+        $this->assertDatabaseCount('receivings', 1);
+
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'RECORD_RESPONSE',
+            'supplier_response_code' => ReceivingDiscrepancy::RESPONSE_WILL_FULFILL,
+            'response_notes' => 'Supplier will send the balance.',
+            'expected_balance_delivery_date' => now()->addDay()->toDateString(),
+        ])->assertOk()
+            ->assertJsonPath('status', ReceivingDiscrepancy::STATUS_AWAITING_BALANCE)
+            ->assertJsonPath('short_quantity', 2);
+
+        $this->assertDatabaseCount('receivings', 1);
+        $this->assertDatabaseCount('inventories', 0);
+        $this->assertDatabaseHas('receiving_discrepancies', [
+            'id' => $case->id, 'receiving_id' => $receivingId, 'contact_method' => 'PHONE',
+            'supplier_response_code' => ReceivingDiscrepancy::RESPONSE_WILL_FULFILL,
+        ]);
+        $this->actingAs($this->admin)->getJson('/api/purchase-orders')->assertOk()
+            ->assertJsonPath('data.0.discrepancies.0.contact_method', 'PHONE')
+            ->assertJsonPath('data.0.discrepancies.0.supplier_response_code', ReceivingDiscrepancy::RESPONSE_WILL_FULFILL)
+            ->assertJsonPath('data.0.discrepancies.0.response_notes', 'Supplier will send the balance.');
+    }
+
+    public function test_response_requires_contact_and_non_fulfillment_requires_notes(): void
+    {
+        $this->receive(3, 'DEL-1');
+        $case = ReceivingDiscrepancy::firstOrFail();
+
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'RECORD_RESPONSE',
+            'supplier_response_code' => ReceivingDiscrepancy::RESPONSE_WILL_FULFILL,
+        ])->assertUnprocessable();
+
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'CONTACT_SUPPLIER', 'contact_method' => 'OTHER',
+        ])->assertOk();
+        $this->actingAs($this->admin)->patchJson("/api/admin/receiving-discrepancies/{$case->id}", [
+            'action' => 'RECORD_RESPONSE',
+            'supplier_response_code' => ReceivingDiscrepancy::RESPONSE_WILL_NOT_FULFILL,
+        ])->assertUnprocessable()->assertJsonValidationErrors('response_notes');
     }
 }

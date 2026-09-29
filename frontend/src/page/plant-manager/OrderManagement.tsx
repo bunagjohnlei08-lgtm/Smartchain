@@ -188,6 +188,8 @@ const getStatusColor = (status: OrderStatus) => {
       return 'bg-sky-500/20 text-sky-400 border-sky-500/30';
     case 'Ready for Shipment':
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    case 'Forwarded to Logistics':
+      return 'bg-slate-500/20 text-white border-slate-500/30 dark:text-slate-400';
     case 'In Transit':
       return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
     case 'Delivered':

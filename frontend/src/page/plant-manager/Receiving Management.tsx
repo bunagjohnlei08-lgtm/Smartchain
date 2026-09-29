@@ -66,6 +66,28 @@ interface AssignmentToast {
   message: string;
 }
 
+type ReceivingView = 'active' | 'history';
+
+interface ReceivingListResponse {
+  data: ApiReceiving[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+  };
+  summary: {
+    total: number;
+    pending_qa: number;
+    passed: number;
+    rejected: number;
+    partial: number;
+  };
+  suppliers: string[];
+}
+
 // ============================================
 // HELPERS
 // ============================================
@@ -101,30 +123,6 @@ function formatCreatedAt(dateString: string | null | undefined): string {
     hour: 'numeric',
     minute: '2-digit',
   });
-}
-
-function matchesDateFilter(dateString: string, filter: string): boolean {
-  if (filter === 'All Dates') return true;
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
-  if (!match) return false;
-  const target = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  if (filter === 'Today') {
-    return target.getTime() === today.getTime();
-  }
-  if (filter === 'This Week') {
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay());
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    return target >= startOfWeek && target <= endOfWeek;
-  }
-  if (filter === 'This Month') {
-    return target.getFullYear() === today.getFullYear() && target.getMonth() === today.getMonth();
-  }
-  return true;
 }
 
 function getApiErrorMessage(error: unknown): string {
@@ -452,8 +450,12 @@ const ReceivingManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [dateFilter, setDateFilter] = useState('All Dates');
   const [currentPage, setCurrentPage] = useState(1);
+  const [receivingView, setReceivingView] = useState<ReceivingView>('active');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const itemsPerPage = 5;
+  const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalItems: 0, from: 0, to: 0 });
+  const [summary, setSummary] = useState({ total: 0, pending_qa: 0, passed: 0, rejected: 0, partial: 0 });
+  const [supplierOptions, setSupplierOptions] = useState<string[]>(['All Suppliers']);
 
   const [selectedReceivingId, setSelectedReceivingId] = useState<number | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -471,18 +473,37 @@ const ReceivingManagement: React.FC = () => {
   const [replacementSaving, setReplacementSaving] = useState(false);
   const [replacementError, setReplacementError] = useState<string | null>(null);
 
-  const fetchReceivings = useCallback(async () => {
+  const fetchReceivings = useCallback(async (viewOverride?: ReceivingView, pageOverride?: number) => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await apiClient.get<{ data: ApiReceiving[] }>('/receivings');
+      const view = viewOverride ?? receivingView;
+      const page = pageOverride ?? currentPage;
+      const res = await apiClient.get<ReceivingListResponse>('/receivings', { params: {
+        view,
+        page,
+        per_page: itemsPerPage,
+        search: search.trim() || undefined,
+        supplier: supplierFilter === 'All Suppliers' ? undefined : supplierFilter,
+        status: statusFilter === 'All Status' ? undefined : statusFilter,
+        date: dateFilter === 'Today' ? 'today' : dateFilter === 'This Week' ? 'week' : dateFilter === 'This Month' ? 'month' : undefined,
+      } });
       setReceivings(res.data.data);
+      setPagination({
+        currentPage: res.data.meta.current_page,
+        totalPages: Math.max(1, res.data.meta.last_page),
+        totalItems: res.data.meta.total,
+        from: res.data.meta.from ?? 0,
+        to: res.data.meta.to ?? 0,
+      });
+      setSummary(res.data.summary);
+      setSupplierOptions(['All Suppliers', ...res.data.suppliers]);
     } catch (err) {
       setLoadError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, dateFilter, receivingView, search, statusFilter, supplierFilter]);
 
   useEffect(() => {
     fetchReceivings();
@@ -511,38 +532,18 @@ const ReceivingManagement: React.FC = () => {
     return receivings.find((r) => r.id === selectedReceivingId) || null;
   }, [receivings, selectedReceivingId]);
 
-  const supplierOptions = useMemo(() => {
-    const unique = Array.from(new Set(receivings.map((r) => r.supplier)));
-    return ['All Suppliers', ...unique];
-  }, [receivings]);
-
-  // Filter data
-  const filteredReceivings = useMemo(() => {
-    return receivings.filter((r) => {
-      const matchSearch =
-        r.receiving_no.toLowerCase().includes(search.toLowerCase()) ||
-        r.purchase_order.toLowerCase().includes(search.toLowerCase()) ||
-        r.supplier.toLowerCase().includes(search.toLowerCase());
-      const matchSupplier = supplierFilter === 'All Suppliers' || r.supplier === supplierFilter;
-      const matchStatus = statusFilter === 'All Status' || r.status === statusFilter;
-      const matchDate = matchesDateFilter(r.delivery_date, dateFilter);
-      return matchSearch && matchSupplier && matchStatus && matchDate;
-    });
-  }, [receivings, search, supplierFilter, statusFilter, dateFilter]);
-
-  // Pagination
-  const totalItems = filteredReceivings.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-  const start = (currentPage - 1) * itemsPerPage + 1;
-  const end = Math.min(currentPage * itemsPerPage, totalItems);
-  const paginatedReceivings = filteredReceivings.slice(start - 1, end);
+  const totalItems = pagination.totalItems;
+  const totalPages = pagination.totalPages;
+  const start = pagination.from;
+  const end = pagination.to;
+  const paginatedReceivings = receivings;
 
   // KPI data
-  const totalDeliveries = receivings.length;
-  const pendingQA = receivings.filter((r) => r.status === 'Pending QA').length;
-  const passed = receivings.filter((r) => r.status === 'Passed').length;
-  const rejected = receivings.filter((r) => r.status === 'Rejected').length;
-  const partial = receivings.filter((r) => r.status === 'Partial').length;
+  const totalDeliveries = summary.total;
+  const pendingQA = summary.pending_qa;
+  const passed = summary.passed;
+  const rejected = summary.rejected;
+  const partial = summary.partial;
 
   const handleRowClick = (id: number) => {
     setSelectedReceivingId(id);
@@ -559,11 +560,11 @@ const ReceivingManagement: React.FC = () => {
       })),
     };
 
-    const res = await apiClient.post<ApiReceiving>('/receivings', payload);
-    setReceivings((prev) => [res.data, ...prev]);
-    setSelectedReceivingId(res.data.id);
-    setShowCreateModal(false);
+    await apiClient.post<ApiReceiving>('/receivings', payload);
+    setReceivingView('active');
     setCurrentPage(1);
+    setShowCreateModal(false);
+    await fetchReceivings('active', 1);
   };
 
   useEffect(() => {
@@ -676,7 +677,7 @@ const ReceivingManagement: React.FC = () => {
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl p-4 flex items-center justify-between gap-4">
           <span className="text-sm">{loadError}</span>
           <button
-            onClick={fetchReceivings}
+            onClick={() => void fetchReceivings()}
             className="flex items-center gap-1.5 text-sm font-medium hover:text-red-300 transition-colors"
           >
             <RefreshCw className="w-4 h-4" /> Retry
@@ -690,7 +691,7 @@ const ReceivingManagement: React.FC = () => {
           label="Total Deliveries"
           value={totalDeliveries}
           icon={<Package className="w-5 h-5" />}
-          subtitle="All Receiving Records"
+          subtitle={receivingView === 'active' ? 'Active Receiving Records' : 'Historical Receiving Records'}
           color="text-blue-400"
         />
         <KPICard
@@ -723,6 +724,25 @@ const ReceivingManagement: React.FC = () => {
         />
       </div>
 
+      <div className="inline-flex rounded-xl border border-[#1f2937] bg-[#111827] p-1" role="tablist" aria-label="Receiving records">
+        {(['active', 'history'] as const).map((view) => (
+          <button
+            key={view}
+            type="button"
+            role="tab"
+            aria-selected={receivingView === view}
+            onClick={() => {
+              setReceivingView(view);
+              setCurrentPage(1);
+              setSelectedReceivingId(null);
+            }}
+            className={`min-h-10 rounded-lg px-4 text-sm font-medium capitalize transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40 ${receivingView === view ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
+          >
+            {view}
+          </button>
+        ))}
+      </div>
+
       {/* Search & Filters */}
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#1f2937] bg-[#111827] p-3 sm:gap-3 sm:p-4">
         <div className="pm-rcv-search relative basis-full min-w-0 sm:basis-auto sm:flex-1 sm:min-w-[180px]">
@@ -731,14 +751,14 @@ const ReceivingManagement: React.FC = () => {
             type="text"
             placeholder="Search Receiving No., PO Number, Supplier..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
             className="h-10 w-full rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-10 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pr-4 sm:text-sm"
           />
         </div>
         <div className="pm-rcv-select relative min-w-[108px] flex-1 sm:min-w-[130px] sm:flex-none">
           <select
             value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value)}
+            onChange={(e) => { setSupplierFilter(e.target.value); setCurrentPage(1); }}
             aria-label="Filter by supplier"
             className="h-9 w-full cursor-pointer appearance-none rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-2.5 pr-7 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pl-3 sm:pr-8 sm:text-sm"
           >
@@ -751,7 +771,7 @@ const ReceivingManagement: React.FC = () => {
         <div className="pm-rcv-select relative min-w-[104px] flex-1 sm:min-w-[130px] sm:flex-none">
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
           aria-label="Filter by status"
           className="h-9 w-full cursor-pointer appearance-none rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-2.5 pr-7 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pl-3 sm:pr-8 sm:text-sm"
         >
@@ -768,7 +788,7 @@ const ReceivingManagement: React.FC = () => {
           <div className="pm-rcv-select relative min-w-[112px] flex-1 sm:min-w-[130px] sm:flex-none">
           <select
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
             aria-label="Filter by date"
             className="h-9 w-full cursor-pointer appearance-none rounded-xl border border-[#1f2937] bg-[#0b1220] py-0 pl-2.5 pr-7 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:py-2.5 sm:pl-3 sm:pr-8 sm:text-sm"
           >
@@ -780,7 +800,7 @@ const ReceivingManagement: React.FC = () => {
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-500 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
           </div>
           <button
-            onClick={fetchReceivings}
+            onClick={() => void fetchReceivings()}
             aria-label="Refresh receiving records"
             title="Refresh"
             className="pm-rcv-refresh flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[#1f2937] text-slate-400 transition-colors hover:bg-slate-800/30 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-10 sm:w-10"

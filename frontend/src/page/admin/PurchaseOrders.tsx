@@ -36,8 +36,25 @@ type POStatus = 'Pending Approval' | 'Approved' | 'Sent to Supplier' | 'Partiall
 
 interface PurchaseOrderItem { productName: string; quantity: number; receivedQuantity: number; remainingQuantity: number; unitPrice: number; amount: number; }
 interface ReceivingHistory { id: number; receivingNo: string; deliveryDate: string; deliveredQuantity: number; status: string; }
-interface ReceivingDiscrepancy { id: number; receivingId: number; type: string; shortQuantity: number; status: string; supplierResponse?: string; resolutionNotes?: string; }
+type SupplierResponseCode = 'WILL_FULFILL' | 'WILL_NOT_FULFILL' | 'OTHER';
+interface ReceivingDiscrepancy {
+  id: number; receivingId: number; type: string; expectedQuantity: number; deliveredQuantity: number; shortQuantity: number; status: string;
+  reportedAt?: string; reportedBy?: string; contactMethod?: string; contactNote?: string; contactedAt?: string; contactedBy?: string;
+  supplierResponseCode?: SupplierResponseCode; responseNotes?: string; expectedBalanceDeliveryDate?: string; respondedAt?: string; respondedBy?: string;
+  resolutionNotes?: string; resolvedAt?: string; resolvedBy?: string; resolvedByReceiving?: { id: number; receivingNo: string; deliveryDate?: string };
+}
 interface SupplierOption { id: number; supplier_code: string; name: string; }
+
+const mapDiscrepancy = (item: any): ReceivingDiscrepancy => ({
+  id: Number(item.id), receivingId: Number(item.receiving_id), type: item.type ?? item.discrepancy_type,
+  expectedQuantity: Number(item.expected_quantity), deliveredQuantity: Number(item.delivered_quantity), shortQuantity: Number(item.short_quantity), status: item.status,
+  reportedAt: item.reported_at, reportedBy: item.reported_by?.name ?? item.reported_by,
+  contactMethod: item.contact_method, contactNote: item.contact_note, contactedAt: item.contacted_at, contactedBy: item.contacted_by?.name ?? item.contacted_by,
+  supplierResponseCode: item.supplier_response_code, responseNotes: item.response_notes ?? item.supplier_response,
+  expectedBalanceDeliveryDate: item.expected_balance_delivery_date, respondedAt: item.responded_at, respondedBy: item.responded_by?.name ?? item.responded_by,
+  resolutionNotes: item.resolution_notes, resolvedAt: item.resolved_at, resolvedBy: item.resolved_by?.name ?? item.resolved_by,
+  resolvedByReceiving: item.resolved_by_receiving ? { id: Number(item.resolved_by_receiving.id), receivingNo: item.resolved_by_receiving.receiving_no, deliveryDate: item.resolved_by_receiving.delivery_date } : undefined,
+});
 
 interface PurchaseOrder {
   id: string;
@@ -101,6 +118,9 @@ const PurchaseOrders: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [resolvingDiscrepancyId, setResolvingDiscrepancyId] = useState<number | null>(null);
+  const [discrepancyDialog, setDiscrepancyDialog] = useState<{ item: ReceivingDiscrepancy; mode: 'contact' | 'response' | 'close' } | null>(null);
+  const [discrepancyForm, setDiscrepancyForm] = useState({ contactMethod: 'PHONE', contactNote: '', responseCode: 'WILL_FULFILL' as SupplierResponseCode, responseNotes: '', expectedDate: '', closureReason: '' });
+  const [discrepancyFormError, setDiscrepancyFormError] = useState('');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
@@ -148,7 +168,7 @@ const PurchaseOrders: React.FC = () => {
           unitPrice: Number(item.unit_price), amount: Number(item.total_price),
         })),
         receivingHistory: (order.receiving_history ?? []).map((receiving: any) => ({ id: Number(receiving.id), receivingNo: receiving.receiving_no, deliveryDate: receiving.delivery_date, deliveredQuantity: Number(receiving.delivered_quantity), status: receiving.status })),
-        discrepancies: (order.discrepancies ?? []).map((item: any) => ({ id: Number(item.id), receivingId: Number(item.receiving_id), type: item.type, shortQuantity: Number(item.short_quantity), status: item.status, supplierResponse: item.supplier_response, resolutionNotes: item.resolution_notes })),
+        discrepancies: (order.discrepancies ?? []).map(mapDiscrepancy),
       })));
       const inventoryItems = (inventoryResponse.data?.data ?? []) as Array<{ product?: string }>;
       setProductNames([...new Set(inventoryItems.map((item) => item.product).filter((name): name is string => Boolean(name)))]);
@@ -258,28 +278,49 @@ const PurchaseOrders: React.FC = () => {
     toastTimer.current = window.setTimeout(() => setToast(null), 5000);
   };
 
-  const handleDiscrepancyAction = async (item: ReceivingDiscrepancy, action: 'CONTACT_SUPPLIER' | 'AWAIT_BALANCE' | 'CLOSE_SHORTAGE') => {
-    const promptLabel = action === 'CLOSE_SHORTAGE' ? 'Resolution notes (required)' : action === 'AWAIT_BALANCE' ? 'Record the supplier response (required)' : 'Supplier contact note (optional)';
-    const note = window.prompt(promptLabel, '');
-    if (note === null || ((action === 'CLOSE_SHORTAGE' || action === 'AWAIT_BALANCE') && !note.trim())) return;
+  const openDiscrepancyDialog = (item: ReceivingDiscrepancy, mode: 'contact' | 'response' | 'close') => {
+    setDiscrepancyForm({ contactMethod: item.contactMethod || 'PHONE', contactNote: '', responseCode: item.supplierResponseCode || 'WILL_FULFILL', responseNotes: '', expectedDate: item.expectedBalanceDeliveryDate || '', closureReason: '' });
+    setDiscrepancyFormError('');
+    setDiscrepancyDialog({ item, mode });
+  };
+
+  const handleDiscrepancyAction = async () => {
+    if (!discrepancyDialog) return;
+    const { item, mode } = discrepancyDialog;
+    if (mode === 'response' && discrepancyForm.responseCode !== 'WILL_FULFILL' && !discrepancyForm.responseNotes.trim()) {
+      setDiscrepancyFormError('Response notes are required for this response.');
+      return;
+    }
+    if (mode === 'close' && !discrepancyForm.closureReason.trim()) {
+      setDiscrepancyFormError('A closure reason is required.');
+      return;
+    }
+    const action = mode === 'contact' ? 'CONTACT_SUPPLIER' : mode === 'response' ? 'RECORD_RESPONSE' : 'CLOSE_SHORTAGE';
     setResolvingDiscrepancyId(item.id);
+    setDiscrepancyFormError('');
     try {
-      const payload = action === 'CLOSE_SHORTAGE' ? { action, resolution_notes: note.trim() } : { action, supplier_response: note.trim() || undefined };
+      const payload = mode === 'contact'
+        ? { action, contact_method: discrepancyForm.contactMethod, contact_note: discrepancyForm.contactNote.trim() || undefined }
+        : mode === 'response'
+          ? { action, supplier_response_code: discrepancyForm.responseCode, response_notes: discrepancyForm.responseNotes.trim() || undefined, expected_balance_delivery_date: discrepancyForm.responseCode === 'WILL_FULFILL' ? discrepancyForm.expectedDate || undefined : undefined }
+          : { action, resolution_notes: discrepancyForm.closureReason.trim() };
       const response = await apiClient.patch(`/admin/receiving-discrepancies/${item.id}`, payload);
-      const updatedStatus = String(response.data?.status ?? item.status);
+      const updated = mapDiscrepancy(response.data);
       setSelectedOrder((current) => current ? {
         ...current,
         status: action === 'CLOSE_SHORTAGE' ? 'Closed with Shortage' : 'Partially Received',
-        discrepancies: current.discrepancies.map((value) => value.id === item.id ? { ...value, status: updatedStatus, supplierResponse: response.data?.supplier_response, resolutionNotes: response.data?.resolution_notes } : value),
+        discrepancies: current.discrepancies.map((value) => value.id === item.id ? updated : value),
       } : current);
       setOrders((current) => current.map((order) => order.id === selectedOrder?.id ? {
         ...order,
         status: action === 'CLOSE_SHORTAGE' ? 'Closed with Shortage' : 'Partially Received',
-        discrepancies: order.discrepancies.map((value) => value.id === item.id ? { ...value, status: updatedStatus } : value),
+        discrepancies: order.discrepancies.map((value) => value.id === item.id ? updated : value),
       } : order));
-      showToast('success', action === 'CLOSE_SHORTAGE' ? 'Shortage case closed.' : 'Supplier response updated.');
+      setDiscrepancyDialog(null);
+      showToast('success', mode === 'contact' ? 'Supplier contact recorded.' : mode === 'response' ? 'Supplier response recorded.' : 'Shortage case closed.');
     } catch (requestError: any) {
-      showToast('error', requestError?.response?.data?.message || 'Unable to update the discrepancy.');
+      const validationMessage = Object.values(requestError?.response?.data?.errors ?? {}).flat().find(Boolean);
+      setDiscrepancyFormError(String(validationMessage || requestError?.response?.data?.message || 'Unable to update the discrepancy.'));
     } finally {
       setResolvingDiscrepancyId(null);
     }
@@ -631,7 +672,24 @@ const PurchaseOrders: React.FC = () => {
                 <section className="rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3 sm:p-4" aria-label="Receiving discrepancies">
                   <h3 className="mb-3 text-xs font-semibold text-white sm:text-sm">Receiving Discrepancies</h3>
                   <ul className="space-y-2 text-xs">
-                    {selectedOrder.discrepancies.map((item) => <li key={item.id} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2"><div className="flex justify-between gap-2"><span className="font-medium text-amber-300">Short Delivery</span><span className="text-white">{item.shortQuantity} short</span></div><p className="mt-1 text-slate-400">{item.status.replaceAll('_', ' ')}</p>{!['RESOLVED', 'CLOSED_WITH_SHORTAGE'].includes(item.status) && <div className="mt-2 grid gap-2"><button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => void handleDiscrepancyAction(item, 'CONTACT_SUPPLIER')} className="min-h-11 cursor-pointer rounded-lg border border-slate-600 px-2 text-slate-200 transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50">Contact Supplier</button><button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => void handleDiscrepancyAction(item, 'AWAIT_BALANCE')} className="min-h-11 cursor-pointer rounded-lg border border-cyan-500/40 px-2 text-cyan-300 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50">Supplier Will Fulfill Balance</button><button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => void handleDiscrepancyAction(item, 'CLOSE_SHORTAGE')} className="min-h-11 cursor-pointer rounded-lg border border-orange-500/40 px-2 text-orange-300 transition-colors hover:bg-orange-500/10 focus:outline-none focus:ring-2 focus:ring-orange-500/50 disabled:cursor-not-allowed disabled:opacity-50">Close Case</button></div>}</li>)}
+                    {selectedOrder.discrepancies.map((item) => (
+                      <li key={item.id} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                        <div className="flex justify-between gap-2"><span className="font-medium text-amber-700 dark:text-amber-300">Short Delivery</span><span className="text-slate-900 dark:text-white">{item.shortQuantity} short</span></div>
+                        <p className="mt-1 font-medium text-slate-600 dark:text-slate-400">{item.status.replaceAll('_', ' ')}</p>
+                        <ol className="mt-3 space-y-3 border-l border-slate-300 pl-3 text-slate-700 dark:border-slate-700 dark:text-slate-300" aria-label="Short delivery activity">
+                          <li><p className="font-semibold text-slate-900 dark:text-white">Short delivery detected</p><p>{item.reportedAt ? new Date(item.reportedAt).toLocaleString() : 'Recorded'}{item.reportedBy ? ` by ${item.reportedBy}` : ''}</p><p>Ordered: {item.expectedQuantity} · Delivered: {item.deliveredQuantity} · Short: {item.shortQuantity}</p></li>
+                          {item.contactedAt && <li><p className="font-semibold text-slate-900 dark:text-white">Supplier contacted</p><p>{new Date(item.contactedAt).toLocaleString()}{item.contactedBy ? ` by ${item.contactedBy}` : ''}</p><p>Method: {item.contactMethod?.replaceAll('_', ' ')}</p>{item.contactNote && <p>Note: {item.contactNote}</p>}</li>}
+                          {item.respondedAt && <li><p className="font-semibold text-slate-900 dark:text-white">Supplier response recorded</p><p>{new Date(item.respondedAt).toLocaleString()}{item.respondedBy ? ` by ${item.respondedBy}` : ''}</p><p>Response: {item.supplierResponseCode?.replaceAll('_', ' ')}</p>{item.expectedBalanceDeliveryDate && <p>Expected delivery: {new Date(`${item.expectedBalanceDeliveryDate}T00:00:00`).toLocaleDateString()}</p>}{item.responseNotes && <p>Note: {item.responseNotes}</p>}</li>}
+                          {item.resolvedByReceiving && <li><p className="font-semibold text-slate-900 dark:text-white">Balance delivery received</p><p>{item.resolvedByReceiving.receivingNo} · {item.resolvedByReceiving.deliveryDate || 'Delivery recorded'}</p></li>}
+                          {item.resolvedAt && <li><p className="font-semibold text-slate-900 dark:text-white">{item.status === 'CLOSED_WITH_SHORTAGE' ? 'Case closed with shortage' : 'Discrepancy resolved'}</p><p>{new Date(item.resolvedAt).toLocaleString()}{item.resolvedBy ? ` by ${item.resolvedBy}` : ''}</p>{item.resolutionNotes && <p>Reason: {item.resolutionNotes}</p>}</li>}
+                        </ol>
+                        {!['RESOLVED', 'CLOSED_WITH_SHORTAGE'].includes(item.status) && <div className="mt-3 grid gap-2">
+                          {['REPORTED', 'SUPPLIER_CONTACTED', 'AWAITING_SUPPLIER_RESPONSE'].includes(item.status) && <button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => openDiscrepancyDialog(item, 'contact')} className="min-h-11 cursor-pointer rounded-lg border border-slate-300 bg-white px-2 text-slate-800 transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-transparent dark:text-slate-200 dark:hover:bg-slate-700">Contact Supplier</button>}
+                          {['SUPPLIER_CONTACTED', 'AWAITING_SUPPLIER_RESPONSE', 'AWAITING_BALANCE_DELIVERY', 'UNDER_RESOLUTION'].includes(item.status) && <button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => openDiscrepancyDialog(item, 'response')} className="min-h-11 cursor-pointer rounded-lg border border-cyan-600/50 px-2 text-cyan-700 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-cyan-300">Record Supplier Response</button>}
+                          {item.supplierResponseCode === 'WILL_NOT_FULFILL' && <button type="button" disabled={resolvingDiscrepancyId !== null} onClick={() => openDiscrepancyDialog(item, 'close')} className="min-h-11 cursor-pointer rounded-lg border border-orange-500/50 px-2 text-orange-700 transition-colors hover:bg-orange-500/10 focus:outline-none focus:ring-2 focus:ring-orange-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-orange-300">Close Case</button>}
+                        </div>}
+                      </li>
+                    ))}
                   </ul>
                 </section>
               </div>
@@ -639,16 +697,16 @@ const PurchaseOrders: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="admin-po-details-actions grid grid-cols-1 gap-2 border-t border-[#1f2937] pt-3 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:pt-4">
-              <button onClick={() => openPrintablePo(selectedOrder)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-2 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+              <button onClick={() => openPrintablePo(selectedOrder)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-2 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]">
                 <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">Print PO</span>
               </button>
-              <button onClick={() => void downloadPoPdf(selectedOrder)} disabled={downloadingId !== null} aria-busy={downloadingId === selectedOrder.id} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+              <button onClick={() => void downloadPoPdf(selectedOrder)} disabled={downloadingId !== null} aria-busy={downloadingId === selectedOrder.id} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]">
                 <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{downloadingId === selectedOrder.id ? 'Preparing PDF…' : 'Download PO (PDF)'}</span>
               </button>
-              <button onClick={() => void handleSendToSupplier(selectedOrder)} disabled={sending} aria-busy={sending} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/50 px-2 py-2 text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+              <button onClick={() => void handleSendToSupplier(selectedOrder)} disabled={sending} aria-busy={sending} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/50 px-2 py-2 text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]">
                 <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{sending ? 'Sending…' : selectedOrder.status === 'Sent to Supplier' ? 'Resend PO to Supplier' : 'Send PO to Supplier'}</span>
               </button>
-              <button onClick={() => setShowHistory((visible) => !visible)} aria-expanded={showHistory} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-sm">
+              <button onClick={() => setShowHistory((visible) => !visible)} aria-expanded={showHistory} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]">
                 <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{showHistory ? 'Hide History' : 'View History'}</span>
               </button>
             </div>
@@ -662,6 +720,31 @@ const PurchaseOrders: React.FC = () => {
                 </ol>
               </section>
             )}
+          </div>
+        </div>
+      )}
+
+      {discrepancyDialog && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="discrepancy-dialog-title">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 id="discrepancy-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-white">{discrepancyDialog.mode === 'contact' ? 'Contact Supplier' : discrepancyDialog.mode === 'response' ? 'Record Supplier Response' : 'Close Shortage Case'}</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Short delivery of {discrepancyDialog.item.shortQuantity} unit(s).</p></div>
+              <button type="button" onClick={() => setDiscrepancyDialog(null)} disabled={resolvingDiscrepancyId !== null} aria-label="Close dialog" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mt-5 space-y-4">
+              {discrepancyDialog.mode === 'contact' && <>
+                <div><label htmlFor="contact-method" className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Contact method</label><select id="contact-method" value={discrepancyForm.contactMethod} onChange={(event) => setDiscrepancyForm({ ...discrepancyForm, contactMethod: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white"><option value="PHONE">Phone</option><option value="EMAIL">Email</option><option value="OTHER">Other</option></select></div>
+                <div><label htmlFor="contact-note" className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Contact note <span className="font-normal text-slate-500">(optional)</span></label><textarea id="contact-note" rows={3} value={discrepancyForm.contactNote} onChange={(event) => setDiscrepancyForm({ ...discrepancyForm, contactNote: event.target.value })} placeholder="How the supplier was contacted" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400" /></div>
+              </>}
+              {discrepancyDialog.mode === 'response' && <>
+                <div><label htmlFor="supplier-response" className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Supplier response</label><select id="supplier-response" value={discrepancyForm.responseCode} onChange={(event) => setDiscrepancyForm({ ...discrepancyForm, responseCode: event.target.value as SupplierResponseCode, expectedDate: event.target.value === 'WILL_FULFILL' ? discrepancyForm.expectedDate : '' })} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white"><option value="WILL_FULFILL">Will Fulfill Remaining Balance</option><option value="WILL_NOT_FULFILL">Will Not Fulfill Remaining Balance</option><option value="OTHER">Other / Under Negotiation</option></select></div>
+                <div><label htmlFor="response-notes" className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Response notes {discrepancyForm.responseCode !== 'WILL_FULFILL' && '*'}</label><textarea id="response-notes" rows={3} value={discrepancyForm.responseNotes} onChange={(event) => setDiscrepancyForm({ ...discrepancyForm, responseNotes: event.target.value })} placeholder="Record the supplier's response" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400" /></div>
+                {discrepancyForm.responseCode === 'WILL_FULFILL' && <div><label htmlFor="expected-balance-date" className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Expected delivery date <span className="font-normal text-slate-500">(optional)</span></label><input id="expected-balance-date" type="date" min={new Date().toISOString().slice(0, 10)} value={discrepancyForm.expectedDate} onChange={(event) => setDiscrepancyForm({ ...discrepancyForm, expectedDate: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white" /></div>}
+              </>}
+              {discrepancyDialog.mode === 'close' && <div><label htmlFor="closure-reason" className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Closure reason *</label><textarea id="closure-reason" rows={4} value={discrepancyForm.closureReason} onChange={(event) => setDiscrepancyForm({ ...discrepancyForm, closureReason: event.target.value })} placeholder="Explain why the balance will remain unfulfilled" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400" /></div>}
+              {discrepancyFormError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{discrepancyFormError}</p>}
+            </div>
+            <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700"><button type="button" onClick={() => setDiscrepancyDialog(null)} disabled={resolvingDiscrepancyId !== null} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Cancel</button><button type="button" onClick={() => void handleDiscrepancyAction()} disabled={resolvingDiscrepancyId !== null} className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">{resolvingDiscrepancyId !== null ? 'Saving…' : discrepancyDialog.mode === 'close' ? 'Close Case' : 'Save'}</button></div>
           </div>
         </div>
       )}

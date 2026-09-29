@@ -277,8 +277,8 @@ interface PrepareModalProps {
 const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, onMarkReady }) => {
   const [packing, setPacking] = useState({
     packageId: '',
-    boxes: 0,
-    weight: 0,
+    boxes: '',
+    weight: '',
     fragile: false,
     notes: '',
   });
@@ -296,8 +296,8 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
     if (shipment) {
       setPacking({
         packageId: shipment.packing?.packageId || '',
-        boxes: shipment.packing?.boxes || 0,
-        weight: shipment.packing?.weight || 0,
+        boxes: shipment.packing?.boxes > 0 ? String(shipment.packing.boxes) : '',
+        weight: shipment.packing?.weight > 0 ? String(shipment.packing.weight) : '',
         fragile: shipment.packing?.fragile || false,
         notes: shipment.packing?.notes || '',
       });
@@ -311,7 +311,9 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
   }, [shipment]);
 
   const checklistComplete = Object.values(checklist).every(v => v === true);
-  const packingComplete = packing.boxes >= 1 && packing.weight > 0;
+  const boxes = Number(packing.boxes);
+  const weight = Number(packing.weight);
+  const packingComplete = Number.isInteger(boxes) && boxes >= 1 && Number.isFinite(weight) && weight > 0;
 
   const handleSubmit = () => {
     if (!shipment.barcodeVerifiedAll || !checklistComplete || !packingComplete) {
@@ -319,7 +321,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
       return;
     }
     // Mark the shipment as ready
-    onMarkReady(shipment.id, packing, checklist);
+    onMarkReady(shipment.id, { ...packing, boxes, weight }, checklist);
     onClose();
   };
 
@@ -362,7 +364,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
           {/* Stock Out verification is historical and read-only here. */}
           <div>
             <h3 className="text-sm font-medium text-slate-300 mb-2">Product Verification</h3>
-            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-700 bg-emerald-600 p-3 text-sm text-white dark:border-emerald-600 dark:bg-emerald-600">
               <CheckCircle className="h-4 w-4" /> Barcode verified during Stock Out
             </div>
             <div className="space-y-3">
@@ -426,8 +428,9 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                 <input
                   type="number"
                   value={packing.boxes}
-                  onChange={(e) => setPacking({ ...packing, boxes: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  onChange={(e) => setPacking({ ...packing, boxes: e.target.value })}
+                  placeholder="0"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-slate-700 dark:bg-[#0b0f19] dark:text-slate-200 dark:placeholder:text-slate-500"
                   min="1"
                 />
               </div>
@@ -436,8 +439,9 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                 <input
                   type="number"
                   value={packing.weight}
-                  onChange={(e) => setPacking({ ...packing, weight: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  onChange={(e) => setPacking({ ...packing, weight: e.target.value })}
+                  placeholder="0"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-slate-700 dark:bg-[#0b0f19] dark:text-slate-200 dark:placeholder:text-slate-500"
                   step="0.1"
                   min="0.01"
                 />
@@ -459,7 +463,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                   value={packing.notes}
                   onChange={(e) => setPacking({ ...packing, notes: e.target.value })}
                   rows={2}
-                  className="w-full bg-[#0b0f19] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-slate-700 dark:bg-[#0b0f19] dark:text-slate-200 dark:placeholder:text-slate-500"
                   placeholder="Any special instructions..."
                 />
               </div>
@@ -744,7 +748,12 @@ const Shipments: React.FC = () => {
       {/* Shipment Table */}
       <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
-        <div className="pm-table-scroll min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+        <div
+          className="pm-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-1 [scrollbar-gutter:stable]"
+          role="region"
+          aria-label="Shipment table"
+          tabIndex={0}
+        >
           <table className="pm-status-table pm-shipment-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[76rem]">
             <thead className="bg-slate-50 dark:bg-[#0b0f19]/50 border-b border-slate-200 dark:border-slate-800">
               <tr>
@@ -789,7 +798,7 @@ const Shipments: React.FC = () => {
                           setSelectedShipment(shipment);
                           setIsViewDrawerOpen(true);
                         }}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                        className="rounded-lg p-1.5 text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
                         title="View Details"
                       >
                         <Eye className="w-4 h-4" />
@@ -798,7 +807,7 @@ const Shipments: React.FC = () => {
                         <button
                           onClick={() => handleStartPacking(shipment)}
                           disabled={transitioningId === shipment.id}
-                          className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-lg p-1.5 text-cyan-700 transition-all hover:bg-slate-100 hover:text-cyan-800 disabled:cursor-not-allowed disabled:opacity-40 dark:text-cyan-400 dark:hover:bg-cyan-500/20 dark:hover:text-cyan-300"
                           title="Start Packing"
                         >
                           {transitioningId === shipment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
@@ -808,7 +817,7 @@ const Shipments: React.FC = () => {
                         <button
                           onClick={() => handlePrepare(shipment)}
                           disabled={transitioningId === shipment.id}
-                          className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-lg p-1.5 text-cyan-700 transition-all hover:bg-slate-100 hover:text-cyan-800 disabled:cursor-not-allowed disabled:opacity-40 dark:text-cyan-400 dark:hover:bg-cyan-500/20 dark:hover:text-cyan-300"
                           title="Prepare / Pack"
                         >
                           <Clipboard className="w-4 h-4" />

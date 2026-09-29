@@ -13,8 +13,10 @@ use App\Models\User;
 use App\Notifications\WorkflowNotification;
 use App\Support\WorkflowNotificationSender;
 use App\Support\AuditLogger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ReceivingController extends Controller
 {
@@ -97,18 +99,31 @@ class ReceivingController extends Controller
     {
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
+        $validated = $request->validate([
+            'view' => ['nullable', Rule::in(['active', 'history'])],
+            'status' => ['nullable', 'string', 'max:40'],
+            'supplier' => ['nullable', 'string', 'max:255'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'date' => ['nullable', Rule::in(['today', 'week', 'month'])],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $view = $validated['view'] ?? 'active';
+
         $query = Receiving::query()->with(['items', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
+        $this->applyWorkflowView($query, $view);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
         }
 
-        if ($request->filled('supplier')) {
-            $query->where('supplier', $request->supplier);
+        if (! empty($validated['supplier'])) {
+            $query->where('supplier', $validated['supplier']);
         }
 
-        if ($request->filled('search')) {
-            $search = $request->search;
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('receiving_no', 'like', "%{$search}%")
                     ->orWhere('purchase_order', 'like', "%{$search}%")
@@ -116,11 +131,83 @@ class ReceivingController extends Controller
             });
         }
 
-        $items = $query->orderByDesc('created_at')
-            ->get()
-            ->map(fn (Receiving $receiving) => $this->present($receiving));
+        if (! empty($validated['date'])) {
+            if ($validated['date'] === 'today') {
+                $query->whereDate('delivery_date', now()->toDateString());
+            } else {
+                [$from, $to] = $validated['date'] === 'week'
+                    ? [now()->startOfWeek()->toDateString(), now()->endOfWeek()->toDateString()]
+                    : [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()];
+                $query->whereBetween('delivery_date', [$from, $to]);
+            }
+        }
 
-        return response()->json(['data' => $items]);
+        $summaryQuery = Receiving::query();
+        $this->applyWorkflowView($summaryQuery, $view);
+        $summary = [
+            'total' => (clone $summaryQuery)->count(),
+            'pending_qa' => (clone $summaryQuery)->where('status', 'Pending QA')->count(),
+            'passed' => (clone $summaryQuery)->where('status', 'Passed')->count(),
+            'rejected' => (clone $summaryQuery)->where('status', 'Rejected')->count(),
+            'partial' => (clone $summaryQuery)->where('status', 'Partial')->count(),
+        ];
+        $suppliers = (clone $summaryQuery)->distinct()->orderBy('supplier')->pluck('supplier')->values();
+
+        $paginator = $query
+            ->orderByDesc($view === 'history' ? 'updated_at' : 'created_at')
+            ->paginate($validated['per_page'] ?? 5)
+            ->withQueryString();
+
+        return response()->json([
+            'data' => $paginator->getCollection()->map(fn (Receiving $receiving) => $this->present($receiving))->values(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
+            'summary' => $summary,
+            'suppliers' => $suppliers,
+        ]);
+    }
+
+    private function applyWorkflowView(Builder $query, string $view): void
+    {
+        $applyUnresolvedRejections = fn (Builder $items) => $items
+            ->where('rejected_quantity', '>', 0)
+            ->where(function (Builder $cases) {
+                $cases->whereDoesntHave('supplierRejectionCase')
+                    ->orWhereHas('supplierRejectionCase', fn (Builder $case) => $case->where('status', '<>', 'RESOLVED'));
+            });
+        $openDiscrepancyStatuses = [
+            ReceivingDiscrepancy::STATUS_REPORTED,
+            ReceivingDiscrepancy::STATUS_CONTACTED,
+            ReceivingDiscrepancy::STATUS_AWAITING_RESPONSE,
+            ReceivingDiscrepancy::STATUS_AWAITING_BALANCE,
+            ReceivingDiscrepancy::STATUS_UNDER_RESOLUTION,
+        ];
+
+        if ($view === 'history') {
+            $query->whereHas('qaInspection', fn (Builder $inspection) => $inspection->whereNotNull('completed_at'))
+                ->whereDoesntHave('items', fn (Builder $items) => $items
+                    ->whereNull('stocked_in_at')
+                    ->whereHas('qaInspectionItem', fn (Builder $item) => $item->where('accepted_quantity', '>', 0)))
+                ->whereDoesntHave('qaInspection.items', $applyUnresolvedRejections)
+                ->whereDoesntHave('discrepancy', fn (Builder $discrepancy) => $discrepancy->whereIn('status', $openDiscrepancyStatuses));
+
+            return;
+        }
+
+        $query->where(function (Builder $active) use ($applyUnresolvedRejections, $openDiscrepancyStatuses) {
+            $active->whereDoesntHave('qaInspection', fn (Builder $inspection) => $inspection->whereNotNull('completed_at'))
+                ->orWhereHas('items', fn (Builder $items) => $items
+                    ->whereNull('stocked_in_at')
+                    ->whereHas('qaInspectionItem', fn (Builder $item) => $item->where('accepted_quantity', '>', 0)))
+                ->orWhereHas('qaInspection.items', $applyUnresolvedRejections)
+                ->orWhereHas('discrepancy', fn (Builder $discrepancy) => $discrepancy->whereIn('status', $openDiscrepancyStatuses));
+        });
     }
 
     public function show(Request $request, $id)
@@ -252,13 +339,27 @@ class ReceivingController extends Controller
 
                 $purchaseOrder->update(['status' => $receivedNow ? 'Completed' : 'Partially Received']);
                 if ($receivedNow) {
-                    ReceivingDiscrepancy::query()
+                    $resolvedCases = ReceivingDiscrepancy::query()
                         ->where('purchase_order_id', $purchaseOrder->id)
-                        ->whereIn('status', [ReceivingDiscrepancy::STATUS_REPORTED, ReceivingDiscrepancy::STATUS_CONTACTED, ReceivingDiscrepancy::STATUS_AWAITING_BALANCE])
-                        ->update(['status' => ReceivingDiscrepancy::STATUS_RESOLVED, 'resolution_notes' => 'Outstanding balance was received.', 'resolved_at' => $now]);
+                        ->whereIn('status', [ReceivingDiscrepancy::STATUS_REPORTED, ReceivingDiscrepancy::STATUS_CONTACTED, ReceivingDiscrepancy::STATUS_AWAITING_RESPONSE, ReceivingDiscrepancy::STATUS_AWAITING_BALANCE, ReceivingDiscrepancy::STATUS_UNDER_RESOLUTION])
+                        ->get();
+                    foreach ($resolvedCases as $case) {
+                        $case->update([
+                            'status' => ReceivingDiscrepancy::STATUS_RESOLVED,
+                            'resolution_notes' => 'Outstanding balance was received.',
+                            'resolved_by_receiving_id' => $receiving->id,
+                            'resolved_at' => $now,
+                        ]);
+                        AuditLogger::success('SHORT_DELIVERY_RESOLVED', AuditLogger::MODULE_RECEIVING, [
+                            'resource' => $case,
+                            'resource_label' => 'Discrepancy #'.$case->id,
+                            'details' => "Outstanding balance received in {$receiving->receiving_no}",
+                            'metadata' => ['purchase_order_id' => $purchaseOrder->id, 'receiving_id' => $receiving->id, 'short_quantity' => $case->short_quantity],
+                        ]);
+                    }
                 }
 
-                AuditLogger::success($shortNow > 0 ? 'SHORT_DELIVERY_REPORTED' : 'RECEIVING_CREATED', AuditLogger::MODULE_RECEIVING, [
+                AuditLogger::success($shortNow > 0 ? 'SHORT_DELIVERY_DETECTED' : 'RECEIVING_CREATED', AuditLogger::MODULE_RECEIVING, [
                     'resource' => $receiving,
                     'resource_label' => $receiving->receiving_no,
                     'details' => $shortNow > 0 ? "Short delivery of {$shortNow} unit(s) reported" : "Created {$receiving->receiving_no}",

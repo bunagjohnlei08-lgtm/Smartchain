@@ -46,7 +46,6 @@ export interface LoginFormData {
   mode: 'login';
   email: string;
   password: string;
-  rememberMe: boolean;
   role?: RoleSlug;
 }
 

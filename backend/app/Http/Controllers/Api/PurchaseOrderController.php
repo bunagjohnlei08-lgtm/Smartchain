@@ -26,7 +26,12 @@ class PurchaseOrderController extends Controller
     public function index(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $orders = PurchaseOrder::query()->with(['items', 'approver:id,name', 'receivings.items', 'discrepancies'])->latest()->get();
+        $orders = PurchaseOrder::query()->with([
+            'items', 'approver:id,name', 'receivings.items',
+            'discrepancies.reportedBy:id,name', 'discrepancies.contactedBy:id,name',
+            'discrepancies.respondedBy:id,name', 'discrepancies.resolvedBy:id,name',
+            'discrepancies.resolvedByReceiving:id,receiving_no,delivery_date',
+        ])->latest()->get();
         return response()->json(['data' => $orders->map(fn (PurchaseOrder $order) => $this->present($order))]);
     }
 
@@ -248,8 +253,28 @@ class PurchaseOrderController extends Controller
                 'type' => $case->discrepancy_type,
                 'short_quantity' => $case->short_quantity,
                 'status' => $case->status,
+                'expected_quantity' => $case->expected_quantity,
+                'delivered_quantity' => $case->delivered_quantity,
+                'reported_at' => $case->reported_at,
+                'reported_by' => $case->reportedBy?->name,
+                'contact_method' => $case->contact_method,
+                'contact_note' => $case->contact_note,
+                'contacted_at' => $case->contacted_at,
+                'contacted_by' => $case->contactedBy?->name,
+                'supplier_response_code' => $case->supplier_response_code,
                 'supplier_response' => $case->supplier_response,
+                'response_notes' => $case->response_notes,
+                'expected_balance_delivery_date' => $case->expected_balance_delivery_date?->toDateString(),
+                'responded_at' => $case->responded_at,
+                'responded_by' => $case->respondedBy?->name,
                 'resolution_notes' => $case->resolution_notes,
+                'resolved_at' => $case->resolved_at,
+                'resolved_by' => $case->resolvedBy?->name,
+                'resolved_by_receiving' => $case->resolvedByReceiving ? [
+                    'id' => $case->resolvedByReceiving->id,
+                    'receiving_no' => $case->resolvedByReceiving->receiving_no,
+                    'delivery_date' => $case->resolvedByReceiving->delivery_date?->toDateString(),
+                ] : null,
             ])->values() : [],
         ];
     }
