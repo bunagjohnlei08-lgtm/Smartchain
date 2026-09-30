@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ReplenishmentRequest extends Model
 {
@@ -49,6 +50,7 @@ class ReplenishmentRequest extends Model
     public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
     public function requester(): BelongsTo { return $this->belongsTo(User::class, 'requested_by'); }
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
+    public function purchaseOrder(): HasOne { return $this->hasOne(PurchaseOrder::class); }
 
     /** Approved and not yet consumed by a Purchase Order. */
     public function isAvailableForPurchaseOrder(): bool

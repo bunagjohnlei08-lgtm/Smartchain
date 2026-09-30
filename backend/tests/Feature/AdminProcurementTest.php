@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ReplenishmentRequest;
 use App\Models\Branch;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -73,6 +74,134 @@ class AdminProcurementTest extends TestCase
             ->assertJsonPath('data.0.status', ReplenishmentRequest::STATUS_PENDING)
             ->assertJsonPath('data.0.requested_by', 'M. Santos')
             ->assertJsonPath('data.0.submitted_date', '2026-08-27');
+    }
+
+    public function test_admin_default_queue_contains_only_requests_with_remaining_procurement_action(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $pending = $this->replenishmentRequest(['request_no' => 'RR-PENDING']);
+        $approved = $this->replenishmentRequest([
+            'request_no' => 'RR-APPROVED',
+            'status' => ReplenishmentRequest::STATUS_APPROVED,
+        ]);
+        $rejected = $this->replenishmentRequest([
+            'request_no' => 'RR-REJECTED',
+            'status' => ReplenishmentRequest::STATUS_REJECTED,
+        ]);
+        $handedOff = $this->replenishmentRequest([
+            'request_no' => 'RR-HANDED-OFF',
+            'status' => ReplenishmentRequest::STATUS_PO_CREATED,
+        ]);
+
+        PurchaseOrder::create([
+            'po_number' => 'PO-QUEUE-1001',
+            'replenishment_request_id' => $handedOff->id,
+            'supplier_name' => 'Queue Test Supplier',
+            'delivery_details' => 'Main Warehouse',
+            'expected_delivery_date' => '2026-10-15',
+            'total_amount' => 100,
+            'status' => PurchaseOrder::STATUS_APPROVED,
+            'approved_by' => $admin->id,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->getJson('/api/admin/procurement/requests?per_page=1')
+            ->assertOk()
+            ->assertJsonPath('total', 2)
+            ->assertJsonPath('per_page', 1)
+            ->assertJsonCount(1, 'data');
+
+        $visibleIds = collect([1, 2])
+            ->flatMap(fn (int $page) => $this->actingAs($admin)
+                ->getJson("/api/admin/procurement/requests?per_page=1&page={$page}")
+                ->assertOk()
+                ->json('data'))
+            ->pluck('id')
+            ->all();
+
+        $this->assertEqualsCanonicalizing([$pending->id, $approved->id], $visibleIds);
+
+        foreach ([$rejected, $handedOff] as $finishedRequest) {
+            $this->assertDatabaseHas('replenishment_requests', [
+                'id' => $finishedRequest->id,
+                'status' => $finishedRequest->status,
+            ]);
+        }
+        $this->assertDatabaseHas('purchase_orders', [
+            'replenishment_request_id' => $handedOff->id,
+            'po_number' => 'PO-QUEUE-1001',
+        ]);
+
+        $historicalRows = collect($this->actingAs($admin)
+            ->getJson('/api/admin/reports/preview?report_key=procurement.replenishment&per_page=100')
+            ->assertOk()
+            ->json('rows'))
+            ->pluck('request_no')
+            ->all();
+
+        $this->assertContains($rejected->request_no, $historicalRows);
+        $this->assertContains($handedOff->request_no, $historicalRows);
+    }
+
+    public function test_actual_purchase_order_linkage_removes_an_approved_request_from_the_operational_queue(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $approved = $this->replenishmentRequest([
+            'request_no' => 'RR-LINKED',
+            'status' => ReplenishmentRequest::STATUS_APPROVED,
+        ]);
+
+        PurchaseOrder::create([
+            'po_number' => 'PO-QUEUE-1002',
+            'replenishment_request_id' => $approved->id,
+            'supplier_name' => 'Linked Test Supplier',
+            'delivery_details' => 'Main Warehouse',
+            'expected_delivery_date' => '2026-10-16',
+            'total_amount' => 200,
+            'status' => PurchaseOrder::STATUS_APPROVED,
+            'approved_by' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/procurement/requests')
+            ->assertOk()
+            ->assertJsonPath('total', 0)
+            ->assertJsonCount(0, 'data');
+
+        $this->assertDatabaseHas('replenishment_requests', ['id' => $approved->id]);
+        $this->assertDatabaseHas('purchase_orders', ['replenishment_request_id' => $approved->id]);
+    }
+
+    public function test_search_and_status_filters_are_applied_within_the_operational_dataset_before_pagination(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $pending = $this->replenishmentRequest(['request_no' => 'RR-SEARCH-PENDING']);
+        $approved = $this->replenishmentRequest([
+            'request_no' => 'RR-SEARCH-APPROVED',
+            'status' => ReplenishmentRequest::STATUS_APPROVED,
+        ]);
+        $this->replenishmentRequest([
+            'request_no' => 'RR-SEARCH-REJECTED',
+            'status' => ReplenishmentRequest::STATUS_REJECTED,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/procurement/requests?search=SEARCH&status=approved&per_page=1')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $approved->id);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/procurement/requests?search=SEARCH&status=pending&per_page=1')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $pending->id);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/procurement/requests?search=SEARCH&status=rejected')
+            ->assertOk()
+            ->assertJsonPath('total', 0)
+            ->assertJsonCount(0, 'data');
     }
 
     public function test_approving_keeps_the_request_number_and_persists_the_decision(): void

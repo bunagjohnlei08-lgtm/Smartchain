@@ -332,7 +332,7 @@ const Procurement: React.FC = () => {
         <KPICard
           label="For Purchase Order"
           value={summary.for_purchase_order}
-          indicator="Approved, no PO yet"
+          indicator="Purchase Order created"
           icon={<FileText className="w-5 h-5 text-cyan-500" />}
         />
         <KPICard
@@ -343,7 +343,7 @@ const Procurement: React.FC = () => {
         />
       </div>
 
-      {/* All replenishment requests from the shared backend source */}
+      {/* Operational requests from the shared backend source; historical counts remain in the summary cards. */}
       <section className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-6">
         <div className="flex flex-col gap-4 mb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>

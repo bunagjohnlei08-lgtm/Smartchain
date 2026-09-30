@@ -36,9 +36,11 @@ class AdminProcurementController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
         ]);
 
-        // Drafts have not been submitted to Admin Procurement yet.
+        // The default endpoint is Admin Procurement's operational queue.
+        // Approved requests remain actionable until a Purchase Order consumes them.
         $query = ReplenishmentRequest::query()
-            ->where('status', '!=', self::STATUS_DRAFT)
+            ->whereIn('status', [self::STATUS_PENDING, self::STATUS_APPROVED])
+            ->whereDoesntHave('purchaseOrder')
             ->with(['requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name']);
 
         if (!empty($validated['search'])) {

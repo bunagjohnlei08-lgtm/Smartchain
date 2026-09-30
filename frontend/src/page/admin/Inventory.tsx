@@ -878,8 +878,8 @@ const InventoryGrid: React.FC<{
 
             {/* Category & Warehouse */}
             <div className="admin-inventory-grid-meta flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-3">
-              <span className="admin-inventory-grid-chip admin-badge bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.category || 'Uncategorized'}</span>
-              <span className="admin-inventory-grid-chip admin-badge bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.warehouse}</span>
+              <span className="admin-inventory-grid-chip bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.category || 'Uncategorized'}</span>
+              <span className="admin-inventory-grid-chip bg-slate-800/50 px-2 py-1 rounded-lg truncate">{item.warehouse}</span>
             </div>
 
             {/* Stock Quantities */}
