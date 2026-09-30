@@ -667,7 +667,42 @@ const PurchaseOrders: React.FC = () => {
             {/* Items Table */}
             <div className="admin-po-details-items mb-4 sm:mb-6">
               <h3 className="mb-2 text-xs font-semibold text-white sm:text-sm">Items</h3>
-              <div className="admin-po-details-items-scroll admin-table-scroll">
+              <div className="space-y-2 sm:hidden">
+                {selectedOrder.items.map((item, idx) => (
+                  <article key={idx} className="min-w-0 rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3">
+                    <h4 className="break-words text-[13px] font-semibold leading-4 text-white" title={item.productName}>{item.productName}</h4>
+                    <dl className="mt-2 grid grid-cols-3 gap-2">
+                      <div className="min-w-0">
+                        <dt className="text-xs leading-4 text-slate-400">Ordered</dt>
+                        <dd className="text-[13px] font-medium leading-4 text-white">{item.quantity}</dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs leading-4 text-slate-400">Received</dt>
+                        <dd className="text-[13px] font-medium leading-4 text-white">{item.receivedQuantity}</dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-xs leading-4 text-slate-400">Remaining</dt>
+                        <dd className="text-[13px] font-medium leading-4 text-white">{item.remainingQuantity}</dd>
+                      </div>
+                    </dl>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 border-t border-[#1f2937] pt-2">
+                      <div className="min-w-0">
+                        <dt className="text-xs leading-4 text-slate-400">Unit Price</dt>
+                        <dd className="whitespace-nowrap text-[13px] font-medium leading-4 text-white">₱{item.unitPrice.toLocaleString()}</dd>
+                      </div>
+                      <div className="min-w-0 text-right">
+                        <dt className="text-xs leading-4 text-slate-400">Amount</dt>
+                        <dd className="whitespace-nowrap text-[13px] font-semibold leading-4 text-white">₱{item.amount.toLocaleString()}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+                <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3">
+                  <span className="text-xs font-semibold leading-4 text-white">Total Amount</span>
+                  <span className="min-w-0 whitespace-nowrap text-right text-sm font-bold leading-5 text-cyan-400">₱{selectedOrder.totalAmount.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="admin-po-details-items-scroll admin-table-scroll hidden sm:block">
                 <table className="admin-po-details-items-table admin-responsive-table admin-cols-4 admin-sticky-1 w-full min-w-[420px] text-xs sm:min-w-0 sm:text-sm">
                   <thead className="border-b border-[#1f2937]">
                     <tr className="text-gray-400 text-xs uppercase">

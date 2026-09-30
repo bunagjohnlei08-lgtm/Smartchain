@@ -1432,6 +1432,16 @@
     display: none !important;
   }
 
+  .admin-main .admin-dashboard-inventory-status-badge {
+    width: max-content;
+    max-width: none;
+    padding: 2px 6px !important;
+    font-size: 12px !important;
+    line-height: 16px !important;
+    white-space: nowrap !important;
+    vertical-align: middle;
+  }
+
   .admin-main .admin-responsive-table td:last-child button:has(> svg:only-child),
   .admin-product-catalog .product-catalog-table td:last-child button {
     display: inline-flex;
