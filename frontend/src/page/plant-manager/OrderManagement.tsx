@@ -208,7 +208,7 @@ const getStatusColor = (status: OrderStatus) => {
 // Status Badge
 const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
   return (
-    <span className={`plant-manager-badge inline-flex w-fit items-center whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
+    <span className={`plant-manager-badge ${status === 'Forwarded to Logistics' ? 'pm-forwarded-to-logistics-badge' : ''} inline-flex w-fit items-center whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(status)}`}>
       {status}
     </span>
   );

@@ -191,8 +191,62 @@ class AdminProcurementTest extends TestCase
         $this->actingAs($this->requester)
             ->getJson('/api/plant-manager/procurement/requests')
             ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->actingAs($this->requester)
+            ->getJson('/api/plant-manager/procurement/requests?scope=history')
+            ->assertOk()
             ->assertJsonPath('data.0.id', $replenishmentRequest->id)
             ->assertJsonPath('data.0.status', ReplenishmentRequest::STATUS_APPROVED);
+    }
+
+    public function test_plant_manager_default_queue_contains_only_active_requests(): void
+    {
+        $draft = $this->replenishmentRequest([
+            'request_no' => 'RR-DRAFT',
+            'status' => ReplenishmentRequest::STATUS_DRAFT,
+            'submitted_at' => null,
+        ]);
+        $pending = $this->replenishmentRequest(['request_no' => 'RR-PENDING']);
+        $approved = $this->replenishmentRequest([
+            'request_no' => 'RR-APPROVED',
+            'status' => ReplenishmentRequest::STATUS_APPROVED,
+        ]);
+        $rejected = $this->replenishmentRequest([
+            'request_no' => 'RR-REJECTED',
+            'status' => ReplenishmentRequest::STATUS_REJECTED,
+        ]);
+        $poCreated = $this->replenishmentRequest([
+            'request_no' => 'RR-PO-CREATED',
+            'status' => ReplenishmentRequest::STATUS_PO_CREATED,
+        ]);
+
+        $queue = $this->actingAs($this->requester)
+            ->getJson('/api/plant-manager/procurement/requests')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->json('data');
+
+        $this->assertEqualsCanonicalizing([$draft->id, $pending->id], array_column($queue, 'id'));
+        $this->assertTrue($approved->fresh()->isAvailableForPurchaseOrder());
+
+        foreach ([$approved, $rejected, $poCreated] as $terminalRequest) {
+            $this->assertDatabaseHas('replenishment_requests', [
+                'id' => $terminalRequest->id,
+                'status' => $terminalRequest->status,
+            ]);
+        }
+
+        $history = $this->actingAs($this->requester)
+            ->getJson('/api/plant-manager/procurement/requests?scope=history')
+            ->assertOk()
+            ->assertJsonCount(5, 'data')
+            ->json('data');
+
+        $this->assertEqualsCanonicalizing(
+            [$draft->id, $pending->id, $approved->id, $rejected->id, $poCreated->id],
+            array_column($history, 'id'),
+        );
     }
 
     public function test_submitted_plant_manager_request_appears_in_admin_procurement(): void

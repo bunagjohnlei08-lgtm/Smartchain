@@ -197,10 +197,40 @@ class ReceivingQueueTest extends TestCase
 
     public function test_receiving_reports_still_include_history_records(): void
     {
-        [$history] = $this->receiving(5, 0, true, true);
+        [$history, $originalInspectionItem] = $this->receiving(5, 0, true, true);
+        $purchaseOrder = $this->purchaseOrder('PO-REPORT', 'Closed with Shortage');
+        $history->update(['purchase_order_id' => $purchaseOrder->id]);
+        $history->items()->update(['ordered_quantity' => 10]);
+        ReceivingDiscrepancy::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'receiving_id' => $history->id,
+            'discrepancy_type' => ReceivingDiscrepancy::TYPE_SHORT_DELIVERY,
+            'expected_quantity' => 10,
+            'delivered_quantity' => 5,
+            'short_quantity' => 5,
+            'status' => ReceivingDiscrepancy::STATUS_CLOSED_SHORTAGE,
+            'reported_at' => now(),
+        ]);
+        $case = SupplierRejectionCase::create([
+            'qa_inspection_item_id' => $originalInspectionItem->id,
+            'status' => 'RESOLVED',
+            'resolved_at' => now(),
+        ]);
+        [$replacement] = $this->receiving(5, 0, true, true);
+        $replacement->update(['replacement_for_rejection_case_id' => $case->id]);
 
-        $this->actingAs($this->manager)->getJson('/api/plant-manager/reports/generate?type=receiving&format=preview')
-            ->assertOk()
-            ->assertJsonFragment(['receiving_no' => $history->receiving_no]);
+        $rows = collect($this->actingAs($this->manager)
+            ->getJson('/api/plant-manager/reports/generate?type=receiving&format=preview')
+            ->assertOk()->json('report.rows'))->keyBy('receiving_no');
+
+        $this->assertSame(5, $rows[$history->receiving_no]['delivered_quantity']);
+        $this->assertSame(5, $rows[$history->receiving_no]['accepted_quantity']);
+        $this->assertSame(0, $rows[$history->receiving_no]['rejected_quantity']);
+        $this->assertSame(5, $rows[$history->receiving_no]['short_quantity']);
+        $this->assertSame(ReceivingDiscrepancy::STATUS_CLOSED_SHORTAGE, $rows[$history->receiving_no]['discrepancy_status']);
+        $this->assertSame('Original', $rows[$history->receiving_no]['receiving_type']);
+        $this->assertSame('Replacement', $rows[$replacement->receiving_no]['receiving_type']);
+        $this->assertSame($history->receiving_no, $rows[$replacement->receiving_no]['replaces_receiving']);
+        $this->assertCount(2, $rows);
     }
 }

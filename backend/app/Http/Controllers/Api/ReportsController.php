@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Receiving;
+use App\Models\ReportExport;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\WarehouseCapacity;
@@ -46,7 +47,7 @@ class ReportsController extends Controller
     ];
 
     /** Event timestamps are stored in the app timezone and shown to users in business time. */
-    private const TIMESTAMP_COLUMNS = ['stocked_in_at', 'created_at', 'completed_at', 'occurred_at', 'ready_for_shipment_at'];
+    private const TIMESTAMP_COLUMNS = ['stocked_in_at', 'created_at', 'completed_at', 'occurred_at', 'ready_for_shipment_at', 'packed_at'];
 
     /** Same business day convention as the Plant Manager Dashboard trends. */
     private const BUSINESS_TIMEZONE = 'Asia/Manila';
@@ -152,6 +153,20 @@ class ReportsController extends Controller
         [$columns, $rows, $summary] = $this->reportData($validated['type'], $from, $to);
         $rows = array_map(fn (array $row) => $this->toBusinessTime($row), $rows);
 
+        ReportExport::create([
+            'user_id' => $request->user()->id,
+            'action' => $validated['format'] === 'preview' ? ReportExport::ACTION_PREVIEW : ReportExport::ACTION_EXPORT,
+            'source' => ReportExport::SOURCE_STANDARD,
+            'report_key' => $validated['type'],
+            'report_name' => self::REPORTS[$validated['type']],
+            'category' => $validated['type'],
+            'format' => $validated['format'],
+            'filters' => ['from' => $from?->toDateString(), 'to' => $to?->toDateString()],
+            'status' => ReportExport::STATUS_SUCCESS,
+            'row_count' => count($rows),
+            'generated_at' => now(),
+        ]);
+
         return response()->json(['report' => [
             'type' => $validated['type'],
             'title' => self::REPORTS[$validated['type']],
@@ -169,7 +184,21 @@ class ReportsController extends Controller
     {
         $this->authorizePlantManager($request);
 
-        return response()->json(['data' => []]);
+        return response()->json(['data' => ReportExport::query()
+            ->where('user_id', $request->user()->id)
+            ->whereIn('report_key', array_keys(self::REPORTS))
+            ->with('user:id,name')
+            ->orderByDesc('generated_at')->orderByDesc('id')
+            ->limit(20)->get()
+            ->map(fn (ReportExport $export) => [
+                'id' => $export->id,
+                'name' => $export->report_name,
+                'type' => $export->report_key,
+                'category' => $export->report_key,
+                'generated_at' => $export->generated_at?->toIso8601String(),
+                'generated_by' => $export->user?->name,
+                'format' => $export->format,
+            ])]);
     }
 
     /**
@@ -227,10 +256,57 @@ class ReportsController extends Controller
 
     private function receivingReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
     {
-        $query = DB::table('receivings')->leftJoin('receiving_items', 'receiving_items.receiving_id', '=', 'receivings.id')->groupBy('receivings.id')->orderByDesc('receivings.delivery_date');
+        $itemTotals = DB::table('receiving_items')->select('receiving_id')
+            ->selectRaw('COALESCE(SUM(ordered_quantity), 0) as ordered_quantity')
+            ->selectRaw('COALESCE(SUM(delivered_quantity), 0) as delivered_quantity')
+            ->selectRaw('MAX(stocked_in_at) as stocked_in_at')
+            ->groupBy('receiving_id');
+        $qaTotals = DB::table('qa_inspection_items')
+            ->join('receiving_items', 'receiving_items.id', '=', 'qa_inspection_items.receiving_item_id')
+            ->select('receiving_items.receiving_id')
+            ->selectRaw('COALESCE(SUM(qa_inspection_items.accepted_quantity), 0) as accepted_quantity')
+            ->selectRaw('COALESCE(SUM(qa_inspection_items.rejected_quantity), 0) as rejected_quantity')
+            ->groupBy('receiving_items.receiving_id');
+        $replacementOrigins = DB::table('supplier_rejection_cases as src')
+            ->join('qa_inspection_items as original_qai', 'original_qai.id', '=', 'src.qa_inspection_item_id')
+            ->join('receiving_items as original_item', 'original_item.id', '=', 'original_qai.receiving_item_id')
+            ->join('receivings as original_receiving', 'original_receiving.id', '=', 'original_item.receiving_id')
+            ->select(['src.id as case_id', 'original_receiving.receiving_no as replaces_receiving']);
+
+        $query = DB::table('receivings')
+            ->leftJoinSub($itemTotals, 'item_totals', 'item_totals.receiving_id', '=', 'receivings.id')
+            ->leftJoinSub($qaTotals, 'qa_totals', 'qa_totals.receiving_id', '=', 'receivings.id')
+            ->leftJoin('qa_inspections', 'qa_inspections.receiving_id', '=', 'receivings.id')
+            ->leftJoin('receiving_discrepancies', 'receiving_discrepancies.receiving_id', '=', 'receivings.id')
+            ->leftJoinSub($replacementOrigins, 'replacement_origins', 'replacement_origins.case_id', '=', 'receivings.replacement_for_rejection_case_id')
+            ->orderByDesc('receivings.delivery_date')->orderByDesc('receivings.id');
         $this->applyDateRange($query, 'receivings.delivery_date', $from, $to);
-        $rows = $query->get(['receivings.receiving_no', 'receivings.purchase_order', 'receivings.supplier', 'receivings.delivery_date', 'receivings.status', DB::raw('COALESCE(SUM(receiving_items.delivered_quantity), 0) as delivered_quantity')])->map(fn ($row) => (array) $row)->all();
-        return [['receiving_no', 'purchase_order', 'supplier', 'delivery_date', 'status', 'delivered_quantity'], $rows, ['records' => count($rows), 'delivered_quantity' => array_sum(array_column($rows, 'delivered_quantity'))]];
+        $rows = $query->get([
+            'receivings.receiving_no', 'receivings.purchase_order', 'receivings.reference_no', 'receivings.supplier',
+            'receivings.delivery_date', 'receivings.status',
+            DB::raw("CASE WHEN receivings.replacement_for_rejection_case_id IS NULL THEN 'Original' ELSE 'Replacement' END as receiving_type"),
+            'replacement_origins.replaces_receiving',
+            DB::raw('COALESCE(item_totals.ordered_quantity, 0) as ordered_quantity'),
+            DB::raw('COALESCE(item_totals.delivered_quantity, 0) as delivered_quantity'),
+            DB::raw('COALESCE(receiving_discrepancies.short_quantity, 0) as short_quantity'),
+            'receiving_discrepancies.status as discrepancy_status',
+            'qa_inspections.status as qa_status',
+            DB::raw('COALESCE(qa_totals.accepted_quantity, 0) as accepted_quantity'),
+            DB::raw('COALESCE(qa_totals.rejected_quantity, 0) as rejected_quantity'),
+            'item_totals.stocked_in_at',
+        ])->map(fn ($row) => (array) $row)->all();
+
+        return [[
+            'receiving_no', 'purchase_order', 'reference_no', 'supplier', 'delivery_date', 'status', 'receiving_type',
+            'replaces_receiving', 'ordered_quantity', 'delivered_quantity', 'short_quantity', 'discrepancy_status',
+            'qa_status', 'accepted_quantity', 'rejected_quantity', 'stocked_in_at',
+        ], $rows, [
+            'records' => count($rows),
+            'delivered_quantity' => array_sum(array_column($rows, 'delivered_quantity')),
+            'accepted_quantity' => array_sum(array_column($rows, 'accepted_quantity')),
+            'rejected_quantity' => array_sum(array_column($rows, 'rejected_quantity')),
+            'short_quantity' => array_sum(array_column($rows, 'short_quantity')),
+        ]];
     }
 
     private function stockInReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
@@ -259,8 +335,16 @@ class ReportsController extends Controller
         // or READY_FOR_SHIPMENT for orders that entered before the packing stages existed.
         $enteredAt = DB::table('order_status_histories')->selectRaw('MIN(order_status_histories.created_at)')
             ->whereColumn('order_status_histories.order_id', 'orders.id')->whereIn('order_status_histories.new_status', Order::SHIPMENT_QUEUE_STATUSES);
-        $query = DB::table('orders')->whereIn('orders.status', $statuses)->orderByDesc('orders.updated_at')
-            ->select(['orders.order_no', 'orders.customer_name', 'orders.required_delivery_date', 'orders.status', 'orders.total_amount'])
+        $query = DB::table('orders')
+            ->leftJoin('shipment_packings', 'shipment_packings.order_id', '=', 'orders.id')
+            ->leftJoin('users as packers', 'packers.id', '=', 'shipment_packings.packed_by_id')
+            ->whereIn('orders.status', $statuses)->orderByDesc('orders.updated_at')
+            ->select([
+                'orders.order_no', 'orders.customer_name', 'orders.required_delivery_date', 'orders.status', 'orders.total_amount',
+                'shipment_packings.package_id', 'shipment_packings.number_of_boxes', 'shipment_packings.estimated_weight_kg',
+                'shipment_packings.is_fragile', 'packers.name as packed_by', 'shipment_packings.packed_at',
+            ])
+            ->selectRaw("CASE WHEN shipment_packings.correct_product = ? AND shipment_packings.correct_quantity = ? AND shipment_packings.package_condition = ? AND shipment_packings.items_complete = ? THEN ? ELSE ? END as packing_checklist", [true, true, true, true, 'Complete', 'Incomplete'])
             ->selectSub($readyAt, 'ready_for_shipment_at');
         if ($from) {
             $query->where(clone $enteredAt, '>=', $this->startOf($from));
@@ -269,7 +353,11 @@ class ReportsController extends Controller
             $query->where(clone $enteredAt, '<', $this->endBefore($to));
         }
         $rows = $query->get()->map(fn ($row) => (array) $row)->all();
-        return [['order_no', 'customer_name', 'required_delivery_date', 'status', 'total_amount', 'ready_for_shipment_at'], $rows, ['records' => count($rows), 'delivered' => collect($rows)->where('status', 'DELIVERED')->count()]];
+        return [[
+            'order_no', 'customer_name', 'required_delivery_date', 'status', 'total_amount', 'package_id',
+            'number_of_boxes', 'estimated_weight_kg', 'is_fragile', 'packed_by', 'packed_at', 'packing_checklist',
+            'ready_for_shipment_at',
+        ], $rows, ['records' => count($rows), 'delivered' => collect($rows)->where('status', 'DELIVERED')->count()]];
     }
 
     private function movementReport(?CarbonImmutable $from, ?CarbonImmutable $to): array

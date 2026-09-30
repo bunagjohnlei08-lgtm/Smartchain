@@ -98,7 +98,7 @@ export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ attachments, e
       <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300">{total} / 5 files</span>
     </div>
     {total === 0 && <p className="rounded-lg border border-dashed border-(--border-color-strong) p-4 text-center text-sm text-(--text-secondary)">No evidence attached.</p>}
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div data-qa-layout-debug="evidenceGrid" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {visibleSaved.map((attachment) => <article key={attachment.id} className="min-w-0 rounded-xl border border-(--border-color-strong) bg-(--bg-surface-alt) p-3">
         {attachment.mime_type.startsWith('image/') ? <SavedImage attachment={attachment} onOpen={(url, name) => setPreview({ url, name, owned: false })} /> : <div className="flex aspect-video items-center justify-center rounded-lg bg-red-500/10"><FileText className="h-10 w-10 text-red-500" /></div>}
         <p className="mt-2 truncate text-sm font-medium text-(--text-primary)" title={attachment.original_name}>{attachment.original_name}</p>

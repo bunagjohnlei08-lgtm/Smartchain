@@ -21,18 +21,54 @@ use Throwable;
 
 class PurchaseOrderController extends Controller
 {
-    private const STATUSES = ['Pending Approval', 'Approved', 'Sent to Supplier', 'Partially Received', 'Completed', 'Closed with Shortage', 'Cancelled'];
-
     public function index(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $orders = PurchaseOrder::query()->with([
+
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', Rule::in(PurchaseOrder::ACTIVE_STATUSES)],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:10'],
+        ]);
+
+        $query = PurchaseOrder::query()
+            ->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)
+            ->with([
             'items', 'approver:id,name', 'receivings.items',
             'discrepancies.reportedBy:id,name', 'discrepancies.contactedBy:id,name',
             'discrepancies.respondedBy:id,name', 'discrepancies.resolvedBy:id,name',
             'discrepancies.resolvedByReceiving:id,receiving_no,delivery_date',
-        ])->latest()->get();
-        return response()->json(['data' => $orders->map(fn (PurchaseOrder $order) => $this->present($order))]);
+        ]);
+
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
+            $query->where(function ($builder) use ($search) {
+                $builder->where('po_number', 'like', "%{$search}%")
+                    ->orWhere('supplier_name', 'like', "%{$search}%")
+                    ->orWhereHas('items', fn ($items) => $items->where('product_name', 'like', "%{$search}%"));
+            });
+        }
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        $orders = $query->latest()
+            ->paginate($validated['per_page'] ?? 10)
+            ->through(fn (PurchaseOrder $order) => $this->present($order));
+
+        $counts = PurchaseOrder::query()->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')->pluck('aggregate', 'status');
+
+        return response()->json([
+            ...$orders->toArray(),
+            'summary' => [
+                'total' => (int) $counts->sum(),
+                'pending' => (int) ($counts[PurchaseOrder::STATUS_PENDING_APPROVAL] ?? 0),
+                'approved' => (int) ($counts[PurchaseOrder::STATUS_APPROVED] ?? 0),
+                'completed' => (int) ($counts[PurchaseOrder::STATUS_COMPLETED] ?? 0),
+                'cancelled' => (int) ($counts[PurchaseOrder::STATUS_CANCELLED] ?? 0),
+            ],
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -48,7 +84,7 @@ class PurchaseOrderController extends Controller
             'delivery_details' => ['required', 'string', 'max:2000'],
             'expected_delivery_date' => ['required', 'date', 'after_or_equal:today'],
             'replenishment_request_id' => ['nullable', 'integer', 'exists:replenishment_requests,id', 'unique:purchase_orders,replenishment_request_id'],
-            'status' => ['nullable', Rule::in(self::STATUSES)],
+            'status' => ['nullable', Rule::in(PurchaseOrder::STATUSES)],
             'signature_data' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_name' => ['required', 'string', 'distinct', Rule::exists('products', 'name')],

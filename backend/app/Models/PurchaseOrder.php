@@ -8,6 +8,37 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PurchaseOrder extends Model
 {
+    public const STATUS_PENDING_APPROVAL = 'Pending Approval';
+    public const STATUS_APPROVED = 'Approved';
+    public const STATUS_SENT_TO_SUPPLIER = 'Sent to Supplier';
+    public const STATUS_PARTIALLY_RECEIVED = 'Partially Received';
+    public const STATUS_COMPLETED = 'Completed';
+    public const STATUS_CLOSED_WITH_SHORTAGE = 'Closed with Shortage';
+    public const STATUS_CANCELLED = 'Cancelled';
+
+    public const STATUSES = [
+        self::STATUS_PENDING_APPROVAL,
+        self::STATUS_APPROVED,
+        self::STATUS_SENT_TO_SUPPLIER,
+        self::STATUS_PARTIALLY_RECEIVED,
+        self::STATUS_COMPLETED,
+        self::STATUS_CLOSED_WITH_SHORTAGE,
+        self::STATUS_CANCELLED,
+    ];
+
+    public const ACTIVE_STATUSES = [
+        self::STATUS_PENDING_APPROVAL,
+        self::STATUS_APPROVED,
+        self::STATUS_SENT_TO_SUPPLIER,
+        self::STATUS_PARTIALLY_RECEIVED,
+    ];
+
+    public const TERMINAL_STATUSES = [
+        self::STATUS_COMPLETED,
+        self::STATUS_CLOSED_WITH_SHORTAGE,
+        self::STATUS_CANCELLED,
+    ];
+
     protected $fillable = [
         'po_number', 'replenishment_request_id', 'supplier_id', 'supplier_name', 'delivery_details',
         'expected_delivery_date', 'total_amount',

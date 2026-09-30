@@ -10,7 +10,6 @@ import {
   Clock,
   AlertCircle,
   Check,
-  Download,
   Edit,
   Eye,
   Mail,
@@ -636,7 +635,7 @@ const UserManagement: React.FC = () => {
         <KPICard label="SUSPENDED ACCOUNTS" value={statistics.suspended} icon={<AlertCircle className="w-5 h-5" />} />
       </div>
 
-      {/* 3. TOOLBAR (Search, Filters, Export, New User) */}
+      {/* 3. TOOLBAR (Search, Filters, New User) */}
       <div className="bg-[#0d1322] border border-gray-800/50 shadow-sm rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="admin-user-search-wrap relative flex-1 min-w-[240px]">
           <Search className="admin-user-search-icon w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
@@ -685,12 +684,6 @@ const UserManagement: React.FC = () => {
             <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
             <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
           </div>
-
-          <button
-            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:hover:bg-gray-800 dark:hover:text-white"
-          >
-            <Download className="w-3.5 h-3.5" /> Export
-          </button>
 
           <button onClick={() => setIsAddUserModalOpen(true)} className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-lg transition shadow-lg shadow-[#092635]/20">
             <UserPlus className="w-3.5 h-3.5" /> + New User

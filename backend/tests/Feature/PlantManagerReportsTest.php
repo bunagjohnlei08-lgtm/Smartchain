@@ -11,7 +11,9 @@ use App\Models\QaInspection;
 use App\Models\QaInspectionItem;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
+use App\Models\ReportExport;
 use App\Models\Role;
+use App\Models\ShipmentPacking;
 use App\Models\StockOutTransaction;
 use App\Models\SupplierRejectionCase;
 use App\Models\User;
@@ -399,6 +401,56 @@ class PlantManagerReportsTest extends TestCase
         $this->assertEqualsCanonicalizing([$packing->order_no, $ready->order_no], $rows->keys()->all());
         $this->assertNull($rows[$packing->order_no]['ready_for_shipment_at']);
         $this->assertSame('2026-09-12 10:00:00', $rows[$ready->order_no]['ready_for_shipment_at']);
+    }
+
+    public function test_shipment_report_includes_persisted_packing_details(): void
+    {
+        $order = $this->order('FORWARDED_TO_LOGISTICS', [['FOR_PACKING', '2026-09-03 02:00:00'], ['READY_FOR_SHIPMENT', '2026-09-03 04:00:00']]);
+        ShipmentPacking::create([
+            'order_id' => $order->id,
+            'package_id' => 'PKG-2026-000001',
+            'number_of_boxes' => 3,
+            'estimated_weight_kg' => 12.5,
+            'is_fragile' => true,
+            'correct_product' => true,
+            'correct_quantity' => true,
+            'package_condition' => true,
+            'items_complete' => true,
+            'packed_by_id' => $this->manager->id,
+            'packed_at' => '2026-09-03 03:30:00',
+        ]);
+
+        $row = $this->generate('shipment')->assertOk()->json('report.rows.0');
+
+        $this->assertSame('PKG-2026-000001', $row['package_id']);
+        $this->assertSame(3, $row['number_of_boxes']);
+        $this->assertSame('12.50', $row['estimated_weight_kg']);
+        $this->assertTrue((bool) $row['is_fragile']);
+        $this->assertSame($this->manager->name, $row['packed_by']);
+        $this->assertSame('Complete', $row['packing_checklist']);
+        $this->assertSame('2026-09-03 11:30:00', $row['packed_at']);
+    }
+
+    public function test_generated_report_history_uses_persisted_records_and_is_user_scoped(): void
+    {
+        $this->generate('stock-out', format: 'excel')->assertOk();
+
+        $this->assertDatabaseHas('report_exports', [
+            'user_id' => $this->manager->id,
+            'report_key' => 'stock-out',
+            'format' => 'excel',
+            'status' => ReportExport::STATUS_SUCCESS,
+        ]);
+        $this->actingAs($this->manager)->getJson('/api/plant-manager/reports/recent')
+            ->assertOk()
+            ->assertJsonPath('data.0.name', 'Stock Out Report')
+            ->assertJsonPath('data.0.type', 'stock-out')
+            ->assertJsonPath('data.0.generated_by', $this->manager->name)
+            ->assertJsonPath('data.0.format', 'excel');
+
+        $otherManager = $this->user('PLANT_MANAGER', ['warehouse_id' => $this->main->id]);
+        $this->actingAs($otherManager)->getJson('/api/plant-manager/reports/recent')
+            ->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_current_state_reports_declare_that_dates_do_not_apply(): void

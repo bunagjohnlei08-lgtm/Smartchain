@@ -749,7 +749,7 @@ const Shipments: React.FC = () => {
       <div className="bg-[#0d1322] border border-slate-800/80 rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
         <div
-          className="pm-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-1 [scrollbar-gutter:stable]"
+          className="pm-table-scroll pm-shipment-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1 [scrollbar-gutter:stable]"
           role="region"
           aria-label="Shipment table"
           tabIndex={0}

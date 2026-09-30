@@ -5,7 +5,6 @@ import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManag
 import {
   ChevronRight,
   Search,
-  Download,
   Package,
   Clock,
   Calendar,
@@ -15,7 +14,6 @@ import {
   Plus,
   Eye,
   RefreshCw,
-  Printer,
   FileText,
   ChevronDown,
   TrendingUp,
@@ -574,14 +572,6 @@ const StockIn: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-700 hover:bg-slate-800/50 text-slate-300 rounded-xl text-sm font-medium transition-colors">
-            <Printer className="w-4 h-4" />
-            Print
-          </button>
           <button
             onClick={() => {
               fetchReceivings();
@@ -918,13 +908,13 @@ const StockIn: React.FC = () => {
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
+                <th className="pm-stock-in-history-product-column px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Reference No.</th>
                 <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Stocked Qty</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Barcode</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Stock In Date</th>
+                <th className="pm-stock-in-history-date-column px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Stock In Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
               </tr>
             </thead>
@@ -940,13 +930,13 @@ const StockIn: React.FC = () => {
               {historyItems.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-800/20 transition-colors">
                   <td className="px-4 py-3 font-mono text-slate-900 dark:text-blue-400">{item.receivingNo ?? '—'}</td>
-                  <td className="px-4 py-3 text-white"><div className="truncate" title={item.product}>{item.product}</div></td>
+                  <td className="pm-stock-in-history-product-column px-4 py-3 text-white"><div className="pm-stock-in-history-product truncate" title={item.product}>{item.product}</div></td>
                   <td className="px-4 py-3 text-slate-300">{item.supplier ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-300">{formatDateOnly(item.receivingDate)}</td>
                   <td className="px-4 py-3 text-slate-300">{item.referenceNo ?? '—'}</td>
                   <td className="px-4 py-3 text-center text-white">{item.stockedQuantity}</td>
                   <td className="whitespace-nowrap px-4 py-3 pr-6 font-mono text-slate-900 dark:text-cyan-300">{item.barcode ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{formatDateTime(item.stockInDate)}</td>
+                  <td className="pm-stock-in-history-date-column whitespace-nowrap px-4 py-3 text-slate-300">{formatDateTime(item.stockInDate)}</td>
                   <td className="whitespace-nowrap px-4 py-3"><ReceivingStatusBadge status={item.status} /></td>
                 </tr>
               ))}

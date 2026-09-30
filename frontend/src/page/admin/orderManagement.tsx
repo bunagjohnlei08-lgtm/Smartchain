@@ -6,7 +6,6 @@ import {
   RotateCw,
   Plus,
   Search,
-  Download,
   Eye,
   X,
   CheckCircle,
@@ -582,10 +581,6 @@ const OrderManagement: React.FC = () => {
               <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`admin-orders-toolbar-view-button rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
             </div>
 
-            <button className="admin-orders-toolbar-export inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:h-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-sm">
-              <Download className="h-4 w-4" />
-              Export
-            </button>
           </div>
         </div>
 

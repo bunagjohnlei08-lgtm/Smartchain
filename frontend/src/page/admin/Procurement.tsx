@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Download,
   X,
   Clock as ClockIcon,
   CheckCircle as CheckCircleIcon,
@@ -189,7 +188,6 @@ const Procurement: React.FC = () => {
   const [pendingView, setPendingView] = useState<'cards' | 'table'>('cards');
   const [selectedRequest, setSelectedRequest] = useState<ReplenishmentRequest | null>(null);
   useAdminDetailOverlay(selectedRequest !== null);
-  const [showExportModal, setShowExportModal] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -303,12 +301,6 @@ const Procurement: React.FC = () => {
               className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all flex items-center gap-2"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-            </button>
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" /> Export summary
             </button>
           </div>
         </div>
@@ -1050,75 +1042,6 @@ const Procurement: React.FC = () => {
         </div>
       )}
 
-      {/* Export Modal */}
-      {showExportModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowExportModal(false)}
-        >
-          <div
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl w-full max-w-md p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                Export Summary
-              </h2>
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] dark:hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium mb-1 text-[var(--text-muted)]">
-                  Export Format
-                </label>
-                  <select className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-600/50">
-                    <option>PDF Document</option>
-                    <option>Excel Spreadsheet</option>
-                    <option>CSV File</option>
-                  </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium mb-1 text-[var(--text-muted)]">
-                  Date Range
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="date"
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-600/50"
-                  />
-                  <input
-                    type="date"
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-600/50"
-                  />
-                </div>
-              </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
-                <button
-                  type="button"
-                  onClick={() => setShowExportModal(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border-color)] text-[var(--text-secondary)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 shadow-none flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" /> Export
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

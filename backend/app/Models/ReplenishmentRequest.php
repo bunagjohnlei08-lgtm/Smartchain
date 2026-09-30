@@ -22,6 +22,12 @@ class ReplenishmentRequest extends Model
         self::STATUS_PO_CREATED,
     ];
 
+    /** Requests that still require action in the Plant Manager procurement queue. */
+    public const PLANT_MANAGER_ACTIVE_STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_PENDING,
+    ];
+
     public const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
 
     protected $fillable = [

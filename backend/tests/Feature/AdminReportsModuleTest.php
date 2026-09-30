@@ -464,6 +464,7 @@ class AdminReportsModuleTest extends TestCase
         ]);
         $po = $this->purchaseOrder('PO-2026-0009', 'Sent to Supplier');
         $po->update(['replenishment_request_id' => $request->id, 'sent_at' => '2026-09-07 10:00:00']);
+        $this->purchaseOrder('PO-2026-0010', 'Completed');
 
         $requests = collect($this->rows('procurement.replenishment'))->keyBy('request_no');
         $this->assertSame(40, $requests['RR-0001']['quantity']);
@@ -472,17 +473,18 @@ class AdminReportsModuleTest extends TestCase
         $this->assertSame($this->manager->name, $requests['RR-0001']['requester']);
         $this->assertSame(['RR-0002'], array_column($this->rows('procurement.replenishment', ['status' => 'pending']), 'request_no'));
 
-        $orders = $this->rows('procurement.purchase_orders');
-        $this->assertCount(1, $orders);
-        $this->assertSame('Acme Chemicals (snapshot)', $orders[0]['supplier_name']); // snapshot preserved
-        $this->assertSame('SUP-001', $orders[0]['supplier_code']);
-        $this->assertSame(30, $orders[0]['quantity']);
-        $this->assertSame('RR-0001', $orders[0]['linked_request']);
-        $this->assertNotNull($orders[0]['sent_at']);
-        $this->assertArrayNotHasKey('total_amount', $orders[0]);
+        $orders = collect($this->rows('procurement.purchase_orders'))->keyBy('po_no');
+        $this->assertCount(2, $orders);
+        $this->assertSame('Acme Chemicals (snapshot)', $orders['PO-2026-0009']['supplier_name']); // snapshot preserved
+        $this->assertSame('SUP-001', $orders['PO-2026-0009']['supplier_code']);
+        $this->assertSame(30, $orders['PO-2026-0009']['quantity']);
+        $this->assertSame('RR-0001', $orders['PO-2026-0009']['linked_request']);
+        $this->assertNotNull($orders['PO-2026-0009']['sent_at']);
+        $this->assertSame('Completed', $orders['PO-2026-0010']['status']);
+        $this->assertArrayNotHasKey('total_amount', $orders['PO-2026-0009']);
 
         $status = collect($this->rows('procurement.status'))->map(fn ($row) => "{$row['record_type']}|{$row['status']}|{$row['records']}|{$row['total_quantity']}")->all();
-        $this->assertEqualsCanonicalizing(['Replenishment Request|PO Created|1|40', 'Replenishment Request|Pending|1|10', 'Purchase Order|Sent to Supplier|1|30'], $status);
+        $this->assertEqualsCanonicalizing(['Replenishment Request|PO Created|1|40', 'Replenishment Request|Pending|1|10', 'Purchase Order|Sent to Supplier|1|30', 'Purchase Order|Completed|1|30'], $status);
     }
 
     // ------------------------------------------------------------- suppliers

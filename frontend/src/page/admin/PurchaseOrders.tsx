@@ -44,6 +44,7 @@ interface ReceivingDiscrepancy {
   resolutionNotes?: string; resolvedAt?: string; resolvedBy?: string; resolvedByReceiving?: { id: number; receivingNo: string; deliveryDate?: string };
 }
 interface SupplierOption { id: number; supplier_code: string; name: string; }
+interface PurchaseOrderSummary { total: number; pending: number; approved: number; completed: number; cancelled: number; }
 
 const mapDiscrepancy = (item: any): ReceivingDiscrepancy => ({
   id: Number(item.id), receivingId: Number(item.receiving_id), type: item.type ?? item.discrepancy_type,
@@ -105,6 +106,12 @@ const PurchaseOrders: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<POStatus | 'All'>('All');
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageFrom, setPageFrom] = useState(0);
+  const [pageTo, setPageTo] = useState(0);
+  const [summary, setSummary] = useState<PurchaseOrderSummary>({ total: 0, pending: 0, approved: 0, completed: 0, cancelled: 0 });
   const [productNames, setProductNames] = useState<string[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
@@ -133,6 +140,19 @@ const PurchaseOrders: React.FC = () => {
     items: [{ productName: '', quantity: 1, unitPrice: 0 }],
   });
 
+  const mapOrder = useCallback((order: any): PurchaseOrder => ({
+    id: String(order.id), poNumber: order.po_number, supplier: order.supplier_name,
+    expectedDeliveryDate: order.expected_delivery_date, deliveryDetails: order.delivery_details, totalAmount: Number(order.total_amount),
+    status: order.status as POStatus, createdAt: order.created_at,
+    approvedBy: order.approved_by, signatureData: order.signature_data, sentAt: order.sent_at,
+    items: (order.items ?? []).map((item: any) => ({
+      productName: item.product_name, quantity: Number(item.ordered_quantity), receivedQuantity: Number(item.received_quantity ?? 0), remainingQuantity: Number(item.remaining_quantity ?? item.ordered_quantity),
+      unitPrice: Number(item.unit_price), amount: Number(item.total_price),
+    })),
+    receivingHistory: (order.receiving_history ?? []).map((receiving: any) => ({ id: Number(receiving.id), receivingNo: receiving.receiving_no, deliveryDate: receiving.delivery_date, deliveredQuantity: Number(receiving.delivered_quantity), status: receiving.status })),
+    discrepancies: (order.discrepancies ?? []).map(mapDiscrepancy),
+  }), []);
+
   useEffect(() => {
     const linkedRequest = (location.state as any)?.replenishmentRequest;
     if (!linkedRequest) return;
@@ -154,33 +174,39 @@ const PurchaseOrders: React.FC = () => {
   const loadOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const [ordersResponse, inventoryResponse] = await Promise.all([
-        apiClient.get('/purchase-orders'),
-        apiClient.get('/inventory'),
-      ]);
-      setOrders((ordersResponse.data?.data ?? []).map((order: any) => ({
-        id: String(order.id), poNumber: order.po_number, supplier: order.supplier_name,
-        expectedDeliveryDate: order.expected_delivery_date, deliveryDetails: order.delivery_details, totalAmount: Number(order.total_amount),
-        status: order.status as POStatus, createdAt: order.created_at,
-        approvedBy: order.approved_by, signatureData: order.signature_data, sentAt: order.sent_at,
-        items: (order.items ?? []).map((item: any) => ({
-          productName: item.product_name, quantity: Number(item.ordered_quantity), receivedQuantity: Number(item.received_quantity ?? 0), remainingQuantity: Number(item.remaining_quantity ?? item.ordered_quantity),
-          unitPrice: Number(item.unit_price), amount: Number(item.total_price),
-        })),
-        receivingHistory: (order.receiving_history ?? []).map((receiving: any) => ({ id: Number(receiving.id), receivingNo: receiving.receiving_no, deliveryDate: receiving.delivery_date, deliveredQuantity: Number(receiving.delivered_quantity), status: receiving.status })),
-        discrepancies: (order.discrepancies ?? []).map(mapDiscrepancy),
-      })));
-      const inventoryItems = (inventoryResponse.data?.data ?? []) as Array<{ product?: string }>;
-      setProductNames([...new Set(inventoryItems.map((item) => item.product).filter((name): name is string => Boolean(name)))]);
+      const response = await apiClient.get('/purchase-orders', { params: {
+        page: currentPage,
+        per_page: 10,
+        search: searchQuery.trim() || undefined,
+        status: statusFilter === 'All' ? undefined : statusFilter,
+      } });
+      setOrders((response.data?.data ?? []).map(mapOrder));
+      const responseLastPage = Math.max(1, Number(response.data?.last_page ?? 1));
+      setTotalPages(responseLastPage);
+      setTotalItems(Number(response.data?.total ?? 0));
+      setPageFrom(Number(response.data?.from ?? 0));
+      setPageTo(Number(response.data?.to ?? 0));
+      setSummary(response.data?.summary ?? { total: 0, pending: 0, approved: 0, completed: 0, cancelled: 0 });
+      if (currentPage > responseLastPage) setCurrentPage(responseLastPage);
       setError('');
     } catch (requestError: any) {
       setError(requestError?.response?.data?.message || 'Unable to load purchase orders.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, mapOrder, searchQuery, statusFilter]);
 
-  useEffect(() => { void loadOrders(); }, [loadOrders]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadOrders(), 250);
+    return () => window.clearTimeout(timer);
+  }, [loadOrders]);
+
+  useEffect(() => {
+    apiClient.get('/inventory').then((response) => {
+      const inventoryItems = (response.data?.data ?? []) as Array<{ product?: string }>;
+      setProductNames([...new Set(inventoryItems.map((item) => item.product).filter((name): name is string => Boolean(name)))]);
+    }).catch(() => setProductNames([]));
+  }, []);
 
   const loadActiveSuppliers = useCallback(async () => {
     setLoadingSuppliers(true);
@@ -200,24 +226,18 @@ const PurchaseOrders: React.FC = () => {
     if (showCreateModal) void loadActiveSuppliers();
   }, [showCreateModal, loadActiveSuppliers]);
 
-  // Filtered orders
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchSearch =
-        order.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.items.some((item) => item.productName.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchStatus = statusFilter === 'All' || order.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [orders, searchQuery, statusFilter]);
+  const paginationPages = useMemo(() => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1);
+    if (currentPage <= 3) return [1, 2, 3, 4, 5];
+    if (currentPage >= totalPages - 2) return Array.from({ length: 5 }, (_, index) => totalPages - 4 + index);
+    return Array.from({ length: 5 }, (_, index) => currentPage - 2 + index);
+  }, [currentPage, totalPages]);
 
-  // KPI counts
   const kpiCounts = {
-    Pending: orders.filter((o) => o.status === 'Pending Approval').length,
-    Approved: orders.filter((o) => o.status === 'Approved').length,
-    Completed: orders.filter((o) => o.status === 'Completed').length,
-    Cancelled: orders.filter((o) => o.status === 'Cancelled').length,
+    Pending: summary.pending,
+    Approved: summary.approved,
+    Completed: summary.completed,
+    Cancelled: summary.cancelled,
   };
 
   const handleCreateOrder = async () => {
@@ -318,6 +338,7 @@ const PurchaseOrders: React.FC = () => {
       } : order));
       setDiscrepancyDialog(null);
       showToast('success', mode === 'contact' ? 'Supplier contact recorded.' : mode === 'response' ? 'Supplier response recorded.' : 'Shortage case closed.');
+      if (action === 'CLOSE_SHORTAGE') await loadOrders();
     } catch (requestError: any) {
       const validationMessage = Object.values(requestError?.response?.data?.errors ?? {}).flat().find(Boolean);
       setDiscrepancyFormError(String(validationMessage || requestError?.response?.data?.message || 'Unable to update the discrepancy.'));
@@ -419,7 +440,7 @@ const PurchaseOrders: React.FC = () => {
             <Package className="w-4 h-4" />
             <span className="admin-kpi-title text-xs font-medium uppercase tracking-wider">Total POs</span>
           </div>
-          <p className="admin-kpi-value text-2xl font-bold text-white mt-1">{orders.length}</p>
+          <p className="admin-kpi-value text-2xl font-bold text-white mt-1">{summary.total}</p>
           <p className="admin-kpi-helper text-xs text-gray-400">Saved purchase orders</p>
         </div>
         <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 text-center">
@@ -448,21 +469,20 @@ const PurchaseOrders: React.FC = () => {
             type="text"
             placeholder="Search PO number, supplier..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl pl-9 pr-4 py-2 text-sm text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as POStatus | 'All')}
+          onChange={(e) => { setStatusFilter(e.target.value as POStatus | 'All'); setCurrentPage(1); }}
           className="w-full min-w-0 bg-[#1e293b] border border-[#1f2937] rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:w-auto"
         >
           <option value="All">All Status</option>
           <option value="Pending Approval">Pending Approval</option>
           <option value="Approved">Approved</option>
           <option value="Sent to Supplier">Sent to Supplier</option>
-          <option value="Completed">Completed</option>
-          <option value="Cancelled">Cancelled</option>
+          <option value="Partially Received">Partially Received</option>
         </select>
         <div className="flex min-w-0 items-center gap-2 bg-[#1e293b] border border-[#1f2937] rounded-xl px-3 py-2 text-sm text-slate-300">
           <Calendar className="w-4 h-4 shrink-0 text-gray-400" />
@@ -505,7 +525,7 @@ const PurchaseOrders: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((order) => (
+              {orders.map((order) => (
                 <tr key={order.id} className="border-b border-[#1f2937] hover:bg-slate-800/30 transition-colors">
                   <td className="px-5 py-3.5 text-sm font-medium text-white">{order.poNumber}</td>
                   <td className="px-5 py-3.5 text-sm text-gray-300 w-auto min-w-[200px]">{order.supplier}</td>
@@ -550,7 +570,7 @@ const PurchaseOrders: React.FC = () => {
                   </td>
                 </tr>
               ))}
-              {filteredOrders.length === 0 && (
+              {orders.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-5 py-8 text-center text-gray-400">
                     No purchase orders found matching your criteria.
@@ -560,9 +580,9 @@ const PurchaseOrders: React.FC = () => {
             </tbody>
           </table>
         </div>
-        ) : filteredOrders.length > 0 ? (
+        ) : orders.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
-            {filteredOrders.map((order) => (
+            {orders.map((order) => (
               <article key={order.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{order.poNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.supplier}</p></div><StatusBadge status={order.status} /></div>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Created</dt><dd className="text-slate-900 dark:text-white">{order.createdAt}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.expectedDeliveryDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items / Qty</dt><dd className="text-slate-900 dark:text-white">{order.items.length} / {order.items.reduce((sum, item) => sum + item.quantity, 0)}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Total</dt><dd className="font-semibold text-slate-900 dark:text-white">₱{order.totalAmount.toLocaleString()}</dd></div></dl>
@@ -577,16 +597,18 @@ const PurchaseOrders: React.FC = () => {
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#1f2937] bg-white dark:bg-[#0f172a]/30">
           <div className="text-sm text-gray-400">
-            Showing <span className="text-white font-medium">1</span> to{' '}
-            <span className="text-white font-medium">{filteredOrders.length}</span> of{' '}
-            <span className="text-white font-medium">{orders.length}</span> entries
+            Showing <span className="text-white font-medium">{pageFrom}</span> to{' '}
+            <span className="text-white font-medium">{pageTo}</span> of{' '}
+            <span className="text-white font-medium">{totalItems}</span> entries
           </div>
           <div className="flex items-center gap-1">
-            <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} aria-label="Previous page" className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button className="px-3 py-1 rounded-xl text-sm font-medium bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950">1</button>
-            <button className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            {paginationPages.map((page) => (
+              <button key={page} type="button" onClick={() => setCurrentPage(page)} aria-current={currentPage === page ? 'page' : undefined} className={`px-3 py-1 rounded-xl text-sm font-medium ${currentPage === page ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950' : 'text-gray-400 hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-[#1f2937] dark:hover:text-white'}`}>{page}</button>
+            ))}
+            <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} aria-label="Next page" className="p-1.5 rounded-xl border border-[#1f2937] text-gray-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               <ChevronRightIcon className="w-4 h-4" />
             </button>
           </div>

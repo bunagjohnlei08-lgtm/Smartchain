@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
@@ -128,6 +128,124 @@ interface ReceivingDetail extends ReceivingItem {
 }
 
 const statusOptions: Array<'All Status' | InspectionStatus> = ['All Status', 'Pending', 'In Progress', 'Passed', 'Rejected', 'Partial'];
+
+const QA_LAYOUT_DEBUG = import.meta.env.DEV;
+
+type BottomElementDebug = {
+  selector: string;
+  bottomRelativeToQaMain: number;
+  topRelativeToQaMain: number;
+  height: number;
+  display: string;
+  visibility: string;
+  opacity: string;
+  position: string;
+  overflowY: string;
+};
+
+type QaLayoutDebugSnapshot = {
+  attachmentCount: number;
+  qaMainClientHeight: number;
+  qaMainScrollHeight: number;
+  finalContentBottomRelativeToQaMain: number | null;
+  extraBlankSpace: number | null;
+  bottomMostElement: BottomElementDebug | null;
+};
+
+type DebugElementMeasurement = {
+  name: string;
+  className: string;
+  clientHeight: number;
+  scrollHeight: number;
+  offsetHeight: number;
+  rectTop: number;
+  rectBottom: number;
+  bottomRelativeToQaMain: number | null;
+  computedHeight: string;
+  computedMinHeight: string;
+  computedMaxHeight: string;
+  paddingTop: string;
+  paddingBottom: string;
+  marginTop: string;
+  marginBottom: string;
+  display: string;
+  visibility: string;
+  opacity: string;
+  transform: string;
+  position: string;
+  overflowY: string;
+  flex: string;
+  flexGrow: string;
+  flexBasis: string;
+  alignItems: string;
+  alignSelf: string;
+  gridTemplateRows: string;
+  gridAutoRows: string;
+};
+
+function measureDebugElement(name: string, element: HTMLElement | null, qaMain: HTMLElement | null): DebugElementMeasurement | null {
+  if (!element) return null;
+  const style = window.getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  const qaMainRect = qaMain?.getBoundingClientRect();
+
+  return {
+    name,
+    className: element.className,
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    offsetHeight: element.offsetHeight,
+    rectTop: rect.top,
+    rectBottom: rect.bottom,
+    bottomRelativeToQaMain: qaMain && qaMainRect ? rect.bottom - qaMainRect.top + qaMain.scrollTop : null,
+    computedHeight: style.height,
+    computedMinHeight: style.minHeight,
+    computedMaxHeight: style.maxHeight,
+    paddingTop: style.paddingTop,
+    paddingBottom: style.paddingBottom,
+    marginTop: style.marginTop,
+    marginBottom: style.marginBottom,
+    display: style.display,
+    visibility: style.visibility,
+    opacity: style.opacity,
+    transform: style.transform,
+    position: style.position,
+    overflowY: style.overflowY,
+    flex: style.flex,
+    flexGrow: style.flexGrow,
+    flexBasis: style.flexBasis,
+    alignItems: style.alignItems,
+    alignSelf: style.alignSelf,
+    gridTemplateRows: style.gridTemplateRows,
+    gridAutoRows: style.gridAutoRows,
+  };
+}
+
+function measurePseudoElement(element: HTMLElement | null, pseudo: '::before' | '::after') {
+  if (!element) return null;
+  const style = window.getComputedStyle(element, pseudo);
+  return {
+    content: style.content,
+    display: style.display,
+    visibility: style.visibility,
+    opacity: style.opacity,
+    position: style.position,
+    height: style.height,
+    minHeight: style.minHeight,
+    maxHeight: style.maxHeight,
+    paddingTop: style.paddingTop,
+    paddingBottom: style.paddingBottom,
+    marginTop: style.marginTop,
+    marginBottom: style.marginBottom,
+    transform: style.transform,
+  };
+}
+
+function debugSelector(element: Element): string {
+  const id = element.id ? `#${element.id}` : '';
+  const classes = Array.from(element.classList).slice(0, 5).map((name) => `.${name}`).join('');
+  return `${element.tagName.toLowerCase()}${id}${classes}`;
+}
 
 function validateEvidenceFile(file: File): string | null {
   if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type) || !/\.(jpe?g|png|pdf)$/i.test(file.name)) return 'Only JPG, PNG, or PDF files are allowed.';
@@ -330,6 +448,8 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
 };
 
 const QualityInspection: React.FC = () => {
+  const qualityRootRef = useRef<HTMLDivElement>(null);
+  const [layoutDebugSnapshot, setLayoutDebugSnapshot] = useState<QaLayoutDebugSnapshot | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedReceivingId = Number(searchParams.get('receiving')) || null;
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
@@ -683,8 +803,157 @@ const QualityInspection: React.FC = () => {
 
   const inspectionIsFinal = selectedReceiving !== null && ['Passed', 'Rejected', 'Partial'].includes(selectedReceiving.inspectionStatus);
 
+  useLayoutEffect(() => {
+    if (!QA_LAYOUT_DEBUG || activeTab !== 'attachments' || !selectedReceiving) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const qualityRoot = qualityRootRef.current;
+      const qaMain = qualityRoot?.closest<HTMLElement>('main.qa-main') ?? null;
+      const find = (name: string) => qualityRoot?.querySelector<HTMLElement>(`[data-qa-layout-debug="${name}"]`) ?? null;
+      const detailsGrid = find('detailsGrid');
+      const detailsCard = find('detailsCard');
+      const activeTabContent = find('activeTabContent');
+      const evidenceCard = find('evidenceCard');
+      const evidenceGrid = find('evidenceGrid');
+      const lastRealContent = find('lastRealContent');
+      const timeline = find('timeline');
+      const attachmentCount = selectedReceiving.attachments.filter((item) => !removedAttachmentIds.includes(item.id)).length + selectedAttachments.length;
+      const finalContentBottomRelativeToQaMain = qaMain && lastRealContent
+        ? lastRealContent.getBoundingClientRect().bottom - qaMain.getBoundingClientRect().top + qaMain.scrollTop
+        : null;
+      const qaMainScrollHeight = qaMain?.scrollHeight ?? null;
+
+      const bottomElements: BottomElementDebug[] = qaMain
+        ? Array.from(qaMain.querySelectorAll<HTMLElement>('*'))
+          .filter((element) => !element.closest('[data-qa-layout-debug-panel]'))
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            const qaMainRect = qaMain.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
+            return {
+              selector: debugSelector(element),
+              bottomRelativeToQaMain: rect.bottom - qaMainRect.top + qaMain.scrollTop,
+              topRelativeToQaMain: rect.top - qaMainRect.top + qaMain.scrollTop,
+              height: rect.height,
+              display: style.display,
+              visibility: style.visibility,
+              opacity: style.opacity,
+              position: style.position,
+              overflowY: style.overflowY,
+            };
+          })
+          .sort((left, right) => right.bottomRelativeToQaMain - left.bottomRelativeToQaMain)
+          .slice(0, 20)
+        : [];
+
+      const followingSiblings = (element: HTMLElement | null, prefix: string) => {
+        const siblings: Array<DebugElementMeasurement | null> = [];
+        let sibling = element?.nextElementSibling as HTMLElement | null;
+        let index = 0;
+        while (sibling) {
+          siblings.push(measureDebugElement(`${prefix}[${index}]`, sibling, qaMain));
+          sibling = sibling.nextElementSibling as HTMLElement | null;
+          index += 1;
+        }
+        return siblings;
+      };
+
+      const originalTimelinePosition = timeline?.style.position ?? '';
+      const scrollHeightWithTimelineSticky = qaMain?.scrollHeight ?? null;
+      if (timeline) timeline.style.position = 'static';
+      if (qaMain) void qaMain.offsetHeight;
+      const scrollHeightWithTimelineStatic = qaMain?.scrollHeight ?? null;
+      if (timeline) timeline.style.position = originalTimelinePosition;
+
+      console.groupCollapsed(`[QA-LAYOUT-DEBUG] attachments=${attachmentCount} receiving=${selectedReceiving.id}`);
+      console.log({
+        attachmentCount,
+        persistedAttachmentCount: selectedReceiving.attachments.length,
+        removedAttachmentCount: removedAttachmentIds.length,
+        selectedAttachmentCount: selectedAttachments.length,
+        activeTab,
+        selectedInspectionId: selectedReceiving.id,
+        scrollHierarchy: {
+          html: measureDebugElement('html', document.documentElement, qaMain),
+          body: measureDebugElement('body', document.body, qaMain),
+          root: measureDebugElement('root', document.getElementById('root'), qaMain),
+          qaShell: measureDebugElement('qaShell', qualityRoot?.closest<HTMLElement>('.qa-shell') ?? null, qaMain),
+          qaMainParent: measureDebugElement('qaMainParent', qaMain?.parentElement ?? null, qaMain),
+        },
+        qaMain: measureDebugElement('qaMain', qaMain, qaMain),
+        qualityRoot: measureDebugElement('qualityRoot', qualityRoot, qaMain),
+        detailsGrid: measureDebugElement('detailsGrid', detailsGrid, qaMain),
+        detailsCard: measureDebugElement('detailsCard', detailsCard, qaMain),
+        activeTabContent: measureDebugElement('activeTabContent', activeTabContent, qaMain),
+        evidenceCard: measureDebugElement('evidenceCard', evidenceCard, qaMain),
+        evidenceGrid: measureDebugElement('evidenceGrid', evidenceGrid, qaMain),
+        lastRealContent: measureDebugElement('lastRealContent', lastRealContent, qaMain),
+        ancestorBottoms: {
+          evidenceCard: measureDebugElement('evidenceCard', evidenceCard, qaMain)?.bottomRelativeToQaMain,
+          activeTabContent: measureDebugElement('activeTabContent', activeTabContent, qaMain)?.bottomRelativeToQaMain,
+          detailsCard: measureDebugElement('detailsCard', detailsCard, qaMain)?.bottomRelativeToQaMain,
+          detailsGrid: measureDebugElement('detailsGrid', detailsGrid, qaMain)?.bottomRelativeToQaMain,
+          qualityRoot: measureDebugElement('qualityRoot', qualityRoot, qaMain)?.bottomRelativeToQaMain,
+        },
+        calculated: {
+          qaMainClientHeight: qaMain?.clientHeight ?? null,
+          qaMainScrollHeight,
+          qaMainScrollTop: qaMain?.scrollTop ?? null,
+          finalContentBottomRelativeToQaMain,
+          extraBlankSpace: qaMainScrollHeight !== null && finalContentBottomRelativeToQaMain !== null
+            ? qaMainScrollHeight - finalContentBottomRelativeToQaMain
+            : null,
+        },
+        followingSiblings: {
+          afterDetailsCard: followingSiblings(detailsCard, 'afterDetailsCard'),
+          afterDetailsGrid: followingSiblings(detailsGrid, 'afterDetailsGrid'),
+        },
+        pseudoElements: {
+          qaMain: { before: measurePseudoElement(qaMain, '::before'), after: measurePseudoElement(qaMain, '::after') },
+          qualityRoot: { before: measurePseudoElement(qualityRoot, '::before'), after: measurePseudoElement(qualityRoot, '::after') },
+          detailsGrid: { before: measurePseudoElement(detailsGrid, '::before'), after: measurePseudoElement(detailsGrid, '::after') },
+          detailsCard: { before: measurePseudoElement(detailsCard, '::before'), after: measurePseudoElement(detailsCard, '::after') },
+        },
+        stickyExperiment: {
+          scrollHeightWithTimelineSticky,
+          scrollHeightWithTimelineStatic,
+          difference: scrollHeightWithTimelineSticky !== null && scrollHeightWithTimelineStatic !== null
+            ? scrollHeightWithTimelineSticky - scrollHeightWithTimelineStatic
+            : null,
+        },
+        bottomElements,
+      });
+      console.groupEnd();
+
+      setLayoutDebugSnapshot({
+        attachmentCount,
+        qaMainClientHeight: qaMain?.clientHeight ?? 0,
+        qaMainScrollHeight: qaMain?.scrollHeight ?? 0,
+        finalContentBottomRelativeToQaMain,
+        extraBlankSpace: qaMainScrollHeight !== null && finalContentBottomRelativeToQaMain !== null
+          ? qaMainScrollHeight - finalContentBottomRelativeToQaMain
+          : null,
+        bottomMostElement: bottomElements[0] ?? null,
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, removedAttachmentIds.length, selectedAttachments.length, selectedReceiving]);
+
   return (
-    <div className="qa-quality-inspection w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+    <div ref={qualityRootRef} className="qa-quality-inspection w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100">
+      {QA_LAYOUT_DEBUG && activeTab === 'attachments' && layoutDebugSnapshot && (
+        <aside data-qa-layout-debug-panel className="pointer-events-none fixed bottom-3 right-3 z-[200] max-w-[min(24rem,calc(100vw-1.5rem))] rounded-lg bg-slate-950/95 p-3 font-mono text-[11px] leading-4 text-cyan-100 shadow-2xl" aria-label="Temporary QA layout diagnostics">
+          <p className="font-bold text-cyan-300">QA layout diagnostics</p>
+          <p>attachments: {layoutDebugSnapshot.attachmentCount}</p>
+          <p>qa-main client: {layoutDebugSnapshot.qaMainClientHeight}px</p>
+          <p>qa-main scroll: {layoutDebugSnapshot.qaMainScrollHeight}px</p>
+          <p>real content bottom: {layoutDebugSnapshot.finalContentBottomRelativeToQaMain?.toFixed(1) ?? 'n/a'}px</p>
+          <p>extra blank: {layoutDebugSnapshot.extraBlankSpace?.toFixed(1) ?? 'n/a'}px</p>
+          <p className="mt-1 break-all">lowest: {layoutDebugSnapshot.bottomMostElement?.selector ?? 'n/a'}</p>
+          <p>lowest bottom: {layoutDebugSnapshot.bottomMostElement?.bottomRelativeToQaMain.toFixed(1) ?? 'n/a'}px</p>
+        </aside>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Quality Inspection</h1>
@@ -888,9 +1157,9 @@ const QualityInspection: React.FC = () => {
       </div>
 
       {selectedReceivingId !== null && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div data-qa-layout-debug="detailsGrid" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden">
+            <div data-qa-layout-debug="detailsCard" className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden">
               <div className="p-5 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <h3 className="text-lg font-semibold text-white">Inspection Details</h3>
@@ -978,7 +1247,7 @@ const QualityInspection: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-5">
+                  <div data-qa-layout-debug="activeTabContent" className="p-5">
                     {activeTab === 'products' && (
                       <div className="qa-table-scroll">
                         <table className="qa-responsive-table qa-cols-7 qa-sticky-1 w-full min-w-[688px] text-sm">
@@ -1110,9 +1379,9 @@ const QualityInspection: React.FC = () => {
                     )}
 
                     {activeTab === 'attachments' && (
-                      <div className="space-y-3 rounded-lg border border-(--border-color-strong) bg-(--bg-surface-alt) p-4 text-sm text-(--text-primary)">
+                      <div data-qa-layout-debug="evidenceCard" className="space-y-3 rounded-lg border border-(--border-color-strong) bg-(--bg-surface-alt) p-4 text-sm text-(--text-primary)">
                         <EvidenceGallery attachments={selectedReceiving.attachments} receivingId={selectedReceiving.id} editable={!inspectionIsFinal} selectedFiles={selectedAttachments} removedIds={removedAttachmentIds} onSelectedFilesChange={(files) => { setSelectedAttachments(files); setAttachmentError(null); }} onRemovedIdsChange={(ids) => { setRemovedAttachmentIds(ids); setAttachmentError(null); }} error={attachmentError} disabled={isSaving} />
-                        <p className="text-(--text-secondary)">{selectedReceiving.totalRejected > 0 ? 'At least one evidence file is required before submission.' : 'Evidence is optional when no quantity is rejected.'}</p>
+                        <p data-qa-layout-debug="lastRealContent" className="text-(--text-secondary)">{selectedReceiving.totalRejected > 0 ? 'At least one evidence file is required before submission.' : 'Evidence is optional when no quantity is rejected.'}</p>
                       </div>
                     )}
 
@@ -1146,8 +1415,8 @@ const QualityInspection: React.FC = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-1">
-            <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5 sticky top-6">
+          <div data-qa-layout-debug="timeline" className="lg:col-span-1 self-start sticky top-6">
+            <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
               <h3 className="text-lg font-semibold text-white mb-4">Inspection Timeline</h3>
               <div className="space-y-4 relative">
                 {selectedReceiving?.timeline.map((item, index) => (

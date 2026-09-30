@@ -66,8 +66,18 @@ class PlantManagerProcurementController extends Controller
     {
         abort_unless($request->user()->isPlantManager(), 403);
 
-        $requests = ReplenishmentRequest::query()
-            ->where('requested_by', $request->user()->id)
+        $validated = $request->validate([
+            'scope' => ['nullable', Rule::in(['history'])],
+        ]);
+
+        $query = ReplenishmentRequest::query()
+            ->where('requested_by', $request->user()->id);
+
+        if (($validated['scope'] ?? null) !== 'history') {
+            $query->whereIn('status', ReplenishmentRequest::PLANT_MANAGER_ACTIVE_STATUSES);
+        }
+
+        $requests = $query
             ->with(['product:id,name', 'warehouse:id,name', 'requester:id,name'])
             ->latest('created_at')
             ->get()

@@ -254,6 +254,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [procurementWarehouse, setProcurementWarehouse] = useState<ProcurementWarehouse | null>(null);
   const [history, setHistory] = useState<RequestHistory[]>([]);
+  const [activeRequests, setActiveRequests] = useState<RequestHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -293,11 +294,12 @@ const ReplenishmentPlanning: React.FC = () => {
   const loadProcurement = useCallback(async () => {
     setLoading(true);
     try {
-      const [requestsResponse, optionsResponse] = await Promise.all([
+      const [requestsResponse, historyResponse, optionsResponse] = await Promise.all([
         apiClient.get('/plant-manager/procurement/requests'),
+        apiClient.get('/plant-manager/procurement/requests', { params: { scope: 'history' } }),
         apiClient.get('/plant-manager/procurement/options'),
       ]);
-      setHistory((requestsResponse.data?.data ?? []).map((request: any) => ({
+      const mapRequest = (request: any): RequestHistory => ({
         id: String(request.id),
         requestNo: request.request_no,
         product: request.product_name,
@@ -307,7 +309,9 @@ const ReplenishmentPlanning: React.FC = () => {
         status: request.status as RequestStatus,
         requestedBy: request.requested_by ?? '—',
         priority: request.priority as Priority,
-      })));
+      });
+      setActiveRequests((requestsResponse.data?.data ?? []).map(mapRequest));
+      setHistory((historyResponse.data?.data ?? []).map(mapRequest));
       setProducts(optionsResponse.data?.data ?? []);
       const warehouse = optionsResponse.data?.warehouse;
       setProcurementWarehouse(warehouse ? { id: Number(warehouse.id), name: String(warehouse.name) } : null);
@@ -374,7 +378,7 @@ const ReplenishmentPlanning: React.FC = () => {
 
   // Filtered products
   const filteredRequests = useMemo(() => {
-    return history.filter((r) => {
+    return activeRequests.filter((r) => {
       const matchSearch =
         r.requestNo.toLowerCase().includes(search.toLowerCase()) ||
         r.product.toLowerCase().includes(search.toLowerCase()) ||
@@ -384,7 +388,7 @@ const ReplenishmentPlanning: React.FC = () => {
       const matchPriority = priorityFilter === 'All Priorities' || (r.priority || '') === priorityFilter;
       return matchSearch && matchStatus && matchPriority;
     });
-  }, [history, search, statusFilter, priorityFilter]);
+  }, [activeRequests, search, statusFilter, priorityFilter]);
 
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
   const paginatedRequests = filteredRequests.slice(
@@ -557,7 +561,7 @@ const ReplenishmentPlanning: React.FC = () => {
             <button type="button" onClick={() => setViewMode('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} title="Grid view" className={`pm-procurement-toolbar-toggle-button flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors sm:h-8 sm:w-8 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4" /></button>
           </div>
           <div className="order-2 min-w-[88px] flex-1 sm:order-1 sm:flex-none">
-            <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'draft', 'pending', 'approved', 'rejected', 'for_purchase_order']} />
+            <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'draft', 'pending']} />
           </div>
           <div className="order-3 flex min-w-[148px] flex-1 items-center gap-2 sm:order-2 sm:flex-none">
             <FilterSelect value={priorityFilter} onChange={setPriorityFilter} options={['All Priorities', 'Low', 'Medium', 'High', 'Critical']} />
