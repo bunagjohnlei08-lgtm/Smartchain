@@ -4547,6 +4547,21 @@ body {
   }
 }
 
+/* Admin Inventory: keep only the mobile Out of Stock status at the requested
+   readable size without changing other inventory badges or desktop styles. */
+@layer utilities {
+  @media (max-width: 639px) {
+    .admin-main .admin-inventory-out-of-stock-badge {
+      width: fit-content !important;
+      max-width: 100%;
+      flex: 0 0 auto;
+      font-size: 12px !important;
+      line-height: 16px !important;
+      white-space: nowrap !important;
+    }
+  }
+}
+
 /* Admin Sidebar: compact mobile-only navigation typography and alignment. */
 @layer utilities {
   @media (max-width: 639px) {

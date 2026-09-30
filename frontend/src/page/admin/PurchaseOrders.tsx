@@ -78,7 +78,7 @@ interface PurchaseOrder {
 // HELPER COMPONENTS
 // ============================================
 
-const StatusBadge: React.FC<{ status: POStatus }> = ({ status }) => {
+const StatusBadge: React.FC<{ status: POStatus; className?: string }> = ({ status, className = '' }) => {
   const config: Record<POStatus, { color: string; bg: string; border: string }> = {
     'Pending Approval': { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
     Approved: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
@@ -90,7 +90,7 @@ const StatusBadge: React.FC<{ status: POStatus }> = ({ status }) => {
   };
   const { color, bg, border } = config[status] || config['Pending Approval'];
   return (
-    <span className={`admin-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg} ${border}`}>
+    <span className={`admin-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color} ${bg} ${border} ${className}`}>
       {status}
     </span>
   );
@@ -581,13 +581,24 @@ const PurchaseOrders: React.FC = () => {
           </table>
         </div>
         ) : orders.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-2 xl:grid-cols-3">
             {orders.map((order) => (
-              <article key={order.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{order.poNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.supplier}</p></div><StatusBadge status={order.status} /></div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Created</dt><dd className="text-slate-900 dark:text-white">{order.createdAt}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.expectedDeliveryDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items / Qty</dt><dd className="text-slate-900 dark:text-white">{order.items.length} / {order.items.reduce((sum, item) => sum + item.quantity, 0)}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Total</dt><dd className="font-semibold text-slate-900 dark:text-white">₱{order.totalAmount.toLocaleString()}</dd></div></dl>
-                <p className="mt-3 truncate text-xs text-slate-500 dark:text-slate-400" title={order.deliveryDetails}>{order.deliveryDetails}</p>
-                <div className="mt-auto flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => handleViewDetails(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button><button onClick={() => void downloadPoPdf(order)} disabled={downloadingId !== null} className="p-2 text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-white" title="Download PO"><Download className="h-4 w-4" /></button><button onClick={() => openPrintablePo(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="Print PO"><Printer className="h-4 w-4" /></button></div>
+              <article key={order.id} className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-start justify-between gap-2.5 sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="break-words text-sm font-semibold leading-5 text-slate-900 sm:text-base sm:leading-normal dark:text-white">{order.poNumber}</h3>
+                    <p className="mt-0.5 break-words text-[13px] leading-4 text-slate-600 sm:mt-1 sm:text-sm sm:leading-normal dark:text-slate-300">{order.supplier}</p>
+                  </div>
+                  <StatusBadge status={order.status} className="w-fit shrink-0 whitespace-nowrap text-xs" />
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:mt-4 sm:gap-3">
+                  <div className="min-w-0"><dt className="text-xs leading-4 text-slate-500 sm:text-sm sm:leading-normal dark:text-slate-400">Created</dt><dd className="break-words text-[13px] leading-4 text-slate-900 sm:text-sm sm:leading-normal dark:text-white">{order.createdAt}</dd></div>
+                  <div className="min-w-0"><dt className="text-xs leading-4 text-slate-500 sm:text-sm sm:leading-normal dark:text-slate-400">Target</dt><dd className="break-words text-[13px] leading-4 text-slate-900 sm:text-sm sm:leading-normal dark:text-white">{order.expectedDeliveryDate}</dd></div>
+                  <div className="min-w-0"><dt className="text-xs leading-4 text-slate-500 sm:text-sm sm:leading-normal dark:text-slate-400">Items / Qty</dt><dd className="text-[13px] leading-4 text-slate-900 sm:text-sm sm:leading-normal dark:text-white">{order.items.length} / {order.items.reduce((sum, item) => sum + item.quantity, 0)}</dd></div>
+                  <div className="min-w-0"><dt className="text-xs leading-4 text-slate-500 sm:text-sm sm:leading-normal dark:text-slate-400">Total</dt><dd className="break-words text-[13px] font-semibold leading-4 text-slate-900 sm:text-sm sm:leading-normal dark:text-white">₱{order.totalAmount.toLocaleString()}</dd></div>
+                </dl>
+                <p className="mt-2.5 whitespace-normal break-words text-xs leading-4 text-slate-500 sm:mt-3 sm:truncate dark:text-slate-400" title={order.deliveryDetails}>{order.deliveryDetails}</p>
+                <div className="mt-3 flex justify-end gap-1 border-t border-slate-200 pt-2.5 sm:mt-auto sm:pt-3 dark:border-slate-700"><button onClick={() => handleViewDetails(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button><button onClick={() => void downloadPoPdf(order)} disabled={downloadingId !== null} className="p-2 text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-white" title="Download PO"><Download className="h-4 w-4" /></button><button onClick={() => openPrintablePo(order)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="Print PO"><Printer className="h-4 w-4" /></button></div>
               </article>
             ))}
           </div>

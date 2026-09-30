@@ -164,7 +164,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const color = getStatusColor(status);
   const Icon = getStatusIcon(status);
   return (
-    <span className={`admin-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
+    <span className={`admin-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${status === 'Out of Stock' ? 'admin-inventory-out-of-stock-badge' : ''} ${color}`}>
       <Icon className="w-3 h-3" />
       {status}
     </span>
