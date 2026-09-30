@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -298,7 +299,7 @@ class AdminProcurementTest extends TestCase
 
     public function test_plant_manager_and_admin_use_the_same_request_record(): void
     {
-        $replenishmentRequest = $this->replenishmentRequest();
+        $replenishmentRequest = $this->replenishmentRequest(['submitted_at' => now()]);
 
         $this->actingAs($this->requester)
             ->getJson('/api/plant-manager/procurement/requests')
@@ -336,18 +337,21 @@ class AdminProcurementTest extends TestCase
             'status' => ReplenishmentRequest::STATUS_DRAFT,
             'submitted_at' => null,
         ]);
-        $pending = $this->replenishmentRequest(['request_no' => 'RR-PENDING']);
+        $pending = $this->replenishmentRequest(['request_no' => 'RR-PENDING', 'submitted_at' => now()]);
         $approved = $this->replenishmentRequest([
             'request_no' => 'RR-APPROVED',
             'status' => ReplenishmentRequest::STATUS_APPROVED,
+            'submitted_at' => now(),
         ]);
         $rejected = $this->replenishmentRequest([
             'request_no' => 'RR-REJECTED',
             'status' => ReplenishmentRequest::STATUS_REJECTED,
+            'submitted_at' => now(),
         ]);
         $poCreated = $this->replenishmentRequest([
             'request_no' => 'RR-PO-CREATED',
             'status' => ReplenishmentRequest::STATUS_PO_CREATED,
+            'submitted_at' => now(),
         ]);
 
         $queue = $this->actingAs($this->requester)
@@ -369,13 +373,81 @@ class AdminProcurementTest extends TestCase
         $history = $this->actingAs($this->requester)
             ->getJson('/api/plant-manager/procurement/requests?scope=history')
             ->assertOk()
-            ->assertJsonCount(5, 'data')
+            ->assertJsonCount(4, 'data')
             ->json('data');
 
         $this->assertEqualsCanonicalizing(
-            [$draft->id, $pending->id, $approved->id, $rejected->id, $poCreated->id],
+            [$pending->id, $approved->id, $rejected->id, $poCreated->id],
             array_column($history, 'id'),
         );
+    }
+
+    public function test_plant_manager_request_history_is_a_rolling_24_hour_submitted_activity_window(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-30 04:00:00'));
+
+        try {
+            $now = $this->replenishmentRequest([
+                'request_no' => 'RR-NOW',
+                'submitted_at' => now(),
+            ]);
+            $oneHourAgo = $this->replenishmentRequest([
+                'request_no' => 'RR-1-HOUR',
+                'submitted_at' => now()->subHour(),
+            ]);
+            $twentyThreeHoursAgo = $this->replenishmentRequest([
+                'request_no' => 'RR-23-HOURS',
+                'submitted_at' => now()->subHours(23),
+            ]);
+            $exactlyTwentyFourHoursAgo = $this->replenishmentRequest([
+                'request_no' => 'RR-24-HOURS',
+                'submitted_at' => now()->subDay(),
+            ]);
+            $olderRequest = $this->replenishmentRequest([
+                'request_no' => 'RR-OLDER',
+                'submitted_at' => now()->subHours(25),
+            ]);
+
+            $history = $this->actingAs($this->requester)
+                ->getJson('/api/plant-manager/procurement/requests?scope=history')
+                ->assertOk()
+                ->assertJsonCount(3, 'data')
+                ->json('data');
+
+            $this->assertSame(
+                [$now->id, $oneHourAgo->id, $twentyThreeHoursAgo->id],
+                array_column($history, 'id'),
+            );
+            $this->assertDatabaseHas('replenishment_requests', ['id' => $exactlyTwentyFourHoursAgo->id]);
+            $this->assertDatabaseHas('replenishment_requests', ['id' => $olderRequest->id]);
+
+            $activeIds = collect($this->actingAs($this->requester)
+                ->getJson('/api/plant-manager/procurement/requests')
+                ->assertOk()
+                ->json('data'))
+                ->pluck('id')
+                ->all();
+            $this->assertContains($olderRequest->id, $activeIds);
+
+            $admin = $this->userWithRole('ADMIN');
+            $adminIds = collect($this->actingAs($admin)
+                ->getJson('/api/admin/procurement/requests?per_page=100')
+                ->assertOk()
+                ->json('data'))
+                ->pluck('id')
+                ->all();
+            $this->assertContains($olderRequest->id, $adminIds);
+
+            $reportRequestNumbers = collect($this->actingAs($admin)
+                ->getJson('/api/admin/reports/preview?report_key=procurement.replenishment&per_page=100')
+                ->assertOk()
+                ->json('rows'))
+                ->pluck('request_no')
+                ->all();
+            $this->assertContains($olderRequest->request_no, $reportRequestNumbers);
+        } finally {
+            $this->travelBack();
+        }
     }
 
     public function test_submitted_plant_manager_request_appears_in_admin_procurement(): void

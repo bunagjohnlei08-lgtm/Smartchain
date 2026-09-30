@@ -73,13 +73,18 @@ class PlantManagerProcurementController extends Controller
         $query = ReplenishmentRequest::query()
             ->where('requested_by', $request->user()->id);
 
-        if (($validated['scope'] ?? null) !== 'history') {
+        if (($validated['scope'] ?? null) === 'history') {
+            $query->whereNotNull('submitted_at')
+                ->where('submitted_at', '>', now()->subDay())
+                ->orderByDesc('submitted_at')
+                ->orderByDesc('id');
+        } else {
             $query->whereIn('status', ReplenishmentRequest::PLANT_MANAGER_ACTIVE_STATUSES);
+            $query->latest('created_at');
         }
 
         $requests = $query
             ->with(['product:id,name', 'warehouse:id,name', 'requester:id,name'])
-            ->latest('created_at')
             ->get()
             ->map(fn (ReplenishmentRequest $item) => $this->requestData($item));
 

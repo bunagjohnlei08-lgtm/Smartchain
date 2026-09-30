@@ -19,7 +19,6 @@ import {
   TrendingUp,
   TrendingDown,
   CheckCircle,
-  XCircle,
   PackageCheck,
   ArrowDownToLine,
   Box,
@@ -458,7 +457,6 @@ const StockIn: React.FC = () => {
   const totalItemsReceived = receivings.reduce((sum, receiving) => sum + receiving.items.reduce((itemSum, item) => itemSum + item.stockedQuantity, 0), 0);
   const pendingQa = receivings.filter((receiving) => receiving.status === 'Pending QA').length;
   const qaPassed = receivings.filter((receiving) => receiving.status === 'Ready for Stock In').length;
-  const rejected = receivings.filter((receiving) => receiving.status === 'Rejected').length;
   const totalValue = receivings.reduce((sum, receiving) => sum + receiving.receivedValue, 0);
 
   const kpiData = [
@@ -466,7 +464,6 @@ const StockIn: React.FC = () => {
     { label: 'Items Stocked In', value: totalItemsReceived, subtitle: 'QA-approved quantity', trend: 'up' },
     { label: 'Pending QA', value: pendingQa, subtitle: 'Awaiting inspection', trend: 'down' },
     { label: 'Ready for Stock In', value: qaPassed, subtitle: 'Eligible receivings', trend: 'up' },
-    { label: 'Rejected', value: rejected, subtitle: 'Deliveries rejected', trend: 'down' },
     { label: 'Total Received Value', value: `₱${totalValue.toLocaleString()}`, subtitle: 'Stock In view', trend: 'up' },
   ];
 
@@ -614,7 +611,7 @@ const StockIn: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
         {kpiData.map((kpi, idx) => {
           const trendIcon = kpi.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />;
           const trendColor = kpi.trend === 'up' ? 'text-emerald-400' : 'text-rose-400';
@@ -623,7 +620,6 @@ const StockIn: React.FC = () => {
             'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20',
             'text-amber-400 bg-amber-500/10 border border-amber-500/20',
             'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20',
-            'text-rose-400 bg-rose-500/10 border border-rose-500/20',
             'text-teal-400 bg-teal-500/10 border border-teal-500/20',
           ];
           return (
@@ -638,8 +634,7 @@ const StockIn: React.FC = () => {
                   {idx === 1 && <PackageCheck className="w-5 h-5" />}
                   {idx === 2 && <Clock className="w-5 h-5" />}
                   {idx === 3 && <CheckCircle className="w-5 h-5" />}
-                  {idx === 4 && <XCircle className="w-5 h-5" />}
-                  {idx === 5 && <FileText className="w-5 h-5" />}
+                  {idx === 4 && <FileText className="w-5 h-5" />}
                 </div>
               </div>
               <p className="text-xs text-slate-400 mt-1">{kpi.subtitle}</p>

@@ -542,7 +542,6 @@ const ReceivingManagement: React.FC = () => {
   const totalDeliveries = summary.total;
   const pendingQA = summary.pending_qa;
   const passed = summary.passed;
-  const rejected = summary.rejected;
   const partial = summary.partial;
 
   const handleRowClick = (id: number) => {
@@ -686,7 +685,7 @@ const ReceivingManagement: React.FC = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <KPICard
           label="Total Deliveries"
           value={totalDeliveries}
@@ -707,13 +706,6 @@ const ReceivingManagement: React.FC = () => {
           icon={<CheckCircle className="w-5 h-5" />}
           subtitle="Approved by QA"
           color="text-emerald-400"
-        />
-        <KPICard
-          label="Rejected"
-          value={rejected}
-          icon={<XCircle className="w-5 h-5" />}
-          subtitle="Rejected by QA"
-          color="text-red-400"
         />
         <KPICard
           label="Partial"
