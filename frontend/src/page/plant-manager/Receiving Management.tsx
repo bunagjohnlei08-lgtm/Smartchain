@@ -24,6 +24,10 @@ import {
   LayoutGrid,
   LayoutList,
   RotateCcw,
+  FileText,
+  Image as ImageIcon,
+  Trash2,
+  Upload,
 } from 'lucide-react';
 
 // ============================================
@@ -46,6 +50,7 @@ interface CreateReceivingFormData {
   reference_no: string;
   delivery_date: string;
   items: CreateReceivingItemInput[];
+  receipts: File[];
 }
 
 interface ApprovedPurchaseOrder {
@@ -145,7 +150,15 @@ const emptyForm = (): CreateReceivingFormData => ({
   reference_no: '',
   delivery_date: '',
   items: [],
+  receipts: [],
 });
+
+const validateReceiptFile = (file: File): string | null => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+  if (!allowedTypes.includes(file.type)) return `${file.name}: use JPG, PNG, or PDF.`;
+  if (file.size > 5 * 1024 * 1024) return `${file.name}: each receipt must not exceed 5 MB.`;
+  return null;
+};
 
 // ============================================
 // HELPER COMPONENTS
@@ -230,6 +243,53 @@ const KPICard: React.FC<{
   );
 };
 
+const ReceiptPreview: React.FC<{ file: File; onRemove: () => void; disabled?: boolean }> = ({ file, onRemove, disabled }) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  return (
+    <li className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-700 bg-[#0b1220] p-3">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-800 text-cyan-300">
+        {previewUrl ? <img src={previewUrl} alt="Supplier receipt preview" className="h-full w-full object-cover" /> : <FileText className="h-5 w-5" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-slate-100" title={file.name}>{file.name}</p>
+        <p className="mt-0.5 text-xs text-slate-400">{file.type === 'application/pdf' ? 'PDF' : file.type.replace('image/', '').toUpperCase()} · {(file.size / 1024).toFixed(0)} KB</p>
+      </div>
+      <button type="button" onClick={onRemove} disabled={disabled} aria-label={`Remove ${file.name}`} className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+    </li>
+  );
+};
+
+const ReceiptFilePicker: React.FC<{
+  files: File[];
+  onChange: (files: File[]) => void;
+  disabled?: boolean;
+  inputId: string;
+}> = ({ files, onChange, disabled, inputId }) => (
+  <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4" aria-labelledby={`${inputId}-title`}>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h3 id={`${inputId}-title`} className="text-sm font-semibold text-slate-100">Supplier Delivery Receipt *</h3>
+        <p className="mt-1 text-xs text-slate-400">Attach 1–3 supplier document copies. JPG, PNG, or PDF; 5 MB each.</p>
+      </div>
+      <span className="rounded-full border border-slate-600 px-2.5 py-1 text-xs font-medium text-slate-300">{files.length} / 3 files</span>
+    </div>
+    {files.length > 0 && <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{files.map((file, index) => <ReceiptPreview key={`${file.name}-${file.lastModified}-${index}`} file={file} disabled={disabled} onRemove={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))} />)}</ul>}
+    <input id={inputId} type="file" accept="image/jpeg,image/png,application/pdf" multiple disabled={disabled || files.length >= 3} className="sr-only" onChange={(event) => { const selected = Array.from(event.currentTarget.files ?? []); onChange([...files, ...selected].slice(0, 3)); event.currentTarget.value = ''; }} />
+    <label htmlFor={inputId} aria-disabled={disabled || files.length >= 3} className={`mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-500/30 px-4 text-sm font-medium text-cyan-300 transition-colors focus-within:ring-2 focus-within:ring-cyan-500 ${disabled || files.length >= 3 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-cyan-500/10'}`}><Upload className="h-4 w-4" /> Add receipt</label>
+  </section>
+);
+
 // ============================================
 // CREATE RECEIVING MODAL
 // ============================================
@@ -301,6 +361,15 @@ const CreateReceivingModal: React.FC<{
     }
     if (!formData.items.some((item) => Number(item.delivered_quantity) > 0)) {
       setFormError('Enter a delivered quantity for at least one product.');
+      return;
+    }
+    if (formData.receipts.length < 1) {
+      setFormError('Attach at least one supplier delivery receipt before confirming Receiving.');
+      return;
+    }
+    const receiptError = formData.receipts.map(validateReceiptFile).find(Boolean);
+    if (receiptError) {
+      setFormError(receiptError);
       return;
     }
 
@@ -381,6 +450,8 @@ const CreateReceivingModal: React.FC<{
               />
             </div>
           </div>
+
+          <ReceiptFilePicker files={formData.receipts} onChange={(receipts) => setFormData((current) => ({ ...current, receipts }))} disabled={submitting} inputId="receiving-receipts" />
 
           <div className="pt-2 border-t border-slate-800">
             <div className="flex items-center justify-between mt-3 mb-2">
@@ -470,6 +541,7 @@ const ReceivingManagement: React.FC = () => {
   const [replacementQuantities, setReplacementQuantities] = useState<Record<number, string>>({});
   const [replacementDate, setReplacementDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [replacementReference, setReplacementReference] = useState('');
+  const [replacementReceipts, setReplacementReceipts] = useState<File[]>([]);
   const [replacementSaving, setReplacementSaving] = useState(false);
   const [replacementError, setReplacementError] = useState<string | null>(null);
 
@@ -549,15 +621,15 @@ const ReceivingManagement: React.FC = () => {
   };
 
   const handleCreateReceiving = async (formData: CreateReceivingFormData) => {
-    const payload = {
-      purchase_order_id: formData.purchase_order_id,
-      reference_no: formData.reference_no || null,
-      delivery_date: formData.delivery_date,
-      items: formData.items.map((item) => ({
-        purchase_order_item_id: item.purchase_order_item_id,
-        delivered_quantity: Number(item.delivered_quantity),
-      })),
-    };
+    const payload = new FormData();
+    payload.append('purchase_order_id', String(formData.purchase_order_id));
+    if (formData.reference_no) payload.append('reference_no', formData.reference_no);
+    payload.append('delivery_date', formData.delivery_date);
+    formData.items.forEach((item, index) => {
+      payload.append(`items[${index}][purchase_order_item_id]`, String(item.purchase_order_item_id));
+      payload.append(`items[${index}][delivered_quantity]`, String(Number(item.delivered_quantity)));
+    });
+    formData.receipts.forEach((file) => payload.append('receipts[]', file));
 
     await apiClient.post<ApiReceiving>('/receivings', payload);
     setReceivingView('active');
@@ -569,6 +641,7 @@ const ReceivingManagement: React.FC = () => {
   useEffect(() => {
     setReplacementQuantities({});
     setReplacementReference('');
+    setReplacementReceipts([]);
     setReplacementError(null);
   }, [selectedReceivingId]);
 
@@ -581,14 +654,27 @@ const ReceivingManagement: React.FC = () => {
       setReplacementError('Enter a whole-number delivered quantity for each product.');
       return;
     }
+    if (replacementReceipts.length < 1) {
+      setReplacementError('Attach at least one supplier delivery receipt before confirming the replacement.');
+      return;
+    }
+    const receiptError = replacementReceipts.map(validateReceiptFile).find(Boolean);
+    if (receiptError) {
+      setReplacementError(receiptError);
+      return;
+    }
     setReplacementSaving(true);
     setReplacementError(null);
     try {
-      const response = await apiClient.post<ApiReceiving>(`/receivings/${receiving.id}/confirm-replacement`, {
-        delivery_date: replacementDate,
-        reference_no: replacementReference.trim() || null,
-        items,
+      const payload = new FormData();
+      payload.append('delivery_date', replacementDate);
+      if (replacementReference.trim()) payload.append('reference_no', replacementReference.trim());
+      items.forEach((item, index) => {
+        payload.append(`items[${index}][receiving_item_id]`, String(item.receiving_item_id));
+        payload.append(`items[${index}][delivered_quantity]`, String(item.delivered_quantity));
       });
+      replacementReceipts.forEach((file) => payload.append('receipts[]', file));
+      const response = await apiClient.post<ApiReceiving>(`/receivings/${receiving.id}/confirm-replacement`, payload);
       setReceivings((current) => current.map((record) => (record.id === response.data.id ? response.data : record)));
       setAssignmentToast({ type: 'success', message: 'Replacement delivery confirmed. Assign a QA Supervisor to inspect it.' });
     } catch (error) {
@@ -1048,6 +1134,21 @@ const ReceivingManagement: React.FC = () => {
                 </div>
               </div>
 
+              <section className="border-t border-[#1f2937] p-4 sm:p-5" aria-labelledby="saved-receipts-title">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div><h4 id="saved-receipts-title" className="text-sm font-medium text-slate-200">Supplier Delivery Receipt</h4><p className="mt-1 text-xs text-slate-400">Documentary delivery evidence; quantities remain based on the physical count.</p></div>
+                  <span className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300">{selectedReceiving.receipt_attachments?.length ?? 0} / 3 files</span>
+                </div>
+                <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {(selectedReceiving.receipt_attachments ?? []).map((receipt) => (
+                    <li key={receipt.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-700 bg-[#0b1220] p-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-cyan-300">{receipt.mime_type.startsWith('image/') ? <ImageIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}</div>
+                      <div className="min-w-0"><p className="truncate text-sm font-medium text-white" title={receipt.original_name}>{receipt.original_name}</p><p className="mt-0.5 text-xs text-slate-400">{receipt.mime_type === 'application/pdf' ? 'PDF' : receipt.mime_type.replace('image/', '').toUpperCase()} · {(receipt.file_size / 1024).toFixed(0)} KB</p></div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
               {selectedReceiving.replacement && (
                 <div className="border-t border-[#1f2937] p-4 sm:p-5">
                   <h4 className="text-[12px] font-medium text-slate-300 sm:text-sm">Rejected item replacement</h4>
@@ -1077,6 +1178,7 @@ const ReceivingManagement: React.FC = () => {
                           </label>
                         ))}
                       </div>
+                      <ReceiptFilePicker files={replacementReceipts} onChange={setReplacementReceipts} disabled={replacementSaving} inputId={`replacement-receipts-${selectedReceiving.id}`} />
                       {replacementError && <p role="alert" className="text-xs text-red-400 sm:text-sm">{replacementError}</p>}
                       <button type="submit" disabled={replacementSaving} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:text-sm">
                         {replacementSaving && <Loader2 className="h-4 w-4 animate-spin" />}

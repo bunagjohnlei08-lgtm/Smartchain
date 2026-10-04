@@ -24,10 +24,10 @@ export const clearAuthStorage = (): void => {
   sessionStorage.removeItem(FIRST_LOGIN_STORAGE_KEY);
 };
 
-export const redirectToIdleLogin = (): void => {
+export const redirectToPublicLanding = (): void => {
   clearAuthStorage();
-  if (window.location.pathname !== '/login') {
-    window.location.replace('/login?reason=session-expired');
+  if (window.location.pathname !== '/') {
+    window.location.replace('/');
   }
 };
 

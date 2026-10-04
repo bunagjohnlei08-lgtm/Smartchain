@@ -4,6 +4,7 @@ import logo from '../../assets/logo.png';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
+  appearance?: 'dark' | 'light';
 }
 
 const highlights = [
@@ -15,12 +16,14 @@ const highlights = [
 
 // Extra spacing is applied only on taller viewports (min-height: 860px) so the card
 // fits without scrolling on common laptop heights such as 1366x768.
-const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
-  return (
-    <main className="auth-surface relative flex min-h-dvh items-center justify-center overflow-x-hidden bg-[#030b17] px-3 py-3 text-slate-100 sm:px-6 sm:py-5 lg:py-4">
-      <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(96,165,250,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(96,165,250,0.035)_1px,transparent_1px)] [background-size:48px_48px]" />
+const AuthLayout: React.FC<AuthLayoutProps> = ({ children, appearance = 'dark' }) => {
+  const isLight = appearance === 'light';
 
-      <div className="relative grid w-full max-w-[1300px] overflow-hidden rounded-2xl border border-slate-700/40 bg-[#07111f] shadow-[0_20px_60px_rgba(0,0,0,0.35)] sm:rounded-[24px] lg:w-[82vw] lg:grid-cols-2">
+  return (
+    <main className={`auth-surface relative flex min-h-dvh items-center justify-center overflow-x-hidden px-3 py-3 sm:px-6 sm:py-5 lg:py-4 ${isLight ? 'bg-white text-slate-900' : 'bg-[#030b17] text-slate-100'}`}>
+      {!isLight && <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(96,165,250,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(96,165,250,0.035)_1px,transparent_1px)] [background-size:48px_48px]" />}
+
+      <div className={`relative grid w-full max-w-[1300px] overflow-hidden rounded-2xl border sm:rounded-[24px] lg:w-[82vw] lg:grid-cols-2 ${isLight ? 'border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.16)]' : 'border-slate-700/40 bg-[#07111f] shadow-[0_20px_60px_rgba(0,0,0,0.35)]'}`}>
         {/* Marketing panel */}
         <section className="relative flex min-w-0 flex-col border-b border-slate-700/40 bg-[linear-gradient(180deg,#0a1d38_0%,#081629_55%,#07111f_100%)] px-4 pb-3.5 pt-3 sm:p-7 lg:border-b-0 lg:border-r lg:px-10 lg:py-7 xl:px-12 [@media(min-height:860px)]:xl:py-8">
           <div className="inline-flex w-fit items-center justify-center self-start rounded-lg bg-cyan-400/10 px-2 py-0.5 shadow-[0_4px_18px_rgba(34,211,238,0.10)] ring-1 ring-cyan-300/20 backdrop-blur-sm sm:rounded-xl sm:px-3 sm:py-2">
@@ -61,7 +64,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         </section>
 
         {/* Form panel */}
-        <section className="flex min-w-0 items-center justify-center bg-[#060f1c] px-4 py-4 sm:px-10 sm:py-7 lg:px-12 lg:py-7">
+        <section className={`flex min-w-0 items-center justify-center px-4 py-4 sm:px-10 sm:py-7 lg:px-12 lg:py-7 ${isLight ? 'bg-white' : 'bg-[#060f1c]'}`}>
           <div className="w-full min-w-0 max-w-[420px]">
             {children}
           </div>

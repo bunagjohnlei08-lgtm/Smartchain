@@ -182,8 +182,15 @@ class AuthHardeningTest extends TestCase
         $target = $this->user($this->plantManagerRole);
         $targetHeaders = $this->bearer($target);
 
+        foreach (['smartchain@2026', 'SMARTCHAIN@2026', 'Smartchain@Password', 'Smartchain2026'] as $weakPassword) {
+            $this->asToken($this->bearer($admin))
+                ->putJson("/api/users/{$target->id}", ['password' => $weakPassword])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('password');
+        }
+
         $this->asToken($this->bearer($admin))
-            ->putJson("/api/users/{$target->id}", ['password' => 'BrandNewPassword123'])
+            ->putJson("/api/users/{$target->id}", ['password' => 'BrandNewPassword@123'])
             ->assertOk();
 
         $this->assertSame(0, $target->tokens()->count());
@@ -198,8 +205,8 @@ class AuthHardeningTest extends TestCase
 
         $this->asToken($currentHeaders)->putJson('/api/profile/password', [
             'current_password' => 'correct-password',
-            'password' => 'NewPassword123',
-            'password_confirmation' => 'NewPassword123',
+            'password' => 'NewPassword@123',
+            'password_confirmation' => 'NewPassword@123',
         ])->assertOk();
 
         $this->assertSame(1, $user->tokens()->count());

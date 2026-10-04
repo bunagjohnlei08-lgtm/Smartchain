@@ -35,6 +35,11 @@ class Receiving extends Model
         return $this->hasMany(ReceivingItem::class);
     }
 
+    public function receiptAttachments(): HasMany
+    {
+        return $this->hasMany(ReceivingReceiptAttachment::class)->orderBy('created_at')->orderBy('id');
+    }
+
     public function discrepancy(): HasOne
     {
         return $this->hasOne(ReceivingDiscrepancy::class);

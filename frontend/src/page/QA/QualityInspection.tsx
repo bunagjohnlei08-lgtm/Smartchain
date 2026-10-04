@@ -13,15 +13,23 @@ import {
   XCircle,
   AlertCircle,
   Clock,
-  Download,
+  Eye,
   Save,
   Send,
   Grid,
   Table,
+  FileCheck2,
+  ShieldCheck,
+  X,
 } from 'lucide-react';
 
 type InspectionStatus = 'Pending' | 'In Progress' | 'Passed' | 'Rejected' | 'Partial';
 type ViewMode = 'list' | 'grid';
+
+interface ReceivingReceiptAttachment extends QaAttachment {
+  uploaded_by: string | null;
+  receiving_no: string;
+}
 
 interface QaInspectionListRecord {
   id: number;
@@ -40,6 +48,8 @@ interface QaInspectionProductApi {
   id: number;
   receiving_item_id: number;
   product: string;
+  category: string | null;
+  brand: string | null;
   ordered_qty: number;
   delivered_qty: number;
   accepted_qty: number;
@@ -72,6 +82,7 @@ interface QaInspectionDetailApi {
     performed_by: string;
     occurred_at: string;
   }[];
+  receiving_receipts: ReceivingReceiptAttachment[];
   inspection: {
     attachment_path: string | null;
     attachments: QaAttachment[];
@@ -93,6 +104,8 @@ interface ReceivingProduct {
   unit: string;
   inspectionResult: InspectionStatus;
   remarks: string;
+  category: string | null;
+  brand: string | null;
 }
 
 interface ReceivingItem {
@@ -110,6 +123,7 @@ interface ReceivingItem {
 
 interface ReceivingDetail extends ReceivingItem {
   attachments: QaAttachment[];
+  receivingReceipts: ReceivingReceiptAttachment[];
   referenceNo: string;
   products: ReceivingProduct[];
   timeline: {
@@ -409,6 +423,8 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
       unit: item.unit,
       inspectionResult: resolveItemResult(item.delivered_qty, acceptedQty, rejectedQty),
       remarks: item.remarks ?? '',
+      category: item.category,
+      brand: item.brand,
     };
   });
 
@@ -430,6 +446,7 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
     action: detail.action,
     referenceNo: detail.reference_no ?? '-',
     attachments: detail.inspection.attachments ?? [],
+    receivingReceipts: detail.receiving_receipts ?? [],
     products,
     timeline: detail.timeline.map((event) => ({
       status: event.status,
@@ -449,6 +466,9 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
 
 const QualityInspection: React.FC = () => {
   const qualityRootRef = useRef<HTMLDivElement>(null);
+  const receiptTriggerRef = useRef<HTMLButtonElement>(null);
+  const receiptCloseRef = useRef<HTMLButtonElement>(null);
+  const receiptDialogRef = useRef<HTMLDivElement>(null);
   const [layoutDebugSnapshot, setLayoutDebugSnapshot] = useState<QaLayoutDebugSnapshot | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedReceivingId = Number(searchParams.get('receiving')) || null;
@@ -474,6 +494,7 @@ const QualityInspection: React.FC = () => {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const itemsPerPage = 7;
 
   const fetchList = useCallback(async () => {
@@ -530,6 +551,7 @@ const QualityInspection: React.FC = () => {
     setSelectedAttachments([]);
     setRemovedAttachmentIds([]);
     setAttachmentError(null);
+    setIsReceiptModalOpen(false);
     setSelectedReceiving(null);
     setQuantityInputs({});
     setQuantityErrors({});
@@ -541,6 +563,45 @@ const QualityInspection: React.FC = () => {
     fetchDetail(selectedReceivingId);
     return () => { detailRequestId.current += 1; };
   }, [fetchDetail, selectedReceivingId]);
+
+  useEffect(() => {
+    if (!isReceiptModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const receiptTrigger = receiptTriggerRef.current;
+    const handleDialogKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (document.querySelectorAll('[role="dialog"]').length === 1) setIsReceiptModalOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab' || !receiptDialogRef.current) return;
+      const focusable = Array.from(receiptDialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleDialogKeyboard);
+    receiptCloseRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleDialogKeyboard);
+      receiptTrigger?.focus();
+    };
+  }, [isReceiptModalOpen]);
 
   const supplierOptions = useMemo(() => {
     const suppliers = Array.from(new Set(records.map((record) => record.supplier))).sort();
@@ -1180,9 +1241,6 @@ const QualityInspection: React.FC = () => {
                   >
                     <Send className="w-4 h-4" /> Submit Inspection
                   </button>
-                  <button className="p-2 rounded-lg hover:bg-gray-800 text-slate-400 hover:text-white transition-all">
-                    <Download className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
 
@@ -1225,6 +1283,26 @@ const QualityInspection: React.FC = () => {
                     <div>
                       <p className="text-slate-400">Reference No.</p>
                       <p className="text-white font-medium">{selectedReceiving.referenceNo}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">Supplier Receipt</p>
+                      {selectedReceiving.receivingReceipts.length > 0 ? (
+                        <button
+                          ref={receiptTriggerRef}
+                          type="button"
+                          onClick={() => setIsReceiptModalOpen(true)}
+                          aria-haspopup="dialog"
+                          aria-label={`View supplier delivery receipts (${selectedReceiving.receivingReceipts.length})`}
+                          className="mt-0.5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium text-cyan-300 transition-colors hover:bg-cyan-500/10 hover:text-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+                        >
+                          <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          {selectedReceiving.receivingReceipts.length === 1
+                            ? 'View Receipt'
+                            : `View Receipts (${selectedReceiving.receivingReceipts.length})`}
+                        </button>
+                      ) : (
+                        <p className="mt-1 text-slate-500">No receipt attached</p>
+                      )}
                     </div>
                     <div>
                       <p className="text-slate-400">Prepared By</p>
@@ -1277,7 +1355,14 @@ const QualityInspection: React.FC = () => {
 
                               return (
                                 <tr key={product.id} className="border-b border-gray-800 hover:bg-gray-800/30">
-                                  <td className="px-2 py-2 text-white">{product.product}</td>
+                                  <td className="px-2 py-2 text-white">
+                                    <span className="block">{product.product}</span>
+                                    {(product.brand || product.category) && (
+                                      <span className="mt-1 block text-xs text-slate-400">
+                                        {[product.brand, product.category].filter(Boolean).join(' / ')}
+                                      </span>
+                                    )}
+                                  </td>
                                   <td className="px-2 py-2 text-center text-white">{product.orderedQty}</td>
                                   <td className="px-2 py-2 text-center text-white">{product.deliveredQty}</td>
                                   <td className="px-2 py-2 text-center">
@@ -1379,9 +1464,15 @@ const QualityInspection: React.FC = () => {
                     )}
 
                     {activeTab === 'attachments' && (
-                      <div data-qa-layout-debug="evidenceCard" className="space-y-3 rounded-lg border border-(--border-color-strong) bg-(--bg-surface-alt) p-4 text-sm text-(--text-primary)">
-                        <EvidenceGallery attachments={selectedReceiving.attachments} receivingId={selectedReceiving.id} editable={!inspectionIsFinal} selectedFiles={selectedAttachments} removedIds={removedAttachmentIds} onSelectedFilesChange={(files) => { setSelectedAttachments(files); setAttachmentError(null); }} onRemovedIdsChange={(ids) => { setRemovedAttachmentIds(ids); setAttachmentError(null); }} error={attachmentError} disabled={isSaving} />
-                        <p data-qa-layout-debug="lastRealContent" className="text-(--text-secondary)">{selectedReceiving.totalRejected > 0 ? 'At least one evidence file is required before submission.' : 'Evidence is optional when no quantity is rejected.'}</p>
+                      <div className="text-sm text-(--text-primary)">
+                        <section data-qa-layout-debug="evidenceCard" aria-labelledby="qa-evidence-heading" className="space-y-3 rounded-xl border border-(--border-color-strong) bg-(--bg-surface-alt) p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"><ShieldCheck className="h-5 w-5" /></div>
+                            <div className="min-w-0"><h3 id="qa-evidence-heading" className="font-semibold text-(--text-primary)">QA Inspection Evidence</h3><p className="text-(--text-secondary)">Upload photos or documents supporting rejected, damaged, incorrect, or non-conforming items.</p></div>
+                          </div>
+                          <EvidenceGallery attachments={selectedReceiving.attachments} receivingId={selectedReceiving.id} title="Inspection evidence files" editable={!inspectionIsFinal} selectedFiles={selectedAttachments} removedIds={removedAttachmentIds} onSelectedFilesChange={(files) => { setSelectedAttachments(files); setAttachmentError(null); }} onRemovedIdsChange={(ids) => { setRemovedAttachmentIds(ids); setAttachmentError(null); }} error={attachmentError} disabled={isSaving} />
+                          <p data-qa-layout-debug="lastRealContent" className="text-(--text-secondary)">{selectedReceiving.totalRejected > 0 ? 'At least one QA inspection evidence file is required before submission.' : 'QA evidence is optional when no quantity is rejected.'}</p>
+                        </section>
                       </div>
                     )}
 
@@ -1439,6 +1530,60 @@ const QualityInspection: React.FC = () => {
                 ))}
                 {!selectedReceiving && <p className="text-sm text-slate-400">Select a receiving to view its timeline.</p>}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReceiptModalOpen && selectedReceiving && selectedReceiving.receivingReceipts.length > 0 && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="supplier-receipts-title"
+          aria-describedby="supplier-receipts-description"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsReceiptModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-3 sm:p-6"
+        >
+          <div ref={receiptDialogRef} className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-[#0d1322] shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-700 px-4 py-4 sm:px-5">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-300">
+                  <FileCheck2 className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <h2 id="supplier-receipts-title" className="text-base font-semibold text-white sm:text-lg">Supplier Delivery Receipts</h2>
+                  <p id="supplier-receipts-description" className="mt-1 text-sm text-slate-400">Documents uploaded during Receiving for delivery reference.</p>
+                </div>
+              </div>
+              <button
+                ref={receiptCloseRef}
+                type="button"
+                onClick={() => setIsReceiptModalOpen(false)}
+                aria-label="Close supplier delivery receipts"
+                className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
+              <dl className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm min-[430px]:grid-cols-2 dark:border-slate-800 dark:bg-[#090d16]/60 dark:shadow-none sm:grid-cols-3">
+                <div className="min-w-0"><dt className="text-slate-600 dark:text-slate-400">Receiving No.</dt><dd className="truncate font-medium text-slate-900 dark:text-white" title={selectedReceiving.receivingNo}>{selectedReceiving.receivingNo}</dd></div>
+                <div className="min-w-0"><dt className="text-slate-600 dark:text-slate-400">Supplier</dt><dd className="break-words font-medium text-slate-900 dark:text-white">{selectedReceiving.supplier}</dd></div>
+                <div className="min-w-0"><dt className="text-slate-600 dark:text-slate-400">Reference No.</dt><dd className="break-words font-medium text-slate-900 dark:text-white">{selectedReceiving.referenceNo}</dd></div>
+              </dl>
+              <EvidenceGallery
+                attachments={selectedReceiving.receivingReceipts}
+                receivingId={selectedReceiving.id}
+                title="Receipt files"
+                description="Preview or download the authorized Receiving files below."
+                maxFiles={Math.max(3, selectedReceiving.receivingReceipts.length)}
+                readOnlyLabel="Read only"
+                showDownload
+                showMetadata
+              />
             </div>
           </div>
         </div>

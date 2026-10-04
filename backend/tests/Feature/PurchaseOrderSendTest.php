@@ -153,12 +153,24 @@ class PurchaseOrderSendTest extends TestCase
             'expected_delivery_date' => now()->addDay()->toDateString(),
             'items' => [['product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250]],
         ])->assertCreated()->assertJsonPath('supplier_id', $this->supplier->id)
-            ->assertJsonPath('supplier_name', 'Acme Chemicals');
+            ->assertJsonPath('supplier_name', 'Acme Chemicals')
+            ->assertJsonPath('status', PurchaseOrder::STATUS_APPROVED);
 
         $this->assertDatabaseHas('purchase_orders', [
             'supplier_id' => $this->supplier->id,
             'supplier_name' => 'Acme Chemicals',
         ]);
+    }
+
+    public function test_new_purchase_order_status_is_server_controlled(): void
+    {
+        $this->actingAs($this->admin)->postJson('/api/purchase-orders', [
+            'supplier_id' => $this->supplier->id,
+            'delivery_details' => 'Main warehouse',
+            'expected_delivery_date' => now()->addDay()->toDateString(),
+            'status' => PurchaseOrder::STATUS_COMPLETED,
+            'items' => [['product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('status');
     }
 
     public function test_shared_resolver_uses_conservative_normalized_name_matching(): void

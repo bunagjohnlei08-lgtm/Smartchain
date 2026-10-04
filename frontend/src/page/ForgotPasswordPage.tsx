@@ -5,7 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/auth';
 import FormButton from '../components/auth/FormButton';
 import FormInput from '../components/auth/FormInput';
+import PasswordRequirements from '../components/auth/PasswordRequirements';
 import api from '../lib/api';
+import { isPasswordValid, PASSWORD_MAX_LENGTH, passwordValidationMessage } from '../lib/passwordPolicy';
 
 type Step = 'email' | 'otp' | 'password' | 'success';
 type ApiError = { message?: string; reason?: string; retry_after?: number; errors?: Record<string, string[]> };
@@ -85,6 +87,8 @@ const ForgotPasswordPage: React.FC = () => {
 
   const resetPassword = (event: React.FormEvent) => {
     event.preventDefault();
+    const passwordError = passwordValidationMessage(password);
+    if (passwordError) { setError(passwordError); return; }
     if (password !== confirmation) { setError('Password confirmation does not match.'); return; }
     void run(async () => {
       try {
@@ -119,7 +123,7 @@ const ForgotPasswordPage: React.FC = () => {
         <p className="mt-1 text-sm text-slate-400">
           {step === 'email' && 'Enter the email associated with your SmartChain account.'}
           {step === 'otp' && 'We sent a 6-digit verification code to your registered email.'}
-          {step === 'password' && 'Use at least 8 characters with letters and numbers.'}
+          {step === 'password' && 'Choose a password that meets every requirement below.'}
           {step === 'success' && 'You can now sign in using your new password.'}
         </p>
       </div>
@@ -139,9 +143,10 @@ const ForgotPasswordPage: React.FC = () => {
       </form>}
 
       {step === 'password' && <form onSubmit={resetPassword} className="space-y-3">
-        <FormInput label="New Password" type="password" name="new-password" autoComplete="new-password" value={password} onChange={(value) => { setPassword(value); setError(''); }} required showPasswordToggle disabled={busy} />
-        <FormInput label="Confirm Password" type="password" name="confirm-password" autoComplete="new-password" value={confirmation} onChange={(value) => { setConfirmation(value); setError(''); }} required showPasswordToggle disabled={busy} />
-        <FormButton type="submit" isLoading={busy} disabled={busy}>Reset Password</FormButton>
+        <FormInput label="New Password" type="password" name="new-password" autoComplete="new-password" value={password} onChange={(value) => { setPassword(value); setError(''); }} required showPasswordToggle disabled={busy} maxLength={PASSWORD_MAX_LENGTH} />
+        <PasswordRequirements password={password} />
+        <FormInput label="Confirm Password" type="password" name="confirm-password" autoComplete="new-password" value={confirmation} onChange={(value) => { setConfirmation(value); setError(''); }} required showPasswordToggle disabled={busy} maxLength={PASSWORD_MAX_LENGTH} />
+        <FormButton type="submit" isLoading={busy} disabled={busy || !isPasswordValid(password) || confirmation !== password}>Reset Password</FormButton>
       </form>}
 
       {step === 'success' && <FormButton type="button" onClick={back}>Back to Sign In</FormButton>}

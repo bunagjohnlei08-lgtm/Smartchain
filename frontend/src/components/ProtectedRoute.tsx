@@ -35,11 +35,11 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
   const userRole = isAuthenticated ? restoreStoredRole() : '';
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-    const fallback = PANEL_ROUTES[userRole] || '/login';
+    const fallback = PANEL_ROUTES[userRole] || '/';
     return <Navigate to={fallback} replace />;
   }
 

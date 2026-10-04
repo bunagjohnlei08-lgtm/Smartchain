@@ -1,7 +1,7 @@
 import React from 'react';
 import { Clock3 } from 'lucide-react';
 import { apiClient } from '../lib/api';
-import { broadcastSessionEnd, clearAuthStorage, currentSessionKey, redirectToIdleLogin, SESSION_CHANNEL_NAME, SESSION_IDLE_TIMEOUT_EVENT } from '../lib/authSession';
+import { broadcastSessionEnd, clearAuthStorage, currentSessionKey, redirectToPublicLanding, SESSION_CHANNEL_NAME, SESSION_IDLE_TIMEOUT_EVENT } from '../lib/authSession';
 import { logout } from '../lib/logout';
 
 interface SessionStatusResponse {
@@ -66,7 +66,7 @@ const SessionIdleManager: React.FC<{ children: React.ReactNode }> = ({ children 
     endingRef.current = true;
     clearTrailingSync();
     if (broadcast) broadcastSessionEnd('idle-timeout', sessionKeyRef.current);
-    redirectToIdleLogin();
+    redirectToPublicLanding();
   }, [clearTrailingSync]);
 
   const fetchStatus = React.useCallback(async (): Promise<SessionStatus> => {
@@ -122,7 +122,7 @@ const SessionIdleManager: React.FC<{ children: React.ReactNode }> = ({ children 
           endingRef.current = true;
           clearTrailingSync();
           clearAuthStorage();
-          window.location.replace(event.data.type === 'idle-timeout' ? '/login?reason=session-expired' : '/login');
+          window.location.replace('/');
         }
       };
     }
@@ -211,7 +211,7 @@ const SessionIdleManager: React.FC<{ children: React.ReactNode }> = ({ children 
     endingRef.current = true;
     await logout();
     broadcastSessionEnd('logout', sessionKeyRef.current);
-    window.location.replace('/login');
+    window.location.replace('/');
   };
 
   return (

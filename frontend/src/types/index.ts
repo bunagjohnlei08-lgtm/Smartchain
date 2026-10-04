@@ -163,6 +163,15 @@ export interface ApiReceivingReplacement {
   awaiting_delivery: boolean;
 }
 
+export interface ApiReceivingReceiptAttachment {
+  id: number;
+  original_name: string;
+  mime_type: string;
+  file_size: number;
+  view_url: string;
+  created_at: string;
+}
+
 export interface ApiReceiving {
   id: number;
   receiving_no: string;
@@ -178,6 +187,7 @@ export interface ApiReceiving {
   assigned_qa: { id: number; name: string } | null;
   product_summary: string;
   items_count: number;
+  receipt_attachments?: ApiReceivingReceiptAttachment[];
   items: ApiReceivingItem[];
   timeline: ApiReceivingTimelineEvent[];
   created_at: string;

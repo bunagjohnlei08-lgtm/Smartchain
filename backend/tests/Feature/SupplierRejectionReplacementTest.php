@@ -94,10 +94,11 @@ class SupplierRejectionReplacementTest extends TestCase
     private function inspectReplacement(Receiving $replacement, int $delivered, int $accepted, int $rejected)
     {
         $item = $replacement->items()->sole();
-        $this->actingAs($this->manager)->postJson("/api/receivings/{$replacement->id}/confirm-replacement", [
+        $this->actingAs($this->manager)->post("/api/receivings/{$replacement->id}/confirm-replacement", [
             'delivery_date' => now()->toDateString(),
             'items' => [['receiving_item_id' => $item->id, 'delivered_quantity' => $delivered]],
-        ])->assertOk()->assertJsonPath('status', 'Pending QA');
+            'receipts' => [UploadedFile::fake()->image('replacement-receipt.jpg')],
+        ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('status', 'Pending QA');
         $this->actingAs($this->manager)->patchJson("/api/receivings/{$replacement->id}/assign-qa", ['qa_user_id' => $this->qa->id])->assertOk();
 
         $payload = ['items' => [[
@@ -228,13 +229,13 @@ class SupplierRejectionReplacementTest extends TestCase
         $case = $this->sentCase();
         $replacement = $this->route($case);
         $item = $replacement->items()->sole();
-        $payload = fn (int $quantity) => ['delivery_date' => now()->toDateString(), 'items' => [['receiving_item_id' => $item->id, 'delivered_quantity' => $quantity]]];
-        $this->actingAs($this->manager)->postJson("/api/receivings/{$replacement->id}/confirm-replacement", $payload(51))->assertUnprocessable();
-        $this->actingAs($this->manager)->postJson("/api/receivings/{$replacement->id}/confirm-replacement", $payload(50))->assertOk();
-        $this->actingAs($this->manager)->postJson("/api/receivings/{$replacement->id}/confirm-replacement", $payload(50))->assertUnprocessable();
-        $this->actingAs($this->qa)->postJson("/api/receivings/{$replacement->id}/confirm-replacement", $payload(50))->assertForbidden();
+        $payload = fn (int $quantity) => ['delivery_date' => now()->toDateString(), 'items' => [['receiving_item_id' => $item->id, 'delivered_quantity' => $quantity]], 'receipts' => [UploadedFile::fake()->image("replacement-{$quantity}.jpg")]];
+        $this->actingAs($this->manager)->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(51), ['Accept' => 'application/json'])->assertUnprocessable();
+        $this->actingAs($this->manager)->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(50), ['Accept' => 'application/json'])->assertOk();
+        $this->actingAs($this->manager)->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(50), ['Accept' => 'application/json'])->assertUnprocessable();
+        $this->actingAs($this->qa)->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(50), ['Accept' => 'application/json'])->assertForbidden();
         $original = $case->inspectionItem->inspection->receiving;
-        $this->actingAs($this->manager)->postJson("/api/receivings/{$original->id}/confirm-replacement", $payload(1))->assertUnprocessable();
+        $this->actingAs($this->manager)->post("/api/receivings/{$original->id}/confirm-replacement", $payload(1), ['Accept' => 'application/json'])->assertUnprocessable();
     }
 
     public function test_replacement_appears_in_plant_manager_receiving_with_traceability(): void
@@ -364,9 +365,10 @@ class SupplierRejectionReplacementTest extends TestCase
         $replacement->items()->sole()->update(['delivered_quantity' => 50]);
 
         // 100 were delivered on the original receiving; the replacement must not reduce the 100 still open.
-        $this->actingAs($this->manager)->postJson('/api/receivings', [
+        $this->actingAs($this->manager)->post('/api/receivings', [
             'purchase_order_id' => $po->id, 'delivery_date' => now()->toDateString(),
             'items' => [['purchase_order_item_id' => $poItem->id, 'delivered_quantity' => 100]],
-        ])->assertCreated();
+            'receipts' => [UploadedFile::fake()->image('balance-receipt.jpg')],
+        ], ['Accept' => 'application/json'])->assertCreated();
     }
 }

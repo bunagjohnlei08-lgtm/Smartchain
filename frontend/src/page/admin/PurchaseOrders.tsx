@@ -136,7 +136,7 @@ const PurchaseOrders: React.FC = () => {
   const [newOrder, setNewOrder] = useState({
     replenishmentRequestId: null as number | null,
     requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '',
-    deliveryDetails: '', signatureData: '', status: 'Approved' as POStatus,
+    deliveryDetails: '', signatureData: '',
     items: [{ productName: '', quantity: 1, unitPrice: 0 }],
   });
 
@@ -164,7 +164,6 @@ const PurchaseOrders: React.FC = () => {
       expectedDeliveryDate: '',
       deliveryDetails: `Deliver to ${linkedRequest.warehouseLocation}`,
       signatureData: '',
-      status: 'Approved',
       items: [{ productName: linkedRequest.productName, quantity: Number(linkedRequest.orderedQuantity), unitPrice: 0 }],
     });
     setShowCreateModal(true);
@@ -249,13 +248,12 @@ const PurchaseOrders: React.FC = () => {
         replenishment_request_id: newOrder.replenishmentRequestId,
         expected_delivery_date: newOrder.expectedDeliveryDate,
         delivery_details: newOrder.deliveryDetails,
-        status: newOrder.status,
         signature_data: newOrder.signatureData || null,
         items: newOrder.items.map((item) => ({ product_name: item.productName, ordered_quantity: item.quantity, unit_price: item.unitPrice })),
       });
       await loadOrders();
       setShowCreateModal(false);
-      setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', status: 'Approved', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
+      setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
     } catch (requestError: any) {
       setError(requestError?.response?.data?.message || 'Purchase order could not be created.');
     } finally {
@@ -263,7 +261,7 @@ const PurchaseOrders: React.FC = () => {
     }
   };
 
-  const resetNewOrder = () => setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', status: 'Approved', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
+  const resetNewOrder = () => setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
   const closeCreateModal = () => { setShowCreateModal(false); resetNewOrder(); };
 
   const handleViewDetails = (order: PurchaseOrder) => {
@@ -489,17 +487,14 @@ const PurchaseOrders: React.FC = () => {
           <span className="truncate">Date Range</span>
           <ChevronRightIcon className="w-4 h-4 shrink-0 text-gray-400 max-sm:ml-auto" />
         </div>
-        {/* Mobile: the view toggle dissolves (display: contents) so List, Grid, Refresh and Download share one 4-column row. */}
-        <div className="admin-po-toolbar-actions col-span-2 grid grid-cols-4 gap-2 sm:ml-auto sm:flex sm:items-center sm:gap-3">
+        {/* Mobile: the view toggle dissolves so List, Grid and Refresh share one balanced row. */}
+        <div className="admin-po-toolbar-actions col-span-2 grid grid-cols-3 gap-2 sm:ml-auto sm:flex sm:items-center sm:gap-3">
           <div className="flex items-center gap-1 rounded-lg border border-[#1f2937] bg-[#1e293b] p-1 max-sm:contents" aria-label="Purchase order view">
             <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`admin-po-toolbar-view-button rounded-md border-[#1f2937] p-1.5 transition-colors max-sm:flex max-sm:items-center max-sm:justify-center max-sm:rounded-xl max-sm:border max-sm:aria-pressed:border-cyan-400/40 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
             <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`admin-po-toolbar-view-button rounded-md border-[#1f2937] p-1.5 transition-colors max-sm:flex max-sm:items-center max-sm:justify-center max-sm:rounded-xl max-sm:border max-sm:aria-pressed:border-cyan-400/40 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
           </div>
           <button onClick={() => void loadOrders()} disabled={loading} className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors disabled:opacity-50 max-sm:flex max-sm:h-11 max-sm:w-full max-sm:items-center max-sm:justify-center">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button className="p-2 rounded-xl border border-[#1f2937] text-gray-400 hover:bg-slate-800/50 transition-colors max-sm:flex max-sm:h-11 max-sm:w-full max-sm:items-center max-sm:justify-center">
-            <Download className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -846,12 +841,6 @@ const PurchaseOrders: React.FC = () => {
                   {!loadingSuppliers && !supplierError && supplierOptions.length === 0 && <p className="mt-1 text-xs text-amber-400">No active suppliers are available.</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Status *</label>
-                  <select value={newOrder.status} onChange={(e) => setNewOrder({ ...newOrder, status: e.target.value as POStatus })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-                    <option>Pending Approval</option><option>Approved</option><option>Completed</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-300 mb-1">Expected Delivery Date *</label>
                   <input type="date" required value={newOrder.expectedDeliveryDate} onChange={(e) => setNewOrder({ ...newOrder, expectedDeliveryDate: e.target.value })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
                 </div>

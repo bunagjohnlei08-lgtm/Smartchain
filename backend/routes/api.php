@@ -37,8 +37,12 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\SessionController;
+use App\Http\Controllers\Api\SupplierApplicationController;
+use App\Http\Controllers\Api\AdminSupplierApplicationController;
+use App\Http\Controllers\Api\AdminSupplierPerformanceController;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/supplier-applications', [SupplierApplicationController::class, 'store'])->middleware('throttle:supplier-applications');
 
 // Second login step. Public (no token exists yet) but throttled and bound to
 // a single-use challenge; a token is issued only by verify-otp.
@@ -133,6 +137,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::post('/receivings', [ReceivingController::class, 'store']);
     Route::patch('/receivings/{receiving}/assign-qa', [ReceivingController::class, 'assignQa']);
     Route::post('/receivings/{receiving}/confirm-replacement', [ReceivingController::class, 'confirmReplacementDelivery']);
+    Route::get('/receivings/{receiving}/receipts/{receiptAttachment}', [ReceivingController::class, 'receiptAttachment']);
     Route::get('/receivings/{id}', [ReceivingController::class, 'show']);
 
     Route::put('/plant-manager/receivings/{receiving}/notes', [PlantManagerReceivingNoteController::class, 'update']);
@@ -146,6 +151,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::get('/qa/inspections/{receivingId}', [QaInspectionController::class, 'show']);
     Route::get('/qa/inspections/{receivingId}/attachment', [QaInspectionController::class, 'attachment']);
     Route::get('/qa/inspections/{receivingId}/attachments/{attachmentId}', [QaInspectionController::class, 'attachment']);
+    Route::get('/qa/inspections/{receivingId}/receipts/{receiptAttachmentId}', [QaInspectionController::class, 'receivingReceipt']);
     Route::delete('/qa/inspections/{receivingId}/attachments/{attachmentId}', [QaInspectionController::class, 'destroyAttachment']);
     Route::post('/qa/inspections/{receivingId}', [QaInspectionController::class, 'store']);
     Route::put('/qa/inspections/{receivingId}', [QaInspectionController::class, 'update']);
@@ -197,6 +203,12 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
     Route::patch('/suppliers/{supplier}/status', [SupplierController::class, 'updateStatus']);
     Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
+    Route::get('/admin/supplier-applications', [AdminSupplierApplicationController::class, 'index']);
+    Route::get('/admin/supplier-applications/{supplierApplication}', [AdminSupplierApplicationController::class, 'show']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/review', [AdminSupplierApplicationController::class, 'startReview']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/approve', [AdminSupplierApplicationController::class, 'approve']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/reject', [AdminSupplierApplicationController::class, 'reject']);
+    Route::get('/admin/supplier-performance', [AdminSupplierPerformanceController::class, 'index']);
 
     Route::get('/admin/logistics/shipments', [AdminLogisticsController::class, 'index']);
 

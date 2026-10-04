@@ -5,7 +5,9 @@ import { AlertTriangle, CheckCircle2, KeyRound, Lock, ShieldCheck } from 'lucide
 import { AuthLayout } from '../components/auth';
 import FormButton from '../components/auth/FormButton';
 import FormInput from '../components/auth/FormInput';
+import PasswordRequirements from '../components/auth/PasswordRequirements';
 import api from '../lib/api';
+import { isPasswordValid, PASSWORD_MAX_LENGTH, passwordValidationMessage } from '../lib/passwordPolicy';
 
 type PageState = 'validating' | 'valid' | 'invalid' | 'activated';
 
@@ -50,9 +52,9 @@ const ActivateAccountPage: React.FC = () => {
 
   const clientErrors = (): Record<string, string> => {
     const next: Record<string, string> = {};
-    if (password.length < 8) next.password = 'Password must be at least 8 characters.';
-    else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) next.password = 'Password must contain letters and numbers.';
-    if (confirmation !== password) next.password_confirmation = 'Passwords do not match.';
+    const passwordError = passwordValidationMessage(password);
+    if (passwordError) next.password = passwordError;
+    if (confirmation !== password) next.password_confirmation = 'Password confirmation does not match.';
     return next;
   };
 
@@ -159,7 +161,7 @@ const ActivateAccountPage: React.FC = () => {
             type="password"
             name="password"
             autoComplete="new-password"
-            placeholder="At least 8 characters, letters and numbers"
+            placeholder="Create a strong password"
             value={password}
             onChange={(value) => { setPassword(value); setErrors((current) => ({ ...current, password: '', form: '' })); }}
             error={errors.password}
@@ -167,7 +169,10 @@ const ActivateAccountPage: React.FC = () => {
             showPasswordToggle
             leadingIcon={<Lock className="h-5 w-5" />}
             disabled={isSubmitting}
+            maxLength={PASSWORD_MAX_LENGTH}
           />
+
+          <PasswordRequirements password={password} />
 
           <FormInput
             label="Confirm Password"
@@ -182,6 +187,7 @@ const ActivateAccountPage: React.FC = () => {
             showPasswordToggle
             leadingIcon={<KeyRound className="h-5 w-5" />}
             disabled={isSubmitting}
+            maxLength={PASSWORD_MAX_LENGTH}
           />
 
           <p className="text-xs text-slate-500">
@@ -189,7 +195,12 @@ const ActivateAccountPage: React.FC = () => {
           </p>
 
           <div className="pt-2">
-            <FormButton type="submit" variant="primary" isLoading={isSubmitting} disabled={isSubmitting}>
+            <FormButton
+              type="submit"
+              variant="primary"
+              isLoading={isSubmitting}
+              disabled={isSubmitting || !isPasswordValid(password) || confirmation !== password}
+            >
               {!isSubmitting && <ShieldCheck className="h-5 w-5" />}
               {isSubmitting ? 'Activating...' : 'Activate Account'}
             </FormButton>

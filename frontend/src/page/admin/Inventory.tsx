@@ -10,12 +10,10 @@ import {
   Plus,
   Edit,
   Eye,
-  Download,
   AlertCircle,
   CheckCircle,
   XCircle,
   ChevronRight as ChevronBreadcrumb,
-  Printer,
   History,
   X,
   Save,
@@ -117,14 +115,6 @@ const toFormData = (item: InventoryItem): InventoryFormData => ({
   status: item.status,
   pending_receiving: item.pending_receiving,
 });
-
-const escapeHtml = (value: string): string => value.replace(/[&<>'"]/g, (character) => ({
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  "'": '&#39;',
-  '"': '&quot;',
-}[character] ?? character));
 
 // ============================================
 // CONSTANTS
@@ -236,22 +226,6 @@ const BarcodeDisplay: React.FC<{ value: string; responsive?: boolean }> = ({ val
     <BarcodeSvg value={value} className={responsive ? 'h-10 w-full max-w-40 rounded bg-white' : 'h-10 w-40 rounded bg-white'} />
   </div>
 );
-
-const getBarcodeSvgMarkup = (value: string): string => {
-  const pattern = encodeCode128B(value);
-  const moduleWidth = 2;
-  const height = 72;
-  const quietZone = 14;
-  const width = pattern.length * moduleWidth + quietZone * 2;
-  let cursor = quietZone;
-  const bars = pattern.split('').map((bit) => {
-    const x = cursor;
-    cursor += moduleWidth;
-    return bit === '1' ? `<rect x="${x}" y="6" width="${moduleWidth}" height="58" fill="#000000" />` : '';
-  }).join('');
-
-  return `<svg viewBox="0 0 ${width} ${height}" width="320" height="96" preserveAspectRatio="none" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" fill="#ffffff" />${bars}</svg>`;
-};
 
 // ----- KPI Card -----
 const KPICard: React.FC<{
@@ -844,14 +818,12 @@ const InventoryGrid: React.FC<{
   onReserveStock: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onMovementHistory: (item: InventoryItem) => void;
-  onPrintBarcode: (item: InventoryItem) => void;
 }> = ({
   items,
   onViewDetails,
   onReserveStock,
   onEdit,
   onMovementHistory,
-  onPrintBarcode,
 }) => {
   return (
     <div className="admin-inventory-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
@@ -916,38 +888,31 @@ const InventoryGrid: React.FC<{
             <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-slate-800">
               <button
                 onClick={() => onViewDetails(item)}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-white"
                 title="View Details"
               >
                 <Eye className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onReserveStock(item)}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-white"
                 title="Reserve Stock"
               >
                 <Layers className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onEdit(item)}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-white"
                 title="Edit"
               >
                 <Edit className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onMovementHistory(item)}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-white"
                 title="Movement History"
               >
                 <History className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => onPrintBarcode(item)}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
-                title="Print Barcode"
-              >
-                <Printer className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -1118,30 +1083,6 @@ export const InventoryList: React.FC = () => {
     setShowFormModal(true);
   };
 
-  const handleExport = () => {
-    const header = ['Barcode', 'Product', 'Warehouse', 'Available', 'Reserved', 'Backload', 'Status', 'Last Updated'];
-    const rows = filteredItems.map((item) => [
-      item.barcode,
-      item.product,
-      item.warehouse,
-      item.available_stock,
-      item.reserved_stock,
-      item.backload,
-      item.status,
-      item.updated_at,
-    ]);
-    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'inventory-export.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   // Per-row actions
   const handleViewDetails = (product: InventoryItem) => {
     setSelectedProduct(product);
@@ -1162,28 +1103,6 @@ export const InventoryList: React.FC = () => {
   const handleMovementHistory = (product: InventoryItem) => {
     setSelectedProduct(product);
     setShowDetailsDrawer(true);
-  };
-
-  const handlePrintBarcode = (product: InventoryItem) => {
-    const printWindow = window.open('', '_blank', 'width=400,height=300');
-    if (!printWindow) return;
-    const barcodeSvg = getBarcodeSvgMarkup(product.barcode);
-    printWindow.document.write(`
-      <html>
-        <head><title>Print Barcode</title></head>
-        <body style="font-family: Arial, sans-serif; text-align: center; padding: 24px; color: #111;">
-          <h2 style="margin-bottom: 4px; font-size: 18px;">${escapeHtml(product.product)}</h2>
-          <p style="color: #555; margin-top: 0;">${escapeHtml(product.warehouse)}</p>
-          <div style="display: inline-block; margin: 18px 0; padding: 14px; border: 1px solid #ddd; background: #fff;">
-            ${barcodeSvg}
-            <p style="font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 1px; margin: 6px 0 0;">${escapeHtml(product.barcode)}</p>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
   };
 
   const handleBackloadKPIClick = () => {
@@ -1328,12 +1247,6 @@ export const InventoryList: React.FC = () => {
             className="flex min-h-11 items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:min-h-0 sm:gap-2 sm:px-4 sm:text-sm"
           >
             <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Receive Stock
-          </button>
-          <button
-            onClick={handleExport}
-            className="flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition-all hover:bg-slate-800 sm:min-h-0 sm:gap-2 sm:px-4 sm:text-sm"
-          >
-            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Export
           </button>
         </div>
       </div>
@@ -1603,7 +1516,6 @@ export const InventoryList: React.FC = () => {
               onReserveStock={handleReserveStock}
               onEdit={handleEdit}
               onMovementHistory={handleMovementHistory}
-              onPrintBarcode={handlePrintBarcode}
             />
             {paginatedItems.length === 0 && (
               <div className="text-center text-slate-400 py-8">

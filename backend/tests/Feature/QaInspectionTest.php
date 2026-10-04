@@ -5,9 +5,9 @@ namespace Tests\Feature;
 use App\Models\Product;
 use App\Models\QaInspection;
 use App\Models\Branch;
-use App\Models\Inventory;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
+use App\Models\ReceivingReceiptAttachment;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -77,6 +77,21 @@ class QaInspectionTest extends TestCase
         return $receiving->fresh('items');
     }
 
+    private function receivingReceipt(Receiving $receiving, User $uploadedBy, string $name = 'supplier-receipt.pdf'): ReceivingReceiptAttachment
+    {
+        $sequence = $receiving->receiptAttachments()->count() + 1;
+        $path = "receiving-receipts/{$receiving->id}/receipt-{$sequence}.pdf";
+        Storage::disk('local')->put($path, '%PDF-1.4 supplier receipt');
+
+        return $receiving->receiptAttachments()->create([
+            'original_name' => $name,
+            'stored_path' => $path,
+            'mime_type' => 'application/pdf',
+            'file_size' => 25,
+            'uploaded_by' => $uploadedBy->id,
+        ]);
+    }
+
     public function test_index_lists_existing_receivings_for_qa(): void
     {
         $qa = $this->qaUser();
@@ -108,6 +123,27 @@ class QaInspectionTest extends TestCase
         $response->assertJsonPath('products.0.product', 'Industrial Valve DN50');
         $response->assertJsonPath('products.0.ordered_qty', 10);
         $response->assertJsonPath('products.0.delivered_qty', 10);
+        $response->assertJsonCount(0, 'receiving_receipts');
+    }
+
+    public function test_show_returns_receiving_receipts_separately_from_qa_evidence(): void
+    {
+        $qa = $this->qaUser();
+        $plantRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
+        $plantManager = User::factory()->create(['role_id' => $plantRole->id, 'name' => 'Plant Receiver']);
+        $receiving = $this->makeReceiving([['product' => 'Receipt reference product', 'qty' => 5]]);
+        $receipt = $this->receivingReceipt($receiving, $plantManager);
+
+        $this->actingAs($qa)->getJson("/api/qa/inspections/{$receiving->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'receiving_receipts')
+            ->assertJsonCount(0, 'inspection.attachments')
+            ->assertJsonPath('receiving_receipts.0.id', $receipt->id)
+            ->assertJsonPath('receiving_receipts.0.original_name', 'supplier-receipt.pdf')
+            ->assertJsonPath('receiving_receipts.0.uploaded_by', 'Plant Receiver')
+            ->assertJsonPath('receiving_receipts.0.receiving_no', $receiving->receiving_no)
+            ->assertJsonPath('receiving_receipts.0.view_url', "/qa/inspections/{$receiving->id}/receipts/{$receipt->id}")
+            ->assertJsonMissingPath('receiving_receipts.0.stored_path');
     }
 
     public function test_submiting_inspection_updates_qa_and_receiving_statuses(): void
@@ -377,16 +413,25 @@ class QaInspectionTest extends TestCase
     public function test_all_passed_without_attachment_still_submits(): void
     {
         $qa = $this->qaUser();
+        $plantRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
+        $plantManager = User::factory()->create(['role_id' => $plantRole->id]);
         $receiving = $this->makeReceiving([['product' => 'Passed', 'qty' => 5]]);
+        $this->receivingReceipt($receiving, $plantManager);
         $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, $this->attachmentPayload($receiving, 5, 0))
             ->assertOk()->assertJsonPath('inspection_status', 'Passed')->assertJsonCount(0, 'inspection.attachments');
         $this->assertSame([], Storage::disk('local')->allFiles('qa-attachments'));
+        $this->assertDatabaseCount('receiving_receipt_attachments', 1);
     }
 
-    public function test_direct_api_rejection_without_proof_cannot_be_bypassed_with_aggregate(): void
+    public function test_receiving_receipts_do_not_satisfy_qa_rejection_evidence_requirement(): void
     {
         $qa = $this->qaUser();
+        $plantRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
+        $plantManager = User::factory()->create(['role_id' => $plantRole->id]);
         $receiving = $this->makeReceiving([['product' => 'Rejected', 'qty' => 5]]);
+        foreach (range(1, 3) as $number) {
+            $this->receivingReceipt($receiving, $plantManager, "supplier-receipt-{$number}.pdf");
+        }
         $payload = $this->attachmentPayload($receiving);
         $payload['rejected_qty'] = 0;
         $this->actingAs($qa)->postJson('/api/qa/inspections/'.$receiving->id, $payload)
@@ -395,6 +440,16 @@ class QaInspectionTest extends TestCase
         $this->assertDatabaseMissing('qa_inspections', ['receiving_id' => $receiving->id]);
         $this->assertSame('Pending QA', $receiving->fresh()->status);
         $this->assertSame([], Storage::disk('local')->allFiles('qa-attachments'));
+
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, [
+            ...$payload,
+            'attachments' => [$this->proof('qa-rejection-evidence.pdf')],
+        ])->assertOk()->assertJsonPath('inspection_status', 'Partial')
+            ->assertJsonCount(3, 'receiving_receipts')
+            ->assertJsonCount(1, 'inspection.attachments');
+
+        $this->assertDatabaseCount('receiving_receipt_attachments', 3);
+        $this->assertDatabaseCount('qa_inspection_attachments', 1);
     }
 
     public function test_valid_jpeg_png_pdf_persist_and_are_available_on_fresh_detail_request(): void
@@ -557,6 +612,38 @@ class QaInspectionTest extends TestCase
         $this->actingAs($otherQa)->getJson($url)->assertNotFound();
         $this->actingAs($plantManager)->getJson($url)->assertForbidden();
         $this->actingAs($admin)->get($url)->assertOk();
+        $this->app['auth']->forgetGuards();
+        $this->getJson($url)->assertUnauthorized();
+    }
+
+    public function test_receipt_view_is_private_assignment_scoped_and_read_only_for_qa(): void
+    {
+        $qaRole = Role::firstOrCreate(['slug' => 'QA_SUPERVISOR'], ['name' => 'QA Supervisor']);
+        $adminRole = Role::create(['name' => 'Admin', 'slug' => 'ADMIN']);
+        $plantRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
+        $assignedQa = $this->currentQa = User::factory()->create(['role_id' => $qaRole->id]);
+        $otherQa = User::factory()->create(['role_id' => $qaRole->id]);
+        $admin = User::factory()->create(['role_id' => $adminRole->id]);
+        $plantManager = User::factory()->create(['role_id' => $plantRole->id]);
+        $ordinaryUser = User::factory()->create();
+        $receiving = $this->makeReceiving([['product' => 'Private supplier receipt', 'qty' => 5]]);
+        $receipt = $this->receivingReceipt($receiving, $plantManager);
+        $url = "/api/qa/inspections/{$receiving->id}/receipts/{$receipt->id}";
+
+        $this->actingAs($assignedQa)->get($url)->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $this->actingAs($otherQa)->getJson($url)->assertNotFound();
+        $this->actingAs($plantManager)->getJson($url)->assertForbidden();
+        $this->actingAs($ordinaryUser)->getJson($url)->assertForbidden();
+        $this->actingAs($admin)->get($url)->assertOk();
+
+        $this->actingAs($assignedQa)->deleteJson($url)->assertMethodNotAllowed();
+        $this->actingAs($assignedQa)->postJson($url)->assertMethodNotAllowed();
+        $this->actingAs($assignedQa)->putJson($url)->assertMethodNotAllowed();
+        $this->assertDatabaseHas('receiving_receipt_attachments', ['id' => $receipt->id]);
+        Storage::disk('local')->assertExists($receipt->stored_path);
+
         $this->app['auth']->forgetGuards();
         $this->getJson($url)->assertUnauthorized();
     }

@@ -9,8 +9,10 @@ use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\WorkflowNotification;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -19,11 +21,17 @@ class StockOutManagementTest extends TestCase
     use RefreshDatabase;
 
     private User $manager;
+
     private User $otherManager;
+
     private User $admin;
+
     private Warehouse $warehouse;
+
     private Warehouse $otherWarehouse;
+
     private Product $product;
+
     private Product $otherProduct;
 
     protected function setUp(): void
@@ -63,6 +71,7 @@ class StockOutManagementTest extends TestCase
             'unit_price' => 100,
             'subtotal' => $quantity * 100,
         ]);
+
         return $order;
     }
 
@@ -231,6 +240,23 @@ class StockOutManagementTest extends TestCase
             'quantity' => 20,
         ]);
         $this->assertDatabaseCount('stock_out_transactions', 1);
+    }
+
+    public function test_stock_out_creates_one_low_stock_alert_when_inventory_enters_the_low_range(): void
+    {
+        Notification::fake();
+        $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 10);
+        $inventory = $this->inventory($this->product, $this->warehouse, 'stock-alert', 30);
+
+        $this->scan($order, $inventory->barcode, 10)->assertOk()
+            ->assertJsonPath('inventory_remaining_quantity', 20);
+
+        Notification::assertSentToTimes($this->manager, WorkflowNotification::class, 1);
+        Notification::assertSentTo($this->manager, WorkflowNotification::class, fn ($notification) => $notification->title === 'Low Stock'
+            && $notification->message === 'Steel Pipe has reached a low stock level. Current quantity: 20 units.'
+            && $notification->category === 'Inventory');
+        Notification::assertNotSentTo($this->otherManager, WorkflowNotification::class);
+        Notification::assertNotSentTo($this->admin, WorkflowNotification::class);
     }
 
     public function test_manual_release_rejects_invalid_quantities(): void

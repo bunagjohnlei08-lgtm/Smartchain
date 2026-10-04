@@ -93,5 +93,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('supplier-rejection-send', fn (Request $request) => Limit::perMinute(6)->by(
             'supplier-rejection-send:'.($request->user()?->id ?: $request->ip())
         ));
+
+        RateLimiter::for('supplier-applications', fn (Request $request) => Limit::perHour(5)
+            ->by('supplier-applications-ip:'.$request->ip())
+            ->response(fn (Request $request, array $headers) => response()->json([
+                'message' => 'Too many application attempts were submitted. Please try again later.',
+            ], 429, $headers)));
     }
 }

@@ -12,6 +12,7 @@ const destinations: {
   { role: 'ADMIN', category: 'Logistics', types: ['success'], path: '/admin/logistics' },
   { role: 'ADMIN', category: 'Rejected Items', types: ['warning'], path: '/admin/rejected-items' },
   { role: 'PLANT_MANAGER', category: 'Procurement', types: ['success', 'warning'], path: '/plant-manager/procurement' },
+  { role: 'PLANT_MANAGER', category: 'Inventory', types: ['warning', 'error'], path: '/plant-manager/procurement' },
   { role: 'PLANT_MANAGER', category: 'Quality Inspection', types: ['success', 'warning', 'error'], path: '/plant-manager/receiving' },
   { role: 'PLANT_MANAGER', category: 'Receiving', types: ['info'], path: '/plant-manager/receiving' },
   { role: 'PLANT_MANAGER', category: 'Order', types: ['info'], path: '/plant-manager/order-management' },

@@ -6,23 +6,29 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Receiving;
-use App\Models\ReceivingItem;
 use App\Models\ReceivingDiscrepancy;
+use App\Models\ReceivingItem;
+use App\Models\ReceivingReceiptAttachment;
 use App\Models\ReceivingTimeline;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
-use App\Support\WorkflowNotificationSender;
 use App\Support\AuditLogger;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class ReceivingController extends Controller
 {
     private function present(Receiving $receiving): array
     {
-        $receiving->loadMissing(['items', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
+        $receiving->loadMissing(['items', 'receiptAttachments', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
 
         $items = $receiving->items;
         $productSummary = match (true) {
@@ -51,6 +57,9 @@ class ReceivingController extends Controller
             ] : null,
             'product_summary' => $productSummary,
             'items_count' => $items->sum('delivered_quantity'),
+            'receipt_attachments' => $receiving->receiptAttachments->map(
+                fn (ReceivingReceiptAttachment $attachment) => $this->presentReceiptAttachment($attachment, $receiving->id)
+            )->values(),
             'short_quantity' => (int) ($receiving->discrepancy?->short_quantity ?? 0),
             'discrepancy' => $receiving->discrepancy ? [
                 'id' => $receiving->discrepancy->id,
@@ -82,7 +91,9 @@ class ReceivingController extends Controller
     private function presentReplacement(Receiving $receiving): ?array
     {
         $case = $receiving->replacementForCase;
-        if (! $case) return null;
+        if (! $case) {
+            return null;
+        }
         $original = $case->inspectionItem?->inspection?->receiving;
 
         return [
@@ -93,6 +104,78 @@ class ReceivingController extends Controller
             'expected_quantity' => (int) $receiving->items->sum('ordered_quantity'),
             'awaiting_delivery' => $receiving->status === Receiving::STATUS_AWAITING_REPLACEMENT,
         ];
+    }
+
+    private function presentReceiptAttachment(ReceivingReceiptAttachment $attachment, int $receivingId): array
+    {
+        return [
+            'id' => $attachment->id,
+            'original_name' => $attachment->original_name,
+            'mime_type' => $attachment->mime_type,
+            'file_size' => $attachment->file_size,
+            'view_url' => "/receivings/{$receivingId}/receipts/{$attachment->id}",
+            'created_at' => $attachment->created_at,
+        ];
+    }
+
+    private function receiptValidationRules(): array
+    {
+        return [
+            'receipts' => 'required|array|min:1|max:3',
+            'receipts.*' => [
+                'file', 'mimes:jpeg,jpg,png,pdf',
+                'mimetypes:image/jpeg,image/png,application/pdf',
+                'extensions:jpeg,jpg,png,pdf', 'max:5120',
+            ],
+        ];
+    }
+
+    private function receiptValidationMessages(): array
+    {
+        return [
+            'receipts.required' => 'At least one supplier delivery receipt is required.',
+            'receipts.min' => 'At least one supplier delivery receipt is required.',
+            'receipts.max' => 'A receiving may contain no more than 3 supplier receipt files.',
+            'receipts.*.file' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
+            'receipts.*.mimes' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
+            'receipts.*.mimetypes' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
+            'receipts.*.extensions' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
+            'receipts.*.max' => 'Each supplier receipt must not exceed 5 MB.',
+            'receipts.*.uploaded' => 'A supplier receipt could not be uploaded. Use JPG, PNG, or PDF files up to 5 MB each.',
+        ];
+    }
+
+    private function storeReceiptAttachments(Receiving $receiving, Request $request, array &$storedPaths): void
+    {
+        foreach ($request->file('receipts', []) as $upload) {
+            $storedPath = Storage::disk('local')->putFile("receiving-receipts/{$receiving->id}", $upload);
+            if (! $storedPath) {
+                throw new \RuntimeException('Receiving receipt storage failed.');
+            }
+            $storedPaths[] = $storedPath;
+            $receiving->receiptAttachments()->create([
+                'original_name' => Str::limit(basename($upload->getClientOriginalName()), 255, ''),
+                'stored_path' => $storedPath,
+                'mime_type' => $upload->getMimeType(),
+                'file_size' => $upload->getSize(),
+                'uploaded_by' => $request->user()->id,
+            ]);
+        }
+    }
+
+    private function cleanupReceiptFiles(array $paths): void
+    {
+        foreach ($paths as $path) {
+            if (preg_match('~^receiving-receipts/\d+/[A-Za-z0-9]+\.(?:jpe?g|png|pdf)$~', $path)) {
+                try {
+                    if (! Storage::disk('local')->delete($path)) {
+                        report(new \RuntimeException('Receiving receipt cleanup failed.'));
+                    }
+                } catch (Throwable $exception) {
+                    report($exception);
+                }
+            }
+        }
     }
 
     public function index(Request $request)
@@ -111,7 +194,7 @@ class ReceivingController extends Controller
 
         $view = $validated['view'] ?? 'active';
 
-        $query = Receiving::query()->with(['items', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
+        $query = Receiving::query()->with(['items', 'receiptAttachments', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
         $this->applyWorkflowView($query, $view);
 
         if (! empty($validated['status'])) {
@@ -235,9 +318,12 @@ class ReceivingController extends Controller
             'items' => 'required|array|min:1',
             'items.*.purchase_order_item_id' => 'required|integer|distinct|exists:purchase_order_items,id',
             'items.*.delivered_quantity' => 'required|integer|min:0',
-        ]);
+            ...$this->receiptValidationRules(),
+        ], $this->receiptValidationMessages());
 
-        $receiving = DB::transaction(function () use ($validated, $request) {
+        $storedPaths = [];
+        try {
+            $receiving = DB::transaction(function () use ($validated, $request, &$storedPaths) {
                 $purchaseOrder = PurchaseOrder::query()->with('items')->lockForUpdate()->findOrFail($validated['purchase_order_id']);
                 abort_unless(in_array($purchaseOrder->status, ['Approved', 'Sent to Supplier', 'Partially Received'], true), 422, 'This Purchase Order is not active for receiving.');
 
@@ -268,9 +354,13 @@ class ReceivingController extends Controller
                     'prepared_by_id' => $request->user()->id,
                 ]);
 
+                $this->storeReceiptAttachments($receiving, $request, $storedPaths);
+
                 foreach ($purchaseOrder->items as $poItem) {
                     $itemData = $submitted[$poItem->id];
-                    if ((int) $itemData['delivered_quantity'] === 0) continue;
+                    if ((int) $itemData['delivered_quantity'] === 0) {
+                        continue;
+                    }
                     $product = Product::query()->where('name', $poItem->product_name)->firstOrFail();
 
                     ReceivingItem::create([
@@ -365,9 +455,19 @@ class ReceivingController extends Controller
                     'details' => $shortNow > 0 ? "Short delivery of {$shortNow} unit(s) reported" : "Created {$receiving->receiving_no}",
                     'metadata' => ['purchase_order_id' => $purchaseOrder->id, 'delivered_quantity' => $deliveredNow, 'short_quantity' => $shortNow],
                 ]);
+                AuditLogger::success('RECEIVING_RECEIPT_ATTACHED', AuditLogger::MODULE_RECEIVING, [
+                    'resource' => $receiving,
+                    'resource_label' => $receiving->receiving_no,
+                    'details' => 'Supplier delivery receipt evidence attached',
+                    'metadata' => ['receiving_id' => $receiving->id, 'attachment_count' => count($storedPaths)],
+                ]);
 
                 return $receiving;
             });
+        } catch (Throwable $exception) {
+            $this->cleanupReceiptFiles($storedPaths);
+            throw $exception;
+        }
 
         return response()->json($this->present($receiving), 201);
     }
@@ -449,49 +549,84 @@ class ReceivingController extends Controller
             'items' => 'required|array|min:1',
             'items.*.receiving_item_id' => 'required|integer|distinct',
             'items.*.delivered_quantity' => 'required|integer|min:0',
-        ]);
+            ...$this->receiptValidationRules(),
+        ], $this->receiptValidationMessages());
 
-        $receiving = DB::transaction(function () use ($validated, $request, $receiving) {
-            $locked = Receiving::query()->with('items')->lockForUpdate()->findOrFail($receiving->id);
-            abort_unless($locked->replacement_for_rejection_case_id !== null, 422, 'Only replacement receivings can be confirmed this way.');
-            abort_unless($locked->status === Receiving::STATUS_AWAITING_REPLACEMENT, 422, 'This replacement delivery has already been confirmed.');
+        $storedPaths = [];
+        try {
+            $receiving = DB::transaction(function () use ($validated, $request, $receiving, &$storedPaths) {
+                $locked = Receiving::query()->with('items')->lockForUpdate()->findOrFail($receiving->id);
+                abort_unless($locked->replacement_for_rejection_case_id !== null, 422, 'Only replacement receivings can be confirmed this way.');
+                abort_unless($locked->status === Receiving::STATUS_AWAITING_REPLACEMENT, 422, 'This replacement delivery has already been confirmed.');
 
-            $submitted = collect($validated['items'])->keyBy('receiving_item_id');
-            abort_unless($submitted->keys()->sort()->values()->all() === $locked->items->pluck('id')->sort()->values()->all(), 422, 'Delivered items must exactly match the expected replacement items.');
-            abort_unless($submitted->contains(fn ($item) => (int) $item['delivered_quantity'] > 0), 422, 'At least one product must have a delivered quantity greater than zero.');
+                $submitted = collect($validated['items'])->keyBy('receiving_item_id');
+                abort_unless($submitted->keys()->sort()->values()->all() === $locked->items->pluck('id')->sort()->values()->all(), 422, 'Delivered items must exactly match the expected replacement items.');
+                abort_unless($submitted->contains(fn ($item) => (int) $item['delivered_quantity'] > 0), 422, 'At least one product must have a delivered quantity greater than zero.');
 
-            foreach ($locked->items as $item) {
-                $quantity = (int) $submitted[$item->id]['delivered_quantity'];
-                abort_if($quantity > (int) $item->ordered_quantity, 422, "Delivered quantity for {$item->product_name} exceeds the expected replacement quantity of {$item->ordered_quantity}.");
-            }
-            foreach ($locked->items as $item) {
-                $item->update(['delivered_quantity' => (int) $submitted[$item->id]['delivered_quantity'], 'inspection_status' => 'Pending QA']);
-            }
+                foreach ($locked->items as $item) {
+                    $quantity = (int) $submitted[$item->id]['delivered_quantity'];
+                    abort_if($quantity > (int) $item->ordered_quantity, 422, "Delivered quantity for {$item->product_name} exceeds the expected replacement quantity of {$item->ordered_quantity}.");
+                }
+                foreach ($locked->items as $item) {
+                    $item->update(['delivered_quantity' => (int) $submitted[$item->id]['delivered_quantity'], 'inspection_status' => 'Pending QA']);
+                }
 
-            $locked->update([
-                'status' => 'Pending QA',
-                'delivery_date' => $validated['delivery_date'],
-                'reference_no' => $validated['reference_no'] ?? $locked->reference_no,
-            ]);
-            $now = now();
-            foreach (['Replacement Delivered' => $request->user()->name, 'Pending QA Inspection' => 'System'] as $status => $performedBy) {
-                ReceivingTimeline::create(['receiving_id' => $locked->id, 'status' => $status, 'performed_by' => $performedBy, 'occurred_at' => $now]);
-            }
+                $this->storeReceiptAttachments($locked, $request, $storedPaths);
 
-            AuditLogger::success('REPLACEMENT_DELIVERY_CONFIRMED', AuditLogger::MODULE_RECEIVING, [
-                'resource' => $locked,
-                'resource_label' => $locked->receiving_no,
-                'details' => "Confirmed replacement delivery for {$locked->receiving_no}",
-                'metadata' => [
-                    'receiving_id' => $locked->id,
-                    'rejection_case_id' => $locked->replacement_for_rejection_case_id,
-                    'delivered_quantity' => (int) $submitted->sum('delivered_quantity'),
-                ],
-            ]);
+                $locked->update([
+                    'status' => 'Pending QA',
+                    'delivery_date' => $validated['delivery_date'],
+                    'reference_no' => $validated['reference_no'] ?? $locked->reference_no,
+                ]);
+                $now = now();
+                foreach (['Replacement Delivered' => $request->user()->name, 'Pending QA Inspection' => 'System'] as $status => $performedBy) {
+                    ReceivingTimeline::create(['receiving_id' => $locked->id, 'status' => $status, 'performed_by' => $performedBy, 'occurred_at' => $now]);
+                }
 
-            return $locked;
-        });
+                AuditLogger::success('REPLACEMENT_DELIVERY_CONFIRMED', AuditLogger::MODULE_RECEIVING, [
+                    'resource' => $locked,
+                    'resource_label' => $locked->receiving_no,
+                    'details' => "Confirmed replacement delivery for {$locked->receiving_no}",
+                    'metadata' => [
+                        'receiving_id' => $locked->id,
+                        'rejection_case_id' => $locked->replacement_for_rejection_case_id,
+                        'delivered_quantity' => (int) $submitted->sum('delivered_quantity'),
+                    ],
+                ]);
+                AuditLogger::success('RECEIVING_RECEIPT_ATTACHED', AuditLogger::MODULE_RECEIVING, [
+                    'resource' => $locked,
+                    'resource_label' => $locked->receiving_no,
+                    'details' => 'Supplier replacement delivery receipt evidence attached',
+                    'metadata' => ['receiving_id' => $locked->id, 'attachment_count' => count($storedPaths)],
+                ]);
+
+                return $locked;
+            });
+        } catch (Throwable $exception) {
+            $this->cleanupReceiptFiles($storedPaths);
+            throw $exception;
+        }
 
         return response()->json($this->present($receiving->fresh()));
+    }
+
+    public function receiptAttachment(
+        Request $request,
+        Receiving $receiving,
+        ReceivingReceiptAttachment $receiptAttachment
+    ): JsonResponse|StreamedResponse {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+        abort_unless($receiptAttachment->receiving_id === $receiving->id, 404);
+
+        if (! Storage::disk('local')->exists($receiptAttachment->stored_path)) {
+            return response()->json(['message' => 'Supplier receipt not found.'], 404);
+        }
+
+        return Storage::disk('local')->response($receiptAttachment->stored_path, $receiptAttachment->original_name, [
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+            'Content-Type' => $receiptAttachment->mime_type,
+            'Content-Disposition' => 'inline; filename="'.str_replace(['"', "\r", "\n"], '', $receiptAttachment->original_name).'"',
+        ]);
     }
 }

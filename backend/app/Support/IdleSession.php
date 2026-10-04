@@ -12,15 +12,12 @@ class IdleSession
 
     public static function timeoutMinutes(User $user): int
     {
-        $user->loadMissing('role');
-        $timeouts = config('session_idle.timeouts', []);
-
-        return max(1, (int) ($timeouts[$user->role?->slug] ?? config('session_idle.default_timeout_minutes', 20)));
+        return max(1, (int) config('session_idle.timeout_minutes', 5));
     }
 
     public static function warningMinutes(): int
     {
-        return max(1, (int) config('session_idle.warning_minutes', 2));
+        return max(1, (int) config('session_idle.warning_minutes', 1));
     }
 
     public static function lastActivityAt(PersonalAccessToken $token): CarbonInterface

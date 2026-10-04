@@ -181,7 +181,7 @@ class AuditSecurityEventsTest extends TestCase
         $this->postJson('/api/invitations/validate', ['token' => $token])->assertUnprocessable();
         $this->postJson('/api/invitations/validate', ['token' => $token])->assertUnprocessable();
         $this->postJson('/api/invitations/accept', [
-            'token' => $token, 'password' => 'Activate123', 'password_confirmation' => 'Activate123',
+            'token' => $token, 'password' => 'Activate@123', 'password_confirmation' => 'Activate@123',
         ])->assertUnprocessable();
 
         $invitation = UserInvitation::query()->where('user_id', $userId)->sole();
@@ -193,7 +193,7 @@ class AuditSecurityEventsTest extends TestCase
         $this->assertSame(User::findOrFail($userId)->employee_id, $expired->resource_label);
         $this->assertSame('PENDING', User::findOrFail($userId)->status);
 
-        foreach ([$token, UserInvitations::hashToken($token), 'Activate123'] as $secret) {
+        foreach ([$token, UserInvitations::hashToken($token), 'Activate@123'] as $secret) {
             $this->assertNoAuditRowContains($secret);
         }
     }

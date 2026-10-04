@@ -50,6 +50,27 @@
   }
 }
 
+/* Public light-form autofill colors. These selectors are intentionally scoped
+   so browser autofill cannot leak light input styling into internal dark forms. */
+:is(.login-light-input, .supplier-application-page .supplier-application-field):-webkit-autofill,
+:is(.login-light-input, .supplier-application-page .supplier-application-field):-webkit-autofill:hover,
+:is(.login-light-input, .supplier-application-page .supplier-application-field):-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a;
+}
+
+:is(.login-light-input, .supplier-application-page .supplier-application-field):-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset, 0 0 0 3px rgba(14, 165, 233, 0.18) !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a;
+}
+
+:is(.login-light-input, .supplier-application-page .supplier-application-field):autofill {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 /* QA Quality Inspection and Quality Reports mobile scale. These selectors are
    intentionally page-scoped and last so shared QA defaults cannot resize them. */
 @layer utilities {

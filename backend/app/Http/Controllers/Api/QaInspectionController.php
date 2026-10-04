@@ -8,6 +8,7 @@ use App\Models\QaInspectionAttachment;
 use App\Models\QaInspectionItem;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
+use App\Models\ReceivingReceiptAttachment;
 use App\Models\ReceivingTimeline;
 use App\Notifications\WorkflowNotification;
 use App\Support\WorkflowNotificationSender;
@@ -92,6 +93,8 @@ class QaInspectionController extends Controller
             'id' => $item->id,
             'receiving_item_id' => $item->id,
             'product' => $item->product_name,
+            'category' => $item->product?->category,
+            'brand' => $item->product?->brand,
             // The PO quantity and the physical delivery are distinct facts. Legacy
             // rows fall back to the immutable snapshot already stored on the item.
             'ordered_qty' => $item->purchaseOrderItem?->ordered_quantity ?? $item->ordered_quantity ?? $item->delivered_quantity,
@@ -129,7 +132,9 @@ class QaInspectionController extends Controller
     {
         $receiving->loadMissing([
             'items.purchaseOrderItem',
+            'items.product',
             'preparedBy',
+            'receiptAttachments.uploadedBy',
             'timeline',
             'qaInspection.items',
             'qaInspection.attachments',
@@ -165,6 +170,9 @@ class QaInspectionController extends Controller
                 'performed_by' => $event->performed_by,
                 'occurred_at' => $event->occurred_at,
             ])->values(),
+            'receiving_receipts' => $receiving->receiptAttachments->map(
+                fn (ReceivingReceiptAttachment $attachment) => $this->presentReceivingReceipt($attachment, $receiving)
+            )->values(),
             'inspection' => [
                 // Kept temporarily for old clients without exposing a storage path.
                 'attachment_path' => $receiving->qaInspection?->attachments?->first()?->id
@@ -232,6 +240,20 @@ class QaInspectionController extends Controller
         ];
     }
 
+    private function presentReceivingReceipt(ReceivingReceiptAttachment $attachment, Receiving $receiving): array
+    {
+        return [
+            'id' => $attachment->id,
+            'original_name' => $attachment->original_name,
+            'mime_type' => $attachment->mime_type,
+            'file_size' => $attachment->file_size,
+            'view_url' => "/qa/inspections/{$receiving->id}/receipts/{$attachment->id}",
+            'created_at' => $attachment->created_at,
+            'uploaded_by' => $attachment->uploadedBy?->name,
+            'receiving_no' => $receiving->receiving_no,
+        ];
+    }
+
     private function resolveOverallStatus(Collection $items): string
     {
         if ($items->every(fn (array $item) => $item['accepted_quantity'] === 0 && $item['rejected_quantity'] > 0)) {
@@ -293,7 +315,7 @@ class QaInspectionController extends Controller
         try {
             $receiving = DB::transaction(function () use ($request, $validated, $receivingId, $user, $shouldSubmit, &$storedPaths, &$pathsToDelete) {
                 $receiving = $this->scopeForUser(Receiving::query(), $request)
-                    ->with(['items', 'qaInspection.items', 'qaInspection.attachments'])
+                    ->with(['items.product', 'qaInspection.items', 'qaInspection.attachments'])
                     ->lockForUpdate()
                     ->find($receivingId);
 
@@ -453,7 +475,7 @@ class QaInspectionController extends Controller
                 }
 
                 return $receiving->fresh([
-                    'items',
+                    'items.product',
                     'preparedBy',
                     'timeline',
                     'qaInspection.items',
@@ -583,6 +605,27 @@ class QaInspectionController extends Controller
         return response()->json(['message' => 'Attachment removed.']);
     }
 
+    public function receivingReceipt(Request $request, int $receivingId, int $receiptAttachmentId): JsonResponse|StreamedResponse
+    {
+        if ($response = $this->authorizeQa($request)) {
+            return $response;
+        }
+
+        $receiving = $this->scopeForUser(Receiving::query(), $request)->find($receivingId);
+        $attachment = $receiving?->receiptAttachments()->find($receiptAttachmentId);
+
+        if (! $attachment || ! Storage::disk('local')->exists($attachment->stored_path)) {
+            return response()->json(['message' => 'Supplier receipt not found.'], 404);
+        }
+
+        return Storage::disk('local')->response($attachment->stored_path, $attachment->original_name, [
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+            'Content-Type' => $attachment->mime_type,
+            'Content-Disposition' => 'inline; filename="'.str_replace(['"', "\r", "\n"], '', $attachment->original_name).'"',
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         if ($response = $this->authorizeQa($request)) {
@@ -636,7 +679,7 @@ class QaInspectionController extends Controller
         }
 
         $receiving = $this->scopeForUser(Receiving::with([
-            'items',
+            'items.product',
             'preparedBy',
             'timeline',
             'qaInspection.items',

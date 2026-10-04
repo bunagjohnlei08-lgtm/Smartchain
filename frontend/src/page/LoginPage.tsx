@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { AuthLayout } from '../components/auth';
 import FormButton from '../components/auth/FormButton';
@@ -9,10 +10,12 @@ import api from '../lib/api';
 import { FIRST_LOGIN_STORAGE_KEY } from '../lib/greeting';
 import type { AxiosError } from 'axios';
 import { Lock, LockKeyhole, LogIn, Mail } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme } = useTheme();
   // Success notice handed over by the account activation page.
   const stateNotice = (location.state as { notice?: string } | null)?.notice;
   const idleNotice = new URLSearchParams(location.search).get('reason') === 'session-expired'
@@ -106,13 +109,14 @@ const LoginPage: React.FC = () => {
 
   if (challenge) {
     return (
-      <AuthLayout>
+      <AuthLayout appearance={theme}>
         <OtpVerificationForm
           key={challenge.id}
           challengeId={challenge.id}
           email={challenge.email}
           initialResendIn={challenge.resendIn}
           expiresIn={challenge.expiresIn}
+          appearance={theme}
           onVerified={completeLogin}
           onBack={() => {
             setChallenge(null);
@@ -134,27 +138,27 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <AuthLayout>
+    <AuthLayout appearance={theme}>
       <div className="mb-4 text-center">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/10 text-sky-400 shadow-[0_0_24px_rgba(56,189,248,0.18)] lg:h-11 lg:w-11">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-sky-500/30 bg-sky-50 text-sky-600 shadow-[0_0_24px_rgba(56,189,248,0.14)] dark:bg-sky-400/10 dark:text-sky-300 lg:h-11 lg:w-11">
           <LockKeyhole className="h-[18px] w-[18px] lg:h-5 lg:w-5" strokeWidth={1.8} />
         </div>
-        <h2 className="mt-2.5 text-lg font-bold tracking-tight text-white sm:text-xl lg:text-[22px] xl:text-2xl">
-          Sign in to <span className="text-sky-400">SmartChain</span>
+        <h2 className="mt-2.5 text-lg font-bold tracking-tight text-slate-900 dark:text-white sm:text-xl lg:text-[22px] xl:text-2xl">
+          Sign in to <span className="text-sky-600">SmartChain</span>
         </h2>
-        <p className="mt-1 text-[13px] leading-5 text-slate-400 lg:text-xs">
+        <p className="mt-1 text-[13px] leading-5 text-slate-600 dark:text-slate-300 lg:text-xs">
           Welcome back! Please enter your credentials.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="mx-auto w-[90%] space-y-3 sm:w-full">
         {notice && !loginErrors.form && (
-          <div role="status" aria-live="polite" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-[13px] text-emerald-300 lg:text-xs">
+          <div role="status" aria-live="polite" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300 lg:text-xs">
             {notice}
           </div>
         )}
         {loginErrors.form && (
-          <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-300 lg:text-xs">
+          <div role="alert" aria-live="polite" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-300 lg:text-xs">
             {loginErrors.form}
           </div>
         )}
@@ -171,6 +175,7 @@ const LoginPage: React.FC = () => {
           required
           leadingIcon={<Mail className="h-4 w-4" />}
           disabled={isLoginBusy}
+          appearance={theme}
         />
 
         <FormInput
@@ -186,13 +191,14 @@ const LoginPage: React.FC = () => {
           showPasswordToggle
           leadingIcon={<Lock className="h-4 w-4" />}
           disabled={isLoginBusy}
+          appearance={theme}
         />
 
         <div className="flex justify-end">
           <button
             type="button"
             onClick={() => navigate('/forgot-password')}
-            className="min-h-11 rounded-lg border-none bg-transparent px-1 text-[11px] font-medium text-blue-400 transition-colors hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:text-xs"
+            className="min-h-11 rounded-lg border-none bg-transparent px-1 text-[11px] font-medium text-blue-600 transition-colors hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:text-sky-400 dark:hover:text-sky-300 sm:text-xs"
           >
             Forgot Password?
           </button>
@@ -206,7 +212,12 @@ const LoginPage: React.FC = () => {
         </div>
       </form>
 
-      <footer className="mt-4 border-t border-slate-700/50 pt-3 text-center text-[10px] leading-4 text-slate-500 lg:mt-5 lg:pt-4">
+      <div className="mt-4 text-center text-xs text-slate-600 dark:text-slate-300">
+        Interested in supplying SmartChain?{' '}
+        <Link to="/supplier-application" className="inline-flex min-h-11 items-center rounded-lg px-1 font-semibold text-sky-600 transition-colors hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500/40">Apply as a supplier</Link>
+      </div>
+
+      <footer className="mt-4 border-t border-slate-200 pt-3 text-center text-[10px] leading-4 text-slate-500 dark:border-slate-700 dark:text-slate-400 lg:mt-5 lg:pt-4">
         <p>&copy; 2026 Archon Nell Incorporated. All rights reserved.</p>
       </footer>
     </AuthLayout>

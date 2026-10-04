@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Observers\InventoryObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[ObservedBy([InventoryObserver::class])]
 class Inventory extends Model
 {
     protected $fillable = [
@@ -37,5 +40,4 @@ class Inventory extends Model
     {
         return $this->belongsTo(Warehouse::class);
     }
-
 }

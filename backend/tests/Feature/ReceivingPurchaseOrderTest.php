@@ -8,7 +8,9 @@ use App\Models\Role;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ReceivingPurchaseOrderTest extends TestCase
@@ -22,6 +24,7 @@ class ReceivingPurchaseOrderTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Storage::fake('local');
         $this->admin = $this->user('ADMIN');
         $this->plantManager = $this->user('PLANT_MANAGER');
         Product::create(['name' => 'IPAD AIR', 'unit' => 'pcs', 'cost_price' => 100]);
@@ -34,6 +37,11 @@ class ReceivingPurchaseOrderTest extends TestCase
             'product_name' => 'IPAD AIR', 'ordered_quantity' => 10,
             'unit_price' => 100, 'total_price' => 1000,
         ]);
+    }
+
+    private function receipt(string $name = 'supplier-receipt.pdf'): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent($name, "%PDF-1.4\n%%EOF\n");
     }
 
     private function user(string $slug): User
@@ -60,11 +68,12 @@ class ReceivingPurchaseOrderTest extends TestCase
         $inactiveQa = $this->user('QA_SUPERVISOR');
         $inactiveQa->update(['status' => 'SUSPENDED']);
         $item = $this->purchaseOrder->items()->firstOrFail();
-        $response = $this->actingAs($this->plantManager)->postJson('/api/receivings', [
+        $response = $this->actingAs($this->plantManager)->post('/api/receivings', [
             'purchase_order_id' => $this->purchaseOrder->id,
             'reference_no' => 'DEL-1', 'delivery_date' => '2026-09-01',
             'items' => [['purchase_order_item_id' => $item->id, 'delivered_quantity' => 10]],
-        ])->assertCreated()->assertJsonPath('purchase_order', 'PO-2026-0001')
+            'receipts' => [$this->receipt()],
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('purchase_order', 'PO-2026-0001')
             ->assertJsonPath('supplier', 'Approved Supplier')->assertJsonPath('items.0.product_name', 'IPAD AIR')
             ->assertJsonPath('items.0.ordered_quantity', 10)->assertJsonPath('items.0.delivered_quantity', 10)
             ->assertJsonPath('items.0.unit', 'pcs')->assertJsonPath('status', 'Pending QA');
@@ -86,8 +95,8 @@ class ReceivingPurchaseOrderTest extends TestCase
     {
         $item = $this->purchaseOrder->items()->firstOrFail();
         $payload = ['purchase_order_id' => $this->purchaseOrder->id, 'delivery_date' => '2026-09-01',
-            'items' => [['purchase_order_item_id' => $item->id, 'delivered_quantity' => 11]]];
-        $this->actingAs($this->plantManager)->postJson('/api/receivings', $payload)->assertUnprocessable();
+            'items' => [['purchase_order_item_id' => $item->id, 'delivered_quantity' => 11]], 'receipts' => [$this->receipt()]];
+        $this->actingAs($this->plantManager)->post('/api/receivings', $payload, ['Accept' => 'application/json'])->assertUnprocessable();
         $this->assertDatabaseCount('receivings', 0);
     }
 
@@ -110,11 +119,12 @@ class ReceivingPurchaseOrderTest extends TestCase
         $this->assertNotNull($approvedOrder);
         $this->assertNull($approvedOrder['items'][0]['unit']);
 
-        $response = $this->postJson('/api/receivings', [
+        $response = $this->post('/api/receivings', [
             'purchase_order_id' => $order->id, 'reference_no' => 'RTX-12345',
             'delivery_date' => '2026-09-07',
             'items' => [['purchase_order_item_id' => $item->id, 'delivered_quantity' => 20]],
-        ])->assertCreated()->assertJsonPath('status', 'Pending QA')
+            'receipts' => [$this->receipt('null-unit.pdf')],
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('status', 'Pending QA')
             ->assertJsonPath('items.0.product_name', 'TOMAHAWK EC')
             ->assertJsonPath('items.0.delivered_quantity', 20)
             ->assertJsonPath('items.0.unit', null);
@@ -133,10 +143,11 @@ class ReceivingPurchaseOrderTest extends TestCase
         Product::query()->where('name', 'IPAD AIR')->delete();
         $item = $this->purchaseOrder->items()->firstOrFail();
 
-        $this->actingAs($this->plantManager)->postJson('/api/receivings', [
+        $this->actingAs($this->plantManager)->post('/api/receivings', [
             'purchase_order_id' => $this->purchaseOrder->id, 'delivery_date' => '2026-09-01',
             'items' => [['purchase_order_item_id' => $item->id, 'delivered_quantity' => 10]],
-        ])->assertNotFound();
+            'receipts' => [$this->receipt('rollback.pdf')],
+        ], ['Accept' => 'application/json'])->assertNotFound();
 
         $this->assertDatabaseCount('receivings', 0);
         $this->assertDatabaseCount('receiving_items', 0);

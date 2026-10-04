@@ -3,6 +3,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import LoginPage from '../page/LoginPage';
 import ActivateAccountPage from '../page/ActivateAccountPage';
 import ForgotPasswordPage from '../page/ForgotPasswordPage';
+import SupplierApplicationPage from '../page/SupplierApplicationPage';
+import PublicLandingPage from '../page/PublicLandingPage';
 
 import AdminLayout from '../components/layout/AdminLayout';
 import PlantManagerLayout from '../layouts/PlantManagerLayout';
@@ -13,7 +15,7 @@ import AdminDashboard from '../page/admin/AdminDashboard';
 import AdminProductCatalog from '../page/admin/ProductCatalog';
 import AdminProcurement from '../page/admin/Procurement';
 import AdminPurchaseOrders from '../page/admin/PurchaseOrders';
-import AdminSuppliers from '../page/admin/Suppliers';
+import AdminSupplierManagement from '../page/admin/SupplierManagement';
 import AdminLogistics from '../page/admin/logistics';
 import AdminInventory from '../page/admin/Inventory';
 import AdminManageLocations from '../page/admin/warehouse/ManageLocations';
@@ -50,10 +52,11 @@ import QAProfile from '../page/QA/Profile';
 import QANotifications from '../page/QA/Notifications';
 
 const router = createBrowserRouter([
-  { path: '/', element: <Navigate to="/login" replace /> },
+  { path: '/', element: <PublicLandingPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/activate-account', element: <ActivateAccountPage /> },
+  { path: '/supplier-application', element: <SupplierApplicationPage /> },
   {
     path: '/dashboard',
     element: <ProtectedRoute allowedRoles={['ADMIN']}><Navigate to="/admin/dashboard" replace /></ProtectedRoute>,
@@ -71,7 +74,7 @@ const router = createBrowserRouter([
       { path: 'barcode-center', element: <AdminBarcodeCenter /> },
       { path: 'purchase-orders', element: <AdminPurchaseOrders /> },
       { path: 'rejected-items', element: <AdminRejectedItems /> },
-      { path: 'suppliers', element: <AdminSuppliers /> },
+      { path: 'suppliers', element: <AdminSupplierManagement /> },
       { path: 'logistics', element: <AdminLogistics /> },
       { path: 'ai-demand-forecasting', element: <AdminAIDemandForecasting /> },
       { path: 'reports', element: <AdminReports /> },
@@ -117,7 +120,7 @@ const router = createBrowserRouter([
       { path: 'profile', element: <QAProfile /> },
     ],
   },
-  { path: '*', element: <Navigate to="/login" replace /> },
+  { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
 export default router;

@@ -12,8 +12,6 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Edit,
-  Download,
-  Printer,
   RefreshCw,
   Grid,
   List,
@@ -213,18 +211,6 @@ const Suppliers: React.FC = () => {
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
-          <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
-            title="Export"
-          >
-            <Download className="w-4 h-4" />
-          </button>
-          <button
-            className="p-2.5 rounded-xl border border-slate-800/80 text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition-colors"
-            title="Print"
-          >
-            <Printer className="w-4 h-4" />
           </button>
           <div className="flex items-center gap-1 bg-slate-800/50 rounded-xl p-1">
             <button

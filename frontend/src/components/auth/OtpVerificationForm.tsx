@@ -17,6 +17,7 @@ interface OtpVerificationFormProps {
   expiresIn: number;
   onVerified: (result: VerifiedLogin) => void;
   onBack: () => void;
+  appearance?: 'dark' | 'light';
 }
 
 type OtpErrorResponse = {
@@ -47,6 +48,7 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
   expiresIn,
   onVerified,
   onBack,
+  appearance = 'dark',
 }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -156,6 +158,7 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
   };
 
   const busy = isVerifying || isResending;
+  const isLight = appearance === 'light';
 
   return (
     <>
@@ -163,12 +166,12 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-blue-400/10 bg-blue-500/10 text-blue-400 shadow-[0_0_24px_rgba(37,99,235,0.12)]">
           <ShieldCheck className="h-8 w-8" strokeWidth={1.8} />
         </div>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight text-white md:text-[1.625rem] lg:text-[1.75rem] xl:text-[1.875rem]">
+        <h2 className={`mt-4 text-2xl font-bold tracking-tight md:text-[1.625rem] lg:text-[1.75rem] xl:text-[1.875rem] ${isLight ? 'text-slate-900' : 'text-white'}`}>
           Verify your identity
         </h2>
-        <p className="mt-2 text-sm text-slate-400 md:text-[15px] xl:text-base">
+        <p className={`mt-2 text-sm md:text-[15px] xl:text-base ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
           We sent a 6-digit verification code to{' '}
-          <span className="font-medium text-slate-200">{maskEmail(email)}</span>.
+          <span className={`font-medium ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{maskEmail(email)}</span>.
         </p>
       </div>
 
@@ -185,7 +188,7 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
         )}
 
         <div>
-          <label htmlFor="otp" className="mb-1.5 block text-sm font-medium" style={{ color: '#A2AAB8' }}>
+          <label htmlFor="otp" className={`mb-1.5 block text-sm font-medium ${isLight ? 'text-slate-700' : 'text-[#A2AAB8]'}`}>
             Verification code <span className="text-[#EF4444]">*</span>
           </label>
           <input
@@ -202,10 +205,10 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
             onChange={(e) => handleCodeChange(e.target.value)}
             disabled={busy || isTerminal}
             aria-invalid={!!error}
-            className="block min-h-14 w-full appearance-none rounded-xl border border-slate-700 px-4 py-3 text-center font-mono text-2xl tracking-[0.5em] transition-[border-color,box-shadow] duration-200 placeholder:text-slate-600 hover:border-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ backgroundColor: '#050e1b', color: '#F5F7FA' }}
+            className={`block min-h-14 w-full appearance-none rounded-xl border px-4 py-3 text-center font-mono text-2xl tracking-[0.5em] transition-[border-color,box-shadow] duration-200 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${isLight ? 'border-slate-300 placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-600 focus:ring-blue-500/25' : 'border-slate-700 placeholder:text-slate-600 hover:border-slate-500 focus:border-blue-500 focus:ring-blue-500/30'}`}
+            style={{ backgroundColor: isLight ? '#FFFFFF' : '#050e1b', color: isLight ? '#0F172A' : '#F5F7FA' }}
           />
-          <p className="mt-1.5 text-xs text-slate-500">
+          <p className={`mt-1.5 text-xs ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>
             The code expires in {Math.ceil(expiresIn / 60)} minutes. Never share it with anyone.
           </p>
         </div>
@@ -220,7 +223,7 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
             type="button"
             onClick={onBack}
             disabled={busy}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium text-slate-400 transition-colors hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-60 ${isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'}`}
           >
             <ArrowLeft className="h-4 w-4" />
             Back to sign in
@@ -230,7 +233,7 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
             onClick={handleResend}
             disabled={busy || isTerminal || resendIn > 0}
             aria-live="polite"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium text-blue-400 transition-colors hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:text-slate-500"
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:text-slate-500 ${isLight ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'}`}
           >
             <RotateCw className={`h-4 w-4 ${isResending ? 'animate-spin' : ''}`} />
             {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}

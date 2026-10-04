@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Role;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
@@ -171,6 +172,42 @@ class AdminProcurementTest extends TestCase
 
         $this->assertDatabaseHas('replenishment_requests', ['id' => $approved->id]);
         $this->assertDatabaseHas('purchase_orders', ['replenishment_request_id' => $approved->id]);
+    }
+
+    public function test_rejected_request_cannot_generate_a_purchase_order(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $supplier = Supplier::create([
+            'supplier_code' => 'SUP-REJECTED',
+            'name' => 'Rejected Request Supplier',
+            'email' => 'orders@example.test',
+            'status' => 'ACTIVE',
+        ]);
+        $rejected = $this->replenishmentRequest([
+            'request_no' => 'RR-REJECTED-PO',
+            'status' => ReplenishmentRequest::STATUS_REJECTED,
+        ]);
+
+        $this->actingAs($admin)->postJson('/api/purchase-orders', [
+            'supplier_id' => $supplier->id,
+            'replenishment_request_id' => $rejected->id,
+            'delivery_details' => 'Main Warehouse',
+            'expected_delivery_date' => now()->addDay()->toDateString(),
+            'items' => [[
+                'product_name' => $this->product->name,
+                'ordered_quantity' => 60,
+                'unit_price' => 100,
+            ]],
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Only approved replenishment requests can generate a Purchase Order.');
+
+        $this->assertDatabaseMissing('purchase_orders', [
+            'replenishment_request_id' => $rejected->id,
+        ]);
+        $this->assertDatabaseHas('replenishment_requests', [
+            'id' => $rejected->id,
+            'status' => ReplenishmentRequest::STATUS_REJECTED,
+        ]);
     }
 
     public function test_search_and_status_filters_are_applied_within_the_operational_dataset_before_pagination(): void

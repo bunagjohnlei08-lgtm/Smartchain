@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
@@ -18,7 +19,9 @@ class PlantManagerProcurementFlowTest extends TestCase
     use RefreshDatabase;
 
     private User $manager;
+
     private Product $product;
+
     private Warehouse $warehouse;
 
     protected function setUp(): void
@@ -58,6 +61,7 @@ class PlantManagerProcurementFlowTest extends TestCase
             ->assertJsonPath('product_name', 'TOMAHAWK EC')
             ->assertJsonPath('warehouse_name', 'Main Warehouse')
             ->assertJsonPath('requested_qty', 15)
+            ->assertJsonPath('priority', 'Critical')
             ->assertJsonPath('status', 'pending');
 
         $this->assertDatabaseHas('replenishment_requests', [
@@ -73,8 +77,7 @@ class PlantManagerProcurementFlowTest extends TestCase
         }
         $this->assertDatabaseCount('products', 1);
         $this->assertDatabaseCount('warehouses', 1);
-        Notification::assertSentTo($admin, WorkflowNotification::class, fn ($notification) =>
-            $notification->title === 'New Replenishment Request'
+        Notification::assertSentTo($admin, WorkflowNotification::class, fn ($notification) => $notification->title === 'New Replenishment Request'
             && $notification->type === 'info'
             && $notification->referenceId === $response->json('request_no'));
     }
@@ -148,5 +151,64 @@ class PlantManagerProcurementFlowTest extends TestCase
             'requested_qty' => 0, 'priority' => 'Medium',
         ])->assertUnprocessable()->assertJsonValidationErrors('requested_qty');
         $this->assertDatabaseCount('replenishment_requests', 0);
+    }
+
+    public function test_priority_is_generated_from_current_warehouse_stock_at_every_boundary_band(): void
+    {
+        foreach ([3 => 'Critical', 15 => 'High', 25 => 'Medium', 50 => 'Low', 0 => 'Critical'] as $stock => $priority) {
+            $inventory = Inventory::create([
+                'barcode' => "INV-{$stock}", 'product_id' => $this->product->id,
+                'warehouse_id' => $this->warehouse->id, 'available_stock' => $stock,
+            ]);
+
+            $response = $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [
+                'product_id' => $this->product->id,
+                'warehouse_id' => $this->warehouse->id,
+                'requested_qty' => 1000,
+            ])->assertCreated()->assertJsonPath('priority', $priority);
+
+            $this->assertDatabaseHas('replenishment_requests', ['id' => $response->json('id'), 'priority' => $priority]);
+            $inventory->delete();
+        }
+    }
+
+    public function test_client_priority_is_ignored_and_selected_warehouse_stock_is_authoritative(): void
+    {
+        Inventory::create([
+            'barcode' => 'INV-MAIN', 'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id, 'available_stock' => 3,
+        ]);
+        $otherBranch = Branch::create(['name' => 'Other Branch', 'code' => 'OTHER']);
+        $otherWarehouse = Warehouse::create(['name' => 'Other Warehouse', 'code' => 'WH-OTHER', 'branch_id' => $otherBranch->id]);
+        Inventory::create([
+            'barcode' => 'INV-OTHER', 'product_id' => $this->product->id,
+            'warehouse_id' => $otherWarehouse->id, 'available_stock' => 100,
+        ]);
+
+        $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'requested_qty' => 100,
+            'priority' => 'Low',
+        ])->assertCreated()->assertJsonPath('priority', 'Critical');
+    }
+
+    public function test_submitting_a_draft_recalculates_priority_from_latest_stock(): void
+    {
+        $inventory = Inventory::create([
+            'barcode' => 'INV-DRAFT', 'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id, 'available_stock' => 15,
+        ]);
+        $draft = $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'requested_qty' => 25,
+            'status' => 'draft',
+        ])->assertCreated()->assertJsonPath('priority', 'High');
+
+        $inventory->update(['available_stock' => 8]);
+
+        $this->postJson('/api/plant-manager/procurement/requests/'.$draft->json('id').'/submit')
+            ->assertOk()->assertJsonPath('priority', 'Critical')->assertJsonPath('status', 'pending');
     }
 }

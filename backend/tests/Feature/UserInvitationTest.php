@@ -22,7 +22,7 @@ class UserInvitationTest extends TestCase
 {
     use CompletesOtpLogin, RefreshDatabase;
 
-    private const PASSWORD = 'Activate123';
+    private const PASSWORD = 'Activate@123';
 
     private Role $adminRole;
     private Role $plantManagerRole;
@@ -368,9 +368,11 @@ class UserInvitationTest extends TestCase
     {
         [$user, $token] = $this->invite();
 
-        $this->accept($token, self::PASSWORD, 'Different123')->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->accept($token, self::PASSWORD, 'Different@123')->assertUnprocessable()->assertJsonValidationErrors('password');
         $this->accept($token, 'short1')->assertUnprocessable()->assertJsonValidationErrors('password');
         $this->accept($token, 'lettersonly')->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->accept($token, 'Activate@Password')->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->accept($token, 'Activate123')->assertUnprocessable()->assertJsonValidationErrors('password');
 
         $this->assertSame('PENDING', $user->fresh()->status);
         $this->assertNull($user->fresh()->password);

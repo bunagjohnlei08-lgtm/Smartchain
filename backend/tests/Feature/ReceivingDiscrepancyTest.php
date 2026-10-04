@@ -8,6 +8,8 @@ use App\Models\ReceivingDiscrepancy;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ReceivingDiscrepancyTest extends TestCase
@@ -22,6 +24,7 @@ class ReceivingDiscrepancyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Storage::fake('local');
         $this->admin = $this->user('ADMIN');
         $this->manager = $this->user('PLANT_MANAGER');
         $this->qa = $this->user('QA_SUPERVISOR');
@@ -42,7 +45,7 @@ class ReceivingDiscrepancyTest extends TestCase
 
     private function receive(int $quantity, string $reference): int
     {
-        return (int) $this->actingAs($this->manager)->postJson('/api/receivings', [
+        return (int) $this->actingAs($this->manager)->post('/api/receivings', [
             'purchase_order_id' => $this->order->id,
             'reference_no' => $reference,
             'delivery_date' => '2026-10-01',
@@ -50,7 +53,8 @@ class ReceivingDiscrepancyTest extends TestCase
                 'purchase_order_item_id' => $this->order->items()->firstOrFail()->id,
                 'delivered_quantity' => $quantity,
             ]],
-        ])->assertCreated()->json('id');
+            'receipts' => [UploadedFile::fake()->image("{$reference}.jpg")],
+        ], ['Accept' => 'application/json'])->assertCreated()->json('id');
     }
 
     public function test_short_delivery_preserves_po_quantity_and_qa_uses_delivered_quantity(): void
@@ -94,10 +98,11 @@ class ReceivingDiscrepancyTest extends TestCase
         ]);
         $this->assertDatabaseCount('receiving_discrepancies', 1);
 
-        $this->actingAs($this->manager)->postJson('/api/receivings', [
+        $this->actingAs($this->manager)->post('/api/receivings', [
             'purchase_order_id' => $this->order->id, 'delivery_date' => '2026-10-02',
             'items' => [['purchase_order_item_id' => $this->order->items()->firstOrFail()->id, 'delivered_quantity' => 1]],
-        ])->assertUnprocessable();
+            'receipts' => [UploadedFile::fake()->image('excess.jpg')],
+        ], ['Accept' => 'application/json'])->assertUnprocessable();
     }
 
     public function test_admin_can_close_shortage_with_notes_but_other_roles_cannot(): void

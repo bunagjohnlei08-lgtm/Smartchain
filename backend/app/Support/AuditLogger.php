@@ -28,6 +28,7 @@ class AuditLogger
     public const MODULE_RECEIVING = 'Receiving';
     public const MODULE_REJECTED_ITEMS = 'Rejected Items';
     public const MODULE_REPORTS = 'Reports';
+    public const MODULE_SUPPLIERS = 'Supplier Management';
 
     private const SENSITIVE_KEY_PATTERN = '/pass(word)?|secret|token|api[_-]?key|otp|authorization|cookie|session|signature|remember/i';
 

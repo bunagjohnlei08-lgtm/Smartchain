@@ -2,8 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Search,
-  Download,
-  Printer,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -178,30 +176,6 @@ const Inventory: React.FC = () => {
   const totalReserved = inventory.reduce((sum, item) => sum + item.reserved_stock, 0);
   const totalBackload = inventory.reduce((sum, item) => sum + item.backload, 0);
 
-  const handleExport = () => {
-    const header = ['Barcode', 'Product', 'Warehouse', 'Available', 'Reserved', 'Backload', 'Status', 'Last Updated'];
-    const rows = filteredInventory.map((item) => [
-      item.barcode,
-      item.product,
-      item.warehouse,
-      item.available_stock,
-      item.reserved_stock,
-      item.backload,
-      item.status,
-      item.updated_at,
-    ]);
-    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'plant-manager-inventory-export.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       {/* Breadcrumb */}
@@ -218,14 +192,6 @@ const Inventory: React.FC = () => {
           <p className="text-sm text-slate-400">
             Stock positions by product and storage location
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={handleExport} className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
-            <Download className="w-4 h-4" /> Export
-          </button>
-          <button onClick={() => window.print()} className="bg-[#101929] hover:bg-[#18253d] border border-slate-700/60 text-slate-200 text-xs font-medium px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
-            <Printer className="w-4 h-4" /> Print
-          </button>
         </div>
       </div>
 

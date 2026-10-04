@@ -21,7 +21,7 @@ class PasswordResetTest extends TestCase
     use RefreshDatabase;
 
     private const OLD_PASSWORD = 'OldPassword123';
-    private const NEW_PASSWORD = 'NewPassword456';
+    private const NEW_PASSWORD = 'NewPassword@456';
     private const GENERIC = 'If an account exists, a verification code has been sent to the registered email.';
 
     private Role $role;
@@ -218,7 +218,9 @@ class PasswordResetTest extends TestCase
         $grant = $this->grant($flow, $code);
         $this->reset($grant, 'short1')->assertUnprocessable()->assertJsonValidationErrors('password');
         $this->reset($grant, 'lettersonly')->assertUnprocessable()->assertJsonValidationErrors('password');
-        $this->reset($grant, self::NEW_PASSWORD, 'Different789')->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->reset($grant, 'Smartchain@Password')->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->reset($grant, 'Smartchain2026')->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->reset($grant, self::NEW_PASSWORD, 'Different@789')->assertUnprocessable()->assertJsonValidationErrors('password');
     }
 
     public function test_delivery_failure_leaves_no_usable_challenge_and_public_response_stays_generic(): void

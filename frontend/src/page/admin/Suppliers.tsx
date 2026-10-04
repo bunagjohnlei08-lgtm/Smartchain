@@ -14,8 +14,6 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Edit,
-  Download,
-  Printer,
   RefreshCw,
   Grid,
   List,
@@ -194,7 +192,7 @@ const Suppliers: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  // Refresh / Export / Print and the view toggle are declared once and rendered in
+  // Refresh and the view toggle are declared once and rendered in
   // two places: the desktop header keeps them exactly where they were, while the
   // mobile toolbar puts them in the filter card. Only one copy is ever displayed —
   // the other side of the sm breakpoint is display:none, so it leaves no box and
@@ -208,18 +206,6 @@ const Suppliers: React.FC = () => {
         title="Refresh"
       >
         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-      </button>
-      <button
-        className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-        title="Export"
-      >
-        <Download className="w-4 h-4" />
-      </button>
-      <button
-        className="p-2.5 rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-        title="Print"
-      >
-        <Printer className="w-4 h-4" />
       </button>
     </>
   );
@@ -305,7 +291,7 @@ const Suppliers: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="supplier-toolbar bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4">
-        {/* Mobile row 1: search flush left, then Refresh / Export / Print. */}
+        {/* Mobile row 1: search flush left, then Refresh. */}
         <div className="supplier-search-row flex items-center sm:hidden">
           <div className="supplier-search-field relative flex-1 min-w-0">
             <Search className="supplier-search-icon absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />

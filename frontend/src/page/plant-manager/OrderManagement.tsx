@@ -2,7 +2,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
+import { readStoredUser } from '../../lib/authUser';
+import PickListModal from './components/PickListModal';
 import {
+  Download,
   RefreshCw,
   Printer,
   Search,
@@ -214,6 +217,8 @@ const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
   );
 };
 
+const isPickListEligible = (order: Order): boolean => order.status === 'Assigned' || order.status === 'Preparing';
+
 // KPI Card
 const KPICard: React.FC<{
   label: string;
@@ -262,7 +267,10 @@ const OrderManagement: React.FC = () => {
   const [summary, setSummary] = useState<OrderSummary>({ assigned: 0, preparing: 0, readyForStockOut: 0, inTransit: 0, delivered: 0, cancelled: 0 });
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedPickOrderIds, setSelectedPickOrderIds] = useState<Set<string>>(() => new Set());
+  const [pickListAction, setPickListAction] = useState<'print' | 'export' | null>(null);
   const selectionRequestRef = useRef(0);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const loadOrders = useCallback(async () => {
     const [ordersResponse, summaryResponse] = await Promise.all([
@@ -301,6 +309,29 @@ const OrderManagement: React.FC = () => {
     });
   }, [orders, searchTerm, statusFilter, warehouseFilter, priorityFilter]);
 
+  const filteredEligibleOrders = useMemo(() => filteredOrders.filter(isPickListEligible), [filteredOrders]);
+  const selectedPickOrders = useMemo(
+    () => orders.filter((order) => isPickListEligible(order) && selectedPickOrderIds.has(order.id)),
+    [orders, selectedPickOrderIds],
+  );
+  const allVisibleEligibleSelected = filteredEligibleOrders.length > 0
+    && filteredEligibleOrders.every((order) => selectedPickOrderIds.has(order.id));
+  const someVisibleEligibleSelected = filteredEligibleOrders.some((order) => selectedPickOrderIds.has(order.id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleEligibleSelected && !allVisibleEligibleSelected;
+    }
+  }, [allVisibleEligibleSelected, someVisibleEligibleSelected]);
+
+  useEffect(() => {
+    setSelectedPickOrderIds((current) => {
+      const eligibleIds = new Set(orders.filter(isPickListEligible).map((order) => order.id));
+      const next = new Set([...current].filter((id) => eligibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [orders]);
+
   const selectOrder = useCallback(async (order: Order, openPanel = false) => {
     setActionError(null);
     setSelectedOrderId(order.id);
@@ -312,7 +343,7 @@ const OrderManagement: React.FC = () => {
       if (requestId !== selectionRequestRef.current) return;
       setSelectedOrder(mapOrder(response.data));
       if (openPanel) setIsPanelOpen(true);
-    } catch (error) {
+    } catch {
       if (requestId !== selectionRequestRef.current) return;
       setSelectedOrderId(null);
       setSelectedOrder(null);
@@ -414,8 +445,30 @@ const OrderManagement: React.FC = () => {
     }
   };
 
-  const handleGeneratePickList = (orderId: string) => {
-    alert(`Generating pick list for order ${orderId}`);
+  const togglePickOrder = (orderId: string) => {
+    setSelectedPickOrderIds((current) => {
+      const next = new Set(current);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const toggleAllVisibleEligible = () => {
+    setSelectedPickOrderIds((current) => {
+      const next = new Set(current);
+      filteredEligibleOrders.forEach((order) => {
+        if (allVisibleEligibleSelected) next.delete(order.id);
+        else next.add(order.id);
+      });
+      return next;
+    });
+  };
+
+  const handleGeneratePickList = (order: Order) => {
+    if (!isPickListEligible(order)) return;
+    setSelectedPickOrderIds(new Set([order.id]));
+    setPickListAction('print');
   };
 
   const handleFlagStockIssue = (orderId: string) => {
@@ -433,12 +486,12 @@ const OrderManagement: React.FC = () => {
             Process assigned customer orders, check warehouse stock, and prepare shipments for logistics pickup.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => void loadOrders()} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-800 text-sm font-medium text-slate-300 hover:bg-slate-800/50 transition-colors">
             <RefreshCw className="w-4 h-4" />
             Refresh List
           </button>
-          <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 text-sm font-medium transition-colors">
+          <button type="button" onClick={() => setPickListAction('print')} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400">
             <Printer className="w-4 h-4" />
             Print Pick List
           </button>
@@ -521,8 +574,8 @@ const OrderManagement: React.FC = () => {
             <div className="flex h-10 shrink-0 items-center gap-1 rounded-lg border border-slate-700 bg-[#070a12] p-1 sm:ml-auto" aria-label="Order view"><button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button><button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-slate-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button></div>
           </div>
 
-          <button className="col-span-2 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:col-span-1 sm:w-auto sm:justify-start sm:px-4 sm:text-sm">
-            <FileText className="w-4 h-4" />
+          <button type="button" onClick={() => setPickListAction('export')} className="col-span-2 flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:col-span-1 sm:w-auto sm:justify-start sm:px-4 sm:text-sm">
+            <Download className="w-4 h-4" />
             Export Pick List
           </button>
         </div>
@@ -540,7 +593,7 @@ const OrderManagement: React.FC = () => {
           <table className="pm-status-table pm-order-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1100px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Order No.</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400"><span className="flex items-center gap-3"><input ref={selectAllRef} type="checkbox" checked={allVisibleEligibleSelected} disabled={filteredEligibleOrders.length === 0} onChange={toggleAllVisibleEligible} aria-label="Select all currently visible eligible orders" className="h-4 w-4 cursor-pointer rounded border-slate-600 accent-cyan-500 disabled:cursor-not-allowed disabled:opacity-40" />Order No.</span></th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Customer / Destination</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Products</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
@@ -565,7 +618,7 @@ const OrderManagement: React.FC = () => {
                   aria-selected={selectedOrderId === order.id}
                   className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500/60 ${selectedOrderId === order.id ? 'bg-cyan-500/10' : 'hover:bg-slate-800/20'}`}
                 >
-                  <td className="px-4 py-3 font-mono font-medium text-white">{order.orderNumber}</td>
+                  <td className="px-4 py-3 font-mono font-medium text-white"><span className="flex items-center gap-3">{isPickListEligible(order) ? <input type="checkbox" checked={selectedPickOrderIds.has(order.id)} onChange={() => togglePickOrder(order.id)} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} aria-label={`Select ${order.orderNumber} for pick list`} className="h-4 w-4 shrink-0 cursor-pointer rounded border-slate-600 accent-cyan-500" /> : <span className="h-4 w-4 shrink-0" aria-hidden="true" />}<span>{order.orderNumber}</span></span></td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
                       <span className="text-slate-200">{order.customer}</span>
@@ -612,7 +665,7 @@ const OrderManagement: React.FC = () => {
           </table>
         </div>
         ) : filteredOrders.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{filteredOrders.map((order) => <article key={order.id} onClick={() => void selectOrder(order)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void selectOrder(order); } }} tabIndex={0} aria-selected={selectedOrderId === order.id} className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 dark:bg-slate-800 ${selectedOrderId === order.id ? 'border-cyan-500/60 ring-1 ring-cyan-500/30' : 'border-slate-200 dark:border-slate-700'}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-mono font-semibold text-slate-900 dark:text-white">{order.orderNumber}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{order.customer}</p></div><StatusBadge status={order.status} /></div><p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Products</dt><dd className="text-slate-900 dark:text-white">{order.items[0]?.productName || 'No products'}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.totalItems}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned</dt><dd className="text-slate-900 dark:text-white">{order.assignedDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); void handleViewOrder(order); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View / Process Order"><Eye className="h-4 w-4" /></button></div></article>)}</div>
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{filteredOrders.map((order) => <article key={order.id} onClick={() => void selectOrder(order)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void selectOrder(order); } }} tabIndex={0} aria-selected={selectedOrderId === order.id} className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 dark:bg-slate-800 ${selectedOrderId === order.id ? 'border-cyan-500/60 ring-1 ring-cyan-500/30' : 'border-slate-200 dark:border-slate-700'}`}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3">{isPickListEligible(order) && <input type="checkbox" checked={selectedPickOrderIds.has(order.id)} onChange={() => togglePickOrder(order.id)} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} aria-label={`Select ${order.orderNumber} for pick list`} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-600 accent-cyan-500" />}<div className="min-w-0"><h3 className="font-mono font-semibold text-slate-900 dark:text-white">{order.orderNumber}</h3><p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">{order.customer}</p></div></div><StatusBadge status={order.status} /></div><p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Products</dt><dd className="text-slate-900 dark:text-white">{order.items[0]?.productName || 'No products'}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.totalItems}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned</dt><dd className="text-slate-900 dark:text-white">{order.assignedDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); void handleViewOrder(order); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View / Process Order"><Eye className="h-4 w-4" /></button></div></article>)}</div>
         ) : (
           <div className="px-4 py-8 text-center text-slate-400">No orders match your filters.</div>
         )}
@@ -775,8 +828,10 @@ const OrderManagement: React.FC = () => {
                   </button>
                 )}
                 <button
-                  onClick={() => handleGeneratePickList(selectedOrder.id)}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 sm:flex-1 sm:px-4 sm:text-sm"
+                  onClick={() => handleGeneratePickList(selectedOrder)}
+                  disabled={!isPickListEligible(selectedOrder)}
+                  title={isPickListEligible(selectedOrder) ? 'Print this order pick list' : 'This order no longer requires picking'}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-700 sm:flex-1 sm:px-4 sm:text-sm"
                 >
                   <FileText className="w-4 h-4" />
                   Generate Pick List
@@ -800,6 +855,7 @@ const OrderManagement: React.FC = () => {
           </div>
         </div>
       )}
+      {pickListAction && <PickListModal action={pickListAction} selectedOrders={selectedPickOrders} filteredOrders={filteredEligibleOrders} generatedBy={readStoredUser()?.name} onClose={() => setPickListAction(null)} />}
     </div>
   );
 };

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Building2, Camera, CheckCircle2, GitBranch, IdCard, LoaderCircle, LockKeyhole, Trash2, UserRound, Warehouse } from 'lucide-react';
+import { Building2, Camera, CheckCircle2, GitBranch, IdCard, KeyRound, LoaderCircle, LockKeyhole, Trash2, UserRound, Warehouse } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { type AuthUser, updateStoredUser } from '../lib/authUser';
+import { isPasswordValid, PASSWORD_MAX_LENGTH, passwordValidationMessage } from '../lib/passwordPolicy';
+import PasswordRequirements from './auth/PasswordRequirements';
 import UserAvatar from './UserAvatar';
 
 interface ProfilePageProps { breadcrumbLabel: string; }
@@ -49,6 +51,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
   const [photoError, setPhotoError] = useState('');
   const [photoSuccess, setPhotoSuccess] = useState('');
   const [savingPhoto, setSavingPhoto] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ current: '', password: '', confirmation: '' });
+  const [passwordErrors, setPasswordErrors] = useState<FieldErrors>({});
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => {
@@ -129,6 +135,35 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
     finally { setSavingPhoto(false); }
   };
 
+  const updatePasswordField = (field: keyof typeof passwordForm, value: string) => {
+    setPasswordForm((current) => ({ ...current, [field]: value }));
+    setPasswordErrors((current) => ({ ...current, [field === 'confirmation' ? 'password_confirmation' : field]: '', form: '' }));
+    setPasswordSuccess('');
+  };
+
+  const changePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const errors: FieldErrors = {};
+    if (!passwordForm.current) errors.current_password = 'Current password is required.';
+    const policyError = passwordValidationMessage(passwordForm.password);
+    if (policyError) errors.password = policyError;
+    if (passwordForm.confirmation !== passwordForm.password) errors.password_confirmation = 'Password confirmation does not match.';
+    if (Object.keys(errors).length) { setPasswordErrors(errors); return; }
+
+    setSavingPassword(true); setPasswordErrors({}); setPasswordSuccess('');
+    try {
+      await apiClient.put('/profile/password', {
+        current_password: passwordForm.current,
+        password: passwordForm.password,
+        password_confirmation: passwordForm.confirmation,
+      });
+      setPasswordForm({ current: '', password: '', confirmation: '' });
+      setPasswordSuccess('Password changed successfully. Other sessions have been signed out.');
+    } catch (cause) {
+      setPasswordErrors(validationErrors(cause, 'Unable to change your password. Please try again.'));
+    } finally { setSavingPassword(false); }
+  };
+
   const focusProfileForm = () => {
     const nameInput = document.querySelector<HTMLInputElement>('input[autocomplete="name"]');
     nameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -166,6 +201,26 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300"><UserRound className="h-5 w-5"/></span><div><h2 className="font-semibold text-slate-900 dark:text-white">Profile Information</h2><p className="text-xs text-slate-500 dark:text-slate-400">Update your personal account information.</p></div></div><form onSubmit={saveProfile} className="mt-6 space-y-5">{profileErrors.form && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{profileErrors.form}</div>}{profileSuccess && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4"/>{profileSuccess}</div>}<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={saving} autoComplete="name" className={inputClass}/><FieldError message={profileErrors.name}/></label><label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email Address<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={saving} autoComplete="email" className={inputClass}/><FieldError message={profileErrors.email}/></label><ReadOnlyField label="Employee ID" value={profile.employee_id || 'Not Assigned'} /><ReadOnlyField label="Role" value={relationshipName(profile.role)} /><ReadOnlyField label="Warehouse" value={relationshipName(profile.warehouse)} /><ReadOnlyField label="Department" value={relationshipName(profile.department)} /><ReadOnlyField label="Branch" value={relationshipName(profile.branch)} className="md:col-span-2" /></div><div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end dark:border-slate-700"><button type="button" onClick={() => setForm({ name: profile.name, email: profile.email })} disabled={saving} className="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</button><button type="submit" disabled={saving} className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{saving && <LoaderCircle className="h-4 w-4 animate-spin"/>}{saving ? 'Saving…' : 'Save Changes'}</button></div></form></section>
       </div>
+      <section aria-labelledby="password-heading" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-800">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300"><KeyRound className="h-5 w-5" aria-hidden="true" /></span>
+          <div><h2 id="password-heading" className="font-semibold text-slate-900 dark:text-white">Change Password</h2><p className="text-xs text-slate-500 dark:text-slate-400">Use your current password to secure your account with a new one.</p></div>
+        </div>
+        <form onSubmit={changePassword} className="mt-6 space-y-4" noValidate>
+          {passwordErrors.form && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{passwordErrors.form}</div>}
+          {passwordSuccess && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />{passwordSuccess}</div>}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Current Password<input type="password" name="current-password" autoComplete="current-password" value={passwordForm.current} onChange={(event) => updatePasswordField('current', event.target.value)} disabled={savingPassword} required aria-invalid={!!passwordErrors.current_password} className={inputClass} /><FieldError message={passwordErrors.current_password} /></label>
+            <div className="hidden lg:block" aria-hidden="true" />
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">New Password<input type="password" name="profile-new-password" autoComplete="new-password" value={passwordForm.password} onChange={(event) => updatePasswordField('password', event.target.value)} disabled={savingPassword} required maxLength={PASSWORD_MAX_LENGTH} aria-invalid={!!passwordErrors.password} className={inputClass} /><FieldError message={passwordErrors.password} /></label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Confirm New Password<input type="password" name="profile-password-confirmation" autoComplete="new-password" value={passwordForm.confirmation} onChange={(event) => updatePasswordField('confirmation', event.target.value)} disabled={savingPassword} required maxLength={PASSWORD_MAX_LENGTH} aria-invalid={!!passwordErrors.password_confirmation} className={inputClass} /><FieldError message={passwordErrors.password_confirmation} /></label>
+          </div>
+          <PasswordRequirements password={passwordForm.password} appearance="light" />
+          <div className="flex justify-end border-t border-slate-200 pt-5 dark:border-slate-700">
+            <button type="submit" disabled={savingPassword || !passwordForm.current || !isPasswordValid(passwordForm.password) || passwordForm.confirmation !== passwordForm.password} className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{savingPassword && <LoaderCircle className="h-4 w-4 animate-spin" />}{savingPassword ? 'Changing password...' : 'Change Password'}</button>
+          </div>
+        </form>
+      </section>
     </>}
   </div>;
 };

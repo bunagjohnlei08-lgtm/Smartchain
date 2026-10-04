@@ -3,14 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ReplenishmentRequest;
 use App\Models\Inventory;
-use App\Models\Warehouse;
+use App\Models\ReplenishmentRequest;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
+use App\Support\StockLevel;
 use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +20,7 @@ use Illuminate\Validation\ValidationException;
 class PlantManagerProcurementController extends Controller
 {
     private const STATUS_DRAFT = ReplenishmentRequest::STATUS_DRAFT;
+
     private const STATUS_PENDING = ReplenishmentRequest::STATUS_PENDING;
 
     public function options(Request $request): JsonResponse
@@ -30,7 +33,8 @@ class PlantManagerProcurementController extends Controller
         }
 
         $items = $query->get()->map(function (Inventory $inventory) {
-            $needsReplenishment = in_array($inventory->status, ['Low Stock', 'Out of Stock'], true);
+            $stockLevel = StockLevel::classify((int) $inventory->available_stock);
+            $needsReplenishment = $stockLevel['alert'] !== null;
             $recommendedQty = max((int) $inventory->backload, $needsReplenishment ? 1 : 0);
 
             return [
@@ -44,7 +48,8 @@ class PlantManagerProcurementController extends Controller
                 'minStock' => $needsReplenishment ? (int) $inventory->available_stock + 1 : 0,
                 'forecastedDemand' => (int) $inventory->available_stock + (int) $inventory->backload,
                 'recommendedReorderQty' => $recommendedQty,
-                'priority' => $inventory->status === 'Out of Stock' ? 'Critical' : ($needsReplenishment ? 'High' : 'Low'),
+                'priority' => $stockLevel['priority'],
+                'stockCondition' => $stockLevel['condition'],
                 'needsReplenishment' => $needsReplenishment,
             ];
         })->values();
@@ -98,7 +103,6 @@ class PlantManagerProcurementController extends Controller
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'requested_qty' => ['required', 'integer', 'min:1'],
-            'priority' => ['required', Rule::in(ReplenishmentRequest::PRIORITIES)],
             'status' => ['nullable', Rule::in([self::STATUS_DRAFT, self::STATUS_PENDING])],
         ]);
 
@@ -107,13 +111,23 @@ class PlantManagerProcurementController extends Controller
         $validated['warehouse_id'] = $warehouseId;
 
         $status = $validated['status'] ?? self::STATUS_PENDING;
-        $replenishmentRequest = ReplenishmentRequest::create([
-            ...$validated,
-            'request_no' => 'RR-'.now()->format('Ymd').'-'.strtoupper(Str::random(6)),
-            'requested_by' => $request->user()->id,
-            'status' => $status,
-            'submitted_at' => $status === self::STATUS_PENDING ? now() : null,
-        ]);
+        $replenishmentRequest = DB::transaction(function () use ($validated, $warehouseId, $status, $request) {
+            Warehouse::query()->lockForUpdate()->findOrFail($warehouseId);
+            $currentStock = (int) (Inventory::query()
+                ->where('product_id', $validated['product_id'])
+                ->where('warehouse_id', $warehouseId)
+                ->lockForUpdate()
+                ->value('available_stock') ?? 0);
+
+            return ReplenishmentRequest::create([
+                ...$validated,
+                'priority' => StockLevel::priority($currentStock),
+                'request_no' => 'RR-'.now()->format('Ymd').'-'.strtoupper(Str::random(6)),
+                'requested_by' => $request->user()->id,
+                'status' => $status,
+                'submitted_at' => $status === self::STATUS_PENDING ? now() : null,
+            ]);
+        }, 3);
         $replenishmentRequest->load(['product:id,name', 'warehouse:id,name', 'requester:id,name']);
 
         if ($status === self::STATUS_PENDING) {
@@ -133,10 +147,29 @@ class PlantManagerProcurementController extends Controller
             ]);
         }
 
-        $replenishmentRequest->update([
-            'status' => self::STATUS_PENDING,
-            'submitted_at' => now(),
-        ]);
+        $replenishmentRequest = DB::transaction(function () use ($replenishmentRequest) {
+            $lockedRequest = ReplenishmentRequest::query()->lockForUpdate()->findOrFail($replenishmentRequest->id);
+            if ($lockedRequest->status !== self::STATUS_DRAFT) {
+                throw ValidationException::withMessages([
+                    'status' => 'Only Draft replenishment requests can be submitted.',
+                ]);
+            }
+
+            Warehouse::query()->lockForUpdate()->findOrFail($lockedRequest->warehouse_id);
+            $currentStock = (int) (Inventory::query()
+                ->where('product_id', $lockedRequest->product_id)
+                ->where('warehouse_id', $lockedRequest->warehouse_id)
+                ->lockForUpdate()
+                ->value('available_stock') ?? 0);
+
+            $lockedRequest->update([
+                'priority' => StockLevel::priority($currentStock),
+                'status' => self::STATUS_PENDING,
+                'submitted_at' => now(),
+            ]);
+
+            return $lockedRequest;
+        }, 3);
         $replenishmentRequest->load(['product:id,name', 'warehouse:id,name', 'requester:id,name']);
         $this->notifyAdmins($replenishmentRequest);
 

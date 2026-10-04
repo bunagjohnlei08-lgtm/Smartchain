@@ -286,7 +286,6 @@ const ReplenishmentPlanning: React.FC = () => {
     product: '',
     warehouse: 'Main Warehouse',
     quantity: '',
-    priority: 'Medium' as Priority,
     submittedDate: new Date().toISOString().slice(0, 10),
     status: 'pending' as RequestStatus,
   });
@@ -358,6 +357,14 @@ const ReplenishmentPlanning: React.FC = () => {
     () => categoryProducts.find((product) => String(product.id) === newRequest.product) ?? null,
     [categoryProducts, newRequest.product],
   );
+  const selectedInventory = useMemo(
+    () => selectedCatalogProduct && procurementWarehouse
+      ? products.find((product) => product.productId === selectedCatalogProduct.id && product.warehouseId === procurementWarehouse.id) ?? null
+      : null,
+    [products, procurementWarehouse, selectedCatalogProduct],
+  );
+  const selectedCurrentStock = selectedCatalogProduct ? selectedInventory?.currentStock ?? 0 : null;
+  const selectedAutomaticPriority = selectedCatalogProduct ? selectedInventory?.priority ?? 'Critical' : null;
 
   useEffect(() => {
     if (!productDropdownOpen) return;
@@ -426,7 +433,6 @@ const ReplenishmentPlanning: React.FC = () => {
         product_id: selectedProduct.productId,
         warehouse_id: selectedProduct.warehouseId,
         requested_qty: selectedProduct.recommendedReorderQty,
-        priority: selectedProduct.priority,
         status: 'pending',
       });
       await loadProcurement();
@@ -470,13 +476,12 @@ const ReplenishmentPlanning: React.FC = () => {
         product_id: product.id,
         warehouse_id: procurementWarehouse.id,
         requested_qty: Number(newRequest.quantity),
-        priority: newRequest.priority,
         status: 'pending',
       });
       await loadProcurement();
       setShowNewRequestModal(false);
       setSelectedCategory('');
-      setNewRequest({ requestNo: '', product: '', warehouse: procurementWarehouse.name, quantity: '', priority: 'Medium', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
+      setNewRequest({ requestNo: '', product: '', warehouse: procurementWarehouse.name, quantity: '', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
       showToast('Request created successfully!', 'success');
     } catch (error: any) {
       showToast(error?.response?.data?.message || 'Request could not be created.', 'error');
@@ -931,14 +936,18 @@ const ReplenishmentPlanning: React.FC = () => {
                     />
                   </div>
                   <div className="min-w-0">
-                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Priority <span className="text-red-400">*</span></label>
-                    <select
-                      value={newRequest.priority}
-                      onChange={(e) => setNewRequest({ ...newRequest, priority: e.target.value as Priority })}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    >
-                      {(['Low', 'Medium', 'High', 'Critical'] as Priority[]).map((priority) => <option key={priority}>{priority}</option>)}
-                    </select>
+                    <p className="mb-1.5 text-sm font-medium text-[var(--text-secondary)]">Priority</p>
+                    <div aria-live="polite" className="min-h-24 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-alt)] px-4 py-3">
+                      {selectedAutomaticPriority ? (
+                        <>
+                          <PriorityBadge priority={selectedAutomaticPriority} />
+                          <p className="mt-2 text-sm text-[var(--text-secondary)]">Current stock: <span className="font-semibold text-[var(--text-primary)]">{selectedCurrentStock}</span></p>
+                          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Automatically determined from the current warehouse stock level.</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-[var(--text-muted)]">Select a product to view its system-generated priority.</p>
+                      )}
+                    </div>
                   </div>
                   <div className="min-w-0">
                     <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Quantity <span className="text-red-400">*</span></label>
@@ -1011,6 +1020,10 @@ const ReplenishmentPlanning: React.FC = () => {
                   <div>
                     <p className="text-xs text-[var(--text-muted)]">Current Stock</p>
                     <p className="text-[var(--text-primary)]">{selectedProduct.currentStock}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)]">System-Generated Priority</p>
+                    <div className="mt-1"><PriorityBadge priority={selectedProduct.priority} /></div>
                   </div>
                   <div>
                     <p className="text-xs text-[var(--text-muted)]">Minimum Stock</p>

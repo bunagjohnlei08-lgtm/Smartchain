@@ -84,7 +84,7 @@ class PurchaseOrderController extends Controller
             'delivery_details' => ['required', 'string', 'max:2000'],
             'expected_delivery_date' => ['required', 'date', 'after_or_equal:today'],
             'replenishment_request_id' => ['nullable', 'integer', 'exists:replenishment_requests,id', 'unique:purchase_orders,replenishment_request_id'],
-            'status' => ['nullable', Rule::in(PurchaseOrder::STATUSES)],
+            'status' => ['prohibited'],
             'signature_data' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_name' => ['required', 'string', 'distinct', Rule::exists('products', 'name')],
@@ -117,7 +117,7 @@ class PurchaseOrderController extends Controller
                 'delivery_details' => $validated['delivery_details'],
                 'expected_delivery_date' => $validated['expected_delivery_date'],
                 'total_amount' => $items->sum('total_price'),
-                'status' => $validated['status'] ?? 'Approved',
+                'status' => PurchaseOrder::STATUS_APPROVED,
                 'approved_by' => $request->user()->id,
                 'signature_data' => $validated['signature_data'] ?? null,
             ]);

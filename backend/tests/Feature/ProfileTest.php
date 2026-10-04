@@ -225,23 +225,49 @@ class ProfileTest extends TestCase
 
         $this->putJson('/api/profile/password', [
             'current_password' => 'wrong-password',
-            'password' => 'NewPassword123',
-            'password_confirmation' => 'NewPassword123',
+            'password' => 'NewPassword@123',
+            'password_confirmation' => 'NewPassword@123',
         ])->assertUnprocessable()->assertJsonValidationErrors('current_password');
 
         $this->putJson('/api/profile/password', [
             'current_password' => 'old-password',
-            'password' => 'NewPassword123',
+            'password' => 'NewPassword@123',
             'password_confirmation' => 'different-password',
         ])->assertUnprocessable()->assertJsonValidationErrors('password');
 
         $this->putJson('/api/profile/password', [
             'current_password' => 'old-password',
-            'password' => 'NewPassword123',
-            'password_confirmation' => 'NewPassword123',
+            'password' => 'NewPassword@123',
+            'password_confirmation' => 'NewPassword@123',
         ])->assertOk();
 
-        $this->assertTrue(Hash::check('NewPassword123', $user->fresh()->password));
+        $this->assertTrue(Hash::check('NewPassword@123', $user->fresh()->password));
+    }
+
+    #[DataProvider('weakNewPasswords')]
+    public function test_password_change_rejects_each_missing_complexity_requirement(string $password): void
+    {
+        $user = User::factory()->create(['password' => 'old-password']);
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/profile/password', [
+            'current_password' => 'old-password',
+            'password' => $password,
+            'password_confirmation' => $password,
+        ])->assertUnprocessable()->assertJsonValidationErrors('password');
+
+        $this->assertTrue(Hash::check('old-password', $user->fresh()->password));
+    }
+
+    /** @return array<string, array{string}> */
+    public static function weakNewPasswords(): array
+    {
+        return [
+            'missing uppercase' => ['smartchain@2026'],
+            'missing lowercase' => ['SMARTCHAIN@2026'],
+            'missing number' => ['Smartchain@Password'],
+            'missing symbol' => ['Smartchain2026'],
+        ];
     }
 
     public function test_password_change_preserves_existing_token(): void
@@ -252,8 +278,8 @@ class ProfileTest extends TestCase
 
         $this->withHeaders($headers)->putJson('/api/profile/password', [
             'current_password' => 'old-password',
-            'password' => 'NewPassword123',
-            'password_confirmation' => 'NewPassword123',
+            'password' => 'NewPassword@123',
+            'password_confirmation' => 'NewPassword@123',
         ])->assertOk();
 
         $this->withHeaders($headers)->getJson('/api/profile')->assertOk();
