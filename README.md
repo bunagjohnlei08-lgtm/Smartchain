@@ -230,17 +230,23 @@ Available scripts are `npm run dev`, `npm run build`, `npm run lint`, and `npm r
 
 ```bash
 cd forecasting-service
-python -m venv .venv
+python -m venv venv
 ```
 
-Activate the environment for your platform, then install and run:
+The forecasting service requires the exact Python version recorded in
+`forecasting-service/.python-version`. On Windows PowerShell, activate the
+environment, install the pinned dependencies, and run the health-check scaffold:
 
 ```bash
-python -m pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --port 8001
+venv\Scripts\Activate.ps1
+python -m pip install --requirement requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
-The requirements file currently contains a scikit-learn pin that may need correction before installation succeeds. The service is independently runnable for health checks but is not connected to SmartChain.
+The dependency manifest is exactly pinned and validated against that Python
+runtime. The service is independently runnable for health checks but is not
+connected to SmartChain and does not contain a trained model or prediction
+endpoint.
 
 ## API & Services
 
