@@ -36,7 +36,10 @@ RUN set -eux; \
         libzip4; \
     rm -rf /var/lib/apt/lists/*; \
     mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"; \
-    a2enmod rewrite; \
+    for mpm in mpm_event mpm_worker; do \
+        if [ -e "/etc/apache2/mods-enabled/${mpm}.load" ]; then a2dismod -f "$mpm"; fi; \
+    done; \
+    a2enmod mpm_prefork rewrite; \
     sed -ri -e "s!/var/www/html!${APACHE_DOCUMENT_ROOT}!g" /etc/apache2/sites-available/*.conf; \
     printf '%s\n' \
         '<Directory /app/public>' \
@@ -52,7 +55,10 @@ RUN set -eux; \
     grep -F '<Directory /app/public>' /etc/apache2/conf-enabled/smartchain.conf; \
     grep -F 'AllowOverride All' /etc/apache2/conf-enabled/smartchain.conf; \
     grep -F 'Require all granted' /etc/apache2/conf-enabled/smartchain.conf; \
-    apache2ctl -t
+    apache2ctl -t; \
+    apache2ctl -M 2>&1 | grep 'mpm_.*_module'; \
+    test "$(apache2ctl -M 2>&1 | grep -c 'mpm_.*_module')" -eq 1; \
+    apache2ctl -M 2>&1 | grep -q 'mpm_prefork_module'
 
 COPY --from=php-extensions /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=php-extensions /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
