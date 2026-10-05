@@ -1,6 +1,6 @@
 {
   "build": {
-    "builder": "RAILPACK",
-    "railpackVersion": "0.39.0"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
   }
 }

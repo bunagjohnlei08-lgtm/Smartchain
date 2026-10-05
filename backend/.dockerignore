@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.dockerignore
+Dockerfile
+node_modules
+public/build
+public/hot
+public/storage
+storage/logs/*.log
+vendor
