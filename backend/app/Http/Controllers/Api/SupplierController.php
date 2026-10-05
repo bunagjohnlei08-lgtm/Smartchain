@@ -78,7 +78,9 @@ class SupplierController extends Controller
         $this->validateNames($validated, $supplier);
         DB::transaction(function () use ($supplier, $validated) {
             $supplier->update(collect($validated)->except('aliases')->all());
-            $this->syncAliases($supplier, $validated['aliases'] ?? []);
+            if (array_key_exists('aliases', $validated)) {
+                $this->syncAliases($supplier, $validated['aliases']);
+            }
         });
         return response()->json(['data' => $supplier->fresh('aliases')]);
     }
@@ -136,6 +138,7 @@ class SupplierController extends Controller
 
     private function validateNames(array &$validated, ?Supplier $supplier = null): void
     {
+        $aliasesWereSubmitted = array_key_exists('aliases', $validated);
         $aliases = collect($validated['aliases'] ?? [])->map(fn ($alias) => SupplierName::display($alias));
         $normalized = $aliases->map(fn ($alias) => SupplierName::normalize($alias));
         $errors = [];
@@ -163,7 +166,9 @@ class SupplierController extends Controller
         if ($primaryAliasConflict) $errors['name'] = ['This supplier name conflicts with another supplier alias.'];
         if ($errors) throw ValidationException::withMessages($errors);
 
-        $validated['aliases'] = $aliases->values()->all();
+        if ($aliasesWereSubmitted) {
+            $validated['aliases'] = $aliases->values()->all();
+        }
     }
 
     private function syncAliases(Supplier $supplier, array $aliases): void

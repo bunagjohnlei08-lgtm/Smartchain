@@ -24,6 +24,7 @@ class AuditLogger
     public const MODULE_PROCUREMENT = 'Procurement';
     public const MODULE_PURCHASE_ORDERS = 'Purchase Orders';
     public const MODULE_INVENTORY = 'Inventory';
+    public const MODULE_INVENTORY_AUDIT = 'Inventory Quality Audit';
     public const MODULE_ORDERS = 'Order Management';
     public const MODULE_RECEIVING = 'Receiving';
     public const MODULE_REJECTED_ITEMS = 'Rejected Items';

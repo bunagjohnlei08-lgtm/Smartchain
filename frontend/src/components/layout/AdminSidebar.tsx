@@ -86,7 +86,9 @@ const navGroups: NavGroup[] = [
 const AdminSidebar = ({ onMobileClose }: { onMobileClose?: () => void }) => {
   const location = useLocation();
 
-  const [isWarehouseOpen, setIsWarehouseOpen] = useState(false);
+  const [isWarehouseOpen, setIsWarehouseOpen] = useState(
+    location.pathname === '/admin/inventory-audit-approvals' || location.pathname.startsWith('/admin/inventory')
+  );
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -132,12 +134,14 @@ const AdminSidebar = ({ onMobileClose }: { onMobileClose?: () => void }) => {
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = item.hasDropdown ? isPathActive(item.path) : isActive(item.path);
+                const active = item.hasDropdown
+                  ? isPathActive(item.path) || location.pathname === '/admin/inventory-audit-approvals'
+                  : isActive(item.path);
 
                 if (item.hasDropdown) {
                   const isOpen = isWarehouseOpen;
                   const setIsOpen = setIsWarehouseOpen;
-                  const isParentActive = isPathActive(item.path);
+                  const isParentActive = isPathActive(item.path) || location.pathname === '/admin/inventory-audit-approvals';
 
                   return (
                     <div key={item.id}>
@@ -160,6 +164,7 @@ const AdminSidebar = ({ onMobileClose }: { onMobileClose?: () => void }) => {
                       {isOpen && (
                         <div className="pl-9 pr-2 py-1 space-y-1 border-l border-gray-700 ml-5 my-1">
                           <NavLink className={subLinkClass} to="/admin/inventory" onClick={onMobileClose}>Inventory</NavLink>
+                          <NavLink className={subLinkClass} to="/admin/inventory-audit-approvals" onClick={onMobileClose}>Inventory Audit Approvals</NavLink>
                           <NavLink className={subLinkClass} to="/admin/manage-locations" onClick={onMobileClose}>Manage Locations</NavLink>
                         </div>
                       )}

@@ -40,6 +40,9 @@ use App\Http\Controllers\Api\SessionController;
 use App\Http\Controllers\Api\SupplierApplicationController;
 use App\Http\Controllers\Api\AdminSupplierApplicationController;
 use App\Http\Controllers\Api\AdminSupplierPerformanceController;
+use App\Http\Controllers\Api\QaInventoryAuditController;
+use App\Http\Controllers\Api\AdminInventoryAuditController;
+use App\Http\Controllers\Api\InventoryAuditEvidenceController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/supplier-applications', [SupplierApplicationController::class, 'store'])->middleware('throttle:supplier-applications');
@@ -156,6 +159,17 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::post('/qa/inspections/{receivingId}', [QaInspectionController::class, 'store']);
     Route::put('/qa/inspections/{receivingId}', [QaInspectionController::class, 'update']);
 
+    Route::get('/qa/inventory-audits', [QaInventoryAuditController::class, 'index']);
+    Route::get('/qa/inventory-audits/history', [QaInventoryAuditController::class, 'history']);
+    Route::post('/qa/inventory-audits/{inventory}', [QaInventoryAuditController::class, 'store']);
+    Route::get('/inventory-audits/evidence/{evidence}', [InventoryAuditEvidenceController::class, 'show']);
+
+    Route::get('/admin/inventory-audits', [AdminInventoryAuditController::class, 'index']);
+    Route::put('/admin/inventory-audits/schedule/months', [AdminInventoryAuditController::class, 'updateSchedule']);
+    Route::get('/admin/inventory-audits/{inventoryAuditItem}', [AdminInventoryAuditController::class, 'show']);
+    Route::post('/admin/inventory-audits/{inventoryAuditItem}/approve', [AdminInventoryAuditController::class, 'approve']);
+    Route::post('/admin/inventory-audits/{inventoryAuditItem}/return', [AdminInventoryAuditController::class, 'returnForReinspection']);
+
     Route::prefix('admin/orders')->group(function () {
         Route::get('/', [AdminOrderController::class, 'index']);
         Route::get('/summary', [AdminOrderController::class, 'summary']);
@@ -205,6 +219,8 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
     Route::get('/admin/supplier-applications', [AdminSupplierApplicationController::class, 'index']);
     Route::get('/admin/supplier-applications/{supplierApplication}', [AdminSupplierApplicationController::class, 'show']);
+    Route::get('/admin/supplier-applications/{supplierApplication}/attachments/{attachment}/preview', [AdminSupplierApplicationController::class, 'previewAttachment']);
+    Route::get('/admin/supplier-applications/{supplierApplication}/attachments/{attachment}/download', [AdminSupplierApplicationController::class, 'downloadAttachment']);
     Route::post('/admin/supplier-applications/{supplierApplication}/review', [AdminSupplierApplicationController::class, 'startReview']);
     Route::post('/admin/supplier-applications/{supplierApplication}/approve', [AdminSupplierApplicationController::class, 'approve']);
     Route::post('/admin/supplier-applications/{supplierApplication}/reject', [AdminSupplierApplicationController::class, 'reject']);

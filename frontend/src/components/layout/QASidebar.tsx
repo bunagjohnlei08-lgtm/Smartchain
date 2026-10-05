@@ -10,6 +10,7 @@ import {
   User,
   Bell,
   X,
+  ClipboardCheck,
 } from 'lucide-react';
 
 const navGroups = [
@@ -20,6 +21,7 @@ const navGroups = [
       { id: 'inspection', icon: Search, label: 'Quality Inspection', path: '/qa/inspection' },
       { id: 'rejected-items', icon: Ban, label: 'Rejected Items', path: '/qa/rejected-items' },
       { id: 'history', icon: History, label: 'Inspection History', path: '/qa/history' },
+      { id: 'inventory-audit', icon: ClipboardCheck, label: 'Inventory Quality Audit', path: '/qa/inventory-audit' },
       { id: 'reports', icon: BarChart3, label: 'Quality Reports', path: '/qa/reports' },
     ],
   },

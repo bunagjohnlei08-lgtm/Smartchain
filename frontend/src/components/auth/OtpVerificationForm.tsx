@@ -177,12 +177,12 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
 
       <form onSubmit={handleVerify} className="space-y-[18px]" noValidate>
         {notice && !error && (
-          <div role="status" aria-live="polite" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+          <div role="status" aria-live="polite" className={`rounded-xl border p-3 text-sm ${isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'}`}>
             {notice}
           </div>
         )}
         {error && (
-          <div role="alert" aria-live="polite" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+          <div role="alert" aria-live="polite" className={`rounded-xl border p-3 text-sm ${isLight ? 'border-red-200 bg-red-50 text-red-700' : 'border-red-500/20 bg-red-500/10 text-red-300'}`}>
             {error}
           </div>
         )}

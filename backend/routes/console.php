@@ -11,3 +11,4 @@ Artisan::command('inspire', function () {
 // Admin report schedules. Delivery only happens when the production scheduler
 // (`php artisan schedule:run` every minute via cron/worker) is configured.
 Schedule::command('reports:run-scheduled')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('inventory-audits:process-schedule')->dailyAt('08:00')->timezone('Asia/Manila')->withoutOverlapping();

@@ -15,6 +15,7 @@ class WorkflowNotification extends Notification
         public readonly string $type,
         public readonly string $referenceId,
         public readonly ?string $category = null,
+        public readonly array $metadata = [],
     ) {}
 
     public function via(object $notifiable): array
@@ -30,6 +31,7 @@ class WorkflowNotification extends Notification
             'type' => $this->type,
             'reference_id' => $this->referenceId,
             'category' => $this->category,
+            ...($this->metadata === [] ? [] : ['metadata' => $this->metadata]),
         ];
     }
 }

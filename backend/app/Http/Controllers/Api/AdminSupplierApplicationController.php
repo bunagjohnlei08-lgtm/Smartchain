@@ -6,14 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use App\Models\SupplierAlias;
 use App\Models\SupplierApplication;
+use App\Models\SupplierApplicationAttachment;
 use App\Support\AuditLogger;
 use App\Support\SupplierName;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminSupplierApplicationController extends Controller
 {
@@ -55,7 +58,7 @@ class AdminSupplierApplicationController extends Controller
     {
         abort_unless($request->user()->isAdmin(), 403);
 
-        return response()->json(['data' => $supplierApplication->load(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name'])]);
+        return response()->json(['data' => $this->applicationData($supplierApplication)]);
     }
 
     public function startReview(Request $request, SupplierApplication $supplierApplication): JsonResponse
@@ -73,10 +76,10 @@ class AdminSupplierApplicationController extends Controller
                 ]);
             }
 
-            return $locked->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name']);
+            return $locked->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']);
         });
 
-        return response()->json(['data' => $application]);
+        return response()->json(['data' => $this->applicationData($application)]);
     }
 
     public function approve(Request $request, SupplierApplication $supplierApplication): JsonResponse
@@ -87,7 +90,7 @@ class AdminSupplierApplicationController extends Controller
             $application = SupplierApplication::query()->lockForUpdate()->findOrFail($supplierApplication->id);
 
             if ($application->status === SupplierApplication::STATUS_APPROVED && $application->approved_supplier_id) {
-                return [$application->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name']), false];
+                return [$application->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']), false];
             }
 
             abort_if($application->status === SupplierApplication::STATUS_REJECTED, 422, 'A rejected application cannot be approved.');
@@ -128,12 +131,12 @@ class AdminSupplierApplicationController extends Controller
                 'metadata' => ['supplier_id' => $supplier->id],
             ]);
 
-            return [$application->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name']), true];
+            return [$application->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']), true];
         });
 
         return response()->json([
             'message' => $result[1] ? 'Application approved and active supplier created.' : 'Application was already approved; no duplicate supplier was created.',
-            'data' => $result[0],
+            'data' => $this->applicationData($result[0]),
         ]);
     }
 
@@ -159,10 +162,75 @@ class AdminSupplierApplicationController extends Controller
                 ]);
             }
 
-            return $locked->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name']);
+            return $locked->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']);
         });
 
-        return response()->json(['message' => 'Application rejected.', 'data' => $application]);
+        return response()->json(['message' => 'Application rejected.', 'data' => $this->applicationData($application)]);
+    }
+
+    public function previewAttachment(
+        Request $request,
+        SupplierApplication $supplierApplication,
+        SupplierApplicationAttachment $attachment
+    ): JsonResponse|StreamedResponse {
+        return $this->attachmentResponse($request, $supplierApplication, $attachment, false);
+    }
+
+    public function downloadAttachment(
+        Request $request,
+        SupplierApplication $supplierApplication,
+        SupplierApplicationAttachment $attachment
+    ): JsonResponse|StreamedResponse {
+        return $this->attachmentResponse($request, $supplierApplication, $attachment, true);
+    }
+
+    private function attachmentResponse(
+        Request $request,
+        SupplierApplication $application,
+        SupplierApplicationAttachment $attachment,
+        bool $download
+    ): JsonResponse|StreamedResponse {
+        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($attachment->supplier_application_id === $application->id, 404);
+
+        if (! Storage::disk('local')->exists($attachment->stored_path)) {
+            return response()->json(['message' => 'Supplier application attachment not found.'], 404);
+        }
+
+        $filename = str_replace(['"', "\r", "\n"], '', basename($attachment->original_name));
+        $headers = [
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+            'Content-Type' => $attachment->mime_type,
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+        ];
+
+        if ($download) {
+            return Storage::disk('local')->download($attachment->stored_path, $filename, $headers);
+        }
+
+        return Storage::disk('local')->response($attachment->stored_path, $filename, [
+            ...$headers,
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
+    }
+
+    private function applicationData(SupplierApplication $application): array
+    {
+        $application->loadMissing(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']);
+        $data = $application->toArray();
+        $data['attachments'] = $application->attachments->map(fn (SupplierApplicationAttachment $attachment) => [
+            'id' => $attachment->id,
+            'attachment_type' => $attachment->attachment_type,
+            'original_name' => $attachment->original_name,
+            'mime_type' => $attachment->mime_type,
+            'file_size' => $attachment->file_size,
+            'preview_url' => "/admin/supplier-applications/{$application->id}/attachments/{$attachment->id}/preview",
+            'download_url' => "/admin/supplier-applications/{$application->id}/attachments/{$attachment->id}/download",
+            'created_at' => $attachment->created_at,
+        ])->values()->all();
+
+        return $data;
     }
 
     private function guardAgainstDuplicateSupplier(SupplierApplication $application): void

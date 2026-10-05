@@ -20,7 +20,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, appearance = 'dark' }
   const isLight = appearance === 'light';
 
   return (
-    <main className={`auth-surface relative flex min-h-dvh items-center justify-center overflow-x-hidden px-3 py-3 sm:px-6 sm:py-5 lg:py-4 ${isLight ? 'bg-white text-slate-900' : 'bg-[#030b17] text-slate-100'}`}>
+    <main style={{ colorScheme: isLight ? 'light' : 'dark' }} className={`auth-surface relative flex min-h-dvh items-center justify-center overflow-x-hidden px-3 py-3 sm:px-6 sm:py-5 lg:py-4 ${isLight ? 'bg-white text-slate-900' : 'bg-[#030b17] text-slate-100'}`}>
       {!isLight && <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(96,165,250,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(96,165,250,0.035)_1px,transparent_1px)] [background-size:48px_48px]" />}
 
       <div className={`relative grid w-full max-w-[1300px] overflow-hidden rounded-2xl border sm:rounded-[24px] lg:w-[82vw] lg:grid-cols-2 ${isLight ? 'border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.16)]' : 'border-slate-700/40 bg-[#07111f] shadow-[0_20px_60px_rgba(0,0,0,0.35)]'}`}>

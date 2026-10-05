@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SupplierApplication extends Model
 {
@@ -49,5 +50,10 @@ class SupplierApplication extends Model
     public function approvedSupplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class, 'approved_supplier_id');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SupplierApplicationAttachment::class);
     }
 }

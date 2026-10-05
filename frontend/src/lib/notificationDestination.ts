@@ -11,6 +11,8 @@ const destinations: {
   { role: 'ADMIN', category: 'Procurement', types: ['info'], path: '/admin/procurement' },
   { role: 'ADMIN', category: 'Logistics', types: ['success'], path: '/admin/logistics' },
   { role: 'ADMIN', category: 'Rejected Items', types: ['warning'], path: '/admin/rejected-items' },
+  { role: 'ADMIN', category: 'Supplier Applications', types: ['info'], path: '/admin/suppliers?tab=applications' },
+  { role: 'ADMIN', category: 'Inventory Audit Approval', types: ['warning'], path: '/admin/inventory-audit-approvals' },
   { role: 'PLANT_MANAGER', category: 'Procurement', types: ['success', 'warning'], path: '/plant-manager/procurement' },
   { role: 'PLANT_MANAGER', category: 'Inventory', types: ['warning', 'error'], path: '/plant-manager/procurement' },
   { role: 'PLANT_MANAGER', category: 'Quality Inspection', types: ['success', 'warning', 'error'], path: '/plant-manager/receiving' },
@@ -18,6 +20,7 @@ const destinations: {
   { role: 'PLANT_MANAGER', category: 'Order', types: ['info'], path: '/plant-manager/order-management' },
   { role: 'PLANT_MANAGER', category: 'Warehouse Capacity', types: ['warning', 'error'], path: '/plant-manager/warehouse' },
   { role: 'QA_SUPERVISOR', category: 'Quality Inspection', types: ['info'], path: '/qa/inspection' },
+  { role: 'QA_SUPERVISOR', category: 'Inventory Quality Audit', types: ['info', 'success', 'warning'], path: '/qa/inventory-audit' },
 ];
 
 export function getNotificationDestination(notification: NotificationRecord, role: string | null | undefined): string | null {

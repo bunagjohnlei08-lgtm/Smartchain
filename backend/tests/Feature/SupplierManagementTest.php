@@ -143,6 +143,25 @@ class SupplierManagementTest extends TestCase
         $this->assertDatabaseCount('supplier_aliases', 0);
     }
 
+    public function test_edit_without_alias_field_preserves_historical_aliases(): void
+    {
+        $response = $this->create(['aliases' => ['Historical Purchase Order Name']])->assertCreated();
+        $supplier = Supplier::findOrFail($response->json('data.id'));
+
+        $this->actingAs($this->admin)->putJson('/api/suppliers/'.$supplier->id, $this->payload([
+            'name' => 'Acme Chemicals Updated',
+            'notes' => 'Updated without exposing aliases in the form.',
+        ]))->assertOk()
+            ->assertJsonPath('data.name', 'Acme Chemicals Updated')
+            ->assertJsonPath('data.aliases.0.alias', 'Historical Purchase Order Name');
+
+        $this->assertDatabaseHas('supplier_aliases', [
+            'supplier_id' => $supplier->id,
+            'alias' => 'Historical Purchase Order Name',
+            'normalized_alias' => 'historical purchase order name',
+        ]);
+    }
+
     public function test_duplicate_and_cross_supplier_alias_conflicts_are_rejected(): void
     {
         $first = Supplier::findOrFail($this->create(['name' => 'First Supplier', 'aliases' => ['Legacy Name']])->assertCreated()->json('data.id'));

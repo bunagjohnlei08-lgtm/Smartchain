@@ -27,6 +27,7 @@ import AdminOrderManagement from '../page/admin/orderManagement';
 import AdminProfile from '../page/admin/Profile';
 import AdminNotifications from '../page/admin/Notifications';
 import AdminRejectedItems from '../page/admin/RejectedItems';
+import AdminInventoryAuditApprovals from '../page/admin/InventoryAuditApprovals';
 
 import PlantManagerDashboard from '../page/plant-manager/Dashboard';
 import PlantManagerProcurement from '../page/plant-manager/Procurement';
@@ -50,6 +51,7 @@ import QAInspectionHistory from '../page/QA/InspectionHistory';
 import QAQualityReports from '../page/QA/QualityReports';
 import QAProfile from '../page/QA/Profile';
 import QANotifications from '../page/QA/Notifications';
+import QAInventoryQualityAudit from '../page/QA/InventoryQualityAudit';
 
 const router = createBrowserRouter([
   { path: '/', element: <PublicLandingPage /> },
@@ -69,6 +71,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <AdminDashboard /> },
       { path: 'product-catalog', element: <AdminProductCatalog /> },
       { path: 'inventory', element: <AdminInventory /> },
+      { path: 'inventory-audit-approvals', element: <AdminInventoryAuditApprovals /> },
       { path: 'manage-locations', element: <AdminManageLocations /> },
       { path: 'procurement', element: <AdminProcurement /> },
       { path: 'barcode-center', element: <AdminBarcodeCenter /> },
@@ -115,6 +118,7 @@ const router = createBrowserRouter([
       { path: 'inspection', element: <QAInspection /> },
       { path: 'rejected-items', element: <QARejectedItems /> },
       { path: 'history', element: <QAInspectionHistory /> },
+      { path: 'inventory-audit', element: <QAInventoryQualityAudit /> },
       { path: 'reports', element: <QAQualityReports /> },
       { path: 'notifications', element: <QANotifications /> },
       { path: 'profile', element: <QAProfile /> },
