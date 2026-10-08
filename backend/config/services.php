@@ -37,6 +37,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'google_maps' => [
+        // Google Maps place for the Main Warehouse (Archon Nell Incorporated). The feature id
+        // is the "0x…:0x…" value from the place's Share > Embed a map link.
+        'main_warehouse_place' => [
+            'name' => env('GOOGLE_MAPS_MAIN_WAREHOUSE_PLACE_NAME', 'Archon Nell Incorporated'),
+            'feature_id' => env('GOOGLE_MAPS_MAIN_WAREHOUSE_PLACE_FEATURE_ID', '0x3397b9485ea55b87:0x2e093784a1e3763b'),
+        ],
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

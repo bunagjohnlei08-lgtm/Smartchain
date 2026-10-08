@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
@@ -8,7 +8,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
   CheckCircle,
   XCircle,
   AlertCircle,
@@ -142,124 +141,6 @@ interface ReceivingDetail extends ReceivingItem {
 }
 
 const statusOptions: Array<'All Status' | InspectionStatus> = ['All Status', 'Pending', 'In Progress', 'Passed', 'Rejected', 'Partial'];
-
-const QA_LAYOUT_DEBUG = import.meta.env.DEV;
-
-type BottomElementDebug = {
-  selector: string;
-  bottomRelativeToQaMain: number;
-  topRelativeToQaMain: number;
-  height: number;
-  display: string;
-  visibility: string;
-  opacity: string;
-  position: string;
-  overflowY: string;
-};
-
-type QaLayoutDebugSnapshot = {
-  attachmentCount: number;
-  qaMainClientHeight: number;
-  qaMainScrollHeight: number;
-  finalContentBottomRelativeToQaMain: number | null;
-  extraBlankSpace: number | null;
-  bottomMostElement: BottomElementDebug | null;
-};
-
-type DebugElementMeasurement = {
-  name: string;
-  className: string;
-  clientHeight: number;
-  scrollHeight: number;
-  offsetHeight: number;
-  rectTop: number;
-  rectBottom: number;
-  bottomRelativeToQaMain: number | null;
-  computedHeight: string;
-  computedMinHeight: string;
-  computedMaxHeight: string;
-  paddingTop: string;
-  paddingBottom: string;
-  marginTop: string;
-  marginBottom: string;
-  display: string;
-  visibility: string;
-  opacity: string;
-  transform: string;
-  position: string;
-  overflowY: string;
-  flex: string;
-  flexGrow: string;
-  flexBasis: string;
-  alignItems: string;
-  alignSelf: string;
-  gridTemplateRows: string;
-  gridAutoRows: string;
-};
-
-function measureDebugElement(name: string, element: HTMLElement | null, qaMain: HTMLElement | null): DebugElementMeasurement | null {
-  if (!element) return null;
-  const style = window.getComputedStyle(element);
-  const rect = element.getBoundingClientRect();
-  const qaMainRect = qaMain?.getBoundingClientRect();
-
-  return {
-    name,
-    className: element.className,
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-    offsetHeight: element.offsetHeight,
-    rectTop: rect.top,
-    rectBottom: rect.bottom,
-    bottomRelativeToQaMain: qaMain && qaMainRect ? rect.bottom - qaMainRect.top + qaMain.scrollTop : null,
-    computedHeight: style.height,
-    computedMinHeight: style.minHeight,
-    computedMaxHeight: style.maxHeight,
-    paddingTop: style.paddingTop,
-    paddingBottom: style.paddingBottom,
-    marginTop: style.marginTop,
-    marginBottom: style.marginBottom,
-    display: style.display,
-    visibility: style.visibility,
-    opacity: style.opacity,
-    transform: style.transform,
-    position: style.position,
-    overflowY: style.overflowY,
-    flex: style.flex,
-    flexGrow: style.flexGrow,
-    flexBasis: style.flexBasis,
-    alignItems: style.alignItems,
-    alignSelf: style.alignSelf,
-    gridTemplateRows: style.gridTemplateRows,
-    gridAutoRows: style.gridAutoRows,
-  };
-}
-
-function measurePseudoElement(element: HTMLElement | null, pseudo: '::before' | '::after') {
-  if (!element) return null;
-  const style = window.getComputedStyle(element, pseudo);
-  return {
-    content: style.content,
-    display: style.display,
-    visibility: style.visibility,
-    opacity: style.opacity,
-    position: style.position,
-    height: style.height,
-    minHeight: style.minHeight,
-    maxHeight: style.maxHeight,
-    paddingTop: style.paddingTop,
-    paddingBottom: style.paddingBottom,
-    marginTop: style.marginTop,
-    marginBottom: style.marginBottom,
-    transform: style.transform,
-  };
-}
-
-function debugSelector(element: Element): string {
-  const id = element.id ? `#${element.id}` : '';
-  const classes = Array.from(element.classList).slice(0, 5).map((name) => `.${name}`).join('');
-  return `${element.tagName.toLowerCase()}${id}${classes}`;
-}
 
 function validateEvidenceFile(file: File): string | null {
   if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type) || !/\.(jpe?g|png|pdf)$/i.test(file.name)) return 'Only JPG, PNG, or PDF files are allowed.';
@@ -465,11 +346,12 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
 };
 
 const QualityInspection: React.FC = () => {
-  const qualityRootRef = useRef<HTMLDivElement>(null);
+  const inspectionTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const inspectionCloseRef = useRef<HTMLButtonElement>(null);
+  const inspectionDialogRef = useRef<HTMLDivElement>(null);
   const receiptTriggerRef = useRef<HTMLButtonElement>(null);
   const receiptCloseRef = useRef<HTMLButtonElement>(null);
   const receiptDialogRef = useRef<HTMLDivElement>(null);
-  const [layoutDebugSnapshot, setLayoutDebugSnapshot] = useState<QaLayoutDebugSnapshot | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedReceivingId = Number(searchParams.get('receiving')) || null;
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
@@ -494,6 +376,7 @@ const QualityInspection: React.FC = () => {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const itemsPerPage = 7;
 
@@ -565,13 +448,53 @@ const QualityInspection: React.FC = () => {
   }, [fetchDetail, selectedReceivingId]);
 
   useEffect(() => {
+    if (!isInspectionModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const inspectionTrigger = inspectionTriggerRef.current;
+    const handleDialogKeyboard = (event: KeyboardEvent) => {
+      if (isReceiptModalOpen) return;
+      if (event.key === 'Escape') {
+        setIsInspectionModalOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab' || !inspectionDialogRef.current) return;
+      const focusable = Array.from(inspectionDialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleDialogKeyboard);
+    inspectionCloseRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleDialogKeyboard);
+      inspectionTrigger?.focus();
+    };
+  }, [isInspectionModalOpen, isReceiptModalOpen]);
+
+  useEffect(() => {
     if (!isReceiptModalOpen) return;
 
     const previousOverflow = document.body.style.overflow;
     const receiptTrigger = receiptTriggerRef.current;
     const handleDialogKeyboard = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (document.querySelectorAll('[role="dialog"]').length === 1) setIsReceiptModalOpen(false);
+        setIsReceiptModalOpen(false);
         return;
       }
 
@@ -649,6 +572,13 @@ const QualityInspection: React.FC = () => {
     setSearchParams({ receiving: String(id) });
     setSelectedReceivingId(id);
     setActionMessage(null);
+  };
+
+  const openInspection = (receivingId: number, trigger: HTMLButtonElement | null = null) => {
+    inspectionTriggerRef.current = trigger;
+    setActiveTab('products');
+    handleRowClick(receivingId);
+    setIsInspectionModalOpen(true);
   };
 
   const updateProductField = (productId: number, patch: Partial<ReceivingProduct>) => {
@@ -797,6 +727,7 @@ const QualityInspection: React.FC = () => {
         setQuantityErrors({});
         await fetchList();
         setSelectedReceivingId(selectedReceiving.id);
+        setIsInspectionModalOpen(false);
       } else {
         await fetchList();
         await fetchDetail(selectedReceiving.id);
@@ -826,7 +757,7 @@ const QualityInspection: React.FC = () => {
         <button
           onClick={(event) => {
             event.stopPropagation();
-            handleRowClick(receiving.id);
+            openInspection(receiving.id, event.currentTarget);
           }}
           className={`${baseClass} bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950`}
         >
@@ -840,11 +771,11 @@ const QualityInspection: React.FC = () => {
         <button
           onClick={(event) => {
             event.stopPropagation();
-            handleRowClick(receiving.id);
+            openInspection(receiving.id, event.currentTarget);
           }}
           className={`${baseClass} bg-[#092635] hover:opacity-90 text-white dark:bg-blue-500 dark:hover:bg-blue-400 dark:hover:opacity-100`}
         >
-          Continue
+          Continue Inspection
         </button>
       );
     }
@@ -853,7 +784,7 @@ const QualityInspection: React.FC = () => {
       <button
         onClick={(event) => {
           event.stopPropagation();
-          handleRowClick(receiving.id);
+          openInspection(receiving.id, event.currentTarget);
         }}
         className={`${baseClass} border border-gray-700 hover:bg-gray-800 text-slate-300`}
       >
@@ -864,7 +795,7 @@ const QualityInspection: React.FC = () => {
 
   const inspectionIsFinal = selectedReceiving !== null && ['Passed', 'Rejected', 'Partial'].includes(selectedReceiving.inspectionStatus);
 
-  useLayoutEffect(() => {
+  /* Obsolete inline-layout diagnostics retained as commented history during the modal migration.
     if (!QA_LAYOUT_DEBUG || activeTab !== 'attachments' || !selectedReceiving) return;
 
     const frame = window.requestAnimationFrame(() => {
@@ -999,11 +930,11 @@ const QualityInspection: React.FC = () => {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [activeTab, removedAttachmentIds.length, selectedAttachments.length, selectedReceiving]);
+  */
 
   return (
-    <div ref={qualityRootRef} className="qa-quality-inspection w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100">
-      {QA_LAYOUT_DEBUG && activeTab === 'attachments' && layoutDebugSnapshot && (
+    <div className="qa-quality-inspection w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100">
+      {/* Obsolete inline-layout debug panel retained as commented history during the modal migration.
         <aside data-qa-layout-debug-panel className="pointer-events-none fixed bottom-3 right-3 z-[200] max-w-[min(24rem,calc(100vw-1.5rem))] rounded-lg bg-slate-950/95 p-3 font-mono text-[11px] leading-4 text-cyan-100 shadow-2xl" aria-label="Temporary QA layout diagnostics">
           <p className="font-bold text-cyan-300">QA layout diagnostics</p>
           <p>attachments: {layoutDebugSnapshot.attachmentCount}</p>
@@ -1014,7 +945,7 @@ const QualityInspection: React.FC = () => {
           <p className="mt-1 break-all">lowest: {layoutDebugSnapshot.bottomMostElement?.selector ?? 'n/a'}</p>
           <p>lowest bottom: {layoutDebugSnapshot.bottomMostElement?.bottomRelativeToQaMain.toFixed(1) ?? 'n/a'}px</p>
         </aside>
-      )}
+      */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Quality Inspection</h1>
@@ -1082,6 +1013,12 @@ const QualityInspection: React.FC = () => {
         </div>
       )}
 
+      {!isInspectionModalOpen && actionMessage && (
+        <div role="status" className={`rounded-xl border px-4 py-3 text-sm ${actionMessage.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'}`}>
+          {actionMessage.text}
+        </div>
+      )}
+
       <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden">
         {viewMode === 'list' ? (
         <div className="qa-table-scroll">
@@ -1119,8 +1056,7 @@ const QualityInspection: React.FC = () => {
               {currentItems.map((receiving) => (
                 <tr
                   key={receiving.id}
-                  onClick={() => handleRowClick(receiving.id)}
-                  className={`border-b border-gray-800 hover:bg-gray-800/30 transition-all cursor-pointer ${selectedReceivingId === receiving.id ? 'bg-gray-800/30' : ''}`}
+                  className="border-b border-gray-800 transition-colors hover:bg-gray-800/30"
                 >
                   <td className="px-4 py-3.5 text-sm font-medium text-white">{receiving.receivingNo}</td>
                   <td className="px-4 py-3.5 text-sm text-slate-300">{receiving.poNumber}</td>
@@ -1133,15 +1069,6 @@ const QualityInspection: React.FC = () => {
                   <td className="qa-inspection-actions-cell px-4 py-3.5">
                     <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                       {renderActionButton(receiving)}
-                      <button
-                        type="button"
-                        onClick={(event) => event.stopPropagation()}
-                        aria-label={`More options for ${receiving.receivingNo}`}
-                        title="More options"
-                        className="p-1.5 rounded hover:bg-gray-700 text-slate-400 hover:text-white transition-all"
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1163,7 +1090,7 @@ const QualityInspection: React.FC = () => {
         ) : (
           <div className="qa-inspection-grid grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
             {currentItems.map((receiving) => (
-              <article key={receiving.id} onClick={() => handleRowClick(receiving.id)} className={`flex cursor-pointer flex-col rounded-2xl border bg-white p-5 shadow-sm transition-colors dark:bg-slate-800 dark:shadow-none ${selectedReceivingId === receiving.id ? 'border-cyan-500' : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'}`}>
+              <article key={receiving.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:shadow-none">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0"><p className="font-semibold text-slate-900 dark:text-white">{receiving.receivingNo}</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{receiving.product}</p></div>
                   <StatusBadge status={receiving.inspectionStatus} />
@@ -1177,7 +1104,6 @@ const QualityInspection: React.FC = () => {
                 </dl>
                 <div className="mt-auto flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
                   {renderActionButton(receiving)}
-                  <button type="button" onClick={(event) => event.stopPropagation()} aria-label={`More options for ${receiving.receivingNo}`} title="More options" className="p-2 rounded text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"><MoreHorizontal className="w-4 h-4" /></button>
                 </div>
               </article>
             ))}
@@ -1217,13 +1143,26 @@ const QualityInspection: React.FC = () => {
         </div>
       </div>
 
-      {selectedReceivingId !== null && (
-        <div data-qa-layout-debug="detailsGrid" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div data-qa-layout-debug="detailsCard" className="bg-[#0d1322] border border-gray-800/50 rounded-2xl overflow-hidden">
+      {isInspectionModalOpen && selectedReceivingId !== null && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-0 backdrop-blur-sm sm:p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isSaving) setIsInspectionModalOpen(false);
+          }}
+        >
+          <div
+            ref={inspectionDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="inspection-dialog-title"
+            className="max-h-[100dvh] w-full overflow-y-auto overscroll-contain border border-gray-800/50 bg-[#0d1322] shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:w-[94vw] sm:max-w-7xl sm:rounded-2xl"
+          >
               <div className="p-5 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-semibold text-white">Inspection Details</h3>
+                  <div>
+                    <h2 id="inspection-dialog-title" className="text-lg font-semibold text-white">Inspection Details</h2>
+                    {selectedReceiving && <p className="mt-0.5 text-sm text-slate-400">{selectedReceiving.receivingNo} · {selectedReceiving.poNumber} · {selectedReceiving.supplier}</p>}
+                  </div>
                   {selectedReceiving && <StatusBadge status={selectedReceiving.inspectionStatus} />}
                 </div>
                 <div className="flex items-center gap-2">
@@ -1240,6 +1179,16 @@ const QualityInspection: React.FC = () => {
                     className="px-3 py-1.5 bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-4 h-4" /> Submit Inspection
+                  </button>
+                  <button
+                    ref={inspectionCloseRef}
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => setIsInspectionModalOpen(false)}
+                    aria-label="Close inspection details"
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <X className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -1503,34 +1452,6 @@ const QualityInspection: React.FC = () => {
               ) : (
                 <div className="p-5 text-sm text-slate-400">Select a receiving to view inspection details.</div>
               )}
-            </div>
-          </div>
-
-          <div data-qa-layout-debug="timeline" className="lg:col-span-1 self-start sticky top-6">
-            <div className="bg-[#0d1322] border border-gray-800/50 rounded-2xl p-5">
-              <h3 className="text-lg font-semibold text-white mb-4">Inspection Timeline</h3>
-              <div className="space-y-4 relative">
-                {selectedReceiving?.timeline.map((item, index) => (
-                  <div key={`${item.status}-side-${index}`} className="flex items-start gap-3 relative">
-                    {index < selectedReceiving.timeline.length - 1 && <div className="absolute left-2.5 top-5 bottom-0 w-0.5 bg-slate-700" />}
-                    <div className="w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <div className="w-2 h-2 rounded-full bg-cyan-500" />
-                    </div>
-                    <div className="flex-1 pb-4">
-                      <p className="text-white font-medium">{item.status}</p>
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <span>{item.date}</span>
-                        <span>|</span>
-                        <span>{item.time}</span>
-                        <span>|</span>
-                        <span>by {item.performedBy}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {!selectedReceiving && <p className="text-sm text-slate-400">Select a receiving to view its timeline.</p>}
-              </div>
-            </div>
           </div>
         </div>
       )}

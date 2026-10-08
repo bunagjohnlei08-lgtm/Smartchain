@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Warehouse;
 use App\Support\WarehouseCapacity;
+use App\Support\WarehouseMap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -59,6 +60,8 @@ class AdminWarehouseLocationController extends Controller
             ...$capacity,
             'status' => $warehouse->status,
             'show_on_public_website' => (bool) $warehouse->show_on_public_website,
+            'map_embed_url' => WarehouseMap::embedUrl($warehouse),
+            'directions_url' => WarehouseMap::directionsUrl($warehouse),
         ];
     }
 

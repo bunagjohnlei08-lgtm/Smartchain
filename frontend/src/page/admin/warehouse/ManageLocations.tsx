@@ -19,14 +19,12 @@ interface WarehouseLocation {
   capacity_warning: boolean;
   status: 'Active' | 'Inactive';
   show_on_public_website: boolean;
+  map_embed_url: string | null;
+  directions_url: string | null;
 }
 
 type WarehouseForm = Pick<WarehouseLocation, 'name' | 'code' | 'address' | 'latitude' | 'longitude' | 'capacity' | 'status' | 'show_on_public_website'>;
 
-const mapUrl = (latitude: number, longitude: number) =>
-  `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}&z=15&output=embed`;
-const directionsUrl = (latitude: number, longitude: number) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
 const FIELD_CLASS = 'w-full rounded-xl border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30';
 
 type CapacitySeverity = 'normal' | 'warning' | 'critical';
@@ -116,9 +114,9 @@ const ManageLocations: React.FC = () => {
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-gray-800/50 bg-[#0d1322] shadow-sm">
-            <div className="border-b border-gray-800 p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="flex items-center gap-2 text-lg font-semibold text-white"><MapPin className="h-5 w-5 text-blue-400" /> Warehouse Location</h2>{location.latitude !== null && location.longitude !== null && <a href={directionsUrl(location.latitude, location.longitude)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 self-start rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 text-sm font-semibold text-blue-300 transition-colors hover:bg-blue-500/20 focus:outline-none focus:ring-2 focus:ring-blue-400 sm:self-auto"><Navigation className="h-4 w-4" /> Get Directions</a>}</div><div className="mt-3 grid gap-2 text-sm text-gray-400 sm:grid-cols-2 lg:grid-cols-5"><span><strong className="text-gray-300">Warehouse:</strong> {location.name}</span><span><strong className="text-gray-300">Status:</strong> {location.status}</span><span className="sm:col-span-2"><strong className="text-gray-300">Address:</strong> {location.address || 'Not configured'}</span><span><strong className="text-gray-300">Coordinates:</strong> {location.latitude ?? '—'}, {location.longitude ?? '—'}</span></div></div>
-            {location.latitude !== null && location.longitude !== null
-              ? <iframe src={mapUrl(location.latitude, location.longitude)} width="100%" height="450" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title="Main Warehouse location on Google Maps" />
+            <div className="border-b border-gray-800 p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="flex items-center gap-2 text-lg font-semibold text-white"><MapPin className="h-5 w-5 text-blue-400" /> Warehouse Location</h2>{location.directions_url && <a href={location.directions_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 self-start rounded-xl border border-blue-700 bg-blue-700 px-4 text-sm font-semibold text-white transition-colors hover:border-blue-800 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:focus:ring-blue-400 dark:focus:ring-offset-[#0d1322] sm:self-auto"><Navigation className="h-4 w-4" /> Get Directions</a>}</div><div className="mt-3 grid gap-2 text-sm text-gray-400 sm:grid-cols-2 lg:grid-cols-5"><span><strong className="text-gray-300">Warehouse:</strong> {location.name}</span><span><strong className="text-gray-300">Status:</strong> {location.status}</span><span className="sm:col-span-2"><strong className="text-gray-300">Address:</strong> {location.address || 'Not configured'}</span><span><strong className="text-gray-300">Coordinates:</strong> {location.latitude ?? '—'}, {location.longitude ?? '—'}</span></div></div>
+            {location.map_embed_url
+              ? <iframe src={location.map_embed_url} width="100%" height="450" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title="Main Warehouse location on Google Maps" />
               : <div className="flex min-h-56 items-center justify-center px-5 text-center text-sm text-gray-400">Add latitude and longitude to display the map.</div>}
           </section>
         </>}

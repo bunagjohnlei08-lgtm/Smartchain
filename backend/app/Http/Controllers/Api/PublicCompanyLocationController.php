@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Warehouse;
+use App\Support\WarehouseMap;
 use Illuminate\Http\JsonResponse;
 
 class PublicCompanyLocationController extends Controller
@@ -17,7 +18,7 @@ class PublicCompanyLocationController extends Controller
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->orderBy('id')
-            ->first(['name', 'address', 'latitude', 'longitude']);
+            ->first(['code', 'name', 'address', 'latitude', 'longitude']);
 
         return response()->json([
             'data' => $warehouse ? [
@@ -25,6 +26,8 @@ class PublicCompanyLocationController extends Controller
                 'address' => (string) $warehouse->address,
                 'latitude' => (float) $warehouse->latitude,
                 'longitude' => (float) $warehouse->longitude,
+                'map_embed_url' => WarehouseMap::embedUrl($warehouse),
+                'directions_url' => WarehouseMap::directionsUrl($warehouse),
             ] : null,
         ]);
     }

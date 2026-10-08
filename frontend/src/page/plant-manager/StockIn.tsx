@@ -83,20 +83,6 @@ interface RecentlyStockedItem {
   status: 'Stocked In';
 }
 
-interface StockInHistoryItem {
-  id: number;
-  receivingId: number;
-  receivingNo: string | null;
-  product: string;
-  supplier: string | null;
-  receivingDate: string | null;
-  referenceNo: string | null;
-  stockedQuantity: number;
-  barcode: string | null;
-  stockInDate: string | null;
-  status: 'Completed';
-}
-
 interface ApiReceivingLineItem {
   id: number;
   product_id: number;
@@ -144,20 +130,6 @@ interface ApiRecentlyStockedItem {
   quantity: number;
   stock_in_date: string | null;
   status: 'Stocked In';
-}
-
-interface ApiStockInHistoryItem {
-  id: number;
-  receiving_id: number;
-  receiving_no: string | null;
-  product: string;
-  supplier: string | null;
-  receiving_date: string | null;
-  reference_no: string | null;
-  stocked_quantity: number;
-  barcode: string | null;
-  stock_in_date: string | null;
-  status: 'Completed';
 }
 
 interface WarehouseCapacity {
@@ -209,20 +181,6 @@ const mapRecentlyStocked = (item: ApiRecentlyStockedItem): RecentlyStockedItem =
   product: item.product,
   warehouse: item.warehouse,
   quantity: item.quantity,
-  stockInDate: item.stock_in_date,
-  status: item.status,
-});
-
-const mapStockInHistory = (item: ApiStockInHistoryItem): StockInHistoryItem => ({
-  id: item.id,
-  receivingId: item.receiving_id,
-  receivingNo: item.receiving_no,
-  product: item.product,
-  supplier: item.supplier,
-  receivingDate: item.receiving_date,
-  referenceNo: item.reference_no,
-  stockedQuantity: item.stocked_quantity,
-  barcode: item.barcode,
   stockInDate: item.stock_in_date,
   status: item.status,
 });
@@ -362,13 +320,10 @@ const BarcodeSVG: React.FC<{ value: string }> = ({ value }) => {
 const StockIn: React.FC = () => {
   const [receivings, setReceivings] = useState<ReceivingItem[]>([]);
   const [recentlyStocked, setRecentlyStocked] = useState<RecentlyStockedItem[]>([]);
-  const [historyItems, setHistoryItems] = useState<StockInHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingRecent, setIsLoadingRecent] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [recentError, setRecentError] = useState<string | null>(null);
-  const [historyError, setHistoryError] = useState<string | null>(null);
   const [warehouseCapacity, setWarehouseCapacity] = useState<WarehouseCapacity | null>(null);
   const [capacityError, setCapacityError] = useState<string | null>(null);
   const [isStockingIn, setIsStockingIn] = useState(false);
@@ -380,7 +335,6 @@ const StockIn: React.FC = () => {
   usePlantManagerDetailOverlay(drawerMode !== null);
   const [receivingsViewMode, setReceivingsViewMode] = useState<ViewMode>('list');
   const [recentlyStockedViewMode, setRecentlyStockedViewMode] = useState<ViewMode>('list');
-  const [historyViewMode, setHistoryViewMode] = useState<ViewMode>('list');
 
   const fetchReceivings = useCallback(async () => {
     setIsLoading(true);
@@ -413,19 +367,6 @@ const StockIn: React.FC = () => {
     }
   }, []);
 
-  const fetchHistory = useCallback(async () => {
-    setIsLoadingHistory(true);
-    setHistoryError(null);
-    try {
-      const response = await apiClient.get<{ data: ApiStockInHistoryItem[] }>('/stock-in/history');
-      setHistoryItems((response.data.data ?? []).map(mapStockInHistory));
-    } catch (error) {
-      setHistoryError(getApiErrorMessage(error));
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, []);
-
   const fetchWarehouseCapacity = useCallback(async () => {
     setCapacityError(null);
     try {
@@ -440,9 +381,8 @@ const StockIn: React.FC = () => {
   useEffect(() => {
     fetchReceivings();
     fetchRecentStocked();
-    fetchHistory();
     fetchWarehouseCapacity();
-  }, [fetchReceivings, fetchRecentStocked, fetchHistory, fetchWarehouseCapacity]);
+  }, [fetchReceivings, fetchRecentStocked, fetchWarehouseCapacity]);
 
   const selectedReceiving = receivings.find((record) => record.id === selectedId) ?? null;
   const selectedStocked = recentlyStocked.find((record) => record.id === selectedStockedId) ?? null;
@@ -494,7 +434,7 @@ const StockIn: React.FC = () => {
     try {
       await apiClient.post(`/stock-in/receivings/${selectedReceiving.id}/stock-in`);
       setActionMessage({ type: 'success', text: `${selectedReceiving.receivingNo} stocked in successfully. Inventory and barcode are now available.` });
-      await Promise.all([fetchReceivings(), fetchRecentStocked(), fetchHistory(), fetchWarehouseCapacity()]);
+      await Promise.all([fetchReceivings(), fetchRecentStocked(), fetchWarehouseCapacity()]);
       setSelectedId(selectedReceiving.id);
       setDrawerMode('receiving');
     } catch (error) {
@@ -573,7 +513,6 @@ const StockIn: React.FC = () => {
             onClick={() => {
               fetchReceivings();
               fetchRecentStocked();
-              fetchHistory();
               fetchWarehouseCapacity();
             }}
             aria-label="Refresh stock in records"
@@ -872,96 +811,6 @@ const StockIn: React.FC = () => {
                   <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Barcode</dt><dd className="break-all font-mono text-slate-900 dark:text-cyan-300">{item.barcode ?? '—'}</dd></div>
                 </dl>
                 <div className="mt-auto flex justify-end border-t border-slate-200 pt-4 dark:border-slate-700"><button type="button" aria-label={`View ${item.product}`} title="View stocked item" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white" onClick={() => handleSelectStocked(item.id)}><Eye className="w-4 h-4" /></button></div>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-4 space-y-4 w-full">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-cyan-400" />
-            Stock In History
-          </h3>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-xs text-slate-400">Completed records</span>
-            <ViewModeToggle label="stock in history" value={historyViewMode} onChange={setHistoryViewMode} />
-          </div>
-        </div>
-
-        {historyError && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {historyError}
-          </div>
-        )}
-
-        {historyViewMode === 'list' ? (
-        <div className="pm-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain pb-1 [scrollbar-gutter:stable]" role="region" aria-label="Stock in history table" tabIndex={0}>
-          <table className="pm-status-table pm-stock-in-history-table pm-responsive-table pm-cols-9 pm-sticky-2 w-full min-w-[980px] text-sm">
-            <thead className="bg-[#070a12] border-b border-slate-800/80">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving No.</th>
-                <th className="pm-stock-in-history-product-column px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Product</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Supplier</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Receiving Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Reference No.</th>
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-400">Stocked Qty</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Barcode</th>
-                <th className="pm-stock-in-history-date-column px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Stock In Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
-              {isLoadingHistory && historyItems.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                    <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-                    Loading history...
-                  </td>
-                </tr>
-              )}
-              {historyItems.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-800/20 transition-colors">
-                  <td className="px-4 py-3 font-mono text-slate-900 dark:text-blue-400">{item.receivingNo ?? '—'}</td>
-                  <td className="pm-stock-in-history-product-column px-4 py-3 text-white"><div className="pm-stock-in-history-product truncate" title={item.product}>{item.product}</div></td>
-                  <td className="px-4 py-3 text-slate-300">{item.supplier ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{formatDateOnly(item.receivingDate)}</td>
-                  <td className="px-4 py-3 text-slate-300">{item.referenceNo ?? '—'}</td>
-                  <td className="px-4 py-3 text-center text-white">{item.stockedQuantity}</td>
-                  <td className="whitespace-nowrap px-4 py-3 pr-6 font-mono text-slate-900 dark:text-cyan-300">{item.barcode ?? '—'}</td>
-                  <td className="pm-stock-in-history-date-column whitespace-nowrap px-4 py-3 text-slate-300">{formatDateTime(item.stockInDate)}</td>
-                  <td className="whitespace-nowrap px-4 py-3"><ReceivingStatusBadge status={item.status} /></td>
-                </tr>
-              ))}
-              {!isLoadingHistory && historyItems.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                    No stock in history found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        ) : isLoadingHistory && historyItems.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 dark:text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Loading history...</div>
-        ) : historyItems.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 dark:text-slate-400">No stock in history found.</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {historyItems.map((item) => (
-              <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-none dark:hover:border-slate-600">
-                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-mono text-sm font-semibold text-slate-900 dark:text-blue-400">{item.receivingNo ?? '—'}</p><h4 className="mt-1 font-semibold text-slate-900 dark:text-white">{item.product}</h4></div><ReceivingStatusBadge status={item.status} /></div>
-                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Supplier</dt><dd className="text-slate-900 dark:text-slate-200">{item.supplier ?? '—'}</dd></div>
-                  <div><dt className="text-slate-500 dark:text-slate-400">Receiving date</dt><dd className="text-slate-900 dark:text-slate-200">{formatDateOnly(item.receivingDate)}</dd></div>
-                  <div><dt className="text-slate-500 dark:text-slate-400">Stock In date</dt><dd className="text-slate-900 dark:text-slate-200">{formatDateTime(item.stockInDate)}</dd></div>
-                  <div><dt className="text-slate-500 dark:text-slate-400">Reference</dt><dd className="break-all text-slate-900 dark:text-slate-200">{item.referenceNo ?? '—'}</dd></div>
-                  <div><dt className="text-slate-500 dark:text-slate-400">Stocked quantity</dt><dd className="font-medium text-slate-900 dark:text-white">{item.stockedQuantity}</dd></div>
-                  <div className="col-span-2"><dt className="text-slate-500 dark:text-slate-400">Barcode</dt><dd className="break-all font-mono text-slate-900 dark:text-cyan-300">{item.barcode ?? '—'}</dd></div>
-                </dl>
               </article>
             ))}
           </div>

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { ChevronLeft, ChevronRight, Eye, Loader2, RotateCcw, Search, ShieldCheck, X } from 'lucide-react';
+import CompactDatePicker from '../../components/ui/CompactDatePicker';
+import CompactSelect from '../../components/ui/CompactSelect';
 import { apiClient } from '../../lib/api';
 import type { ApiAuditLog } from '../../types';
 
@@ -26,7 +28,7 @@ interface AuditFilters {
 const EMPTY_FILTERS: AuditFilters = { search: '', action: '', module: '', status: '', dateFrom: '', dateTo: '' };
 
 const inputClass =
-  'admin-audit-control h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 placeholder:text-xs placeholder-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:placeholder-slate-400';
+  'admin-audit-control h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 placeholder:text-xs placeholder-slate-500 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-600/30 dark:border-gray-700 dark:bg-[#090d16] dark:text-white dark:placeholder-slate-400';
 
 const ACTION_LABELS: Record<string, string> = {
   PASSWORD_RESET_REQUESTED: 'Password reset requested',
@@ -239,29 +241,17 @@ const AuditLogSection: React.FC = () => {
             className={`${inputClass} admin-audit-search pl-9`}
           />
         </div>
-        <select value={filters.action} onChange={(e) => updateFilter('action', e.target.value)} aria-label="Filter by action" className={`${inputClass} min-w-[130px] flex-1 cursor-pointer`}>
-          <option value="">All Actions</option>
-          {options.actions.map((action) => <option key={action} value={action}>{actionLabel(action)}</option>)}
-        </select>
-        <select value={filters.module} onChange={(e) => updateFilter('module', e.target.value)} aria-label="Filter by module" className={`${inputClass} min-w-[130px] flex-1 cursor-pointer`}>
-          <option value="">All Modules</option>
-          {options.modules.map((module) => <option key={module} value={module}>{module}</option>)}
-        </select>
-        <select value={filters.status} onChange={(e) => updateFilter('status', e.target.value)} aria-label="Filter by status" className={`${inputClass} min-w-[110px] flex-1 cursor-pointer`}>
-          <option value="">All Status</option>
-          <option value="SUCCESS">Success</option>
-          <option value="FAILED">Failed</option>
-          <option value="BLOCKED">Blocked</option>
-          <option value="EXPIRED">Expired</option>
-        </select>
-        <input type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(e) => updateFilter('dateFrom', e.target.value)} aria-label="From date" className={`${inputClass} min-w-[130px] flex-1`} />
-        <input type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(e) => updateFilter('dateTo', e.target.value)} aria-label="To date" className={`${inputClass} min-w-[130px] flex-1`} />
+        <CompactSelect value={filters.action} onChange={(value) => updateFilter('action', value)} label="All Actions" options={options.actions.map((action) => ({ value: action, label: actionLabel(action) }))} />
+        <CompactSelect value={filters.module} onChange={(value) => updateFilter('module', value)} label="All Modules" options={options.modules.map((module) => ({ value: module, label: module }))} />
+        <CompactSelect value={filters.status} onChange={(value) => updateFilter('status', value)} label="All Status" options={[{ value: 'SUCCESS', label: 'Success' }, { value: 'FAILED', label: 'Failed' }, { value: 'BLOCKED', label: 'Blocked' }, { value: 'EXPIRED', label: 'Expired' }]} />
+        <CompactDatePicker value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(value) => updateFilter('dateFrom', value)} label="From Date" className="basis-full sm:basis-auto sm:flex-1" />
+        <CompactDatePicker value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(value) => updateFilter('dateTo', value)} label="To Date" className="basis-full sm:basis-auto sm:flex-1" />
         <button
           type="button"
           onClick={resetFilters}
           aria-label="Reset audit log filters"
           title="Reset filters"
-          className="admin-audit-reset flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:hover:bg-gray-800"
+          className="admin-audit-reset flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-600/50 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:hover:bg-gray-800 sm:h-8 sm:w-8"
         >
           <RotateCcw className="h-[13px] w-[13px]" />
         </button>

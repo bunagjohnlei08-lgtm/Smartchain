@@ -29,7 +29,8 @@ return new class extends Migration
             });
         DB::table('warehouses')->where('id', $main->id)->update([
             'name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'status' => 'Active',
-            'latitude' => 14.6352911, 'longitude' => 121.0884979, 'updated_at' => now(),
+            'address' => 'G/F, Brgy. New Marikina Subd., 29 Flamingo, Marikina, 1800 Metro Manila',
+            'latitude' => 14.6305374, 'longitude' => 121.1010625, 'updated_at' => now(),
         ]);
 
         $duplicateIds = DB::table('warehouses')->where('id', '<>', $main->id)->pluck('id');

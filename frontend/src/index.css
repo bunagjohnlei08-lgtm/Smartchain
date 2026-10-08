@@ -951,31 +951,6 @@
   height: 8px;
 }
 
-/* Constrain long history product names and reserve readable date space at every viewport. */
-.plant-manager-main .pm-stock-in-history-table {
-  min-width: 72.5rem;
-  table-layout: fixed;
-}
-
-.plant-manager-main .pm-stock-in-history-table .pm-stock-in-history-product-column {
-  width: 11.25rem;
-  max-width: 11.25rem;
-}
-
-.plant-manager-main .pm-stock-in-history-table .pm-stock-in-history-date-column {
-  width: 11.25rem;
-  white-space: nowrap;
-}
-
-.plant-manager-main .pm-stock-in-history-table .pm-stock-in-history-product {
-  display: block;
-  width: 100%;
-  max-width: 11.25rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 :is(.pm-stock-in-receivings-table, .pm-stock-in-recent-table, .pm-procurement-status-table, .pm-order-status-table, .pm-shipment-status-table) {
   table-layout: fixed;
 }
@@ -1205,9 +1180,6 @@
   .pm-stock-in-recent-table :is(th, td):nth-child(6) { width: 8.5rem; }
   .pm-stock-in-recent-table :is(th, td):nth-child(7) { width: 5.5rem; }
 
-  .pm-stock-in-history-table { min-width: 61.25rem !important; }
-  .pm-stock-in-history-table :is(th, td):nth-child(9) { width: 8rem; }
-
   .pm-shipment-status-table { min-width: 76rem !important; }
   .pm-shipment-status-table :is(th, td):nth-child(7) { width: 11rem; }
   .pm-shipment-status-table :is(th, td):nth-child(8) { width: 7rem; }
@@ -1257,20 +1229,6 @@
   .pm-cols-10, .admin-cols-10 { min-width: 50rem !important; }
   .admin-cols-12 { min-width: 56rem !important; }
   .admin-cols-15 { min-width: 64rem !important; }
-
-  /* Keep Stock In History readable and scroll it inside its own card. This
-     targeted rule follows the generic column-count minimum by design. */
-  .pm-stock-in-history-table { min-width: 72.5rem !important; }
-  .pm-stock-in-history-table :is(th, td):nth-child(1) { width: 6.25rem; }
-  .pm-stock-in-history-table :is(th, td):nth-child(2) { width: 11.25rem; }
-  .pm-stock-in-history-table :is(th, td):nth-child(3) { width: 6.875rem; }
-  .pm-stock-in-history-table :is(th, td):nth-child(4) { width: 6.875rem; }
-  .pm-stock-in-history-table :is(th, td):nth-child(5) { width: 6.25rem; }
-  .pm-stock-in-history-table :is(th, td):nth-child(6) { width: 5rem; }
-  .pm-stock-in-history-table :is(th, td):nth-child(7) { width: 10.625rem; padding-right: 1.5rem !important; white-space: nowrap; }
-  .pm-stock-in-history-table :is(th, td):nth-child(8) { width: 11.25rem; white-space: nowrap; }
-  .pm-stock-in-history-table :is(th, td):nth-child(9) { width: 7.5rem; white-space: nowrap; }
-  .plant-manager-main .pm-stock-in-history-table .plant-manager-badge { white-space: nowrap !important; }
 
   .pm-sticky-1 th:nth-child(1),
   .pm-sticky-2 th:nth-child(2),

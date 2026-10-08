@@ -37,13 +37,9 @@ interface PublicCompanyLocation {
   address: string;
   latitude: number;
   longitude: number;
+  map_embed_url: string | null;
+  directions_url: string | null;
 }
-
-const mapUrl = (latitude: number, longitude: number) =>
-  `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}&z=15&output=embed`;
-
-const directionsUrl = (latitude: number, longitude: number) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
 
 const focusClasses = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-[#06101d]';
 
@@ -225,11 +221,11 @@ const PublicLandingPage: React.FC = () => {
                 <p className="text-lg font-semibold text-slate-950 dark:text-white">Archon Nell Incorporated</p>
                 {location.name !== 'Archon Nell Incorporated' && <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-400">{location.name}</p>}
                 <address className="mt-4 flex max-w-md items-start gap-3 not-italic text-base leading-7 text-slate-700 dark:text-slate-300"><MapPin className="mt-1 h-5 w-5 shrink-0 text-sky-700 dark:text-sky-400" aria-hidden="true" /><span>{location.address}</span></address>
-                <a href={directionsUrl(location.latitude, location.longitude)} target="_blank" rel="noopener noreferrer" className={`mt-6 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 self-start rounded-xl bg-sky-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}><Navigation className="h-4 w-4" aria-hidden="true" /> Get Directions</a>
+                {location.directions_url && <a href={location.directions_url} target="_blank" rel="noopener noreferrer" className={`mt-6 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 self-start rounded-xl bg-sky-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}><Navigation className="h-4 w-4" aria-hidden="true" /> Get Directions</a>}
               </div> : <p className="mt-5 max-w-md text-sm leading-6 text-slate-600 dark:text-slate-400">Public location details are not currently available.</p>}
             </div>
             <div className="min-h-72 border-t border-slate-200 bg-slate-200 dark:border-white/10 dark:bg-[#050d18] lg:min-h-96 lg:border-l lg:border-t-0">
-              {location ? <iframe src={mapUrl(location.latitude, location.longitude)} className="h-full min-h-72 w-full lg:min-h-96" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title="Archon Nell public business location on Google Maps" /> : <div className="flex h-full min-h-72 items-center justify-center p-6 text-center text-sm text-slate-600 dark:text-slate-400 lg:min-h-96"><MapPin className="mr-2 h-5 w-5" aria-hidden="true" /> Map unavailable</div>}
+              {location?.map_embed_url ? <iframe src={location.map_embed_url} className="h-full min-h-72 w-full lg:min-h-96" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title="Archon Nell public business location on Google Maps" /> : <div className="flex h-full min-h-72 items-center justify-center p-6 text-center text-sm text-slate-600 dark:text-slate-400 lg:min-h-96"><MapPin className="mr-2 h-5 w-5" aria-hidden="true" /> Map unavailable</div>}
             </div>
           </div>
         </div>

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, CalendarDays, CheckCircle2, Circle, Clock3, FileText, History, Info, LayoutDashboard, LockKeyhole, Package, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Circle, Clock3, FileText, History, Info, LayoutDashboard, LockKeyhole, Package, Plus, Trash2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import api from '../lib/api';
+import logo from '../assets/logo.png';
 
 const SESSION_KEY = 'supplierPortalSession';
 const SESSION_EXPIRY_KEY = 'supplierPortalSessionExpiresAt';
@@ -197,7 +198,7 @@ const SupplierPortalPage: React.FC = () => {
   ];
 
   return <main className="min-h-screen bg-slate-50 text-slate-950">
-    <header className="border-b border-slate-800 bg-slate-950 text-white"><div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6"><Link to="/" className="flex min-h-11 items-center gap-3 rounded-lg focus:outline-none focus:ring-4 focus:ring-sky-400/40"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600"><Building2 className="h-5 w-5" /></span><span><span className="block text-sm font-bold">SmartChain</span><span className="block text-xs text-slate-300">Supplier Application Portal</span></span></Link><span className="hidden items-center gap-2 text-xs text-slate-300 sm:flex"><LockKeyhole className="h-4 w-4 text-sky-400" />Temporary secure access</span></div></header>
+    <header className="border-b border-slate-800 bg-slate-950 text-white"><div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6"><Link to="/" className="flex min-h-11 min-w-0 items-center gap-3 rounded-lg focus:outline-none focus:ring-4 focus:ring-sky-400/40"><span className="flex shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-white px-1 py-0.5"><img src={logo} alt="Archon Nell Incorporated" className="h-auto w-[64px] object-contain sm:w-[80px]" /></span><span className="min-w-0"><span className="block text-sm font-bold">SmartChain</span><span className="block whitespace-nowrap text-[11px] text-slate-300 sm:text-xs">Supplier Application Portal</span></span></Link><span className="hidden items-center gap-2 text-xs text-slate-300 sm:flex"><LockKeyhole className="h-4 w-4 text-sky-400" />Temporary secure access</span></div></header>
     <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-10">
       {loading && <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">Loading your application…</div>}
       {!loading && error && !application && <section className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8"><LockKeyhole className="mx-auto h-10 w-10 text-sky-700" /><h1 className="mt-4 text-2xl font-bold">Secure portal access</h1><p role="alert" className="mt-3 leading-7 text-slate-600">{error}</p><Link to="/supplier-application" className="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 font-semibold text-white hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-400/40">Return to supplier application</Link></section>}

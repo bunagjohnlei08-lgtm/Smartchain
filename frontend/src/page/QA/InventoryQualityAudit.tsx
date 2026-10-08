@@ -29,7 +29,19 @@ const FAILURE_REASONS = [
   'Other',
 ] as const;
 
+// Frozen Product column: stays at the left of the table's own horizontal scroll, with an opaque surface so scrolled cells never show through.
+const STICKY_CELL = 'sticky left-0 border-r border-slate-200 shadow-[2px_0_4px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:shadow-[2px_0_6px_rgba(0,0,0,0.45)]';
 const statusLabel = (status?: string) => status ? status.replaceAll('_', ' ') : 'NOT AUDITED';
+const NOT_AUDITED_BADGE = 'border-slate-300 bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-transparent dark:text-slate-300';
+const STATUS_BADGE: Record<string, string> = {
+  PASSED: 'border-emerald-700 bg-emerald-700 text-white dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300',
+  // QA failed the item; it is held until an Admin reviews it.
+  PENDING_ADMIN_APPROVAL: 'border-orange-700 bg-orange-700 text-white dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300',
+  RETURNED_FOR_REINSPECTION: 'border-amber-700 bg-amber-700 text-white dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-300',
+  // Admin confirmed the failure and moved the quantity to backload.
+  APPROVED_FOR_BACKLOAD: 'border-red-700 bg-red-700 text-white dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300',
+};
+const statusBadge = (status?: string) => (status && STATUS_BADGE[status]) || NOT_AUDITED_BADGE;
 const errorMessage = (error: unknown) => {
   const response = (error as AxiosError<{ message?: string; errors?: Record<string, string[]> }>).response?.data;
   return Object.values(response?.errors ?? {})[0]?.[0] ?? response?.message ?? 'Unable to save the audit. Please try again.';
@@ -123,9 +135,25 @@ export default function InventoryQualityAudit() {
     </div>
     {error && !selected && <p role="alert" className="rounded-xl border border-red-700 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">{error}</p>}
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0d1322]">
-      <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-[#090d16]/70 dark:text-slate-400"><tr>{['Product', 'Barcode', 'Warehouse', 'Available', 'Backload', 'Audit status', 'Action'].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+      <div className="overflow-x-auto"><table className="w-full min-w-247 table-fixed text-left text-xs sm:min-w-267 sm:text-[13px]">
+        <colgroup><col className="w-44 sm:w-64" /><col className="w-35" /><col className="w-37.5" /><col className="w-27.5" /><col className="w-24" /><col className="w-50" /><col className="w-29" /></colgroup>
+        <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-[#0a0f19] dark:text-slate-400 sm:text-[11px]"><tr>
+          <th scope="col" className={`${STICKY_CELL} z-20 whitespace-nowrap bg-slate-50 px-3 py-2.5 dark:bg-[#0a0f19] sm:px-4 sm:py-3`}>Product</th>
+          {['Barcode', 'Warehouse', 'Available', 'Backload', 'Audit status', 'Action'].map((label) => <th key={label} scope="col" className="whitespace-nowrap px-3 py-2.5 sm:px-4 sm:py-3">{label}</th>)}
+        </tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-800">
         {loading && <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-600 dark:text-slate-400"><Loader2 className="mr-2 inline h-5 w-5 animate-spin" />Loading inventory…</td></tr>}
-        {!loading && filtered.map((item) => <tr key={item.id} className="bg-white hover:bg-slate-50 dark:bg-transparent dark:hover:bg-slate-800/30"><td className="px-4 py-3"><p className="font-semibold text-slate-950 dark:text-white">{item.product}</p><p className="text-xs text-slate-600 dark:text-slate-500">{[item.category, item.brand].filter(Boolean).join(' · ') || 'No catalog details'}</p></td><td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300">{item.barcode}</td><td className="px-4 py-3 text-slate-700 dark:text-slate-300">{item.warehouse}</td><td className="px-4 py-3 font-semibold text-emerald-700 dark:text-emerald-300">{item.available_stock} {item.unit}</td><td className="px-4 py-3 font-semibold text-red-700 dark:text-rose-300">{item.backload}</td><td className="px-4 py-3"><span className="rounded-full border border-slate-700 bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-950 dark:border-slate-700 dark:bg-transparent dark:text-slate-300">{statusLabel(item.latest_audit?.status)}</span>{item.latest_audit?.admin_remarks && <p className="mt-2 max-w-xs text-xs text-amber-800 dark:text-amber-300">Admin: {item.latest_audit.admin_remarks}</p>}</td><td className="px-4 py-3"><button type="button" disabled={!payload?.cycle || !canAudit(item)} onClick={() => open(item)} className="min-h-11 cursor-pointer rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 dark:focus-visible:outline-cyan-400">{item.latest_audit?.status === 'RETURNED_FOR_REINSPECTION' ? 'Reinspect' : canAudit(item) ? 'Inspect' : 'Submitted'}</button></td></tr>)}
+        {!loading && filtered.map((item) => {
+          const catalog = [item.category, item.brand].filter(Boolean).join(' · ') || 'No catalog details';
+          return <tr key={item.id} className="group bg-white hover:bg-slate-50 dark:bg-transparent dark:hover:bg-slate-800/30">
+            <th scope="row" className={`${STICKY_CELL} z-10 bg-white px-3 py-2.5 text-left font-normal group-hover:bg-slate-50 dark:bg-[#0d1322] dark:group-hover:bg-[#121a2a] sm:px-4 sm:py-3`}><p className="truncate text-[13px] font-semibold text-slate-950 dark:text-white" title={item.product}>{item.product}</p><p className="mt-0.5 truncate text-[10px] uppercase tracking-wide text-slate-600 dark:text-slate-500 sm:text-[11px]" title={catalog}>{catalog}</p></th>
+            <td className="truncate whitespace-nowrap px-3 py-2.5 font-mono text-slate-700 dark:text-slate-300 sm:px-4 sm:py-3" title={item.barcode}>{item.barcode}</td>
+            <td className="truncate whitespace-nowrap px-3 py-2.5 text-slate-700 dark:text-slate-300 sm:px-4 sm:py-3" title={item.warehouse}>{item.warehouse}</td>
+            <td className="whitespace-nowrap px-3 py-2.5 font-semibold tabular-nums text-emerald-700 dark:text-emerald-300 sm:px-4 sm:py-3">{item.available_stock} {item.unit}</td>
+            <td className="whitespace-nowrap px-3 py-2.5 font-semibold tabular-nums text-red-700 dark:text-rose-300 sm:px-4 sm:py-3">{item.backload}</td>
+            <td className="px-3 py-2.5 sm:px-4 sm:py-3"><span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-4 sm:text-[11px] ${statusBadge(item.latest_audit?.status)}`}>{statusLabel(item.latest_audit?.status)}</span>{item.latest_audit?.admin_remarks && <p className="mt-1.5 text-[11px] leading-4 text-amber-800 dark:text-amber-300">Admin: {item.latest_audit.admin_remarks}</p>}</td>
+            <td className="px-3 py-2.5 sm:px-4 sm:py-3"><button type="button" disabled={!payload?.cycle || !canAudit(item)} onClick={() => open(item)} className="inline-flex min-h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg bg-slate-950 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 dark:focus-visible:outline-cyan-400">{item.latest_audit?.status === 'RETURNED_FOR_REINSPECTION' ? 'Reinspect' : canAudit(item) ? 'Inspect' : 'Submitted'}</button></td>
+          </tr>;
+        })}
         {!loading && filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">No inventory records match this search.</td></tr>}
       </tbody></table></div>
     </div>

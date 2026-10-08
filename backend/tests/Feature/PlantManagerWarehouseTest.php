@@ -27,8 +27,8 @@ class PlantManagerWarehouseTest extends TestCase
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
         $warehouse = Warehouse::create([
             'name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id,
-            'address' => 'Archon Nell Incorporated', 'latitude' => 14.6352911,
-            'longitude' => 121.0884979, 'capacity' => 1000, 'status' => 'Active',
+            'address' => 'G/F, Brgy. New Marikina Subd., 29 Flamingo, Marikina, 1800 Metro Manila', 'latitude' => 14.6305374,
+            'longitude' => 121.1010625, 'capacity' => 1000, 'status' => 'Active',
         ]);
         $product = Product::create(['name' => 'Warehouse Product', 'unit' => 'pcs', 'cost_price' => 10]);
         Inventory::create([
@@ -41,6 +41,11 @@ class PlantManagerWarehouseTest extends TestCase
             ->assertJsonPath('id', $warehouse->id)
             ->assertJsonPath('name', 'Main Warehouse')
             ->assertJsonPath('code', 'WH-MAIN')
+            ->assertJsonPath('address', 'G/F, Brgy. New Marikina Subd., 29 Flamingo, Marikina, 1800 Metro Manila')
+            ->assertJsonPath('latitude', 14.6305374)
+            ->assertJsonPath('longitude', 121.1010625)
+            ->assertJsonPath('map_embed_url', 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3679.48874398943!2d121.1010625!3d14.6305374!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b9485ea55b87%3A0x2e093784a1e3763b!2sArchon%20Nell%20Incorporated!5e1!3m2!1sen!2sph!4v1791469640495!5m2!1sen!2sph')
+            ->assertJsonPath('directions_url', 'https://www.google.com/maps/dir/?api=1&destination=14.6305374%2C121.1010625')
             ->assertJsonPath('utilized', 350)
             ->assertJsonPath('available', 650)
             ->assertJsonPath('utilization_percentage', 35)

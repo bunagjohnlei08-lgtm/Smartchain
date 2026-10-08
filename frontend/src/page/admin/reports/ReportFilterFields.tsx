@@ -1,4 +1,5 @@
 import React from 'react';
+import CompactDatePicker from '../../../components/ui/CompactDatePicker';
 import type { ReportDefinition, ReportFilterValues, ReportOptions } from './reportApi';
 
 export const fieldClass = 'w-full min-h-11 rounded-xl border border-slate-800 bg-[#070a12] px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:text-sm';
@@ -29,12 +30,12 @@ const ReportFilterFields: React.FC<Props> = ({ definition, values, onChange, opt
       {has('date') && !hideDates && (
         <>
           <div>
-            <label htmlFor={`${idPrefix}-from`} className={labelClass}>{definition.date_label ?? 'Date'} — From</label>
-            <input id={`${idPrefix}-from`} type="date" value={values.date_from ?? ''} max={values.date_to || undefined} onChange={(event) => set('date_from', event.target.value)} className={fieldClass} />
+            <span className={labelClass}>{definition.date_label ?? 'Date'} — From</span>
+            <CompactDatePicker value={values.date_from ?? ''} max={values.date_to || undefined} onChange={(value) => set('date_from', value)} label={`${definition.date_label ?? 'Date'} from`} />
           </div>
           <div>
-            <label htmlFor={`${idPrefix}-to`} className={labelClass}>{definition.date_label ?? 'Date'} — To</label>
-            <input id={`${idPrefix}-to`} type="date" value={values.date_to ?? ''} min={values.date_from || undefined} onChange={(event) => set('date_to', event.target.value)} aria-invalid={dateInvalid} className={fieldClass} />
+            <span className={labelClass}>{definition.date_label ?? 'Date'} — To</span>
+            <CompactDatePicker value={values.date_to ?? ''} min={values.date_from || undefined} onChange={(value) => set('date_to', value)} label={`${definition.date_label ?? 'Date'} to`} />
             {dateInvalid && <p role="alert" className="mt-1 text-xs text-red-500">To date must be on or after the From date.</p>}
           </div>
         </>

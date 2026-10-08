@@ -5,13 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Warehouse;
 use App\Support\WarehouseCapacity;
+use App\Support\WarehouseMap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PlantManagerWarehouseController extends Controller
 {
-    private const MAP_EMBED_URL = 'https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d14717.63615355505!2d121.0884979!3d14.6352911!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b9485ea55b87%3A0x2e093784a1e3763b!2sArchon%20Nell%20Incorporated!5e1!3m2!1sen!2sph!4v1787998954055!5m2!1sen!2sph';
-
     public function show(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -46,7 +45,8 @@ class PlantManagerWarehouseController extends Controller
             'longitude' => $warehouse->longitude === null ? null : (float) $warehouse->longitude,
             ...$capacity,
             'status' => $warehouse->status,
-            'map_embed_url' => self::MAP_EMBED_URL,
+            'map_embed_url' => WarehouseMap::embedUrl($warehouse),
+            'directions_url' => WarehouseMap::directionsUrl($warehouse),
             'inventory' => [
                 'total_units' => $capacity['utilized'],
                 'available_stock' => $availableStock,

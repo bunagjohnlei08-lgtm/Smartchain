@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, Printer, XCircle } from 'lucide-react';
 import { CartesianGrid, Cell, Legend as ChartLegend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useTheme } from '../../context/ThemeContext';
+import CompactDatePicker from '../../components/ui/CompactDatePicker';
 import { apiClient } from '../../lib/api';
 import { EvidenceGallery, type QaAttachment } from './components/EvidenceGallery';
 
@@ -174,8 +175,8 @@ const QualityReports: React.FC = () => {
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Filter completed QA inspections using their completion date.</p>
           </div>
           <div className="grid min-w-0 grid-cols-1 gap-3 min-[430px]:grid-cols-2 lg:flex lg:items-end">
-            <label className="min-w-0 text-xs font-medium text-slate-700 dark:text-slate-300"><span className="mb-1.5 block">From Date</span><input type="date" value={fromDate} onChange={(event) => { setFromDate(event.target.value); setDateError(null); }} className="min-h-11 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none [color-scheme:light] focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 dark:border-slate-700 dark:bg-[#090d16] dark:text-slate-100 dark:[color-scheme:dark] lg:w-40" /></label>
-            <label className="min-w-0 text-xs font-medium text-slate-700 dark:text-slate-300"><span className="mb-1.5 block">To Date</span><input type="date" value={toDate} onChange={(event) => { setToDate(event.target.value); setDateError(null); }} className="min-h-11 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none [color-scheme:light] focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 dark:border-slate-700 dark:bg-[#090d16] dark:text-slate-100 dark:[color-scheme:dark] lg:w-40" /></label>
+            <div className="min-w-0 text-xs font-medium text-slate-700 dark:text-slate-300"><span className="mb-1.5 block">From Date</span><CompactDatePicker value={fromDate} max={toDate || undefined} onChange={(value) => { setFromDate(value); setDateError(null); }} label="From Date" className="lg:w-40" /></div>
+            <div className="min-w-0 text-xs font-medium text-slate-700 dark:text-slate-300"><span className="mb-1.5 block">To Date</span><CompactDatePicker value={toDate} min={fromDate || undefined} onChange={(value) => { setToDate(value); setDateError(null); }} label="To Date" className="lg:w-40" /></div>
             <div className="flex gap-2 min-[430px]:col-span-2 lg:col-span-1">
               <button type="button" onClick={applyDateRange} disabled={loading} className="min-h-11 flex-1 cursor-pointer rounded-xl bg-[#092635] px-4 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 lg:flex-none">Apply Filter</button>
               <button type="button" onClick={clearDateRange} disabled={loading || (!fromDate && !toDate && !hasCustomRange)} className="min-h-11 flex-1 cursor-pointer rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 lg:flex-none">Clear</button>
