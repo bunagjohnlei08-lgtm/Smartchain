@@ -1,51 +1,64 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\InvitationController;
-use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AdminCatalogMappingController;
+use App\Http\Controllers\Api\AdminInventoryAuditController;
+use App\Http\Controllers\Api\AdminLogisticsController;
+use App\Http\Controllers\Api\AdminOrderController;
+use App\Http\Controllers\Api\AdminProcurementController;
+use App\Http\Controllers\Api\AdminReportController;
+use App\Http\Controllers\Api\AdminSupplierApplicationController;
+use App\Http\Controllers\Api\AdminSupplierApplicationMeetingController;
+use App\Http\Controllers\Api\AdminSupplierPerformanceController;
+use App\Http\Controllers\Api\AdminSupplierRejectionController;
+use App\Http\Controllers\Api\AdminWarehouseLocationController;
 use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\InventoryAuditEvidenceController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryHistoryController;
-use App\Http\Controllers\Api\StockInController;
-use App\Http\Controllers\Api\ReceivingController;
-use App\Http\Controllers\Api\ReceivingDiscrepancyController;
-use App\Http\Controllers\Api\QaInspectionController;
-use App\Http\Controllers\Api\QaInspectionHistoryController;
-use App\Http\Controllers\Api\QaRejectedItemsController;
-use App\Http\Controllers\Api\QaQualityReportController;
-use App\Http\Controllers\Api\QaDashboardController;
-use App\Http\Controllers\Api\AdminOrderController;
-use App\Http\Controllers\Api\PlantManagerOrderController;
-use App\Http\Controllers\Api\StockOutController;
-use App\Http\Controllers\Api\AdminLogisticsController;
-use App\Http\Controllers\Api\AdminProcurementController;
-use App\Http\Controllers\Api\AdminSupplierRejectionController;
-use App\Http\Controllers\Api\PlantManagerShipmentController;
-use App\Http\Controllers\Api\PlantManagerReceivingNoteController;
-use App\Http\Controllers\Api\PlantManagerProcurementController;
-use App\Http\Controllers\Api\PurchaseOrderController;
-use App\Http\Controllers\Api\SupplierController;
-use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\PlantManagerDashboardController;
-use App\Http\Controllers\Api\ProductController;
-use App\Http\Controllers\Api\AdminReportController;
-use App\Http\Controllers\Api\AdminWarehouseLocationController;
-use App\Http\Controllers\Api\PlantManagerWarehouseController;
-use App\Http\Controllers\Api\ReportsController;
-use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\InvitationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordResetController;
-use App\Http\Controllers\Api\SessionController;
-use App\Http\Controllers\Api\SupplierApplicationController;
-use App\Http\Controllers\Api\AdminSupplierApplicationController;
-use App\Http\Controllers\Api\AdminSupplierPerformanceController;
+use App\Http\Controllers\Api\PlantManagerDashboardController;
+use App\Http\Controllers\Api\PlantManagerOrderController;
+use App\Http\Controllers\Api\PlantManagerProcurementController;
+use App\Http\Controllers\Api\PlantManagerReceivingNoteController;
+use App\Http\Controllers\Api\PlantManagerShipmentController;
+use App\Http\Controllers\Api\PlantManagerWarehouseController;
+use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\PublicCompanyLocationController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\QaDashboardController;
+use App\Http\Controllers\Api\QaInspectionController;
+use App\Http\Controllers\Api\QaInspectionHistoryController;
 use App\Http\Controllers\Api\QaInventoryAuditController;
-use App\Http\Controllers\Api\AdminInventoryAuditController;
-use App\Http\Controllers\Api\InventoryAuditEvidenceController;
+use App\Http\Controllers\Api\QaQualityReportController;
+use App\Http\Controllers\Api\QaRejectedItemsController;
+use App\Http\Controllers\Api\ReceivingController;
+use App\Http\Controllers\Api\ReceivingDiscrepancyController;
+use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\SessionController;
+use App\Http\Controllers\Api\StockInController;
+use App\Http\Controllers\Api\StockOutController;
+use App\Http\Controllers\Api\SupplierApplicationController;
+use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\SupplierPortalController;
+use App\Http\Controllers\Api\UserController;
+use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/supplier-applications', [SupplierApplicationController::class, 'store'])->middleware('throttle:supplier-applications');
+Route::get('/public/company-location', [PublicCompanyLocationController::class, 'show'])->middleware('throttle:60,1');
+Route::post('/supplier-portal/access', [SupplierPortalController::class, 'exchange'])->middleware('throttle:supplier-portal-access');
+Route::middleware(['supplier.portal', 'throttle:supplier-portal'])->prefix('supplier-portal')->group(function () {
+    Route::get('/application', [SupplierPortalController::class, 'show']);
+    Route::post('/meeting-slots/{meetingSlot}/select', [SupplierPortalController::class, 'selectMeeting'])
+        ->whereNumber('meetingSlot')->middleware('throttle:supplier-portal-selection');
+    Route::post('/request-another-schedule', [SupplierPortalController::class, 'requestAnotherSchedule']);
+    Route::post('/resubmit', [SupplierPortalController::class, 'resubmit']);
+});
 
 // Second login step. Public (no token exists yet) but throttled and bound to
 // a single-use challenge; a token is issued only by verify-otp.
@@ -91,7 +104,12 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     });
     Route::get('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'show']);
     Route::put('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'update']);
+    Route::post('/admin/products/bulk-supplier', [ProductController::class, 'bulkAssignSupplier']);
+    Route::post('/admin/products/{product}/warehouse', [ProductController::class, 'assignWarehouse']);
     Route::apiResource('/admin/products', ProductController::class);
+    Route::get('/admin/catalog-mapping/offerings', [AdminCatalogMappingController::class, 'index']);
+    Route::post('/admin/catalog-mapping/offerings/{offering}/link', [AdminCatalogMappingController::class, 'link']);
+    Route::post('/admin/catalog-mapping/offerings/{offering}/create-product', [AdminCatalogMappingController::class, 'createProduct']);
     Route::get('/plant-manager/dashboard', [PlantManagerDashboardController::class, 'index']);
     Route::get('/plant-manager/warehouse', [PlantManagerWarehouseController::class, 'show']);
     Route::prefix('plant-manager/reports')->group(function () {
@@ -200,6 +218,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
         Route::get('/options', [PlantManagerProcurementController::class, 'options']);
         Route::get('/requests', [PlantManagerProcurementController::class, 'index']);
         Route::post('/requests', [PlantManagerProcurementController::class, 'store']);
+        Route::post('/requests/bulk', [PlantManagerProcurementController::class, 'bulkStore']);
         Route::post('/requests/{replenishmentRequest}/submit', [PlantManagerProcurementController::class, 'submit']);
     });
 
@@ -216,14 +235,20 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::get('/suppliers/{supplier}', [SupplierController::class, 'show']);
     Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
     Route::patch('/suppliers/{supplier}/status', [SupplierController::class, 'updateStatus']);
+    Route::post('/suppliers/{supplier}/restore', [SupplierController::class, 'restore']);
     Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
     Route::get('/admin/supplier-applications', [AdminSupplierApplicationController::class, 'index']);
     Route::get('/admin/supplier-applications/{supplierApplication}', [AdminSupplierApplicationController::class, 'show']);
     Route::get('/admin/supplier-applications/{supplierApplication}/attachments/{attachment}/preview', [AdminSupplierApplicationController::class, 'previewAttachment']);
     Route::get('/admin/supplier-applications/{supplierApplication}/attachments/{attachment}/download', [AdminSupplierApplicationController::class, 'downloadAttachment']);
     Route::post('/admin/supplier-applications/{supplierApplication}/review', [AdminSupplierApplicationController::class, 'startReview']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/qualify', [AdminSupplierApplicationController::class, 'qualify']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/revision', [AdminSupplierApplicationController::class, 'requestRevision']);
     Route::post('/admin/supplier-applications/{supplierApplication}/approve', [AdminSupplierApplicationController::class, 'approve']);
     Route::post('/admin/supplier-applications/{supplierApplication}/reject', [AdminSupplierApplicationController::class, 'reject']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/meeting-slots', [AdminSupplierApplicationMeetingController::class, 'store']);
+    Route::delete('/admin/supplier-applications/{supplierApplication}/meeting-slots/{meetingSlot}', [AdminSupplierApplicationMeetingController::class, 'destroy']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/meeting-slots/{meetingSlot}/complete', [AdminSupplierApplicationMeetingController::class, 'complete']);
     Route::get('/admin/supplier-performance', [AdminSupplierPerformanceController::class, 'index']);
 
     Route::get('/admin/logistics/shipments', [AdminLogisticsController::class, 'index']);

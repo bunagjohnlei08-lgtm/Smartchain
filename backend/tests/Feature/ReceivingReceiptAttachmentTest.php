@@ -51,6 +51,11 @@ class ReceivingReceiptAttachmentTest extends TestCase
         ];
     }
 
+    private function receipt(string $name, string $content): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent($name, "%PDF-1.4\n{$content}\n%%EOF");
+    }
+
     public function test_final_receiving_requires_one_supplier_receipt(): void
     {
         $this->actingAs($this->manager)->postJson('/api/receivings', $this->payload())
@@ -106,5 +111,61 @@ class ReceivingReceiptAttachmentTest extends TestCase
         $this->actingAs($ordinaryUser)->post('/api/receivings', [
             ...$this->payload(), 'receipts' => [UploadedFile::fake()->image('receipt.jpg')],
         ], ['Accept' => 'application/json'])->assertForbidden();
+    }
+
+    public function test_duplicate_receipts_in_same_create_request_are_rejected_when_renamed(): void
+    {
+        $bytes = 'same supplier receipt bytes';
+
+        $this->actingAs($this->manager)->post('/api/receivings', [
+            ...$this->payload(),
+            'receipts' => [
+                $this->receipt('receipt.pdf', $bytes),
+                $this->receipt('delivery-copy.pdf', $bytes),
+            ],
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('receipts')
+            ->assertJsonPath('errors.receipts.0', 'Duplicate file detected. This exact receipt has already been added.');
+
+        $this->assertDatabaseCount('receivings', 0);
+        $this->assertDatabaseCount('receiving_receipt_attachments', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles('receiving-receipts'));
+    }
+
+    public function test_same_receipt_name_with_different_content_is_allowed(): void
+    {
+        $response = $this->actingAs($this->manager)->post('/api/receivings', [
+            ...$this->payload(),
+            'receipts' => [
+                $this->receipt('receipt.pdf', 'first receipt content'),
+                $this->receipt('receipt.pdf', 'second receipt content'),
+            ],
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonCount(2, 'receipt_attachments');
+
+        $receiving = $this->order->receivings()->findOrFail($response->json('id'));
+        $this->assertSame(2, $receiving->receiptAttachments()->distinct('file_sha256')->count('file_sha256'));
+    }
+
+    public function test_same_exact_receipt_is_allowed_for_different_receivings(): void
+    {
+        $secondOrder = $this->order->replicate();
+        $secondOrder->po_number = 'PO-RECEIPT-2';
+        $secondOrder->save();
+        $secondOrder->items()->create([
+            'product_name' => 'Receipt Product', 'ordered_quantity' => 10,
+            'unit_price' => 50, 'total_price' => 500,
+        ]);
+        $bytes = 'shared legitimate supplier receipt';
+
+        foreach ([[$this->order, 'receipt.pdf'], [$secondOrder, 'renamed-receipt.pdf']] as [$order, $name]) {
+            $this->order = $order;
+            $this->actingAs($this->manager)->post('/api/receivings', [
+                ...$this->payload(),
+                'receipts' => [$this->receipt($name, $bytes)],
+            ], ['Accept' => 'application/json'])->assertCreated();
+        }
+
+        $this->assertDatabaseCount('receiving_receipt_attachments', 2);
     }
 }

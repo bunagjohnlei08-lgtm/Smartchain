@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { AlertTriangle, Edit, Loader2, MapPin, Save, Warehouse, X } from 'lucide-react';
+import { AlertTriangle, Edit, Loader2, MapPin, Navigation, Save, Warehouse, X } from 'lucide-react';
 import PageContainer from '@/components/layout/PageContainer';
 import { apiClient } from '../../../lib/api';
 
@@ -18,11 +18,15 @@ interface WarehouseLocation {
   capacity_state: 'normal' | 'warning' | 'full';
   capacity_warning: boolean;
   status: 'Active' | 'Inactive';
+  show_on_public_website: boolean;
 }
 
-type WarehouseForm = Pick<WarehouseLocation, 'name' | 'code' | 'address' | 'latitude' | 'longitude' | 'capacity' | 'status'>;
+type WarehouseForm = Pick<WarehouseLocation, 'name' | 'code' | 'address' | 'latitude' | 'longitude' | 'capacity' | 'status' | 'show_on_public_website'>;
 
-const MAP_URL = 'https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d14717.63615355505!2d121.0884979!3d14.6352911!3m2!1i1024!1i768!4f13.1!3m3!1m2!1s0x3397b9485ea55b87%3A0x2e093784a1e3763b!2sArchon%20Nell%20Incorporated!5e1!3m2!1sen!2sph!4v1787998954055!5m2!1sen!2sph';
+const mapUrl = (latitude: number, longitude: number) =>
+  `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}&z=15&output=embed`;
+const directionsUrl = (latitude: number, longitude: number) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`;
 const FIELD_CLASS = 'w-full rounded-xl border border-gray-700 bg-gray-800/50 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30';
 
 type CapacitySeverity = 'normal' | 'warning' | 'critical';
@@ -51,7 +55,7 @@ const ManageLocations: React.FC = () => {
   const openEditor = () => {
     if (!location) return;
     setError('');
-    setForm({ name: location.name, code: location.code, address: location.address, latitude: location.latitude, longitude: location.longitude, capacity: location.capacity, status: location.status });
+    setForm({ name: location.name, code: location.code, address: location.address, latitude: location.latitude, longitude: location.longitude, capacity: location.capacity, status: location.status, show_on_public_website: location.show_on_public_website });
   };
 
   const saveLocation = async (event: React.FormEvent) => {
@@ -97,7 +101,7 @@ const ManageLocations: React.FC = () => {
               <div className="flex gap-3">
                 <div className="flex h-12 w-12 shrink-0 self-start items-center justify-center rounded-xl bg-blue-500/10 text-blue-400 sm:h-auto sm:w-auto sm:p-3"><Warehouse className="h-5 w-5 sm:h-6 sm:w-6" /></div>
                 <div>
-                  <div className="flex flex-wrap items-center gap-2"><h2 className="text-[15px] font-semibold text-white sm:text-lg">{location.name}</h2><StatusBadge status={location.status} /></div>
+                  <div className="flex flex-wrap items-center gap-2"><h2 className="text-[15px] font-semibold text-white sm:text-lg">{location.name}</h2><StatusBadge status={location.status} />{location.show_on_public_website && <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] font-medium text-sky-300 sm:px-2.5 sm:py-1 sm:text-xs">Shown publicly</span>}</div>
                   <p className="mt-1 text-[12px] text-gray-400 sm:text-sm">{location.code}</p>
                   <p className="mt-2 flex items-start gap-2 text-[12px] text-gray-300 sm:text-sm"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500 sm:h-4 sm:w-4" />{location.address || 'Address not configured'}</p>
                 </div>
@@ -112,8 +116,10 @@ const ManageLocations: React.FC = () => {
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-gray-800/50 bg-[#0d1322] shadow-sm">
-            <div className="border-b border-gray-800 p-5"><h2 className="flex items-center gap-2 text-lg font-semibold text-white"><MapPin className="h-5 w-5 text-blue-400" /> Warehouse Location</h2><div className="mt-3 grid gap-2 text-sm text-gray-400 sm:grid-cols-2 lg:grid-cols-5"><span><strong className="text-gray-300">Warehouse:</strong> {location.name}</span><span><strong className="text-gray-300">Status:</strong> {location.status}</span><span className="sm:col-span-2"><strong className="text-gray-300">Address:</strong> {location.address || 'Not configured'}</span><span><strong className="text-gray-300">Coordinates:</strong> {location.latitude ?? '—'}, {location.longitude ?? '—'}</span></div></div>
-            <iframe src={MAP_URL} width="100%" height="450" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title="Main Warehouse location on Google Maps" />
+            <div className="border-b border-gray-800 p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="flex items-center gap-2 text-lg font-semibold text-white"><MapPin className="h-5 w-5 text-blue-400" /> Warehouse Location</h2>{location.latitude !== null && location.longitude !== null && <a href={directionsUrl(location.latitude, location.longitude)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 self-start rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 text-sm font-semibold text-blue-300 transition-colors hover:bg-blue-500/20 focus:outline-none focus:ring-2 focus:ring-blue-400 sm:self-auto"><Navigation className="h-4 w-4" /> Get Directions</a>}</div><div className="mt-3 grid gap-2 text-sm text-gray-400 sm:grid-cols-2 lg:grid-cols-5"><span><strong className="text-gray-300">Warehouse:</strong> {location.name}</span><span><strong className="text-gray-300">Status:</strong> {location.status}</span><span className="sm:col-span-2"><strong className="text-gray-300">Address:</strong> {location.address || 'Not configured'}</span><span><strong className="text-gray-300">Coordinates:</strong> {location.latitude ?? '—'}, {location.longitude ?? '—'}</span></div></div>
+            {location.latitude !== null && location.longitude !== null
+              ? <iframe src={mapUrl(location.latitude, location.longitude)} width="100%" height="450" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" title="Main Warehouse location on Google Maps" />
+              : <div className="flex min-h-56 items-center justify-center px-5 text-center text-sm text-gray-400">Add latitude and longitude to display the map.</div>}
           </section>
         </>}
       </div>
@@ -129,6 +135,10 @@ const ManageLocations: React.FC = () => {
             <Field label="Longitude"><input type="number" step="any" value={form.longitude ?? ''} onChange={e => setForm({ ...form, longitude: e.target.value === '' ? null : Number(e.target.value) })} className={FIELD_CLASS} /></Field>
             <Field label="Capacity (units)"><input type="number" min="0" value={form.capacity ?? ''} onChange={e => setForm({ ...form, capacity: e.target.value === '' ? null : Number(e.target.value) })} className={FIELD_CLASS} /></Field>
             <Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as WarehouseForm['status'] })} className={FIELD_CLASS}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></Field>
+            <label className="flex items-start gap-3 rounded-xl border border-gray-700 bg-gray-800/40 p-4 sm:col-span-2">
+              <input type="checkbox" checked={form.show_on_public_website} onChange={e => setForm({ ...form, show_on_public_website: e.target.checked })} className="mt-1 h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-2 focus:ring-blue-500/40" />
+              <span><span className="block text-sm font-medium text-white">Show on public website</span><span className="mt-1 block text-xs leading-5 text-gray-400">Publishes only the warehouse name, address, latitude, and longitude. An active status, address, and coordinates are required before it can appear.</span></span>
+            </label>
           </div>
           <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setForm(null)} className="min-h-11 rounded-xl border border-gray-700 px-4 text-sm text-gray-300 hover:bg-gray-800">Cancel</button><button disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save changes</button></div>
         </form>

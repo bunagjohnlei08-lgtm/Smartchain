@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Support\AuditLogger;
 use App\Support\PurchaseOrderPdf;
 use App\Support\PurchaseOrderSupplier;
+use App\Support\ReplenishmentLifecycle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -71,7 +72,7 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, ReplenishmentLifecycle $replenishmentLifecycle): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
         $validated = $request->validate([
@@ -144,6 +145,16 @@ class PurchaseOrderController extends Controller
                 'replenishment_request_id' => $order->replenishment_request_id,
             ],
         ]);
+        if ($order->replenishment_request_id) {
+            $replenishmentLifecycle->synchronize($order);
+            AuditLogger::success('REPLENISHMENT_PURCHASE_ORDER_CREATED', AuditLogger::MODULE_PROCUREMENT, [
+                'resource_type' => 'ReplenishmentRequest',
+                'resource_id' => $order->replenishment_request_id,
+                'resource_label' => $order->po_number,
+                'details' => "Created linked Purchase Order {$order->po_number}.",
+                'metadata' => ['purchase_order_id' => $order->id, 'request_status' => ReplenishmentRequest::STATUS_PO_CREATED],
+            ]);
+        }
 
         return response()->json($this->present($order), 201);
     }

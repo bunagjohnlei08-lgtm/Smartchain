@@ -4,6 +4,7 @@ import LoginPage from '../page/LoginPage';
 import ActivateAccountPage from '../page/ActivateAccountPage';
 import ForgotPasswordPage from '../page/ForgotPasswordPage';
 import SupplierApplicationPage from '../page/SupplierApplicationPage';
+import SupplierPortalPage from '../page/SupplierPortalPage';
 import PublicLandingPage from '../page/PublicLandingPage';
 
 import AdminLayout from '../components/layout/AdminLayout';
@@ -59,6 +60,9 @@ const router = createBrowserRouter([
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/activate-account', element: <ActivateAccountPage /> },
   { path: '/supplier-application', element: <SupplierApplicationPage /> },
+  { path: '/supplier-portal', element: <SupplierPortalPage /> },
+  { path: '/supplier-application/access', element: <SupplierPortalPage /> },
+  { path: '/supplier-application/portal', element: <SupplierPortalPage /> },
   {
     path: '/dashboard',
     element: <ProtectedRoute allowedRoles={['ADMIN']}><Navigate to="/admin/dashboard" replace /></ProtectedRoute>,

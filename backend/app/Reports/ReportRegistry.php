@@ -5,6 +5,7 @@ namespace App\Reports;
 use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\ReplenishmentRequest;
+use App\Models\Supplier;
 use App\Models\Warehouse;
 use App\Support\WarehouseCapacity;
 use Illuminate\Database\Query\Builder;
@@ -64,7 +65,13 @@ class ReportRegistry
     ];
 
     public const PURCHASE_ORDER_STATUSES = ['Pending Approval', 'Approved', 'Sent to Supplier', 'Completed', 'Cancelled'];
-    public const SUPPLIER_STATUSES = ['ACTIVE' => 'Active', 'ON_HOLD' => 'On Hold', 'INACTIVE' => 'Inactive'];
+    public const SUPPLIER_STATUSES = [
+        Supplier::STATUS_ACTIVE => 'Active',
+        Supplier::STATUS_ON_HOLD => 'On Hold',
+        Supplier::STATUS_INACTIVE => 'Inactive',
+        Supplier::STATUS_PENDING_REMOVAL => 'Recently Removed',
+        Supplier::STATUS_ARCHIVED => 'Archived',
+    ];
     public const REJECTION_STATUSES = [
         'PENDING_REVIEW' => 'Pending Review', 'SENDING' => 'Sending', 'SENT' => 'Sent', 'FAILED' => 'Send Failed',
         'REPLACEMENT_PENDING' => 'Replacement Pending', 'RESOLVED' => 'Resolved',

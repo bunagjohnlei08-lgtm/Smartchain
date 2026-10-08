@@ -10,6 +10,8 @@ export interface FormInputProps {
   value: string;
   onChange?: (value: string) => void;
   error?: string;
+  helperText?: string;
+  reserveMessageSpace?: boolean;
   required?: boolean;
   showPasswordToggle?: boolean;
   leadingIcon?: React.ReactNode;
@@ -27,6 +29,8 @@ const FormInput: React.FC<FormInputProps> = ({
   value,
   onChange,
   error,
+  helperText,
+  reserveMessageSpace = false,
   required = false,
   showPasswordToggle = false,
   leadingIcon,
@@ -66,7 +70,7 @@ const FormInput: React.FC<FormInputProps> = ({
             color: '#F5F7FA',
           }}
           aria-invalid={!!error}
-          aria-describedby={error ? `${name}-error` : undefined}
+          aria-describedby={error ? `${name}-error` : helperText ? `${name}-helper` : undefined}
           placeholder={placeholder}
         />
         {isPassword && showPasswordToggle && (
@@ -81,8 +85,31 @@ const FormInput: React.FC<FormInputProps> = ({
           </button>
         )}
       </div>
-      {error && (
-        <p id={`${name}-error`} className={`mt-1 text-xs ${isLight ? 'text-red-600' : 'text-red-400'}`}>{error}</p>
+      {reserveMessageSpace ? (
+        <div className="mt-1 h-12 min-[390px]:h-8">
+          {error ? (
+            <p id={`${name}-error`} className={`text-xs ${isLight ? 'text-red-600' : 'text-red-400'}`}>{error}</p>
+          ) : (
+            <p
+              id={`${name}-helper`}
+              aria-hidden={!helperText}
+              className={`text-[11px] font-normal leading-4 transition-opacity duration-200 motion-reduce:transition-none ${isLight ? 'text-slate-600' : 'text-slate-400'} ${helperText ? 'opacity-100' : 'opacity-0'}`}
+            >
+              {helperText || '\u00a0'}
+            </p>
+          )}
+        </div>
+      ) : (
+        <>
+          {error && (
+            <p id={`${name}-error`} className={`mt-1 text-xs ${isLight ? 'text-red-600' : 'text-red-400'}`}>{error}</p>
+          )}
+          {!error && helperText && (
+            <p id={`${name}-helper`} className={`mt-1 text-[11px] font-normal leading-4 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              {helperText}
+            </p>
+          )}
+        </>
       )}
     </div>
   );

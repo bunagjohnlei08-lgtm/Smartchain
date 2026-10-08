@@ -8,8 +8,30 @@ import FormInput from '../components/auth/FormInput';
 import OtpVerificationForm, { type VerifiedLogin } from '../components/auth/OtpVerificationForm';
 import api from '../lib/api';
 import { FIRST_LOGIN_STORAGE_KEY } from '../lib/greeting';
+import { PASSWORD_MIN_LENGTH, passwordRequirements, type PasswordRequirementKey } from '../lib/passwordPolicy';
 import type { AxiosError } from 'axios';
 import { Lock, LockKeyhole, LogIn, Mail } from 'lucide-react';
+
+const passwordRequirementLabels: Record<PasswordRequirementKey, string> = {
+  minimum: `at least ${PASSWORD_MIN_LENGTH} characters`,
+  uppercase: 'an uppercase letter',
+  lowercase: 'a lowercase letter',
+  number: 'a number',
+  symbol: 'a special character',
+};
+
+const formatMissingPasswordRequirements = (password: string): string | undefined => {
+  if (!password) return undefined;
+
+  const missing = passwordRequirements(password)
+    .filter((requirement) => !requirement.met)
+    .map((requirement) => passwordRequirementLabels[requirement.key]);
+
+  if (missing.length === 0) return undefined;
+  if (missing.length === 1) return `Needs ${missing[0]}.`;
+
+  return `Needs ${missing.slice(0, -1).join(', ')}${missing.length > 2 ? ',' : ''} and ${missing.at(-1)}.`;
+};
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -61,14 +83,16 @@ const LoginPage: React.FC = () => {
         const status = axiosError.response?.status;
         if (axiosError.response?.data && typeof axiosError.response.data === 'object') {
           const data = axiosError.response.data as Record<string, unknown>;
-          if ((status === 429 || status === 503) && typeof data.message === 'string') {
+          if (status === 401) {
+            apiErrors.password = 'Incorrect email or password.';
+          } else if ((status === 429 || status === 503) && typeof data.message === 'string') {
             apiErrors.form = data.message;
           } else if (data.errors && typeof data.errors === 'object') {
             Object.entries(data.errors as Record<string, unknown>).forEach(([key, messages]) => {
               apiErrors[key] = Array.isArray(messages) ? String(messages[0]) : String(messages);
             });
-          } else if (data.message) {
-            apiErrors.form = 'Invalid email or password.';
+          } else if (typeof data.message === 'string') {
+            apiErrors.form = data.message;
           }
         }
         if (Object.keys(apiErrors).length === 0) {
@@ -84,6 +108,9 @@ const LoginPage: React.FC = () => {
   });
 
   const isLoginBusy = isSubmitting || isAuthenticating;
+  const passwordHelper = !errors.password && !loginErrors.password && !loginErrors.form
+    ? formatMissingPasswordRequirements(formData.password)
+    : undefined;
 
   const completeLogin = ({ token, user, is_first_login }: VerifiedLogin) => {
     sessionStorage.setItem('isAuthenticated', 'true');
@@ -185,6 +212,8 @@ const LoginPage: React.FC = () => {
           value={formData.password}
           onChange={(value) => updateLoginField('password', value)}
           error={errors.password || loginErrors.password}
+          helperText={passwordHelper}
+          reserveMessageSpace
           required
           showPasswordToggle
           leadingIcon={<Lock className="h-4 w-4" />}

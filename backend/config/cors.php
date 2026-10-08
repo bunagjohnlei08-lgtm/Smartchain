@@ -35,7 +35,7 @@ $localOrigins = [
 ];
 
 $configuredOrigins = array_values(array_filter(array_map(
-    static fn(string $origin): string => rtrim(trim($origin), '/'),
+    static fn (string $origin): string => rtrim(trim($origin), '/'),
     explode(',', (string) env('CORS_ALLOWED_ORIGINS', (string) env('FRONTEND_URL', '')))
 )));
 
@@ -57,7 +57,7 @@ return [
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'X-Requested-With'],
+    'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'X-Requested-With', 'X-Supplier-Portal-Session'],
 
     // Content-Disposition carries server-generated export filenames to the SPA.
     'exposed_headers' => ['Retry-After', 'Content-Disposition', 'X-Report-Rows'],

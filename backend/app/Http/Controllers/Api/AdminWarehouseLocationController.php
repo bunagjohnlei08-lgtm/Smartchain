@@ -22,14 +22,18 @@ class AdminWarehouseLocationController extends Controller
     {
         $this->authorizeAdmin($request);
         $warehouse = $this->mainWarehouse();
+        $willBePublic = $request->has('show_on_public_website')
+            ? $request->boolean('show_on_public_website')
+            : (bool) $warehouse->show_on_public_website;
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', Rule::unique('warehouses', 'code')->ignore($warehouse->id)],
-            'address' => ['nullable', 'string', 'max:2000'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'address' => [Rule::requiredIf($willBePublic), 'nullable', 'string', 'max:2000'],
+            'latitude' => [Rule::requiredIf($willBePublic), 'nullable', 'numeric', 'between:-90,90'],
+            'longitude' => [Rule::requiredIf($willBePublic), 'nullable', 'numeric', 'between:-180,180'],
             'capacity' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', Rule::in(['Active', 'Inactive'])],
+            'show_on_public_website' => ['sometimes', 'boolean'],
         ]);
         DB::transaction(function () use ($warehouse, $validated): void {
             $locked = Warehouse::query()->lockForUpdate()->findOrFail($warehouse->id);
@@ -54,6 +58,7 @@ class AdminWarehouseLocationController extends Controller
             'longitude' => $warehouse->longitude === null ? null : (float) $warehouse->longitude,
             ...$capacity,
             'status' => $warehouse->status,
+            'show_on_public_website' => (bool) $warehouse->show_on_public_website,
         ];
     }
 

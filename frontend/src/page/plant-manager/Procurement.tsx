@@ -1,36 +1,56 @@
-// src/page/plant-manager/ReplenishmentPlanning.tsx
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  AlertTriangle,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  CircleDot,
+  Clock,
+  Eye,
+  RefreshCw,
+  Search,
+  Send,
+  ShoppingCart,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
-import {
-  Search,
-  Eye,
-  Plus,
-  X,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  FileText,
-  RefreshCw,
-  ChevronLeft,
-  ChevronDown,
-  ChevronRight as ChevronRightIcon,
-  LayoutGrid,
-  LayoutList,
-} from 'lucide-react';
-
-// ============================================
-// TYPES
-// ============================================
 
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
-type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order';
+type RequestStatus = 'not_submitted' | 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order' | 'po_created' | 'completed' | 'cancelled';
 
-interface Product {
+interface RequestRecord {
+  id: number;
+  request_no: string;
+  requested_by: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  product_id: number;
+  product_name: string;
+  requested_qty: number;
+  priority: Priority;
+  current_priority: Priority;
+  status: Exclude<RequestStatus, 'not_submitted'>;
+  submitted_date: string | null;
+  admin_decision?: string | null;
+  linked_purchase_order?: { number: string; status: string } | null;
+  current_fulfillment_stage?: string;
+  current_fulfillment_stage_label?: string;
+  fulfillment?: {
+    purchase_order: { number: string; status: string } | null;
+    receiving: { number: string; status: string } | null;
+    qa_status: string | null;
+    replacement: { case_status: string; receiving_number: string | null; receiving_status: string | null } | null;
+  };
+  timeline?: TimelineStep[];
+}
+
+type TimelineStep = { key: string; label: string; state: 'done' | 'current' | 'failed' | 'upcoming' };
+
+interface Candidate {
   id: string;
   productId: number;
   warehouseId: number;
@@ -38,1121 +58,734 @@ interface Product {
   sku: string;
   warehouse: string;
   currentStock: number;
-  minStock: number;
-  forecastedDemand: number;
   recommendedReorderQty: number;
   priority: Priority;
-  needsReplenishment: boolean;
+  requestStatus: RequestStatus;
+  canRequest: boolean;
+  request: RequestRecord | null;
+  primarySupplier?: { id: number; name: string } | null;
+  supplierWarning?: string | null;
 }
 
-interface CatalogProduct {
+interface Warehouse {
   id: number;
   name: string;
-  category: string;
 }
 
-interface ProcurementWarehouse {
-  id: number;
-  name: string;
-}
+const PAGE_SIZE = 10;
+const MAX_REQUESTED_QTY = 100000;
 
-interface RequestHistory {
-  id: string;
-  requestNo: string;
-  product: string;
-  warehouse: string;
-  requestedQty: number;
-  submittedDate: string;
-  status: RequestStatus;
-  adminDecision?: string;
-  requestedBy: string;
-  priority: Priority;
-}
-
-// ============================================
-// HELPER COMPONENTS
-// ============================================
-
-const StatusBadge: React.FC<{ status: RequestStatus | string }> = ({ status }) => {
-  const config: Record<string, { color: string; icon: React.ElementType }> = {
-    draft: { color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', icon: FileText },
-    pending: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Clock },
-    approved: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', icon: CheckCircle },
-    rejected: { color: 'text-red-400 bg-red-500/10 border-red-500/20', icon: XCircle },
-    for_purchase_order: { color: 'text-sky-400 bg-sky-500/10 border-sky-500/20', icon: FileText },
-  };
-  const labels: Record<string, string> = { draft: 'Draft', pending: 'Pending Approval', approved: 'Approved', rejected: 'Rejected', for_purchase_order: 'For Purchase Order' };
-  const { color, icon: Icon } = config[status] || config.draft;
-  return (
-    <span className={`plant-manager-badge inline-flex w-fit items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
-      <Icon className="w-3 h-3" />
-      {labels[status] || status}
-    </span>
-  );
+const statusLabels: Record<RequestStatus, string> = {
+  not_submitted: 'Not Submitted',
+  draft: 'Draft',
+  pending: 'Pending Approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  for_purchase_order: 'For Purchase Order',
+  po_created: 'PO Created',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
 };
 
-const PriorityBadge: React.FC<{ priority: Priority }> = ({ priority }) => {
-  const config: Record<Priority, string> = {
-    'Low': 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-    'Medium': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    'High': 'text-orange-400 bg-orange-500/10 border-orange-500/20',
-    'Critical': 'text-red-400 bg-red-500/10 border-red-500/20',
-  };
+const statusStyles: Record<RequestStatus, string> = {
+  not_submitted: 'border-slate-700 bg-slate-700 text-slate-950 dark:border-slate-500/25 dark:bg-slate-500/10 dark:text-[var(--text-secondary)]',
+  draft: 'border-slate-700 bg-slate-700 text-white dark:border-slate-500/25 dark:bg-slate-500/10 dark:text-slate-300',
+  pending: 'border-amber-700 bg-amber-700 text-white dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-400',
+  approved: 'border-emerald-700 bg-emerald-700 text-white dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-400',
+  rejected: 'border-red-700 bg-red-700 text-white dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-400',
+  for_purchase_order: 'border-blue-700 bg-blue-700 text-white dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-400',
+  po_created: 'border-violet-700 bg-violet-700 text-white dark:border-violet-500/25 dark:bg-violet-500/10 dark:text-violet-400',
+  completed: 'border-emerald-700 bg-emerald-700 text-white dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-400',
+  cancelled: 'border-slate-700 bg-slate-700 text-white dark:border-slate-500/25 dark:bg-slate-500/10 dark:text-slate-300',
+};
+
+const priorityStyles: Record<Priority, string> = {
+  Low: 'border-blue-700 bg-blue-700 text-white dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-400',
+  Medium: 'border-amber-700 bg-amber-700 text-white dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-400',
+  High: 'border-orange-700 bg-orange-700 text-white dark:border-orange-500/25 dark:bg-orange-500/10 dark:text-orange-400',
+  Critical: 'border-red-700 bg-red-700 text-white dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-400',
+};
+
+function StatusBadge({ status }: { status: RequestStatus }) {
   return (
-    <span className={`plant-manager-badge px-2.5 py-1 rounded-full text-xs font-medium border ${config[priority]}`}>
+    <span className={'inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ' + statusStyles[status]}>
+      {statusLabels[status]}
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }: { priority: Priority }) {
+  return (
+    <span className={'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ' + priorityStyles[priority]}>
       {priority}
     </span>
   );
+}
+
+const replacementLabels: Record<string, string> = {
+  PENDING_REVIEW: 'Pending Admin review',
+  SENDING: 'Sending report to supplier',
+  SENT: 'Reported to supplier',
+  FAILED: 'Supplier report failed to send',
+  REPLACEMENT_PENDING: 'Replacement pending',
+  RESOLVED: 'Resolved',
 };
 
-const KPICard: React.FC<{ label: string; value: string | number; icon: React.ReactNode; trend?: string; trendType?: 'up' | 'down' | 'stable' }> = ({
-  label,
-  value,
-  icon,
-  trend,
-  trendType,
-}) => {
-  const trendColor =
-    trendType === 'up'
-      ? 'text-emerald-400'
-      : trendType === 'down'
-      ? 'text-red-400'
-      : 'text-[var(--text-muted)]';
-
-  const TrendIcon =
-    trendType === 'up' ? TrendingUp : trendType === 'down' ? TrendingDown : Minus;
-
+function SupplierWarning() {
   return (
-    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm hover:border-[var(--border-color)] transition-all">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
-          <p className="mobile-kpi-value text-2xl font-bold text-[var(--text-primary)] mt-1.5">{value}</p>
-          {trend && (
-            <p className={`mobile-kpi-helper text-xs mt-1 flex items-center gap-1 ${trendColor}`}>
-              <TrendIcon className="w-3 h-3" />
-              {trend}
-            </p>
-          )}
-        </div>
-        <div className="p-2.5 bg-[var(--bg-surface-alt)] rounded-lg">{icon}</div>
-      </div>
-    </div>
+    <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> No Active Supplier Assigned
+    </p>
   );
-};
+}
 
-const SearchInput: React.FC<{
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}> = ({ value, onChange, placeholder }) => (
-  <div className="relative w-full min-w-0 sm:min-w-[180px] sm:flex-1">
-    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)] sm:h-4 sm:w-4" />
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] py-0 pl-10 pr-3 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all sm:h-auto sm:py-2.5 sm:pr-4 sm:text-sm"
-    />
-  </div>
-);
+function StageHint({ request }: { request: RequestRecord | null }) {
+  if (!request?.current_fulfillment_stage_label) return null;
+  const stage = request.current_fulfillment_stage;
+  if (stage === request.status || (request.status === 'pending' && stage === 'pending_admin_approval')) return null;
+  return <p className="mt-1 text-xs text-[var(--text-muted)]">Stage: {request.current_fulfillment_stage_label}</p>;
+}
 
-const FilterSelect: React.FC<{
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-}> = ({ value, onChange, options }) => (
-  <div className="min-w-0 flex-1 sm:min-w-[130px] sm:flex-none">
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="pm-procurement-toolbar-filter h-9 w-full cursor-pointer appearance-none rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-2.5 py-0 text-xs text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:h-auto sm:px-3 sm:py-2.5 sm:text-sm"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-        </option>
-      ))}
-    </select>
-  </div>
-);
-
-const Pagination: React.FC<{
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  totalItems: number;
-  itemsPerPage: number;
-}> = ({ currentPage, totalPages, onPageChange, totalItems, itemsPerPage }) => {
-  const start = (currentPage - 1) * itemsPerPage + 1;
-  const end = Math.min(currentPage * itemsPerPage, totalItems);
-
-  const getPages = () => {
-    const pages: number[] = [];
-    if (totalPages <= 5) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else if (currentPage <= 3) {
-      for (let i = 1; i <= 5; i++) pages.push(i);
-    } else if (currentPage >= totalPages - 2) {
-      for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
-    } else {
-      for (let i = currentPage - 2; i <= currentPage + 2; i++) pages.push(i);
-    }
-    return pages;
+function Timeline({ steps }: { steps: TimelineStep[] }) {
+  const icon = (state: TimelineStep['state']) => {
+    if (state === 'done') return <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />;
+    if (state === 'failed') return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" aria-hidden="true" />;
+    if (state === 'current') return <CircleDot className="h-4 w-4 text-cyan-600 dark:text-cyan-400" aria-hidden="true" />;
+    return <Circle className="h-4 w-4 text-[var(--text-muted)]" aria-hidden="true" />;
   };
-
-  if (totalItems === 0) return null;
-
+  const stateText: Record<TimelineStep['state'], string> = { done: 'completed', failed: 'failed', current: 'current step', upcoming: 'upcoming' };
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-alt)]">
-      <div className="text-sm text-[var(--text-secondary)]">
-        Showing <span className="text-[var(--text-primary)] font-medium">{start}</span> to{' '}
-        <span className="text-[var(--text-primary)] font-medium">{end}</span> of{' '}
-        <span className="text-[var(--text-primary)] font-medium">{totalItems}</span> items
-      </div>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-          className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        {getPages().map((page) => (
-          <button
-            key={page}
-            onClick={() => onPageChange(page)}
-            className={`px-3 py-1 rounded-xl text-sm font-medium transition-all ${
-              currentPage === page
-                ? 'bg-slate-200 text-slate-900 dark:bg-cyan-500 dark:text-slate-950'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]'
-            }`}
-          >
-            {page}
-          </button>
-        ))}
-        <button
-          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
-          className="p-1.5 rounded-xl border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronRightIcon className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
+    <ol className="mt-3 space-y-2">
+      {steps.map((step) => (
+        <li key={step.key} aria-current={step.state === 'current' ? 'step' : undefined} className="flex items-center gap-2.5 text-sm">
+          {icon(step.state)}
+          <span className={step.state === 'upcoming' ? 'text-[var(--text-muted)]' : step.state === 'current' ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>{step.label}</span>
+          <span className="sr-only">({stateText[step.state]})</span>
+        </li>
+      ))}
+    </ol>
   );
-};
+}
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+function getErrorMessage(error: unknown): string {
+  const response = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response;
+  const validationMessage = response?.data?.errors
+    ? Object.values(response.data.errors).flat()[0]
+    : undefined;
+  return validationMessage || response?.data?.message || 'Something went wrong. Please try again.';
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return 'Not submitted';
+  return new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(
+    new Date(value + 'T00:00:00'),
+  );
+}
 
 const ReplenishmentPlanning: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [procurementWarehouse, setProcurementWarehouse] = useState<ProcurementWarehouse | null>(null);
-  const [history, setHistory] = useState<RequestHistory[]>([]);
-  const [activeRequests, setActiveRequests] = useState<RequestHistory[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RequestRecord[]>([]);
+  const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  // Filter states
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All Status');
-  const [priorityFilter, setPriorityFilter] = useState('All Priorities');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const itemsPerPage = 10;
+  const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
+  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [requestCandidates, setRequestCandidates] = useState<Candidate[]>([]);
+  // Raw input per candidate; the Plant Manager enters every quantity (nothing is pre-calculated).
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [quantityErrors, setQuantityErrors] = useState<Record<string, string>>({});
+  const [detail, setDetail] = useState<RequestRecord | null>(null);
+  const [detailStock, setDetailStock] = useState<number | null>(null);
+  const openDetail = (request: RequestRecord, currentStock: number | null = null) => {
+    setDetailStock(currentStock);
+    setDetail(request);
+  };
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Modal states
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [showNewRequestModal, setShowNewRequestModal] = useState(false);
-  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
-  const [activeProductIndex, setActiveProductIndex] = useState(0);
-  const productDropdownRef = React.useRef<HTMLDivElement>(null);
-  const [selectedRequest, setSelectedRequest] = useState<RequestHistory | null>(null);
-  usePlantManagerDetailOverlay(showViewModal && selectedRequest !== null);
-  const [reason, setReason] = useState('');
-  const [notes, setNotes] = useState('');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  usePlantManagerDetailOverlay(requestCandidates.length > 0 || detail !== null);
 
-  // New request form state
-  const [newRequest, setNewRequest] = useState({
-    requestNo: '',
-    product: '',
-    warehouse: 'Main Warehouse',
-    quantity: '',
-    submittedDate: new Date().toISOString().slice(0, 10),
-    status: 'pending' as RequestStatus,
-  });
-
-  const loadProcurement = useCallback(async () => {
+  const loadPlanning = useCallback(async () => {
     setLoading(true);
     try {
-      const [requestsResponse, historyResponse, optionsResponse] = await Promise.all([
-        apiClient.get('/plant-manager/procurement/requests'),
-        apiClient.get('/plant-manager/procurement/requests', { params: { scope: 'history' } }),
+      const [optionsResponse, activityResponse] = await Promise.all([
         apiClient.get('/plant-manager/procurement/options'),
+        apiClient.get('/plant-manager/procurement/requests?scope=history'),
       ]);
-      const mapRequest = (request: any): RequestHistory => ({
-        id: String(request.id),
-        requestNo: request.request_no,
-        product: request.product_name,
-        warehouse: request.warehouse_name,
-        requestedQty: Number(request.requested_qty),
-        submittedDate: request.submitted_date ?? '',
-        status: request.status as RequestStatus,
-        requestedBy: request.requested_by ?? '—',
-        priority: request.priority as Priority,
-      });
-      setActiveRequests((requestsResponse.data?.data ?? []).map(mapRequest));
-      setHistory((historyResponse.data?.data ?? []).map(mapRequest));
-      setProducts(optionsResponse.data?.data ?? []);
-      const warehouse = optionsResponse.data?.warehouse;
-      setProcurementWarehouse(warehouse ? { id: Number(warehouse.id), name: String(warehouse.name) } : null);
-    } catch (error: any) {
-      setToast({ message: error?.response?.data?.message || 'Unable to load procurement data.', type: 'error' });
+      setCandidates(optionsResponse.data?.data ?? []);
+      setWarehouse(optionsResponse.data?.warehouse ?? null);
+      setRecentActivity(activityResponse.data?.data ?? []);
+    } catch (error: unknown) {
+      setToast({ message: getErrorMessage(error), type: 'error' });
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadProcurement();
-  }, [loadProcurement]);
+    void loadPlanning();
+  }, [loadPlanning]);
 
-  useEffect(() => {
-    if (!showNewRequestModal) return;
-
-    setNewRequest((current) => ({ ...current, warehouse: procurementWarehouse?.name ?? '' }));
-    apiClient.get('/products')
-      .then((response) => {
-        const records = response.data?.data ?? response.data ?? [];
-        setCatalogProducts(records.map((product: any) => ({
-          id: Number(product.id),
-          name: String(product.name),
-          category: String(product.category ?? ''),
-        })));
-      })
-      .catch((error: any) => {
-        showToast(error?.response?.data?.message || 'Unable to load Product Catalog.', 'error');
-      });
-  }, [showNewRequestModal, procurementWarehouse]);
-
-  const catalogCategories = useMemo(
-    () => Array.from(new Set(catalogProducts.map((product) => product.category).filter(Boolean))).sort(),
-    [catalogProducts]
-  );
-  const categoryProducts = useMemo(
-    () => selectedCategory
-      ? catalogProducts.filter((product) => product.category === selectedCategory)
-      : [],
-    [catalogProducts, selectedCategory]
-  );
-  const selectedCatalogProduct = useMemo(
-    () => categoryProducts.find((product) => String(product.id) === newRequest.product) ?? null,
-    [categoryProducts, newRequest.product],
-  );
-  const selectedInventory = useMemo(
-    () => selectedCatalogProduct && procurementWarehouse
-      ? products.find((product) => product.productId === selectedCatalogProduct.id && product.warehouseId === procurementWarehouse.id) ?? null
-      : null,
-    [products, procurementWarehouse, selectedCatalogProduct],
-  );
-  const selectedCurrentStock = selectedCatalogProduct ? selectedInventory?.currentStock ?? 0 : null;
-  const selectedAutomaticPriority = selectedCatalogProduct ? selectedInventory?.priority ?? 'Critical' : null;
-
-  useEffect(() => {
-    if (!productDropdownOpen) return;
-
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!productDropdownRef.current?.contains(event.target as Node)) setProductDropdownOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setProductDropdownOpen(false);
-    };
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [productDropdownOpen]);
-
-  // Filtered products
-  const filteredRequests = useMemo(() => {
-    return activeRequests.filter((r) => {
-      const matchSearch =
-        r.requestNo.toLowerCase().includes(search.toLowerCase()) ||
-        r.product.toLowerCase().includes(search.toLowerCase()) ||
-        r.warehouse.toLowerCase().includes(search.toLowerCase()) ||
-        r.requestedBy.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === 'All Status' || r.status === statusFilter;
-      const matchPriority = priorityFilter === 'All Priorities' || (r.priority || '') === priorityFilter;
-      return matchSearch && matchStatus && matchPriority;
+  const filteredCandidates = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return candidates.filter((candidate) => {
+      const matchesSearch = !term
+        || candidate.name.toLowerCase().includes(term)
+        || candidate.sku.toLowerCase().includes(term)
+        || candidate.warehouse.toLowerCase().includes(term);
+      const matchesPriority = priorityFilter === 'all' || candidate.priority === priorityFilter;
+      const matchesStatus = statusFilter === 'all' || candidate.requestStatus === statusFilter;
+      return matchesSearch && matchesPriority && matchesStatus;
     });
-  }, [activeRequests, search, statusFilter, priorityFilter]);
+  }, [candidates, priorityFilter, search, statusFilter]);
 
-  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
-  const paginatedRequests = filteredRequests.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const visibleCandidates = filteredCandidates.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const selectableVisibleIds = visibleCandidates
+    .filter((candidate) => candidate.canRequest)
+    .map((candidate) => candidate.id);
+  const allVisibleSelected = selectableVisibleIds.length > 0
+    && selectableVisibleIds.every((id) => selectedIds.includes(id));
 
-  // Summary counts
-  const needingReplenishment = products.filter((p) => p.needsReplenishment).length;
-  const criticalStock = products.filter((p) => p.priority === 'Critical').length;
-  const pendingRequests = history.filter((r) => r.status === 'pending').length;
-  const approvedRequests = history.filter((r) => r.status === 'approved').length;
-  const rejectedRequests = history.filter((r) => r.status === 'rejected').length;
-  const criticalRequests = history.filter((r) => r.priority === 'Critical').length;
-  const completedRequests = history.filter((r) => r.status === 'for_purchase_order').length;
+  const summary = useMemo(() => ({
+    needing: candidates.length,
+    critical: candidates.filter((candidate) => candidate.priority === 'Critical').length,
+    pending: candidates.filter((candidate) => candidate.requestStatus === 'pending').length,
+    forPo: candidates.filter((candidate) => candidate.requestStatus === 'for_purchase_order').length,
+  }), [candidates]);
 
-  // Handlers
-  const handleCreateRequest = (product: Product) => {
-    setSelectedProduct(product);
-    setReason('');
-    setNotes('');
-    setShowCreateModal(true);
+  const openRequestDialog = (items: Candidate[]) => {
+    setQuantities(Object.fromEntries(items.map((candidate) => [candidate.id, ''])));
+    setQuantityErrors({});
+    setRequestCandidates(items);
   };
 
-  const handleViewDetails = (request: RequestHistory) => {
-    setSelectedRequest(request);
-    setShowViewModal(true);
+  const quantityError = (value: string | undefined): string => {
+    const trimmed = (value ?? '').trim();
+    if (!trimmed) return 'Enter a requested quantity.';
+    if (!/^\d+$/.test(trimmed)) return 'Enter a whole number (no decimals or negative values).';
+    const quantity = Number(trimmed);
+    if (quantity < 1) return 'Requested quantity must be greater than zero.';
+    if (quantity > MAX_REQUESTED_QTY) return `Requested quantity cannot exceed ${MAX_REQUESTED_QTY.toLocaleString()}.`;
+    return '';
   };
 
-  const submitRequest = async () => {
-    if (!selectedProduct) return;
+  const normalizeQuantity = (value: string | undefined): string => {
+    const trimmed = (value ?? '').trim();
+    return quantityError(trimmed) === '' ? String(Number(trimmed)) : trimmed;
+  };
+
+  const canForward = requestCandidates.length > 0
+    && requestCandidates.every((candidate) => quantityError(quantities[candidate.id]) === '');
+
+  const submitRequests = async () => {
+    if (!warehouse || requestCandidates.length === 0) return;
+    const errors = Object.fromEntries(requestCandidates.map((candidate) => [candidate.id, quantityError(quantities[candidate.id])]).filter(([, message]) => message));
+    setQuantityErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      requestAnimationFrame(() => document.getElementById(`requested-qty-${Object.keys(errors)[0]}`)?.focus());
+      return;
+    }
+
+    const normalizedQuantities = Object.fromEntries(requestCandidates.map((candidate) => [
+      candidate.id,
+      normalizeQuantity(quantities[candidate.id]),
+    ]));
+    setQuantities(normalizedQuantities);
+
     setSubmitting(true);
     try {
-      await apiClient.post('/plant-manager/procurement/requests', {
-        product_id: selectedProduct.productId,
-        warehouse_id: selectedProduct.warehouseId,
-        requested_qty: selectedProduct.recommendedReorderQty,
-        status: 'pending',
+      if (requestCandidates.length === 1) {
+        const candidate = requestCandidates[0];
+        await apiClient.post('/plant-manager/procurement/requests', {
+          product_id: candidate.productId,
+          warehouse_id: warehouse.id,
+          requested_qty: Number(normalizedQuantities[candidate.id]),
+          status: 'pending',
+        });
+      } else {
+        await apiClient.post('/plant-manager/procurement/requests/bulk', {
+          items: requestCandidates.map((candidate) => ({
+            product_id: candidate.productId,
+            requested_qty: Number(normalizedQuantities[candidate.id]),
+          })),
+        });
+      }
+      setToast({
+        message: requestCandidates.length === 1
+          ? 'Replenishment request submitted for Admin approval.'
+          : requestCandidates.length + ' replenishment requests submitted for Admin approval.',
+        type: 'success',
       });
-      await loadProcurement();
-      setShowCreateModal(false);
-      setSelectedProduct(null);
-      showToast('Request submitted successfully!', 'success');
-    } catch (error: any) {
-      showToast(error?.response?.data?.message || 'Request could not be submitted.', 'error');
+      setRequestCandidates([]);
+      setSelectedIds([]);
+      await loadPlanning();
+    } catch (error: unknown) {
+      setToast({ message: getErrorMessage(error), type: 'error' });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleOpenNewRequest = () => {
-    setSelectedCategory('');
-    setNewRequest((current) => ({ ...current, product: '' }));
-    setShowNewRequestModal(true);
+  const toggleCandidate = (candidate: Candidate) => {
+    if (!candidate.canRequest) return;
+    setSelectedIds((current) => (
+      current.includes(candidate.id)
+        ? current.filter((id) => id !== candidate.id)
+        : [...current, candidate.id]
+    ));
   };
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    setNewRequest((current) => ({ ...current, product: '' }));
-    setProductDropdownOpen(false);
-    setActiveProductIndex(0);
+  const setFilterAndResetPage = (setter: () => void) => {
+    setter();
+    setPage(1);
   };
 
-  const handleNewRequestSubmit = async () => {
-    if (!selectedCategory || !newRequest.product || !newRequest.warehouse || !newRequest.quantity || Number(newRequest.quantity) <= 0) {
-      showToast('Please fill in all required fields.', 'error');
-      return;
-    }
+  const selectedCandidates = candidates.filter((candidate) => selectedIds.includes(candidate.id));
 
-    const product = catalogProducts.find((item) => String(item.id) === newRequest.product);
-    if (!product || product.category !== selectedCategory || !procurementWarehouse) {
-      showToast('Select a valid catalog product and warehouse.', 'error');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await apiClient.post('/plant-manager/procurement/requests', {
-        product_id: product.id,
-        warehouse_id: procurementWarehouse.id,
-        requested_qty: Number(newRequest.quantity),
-        status: 'pending',
-      });
-      await loadProcurement();
-      setShowNewRequestModal(false);
-      setSelectedCategory('');
-      setNewRequest({ requestNo: '', product: '', warehouse: procurementWarehouse.name, quantity: '', submittedDate: new Date().toISOString().slice(0, 10), status: 'pending' });
-      showToast('Request created successfully!', 'success');
-    } catch (error: any) {
-      showToast(error?.response?.data?.message || 'Request could not be created.', 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const showToast = (message: string, type: 'success' | 'info' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
-
-  const recommendations = products
-    .filter((p) => p.needsReplenishment && p.recommendedReorderQty > 0)
-    .slice(0, 3);
-
-  {/* FIX: Prevent UI horizontal overflow and align container spacing */}
   return (
-    <div className="w-full max-w-[100vw] overflow-x-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] min-h-screen transition-colors duration-200">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Replenishment Planning</h1>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Monitor inventory levels and submit replenishment requests to Admin.
+    <div className="mx-auto w-full min-w-0 max-w-[1400px] space-y-6 p-4 pb-10 sm:p-6 sm:pb-10 lg:p-8 lg:pb-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 dark:text-cyan-400">
+            Plant Manager · Procurement
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">Replenishment Planning</h1>
+          <p className="mt-2 max-w-3xl text-sm text-[var(--text-secondary)]">
+            Inventory at or below 30 units is identified automatically. Review live priority and submit only the items that need procurement.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => void loadProcurement()} disabled={loading} className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 flex items-center gap-2 border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)] disabled:opacity-50 disabled:cursor-not-allowed">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
-          <button
-            onClick={handleOpenNewRequest}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
-          >
-            <Plus className="w-4 h-4" /> New Request
-          </button>
-        </div>
-      </div>
+        <button
+          type="button"
+          onClick={() => void loadPlanning()}
+          disabled={loading}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-slate-950 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[var(--border-color)] dark:bg-[var(--bg-card)] dark:text-[var(--text-primary)] dark:hover:bg-[var(--bg-surface-alt)] dark:focus-visible:outline-cyan-500"
+        >
+          <RefreshCw className={'h-4 w-4 ' + (loading ? 'animate-spin' : '')} />
+          Refresh
+        </button>
+      </header>
 
-      {/* FIX: Responsive metric cards grid to prevent overflow on narrow screens */}
-      <div className="grid grid-cols-1 gap-4 w-full sm:grid-cols-2 lg:grid-cols-3">
-        <KPICard
-          label="Needing Replenishment"
-          value={needingReplenishment}
-          icon={<AlertTriangle className="w-5 h-5 text-amber-400" />}
-        />
-        <KPICard
-          label="Critical Stock Items"
-          value={criticalStock}
-          icon={<AlertTriangle className="w-5 h-5 text-red-400" />}
-        />
-        <KPICard
-          label="Pending Requests"
-          value={pendingRequests}
-          icon={<Clock className="w-5 h-5 text-amber-400" />}
-        />
-        <KPICard
-          label="Approved Requests"
-          value={approvedRequests}
-          icon={<CheckCircle className="w-5 h-5 text-emerald-400" />}
-        />
-        <KPICard
-          label="Rejected Requests"
-          value={rejectedRequests}
-          icon={<XCircle className="w-5 h-5 text-red-400" />}
-        />
-        <KPICard
-          label="For Purchase Order"
-          value={completedRequests}
-          icon={<CheckCircle className="w-5 h-5 text-cyan-400" />}
-        />
-      </div>
+      <section aria-label="Replenishment summary" className="grid min-w-0 grid-cols-1 gap-3 min-[390px]:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Needing Replenishment', value: summary.needing, icon: AlertTriangle, color: 'text-amber-500' },
+          { label: 'Critical', value: summary.critical, icon: XCircle, color: 'text-red-500' },
+          { label: 'Pending Approval', value: summary.pending, icon: Clock, color: 'text-amber-500' },
+          { label: 'For PO', value: summary.forPo, icon: ShoppingCart, color: 'text-sky-500' },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <article key={label} className="min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-words text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{label}</p>
+                <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{value}</p>
+              </div>
+              <span className="rounded-xl bg-[var(--bg-surface-alt)] p-2.5"><Icon className={'h-5 w-5 ' + color} /></span>
+            </div>
+          </article>
+        ))}
+      </section>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 sm:flex-row sm:items-center sm:gap-3">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search request, requester, product, or warehouse..." />
-        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
-          <div className="order-1 flex h-[30px] shrink-0 items-center gap-0.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-0 sm:order-4 sm:ml-auto sm:h-9 sm:p-0.5" aria-label="Request view">
-            <button type="button" onClick={() => setViewMode('list')} aria-label="Table view" aria-pressed={viewMode === 'list'} title="Table view" className={`pm-procurement-toolbar-toggle-button flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors sm:h-8 sm:w-8 ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutList className="h-3 w-3 sm:h-4 sm:w-4" /></button>
-            <button type="button" onClick={() => setViewMode('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} title="Grid view" className={`pm-procurement-toolbar-toggle-button flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors sm:h-8 sm:w-8 ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}><LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4" /></button>
-          </div>
-          <div className="order-2 min-w-[88px] flex-1 sm:order-1 sm:flex-none">
-            <FilterSelect value={statusFilter} onChange={setStatusFilter} options={['All Status', 'draft', 'pending']} />
-          </div>
-          <div className="order-3 flex min-w-[148px] flex-1 items-center gap-2 sm:order-2 sm:flex-none">
-            <FilterSelect value={priorityFilter} onChange={setPriorityFilter} options={['All Priorities', 'Low', 'Medium', 'High', 'Critical']} />
-            <button
-              type="button"
-              onClick={() => {
-                setSearch('');
-                setStatusFilter('All Status');
-                setPriorityFilter('All Priorities');
-              }}
-              aria-label="Reset procurement filters"
-              title="Reset filters"
-              className="pm-procurement-toolbar-reset flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-alt)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 sm:order-3 sm:h-10 sm:w-10 sm:rounded-xl"
-            >
-              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Table */}
-      <div className="w-full max-w-full bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl overflow-hidden">
-        {viewMode === 'list' ? (
-        <div className="pm-table-scroll pm-procurement-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
-          <table className="pm-status-table pm-procurement-status-table pm-procurement-layout-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full table-fixed">
-            <colgroup>
-              <col className="w-48" />
-              <col className="w-40" />
-              <col className="w-40" />
-              <col className="w-52" />
-              <col className="w-[8.5rem]" />
-              <col className="w-28" />
-              <col className="w-[11.5rem]" />
-              <col className="w-32" />
-              <col className="w-22" />
-            </colgroup>
-            <thead className="bg-[var(--bg-surface-alt)] border-b border-[var(--border-color)]">
-              <tr>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
-                <th className="whitespace-nowrap px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
-                <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
-                <th className="px-4 py-3.5 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedRequests.map((req) => (
-                <tr key={req.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
-                  <td className="overflow-hidden text-ellipsis whitespace-nowrap px-4 py-3.5 text-sm font-medium text-[var(--text-primary)]" title={req.requestNo}>{req.requestNo}</td>
-                  <td className="truncate px-4 py-3.5 text-sm text-[var(--text-secondary)]" title={req.requestedBy}>{req.requestedBy}</td>
-                  <td className="truncate px-4 py-3.5 text-sm text-[var(--text-secondary)]" title={req.warehouse}>{req.warehouse}</td>
-                  <td className="truncate px-4 py-3.5 text-sm text-[var(--text-secondary)]" title={req.product}>{req.product}</td>
-                  <td className="whitespace-nowrap px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.requestedQty.toLocaleString()}</td>
-                  <td className="px-4 py-3.5"><PriorityBadge priority={req.priority} /></td>
-                  <td className="px-4 py-3.5"><StatusBadge status={req.status} /></td>
-                  <td className="whitespace-nowrap px-4 py-3.5 text-sm text-[var(--text-secondary)]">{req.submittedDate}</td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => handleViewDetails(req)}
-                        className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-                        title="View"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {paginatedRequests.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-[var(--text-muted)]">
-                    No requests found matching your criteria.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        ) : paginatedRequests.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedRequests.map((req) => <article key={req.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{req.requestNo}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{req.product}</p></div><StatusBadge status={req.status} /></div><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Requested by</dt><dd className="text-slate-900 dark:text-white">{req.requestedBy}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{req.warehouse}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Quantity</dt><dd className="text-slate-900 dark:text-white">{req.requestedQty.toLocaleString()}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Date</dt><dd className="text-slate-900 dark:text-white">{req.submittedDate}</dd></div></dl><div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700"><PriorityBadge priority={req.priority} /><button onClick={() => handleViewDetails(req)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View"><Eye className="h-4 w-4" /></button></div></article>)}</div>
-        ) : (
-          <div className="px-4 py-8 text-center text-[var(--text-muted)]">No requests found matching your criteria.</div>
-        )}
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          totalItems={filteredRequests.length}
-          itemsPerPage={itemsPerPage}
-        />
-      </div>
-
-      {/* Request History Section */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Request History</h3>
-            <p className="text-sm text-[var(--text-muted)]">Track your submitted replenishment requests</p>
-          </div>
-          <button className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">View all</button>
-        </div>
-        <div className="pm-table-scroll pm-procurement-table-scroll custom-scrollbar min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
-          <table className="pm-status-table pm-procurement-status-table pm-procurement-layout-table pm-responsive-table pm-cols-9 pm-sticky-1 w-full table-fixed">
-            <colgroup>
-              <col className="w-48" />
-              <col className="w-40" />
-              <col className="w-40" />
-              <col className="w-52" />
-              <col className="w-[8.5rem]" />
-              <col className="w-28" />
-              <col className="w-[11.5rem]" />
-              <col className="w-32" />
-              <col className="w-22" />
-            </colgroup>
-            <thead className="border-b border-[var(--border-color)]">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Request No.</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested By</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Warehouse</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Product</th>
-                <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Requested Qty</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Priority</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Status</th>
-                <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Date</th>
-                <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((item) => (
-                <tr key={item.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-surface-alt)] transition-all">
-                  <td className="overflow-hidden text-ellipsis whitespace-nowrap px-4 py-2.5 text-sm font-medium text-[var(--text-primary)]" title={item.requestNo}>{item.requestNo}</td>
-                  <td className="truncate px-4 py-2.5 text-sm text-[var(--text-secondary)]" title={item.requestedBy}>{item.requestedBy}</td>
-                  <td className="truncate px-4 py-2.5 text-sm text-[var(--text-secondary)]" title={item.warehouse}>{item.warehouse}</td>
-                  <td className="truncate px-4 py-2.5 text-sm text-[var(--text-secondary)]" title={item.product}>{item.product}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.requestedQty.toLocaleString()}</td>
-                  <td className="px-4 py-2.5"><PriorityBadge priority={item.priority} /></td>
-                  <td className="px-4 py-2.5"><StatusBadge status={item.status} /></td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-sm text-[var(--text-secondary)]">{item.submittedDate}</td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => handleViewDetails(item)}
-                        className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-                        title="View"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {history.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-6 text-center text-[var(--text-muted)]">No request history found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Right Panel: Replenishment Insights */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-5">
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Replenishment Insights</h3>
-        <div className="space-y-3">
-          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5" />
-            <span><strong>{pendingRequests}</strong> requests are waiting for Admin approval.</span>
-          </div>
-          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5" />
-            <span><strong>{approvedRequests}</strong> replenishment requests have been approved.</span>
-          </div>
-          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
-            <Clock className="w-4 h-4 text-amber-400 mt-0.5" />
-            <span><strong>{rejectedRequests}</strong> replenishment requests have been rejected.</span>
-          </div>
-          <div className="bg-[var(--bg-surface-alt)] rounded-xl p-3 text-sm text-[var(--text-secondary)] flex items-start gap-2">
-            <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5" />
-            <span><strong>{criticalRequests}</strong> requests are marked critical.</span>
-          </div>
-        </div>
-      </div>
-
-      {/* FIX: AI recommendation cards responsive grid */}
-      {recommendations.length > 0 && (
-        <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">AI Recommendations</h3>
-              <p className="text-sm text-[var(--text-muted)]">Products that need immediate attention</p>
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+        <div className="border-b border-[var(--border-color)] p-4 sm:p-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Inventory candidates</h2>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Live stock priority is separate from the lifecycle status of any submitted request.
+              </p>
+            </div>
+            <div className="grid w-full min-w-0 gap-2 sm:grid-cols-3 xl:max-w-[680px] xl:flex-1">
+              <label className="relative min-w-0">
+                <span className="sr-only">Search candidates</span>
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  value={search}
+                  onChange={(event) => setFilterAndResetPage(() => setSearch(event.target.value))}
+                  placeholder="Search product, SKU, warehouse"
+                  className="min-h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] pl-10 pr-3 text-sm text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-cyan-500/40"
+                />
+              </label>
+              <label className="min-w-0">
+                <span className="sr-only">Filter by priority</span>
+                <select
+                  value={priorityFilter}
+                  onChange={(event) => setFilterAndResetPage(() => setPriorityFilter(event.target.value as 'all' | Priority))}
+                  className="min-h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-cyan-500/40"
+                >
+                  <option value="all">All priorities</option>
+                  <option value="Critical">Critical</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                </select>
+              </label>
+              <label className="min-w-0">
+                <span className="sr-only">Filter by request status</span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setFilterAndResetPage(() => setStatusFilter(event.target.value as RequestStatus | 'all'))}
+                  className="min-h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-cyan-500/40"
+                >
+                  <option value="all">All request statuses</option>
+                  <option value="not_submitted">Not Submitted</option>
+                  <option value="pending">Pending Approval</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="for_purchase_order">For Purchase Order</option>
+                </select>
+              </label>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-            {recommendations.map((product) => (
-              <div key={product.id} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-[var(--text-primary)] font-medium">{product.name}</p>
-                    <p className="text-xs text-[var(--text-muted)]">{product.sku}</p>
+        </div>
+
+        {selectedIds.length > 0 && (
+          <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-cyan-500/20 dark:bg-cyan-500/5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {selectedIds.length} eligible item{selectedIds.length === 1 ? '' : 's'} selected
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setSelectedIds([])} className="min-h-11 rounded-xl px-4 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)]">
+                Clear
+              </button>
+              <button type="button" onClick={() => openRequestDialog(selectedCandidates)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-slate-950 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:outline-cyan-500">
+                <Send className="h-4 w-4" />
+                Forward Selected to Admin
+              </button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex min-h-64 items-center justify-center text-sm text-[var(--text-secondary)]">
+            <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Loading live inventory…
+          </div>
+        ) : candidates.length === 0 ? (
+          <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
+            <CheckCircle className="h-10 w-10 text-emerald-500" />
+            <h3 className="mt-4 font-semibold text-[var(--text-primary)]">No replenishment needed</h3>
+            <p className="mt-2 max-w-md text-sm text-[var(--text-secondary)]">
+              All inventory items are currently above the replenishment threshold.
+            </p>
+          </div>
+        ) : filteredCandidates.length === 0 ? (
+          <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center">
+            <Search className="h-9 w-9 text-[var(--text-muted)]" />
+            <h3 className="mt-3 font-semibold text-[var(--text-primary)]">No matching candidates</h3>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Clear or adjust the current search and filters.</p>
+          </div>
+        ) : (
+          <>
+            <div className="pm-procurement-table-scroll hidden w-full min-w-0 max-w-full overscroll-x-contain md:block">
+              <table className="w-full min-w-[980px] table-fixed text-left">
+                <thead className="bg-[var(--bg-surface-alt)] text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                  <tr>
+                    <th className="w-12 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all eligible candidates on this page"
+                        checked={allVisibleSelected}
+                        disabled={selectableVisibleIds.length === 0}
+                        onChange={() => setSelectedIds((current) => (
+                          allVisibleSelected
+                            ? current.filter((id) => !selectableVisibleIds.includes(id))
+                            : Array.from(new Set([...current, ...selectableVisibleIds]))
+                        ))}
+                        className="h-4 w-4 rounded border-[var(--border-color)] accent-cyan-600"
+                      />
+                    </th>
+                    <th className="w-56 px-4 py-3">Product</th>
+                    <th className="w-36 px-4 py-3">Available stock</th>
+                    <th className="w-28 px-4 py-3">Priority</th>
+                    <th className="w-44 px-4 py-3">Request status</th>
+                    <th className="w-44 px-4 py-3">Warehouse</th>
+                    <th className="w-40 px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-color)]">
+                  {visibleCandidates.map((candidate) => (
+                    <tr key={candidate.id} className="text-sm hover:bg-[var(--bg-surface-alt)]/60">
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          aria-label={'Select ' + candidate.name}
+                          checked={selectedIds.includes(candidate.id)}
+                          disabled={!candidate.canRequest}
+                          onChange={() => toggleCandidate(candidate)}
+                          className="h-4 w-4 rounded border-[var(--border-color)] accent-cyan-600 disabled:cursor-not-allowed disabled:opacity-35"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="break-words font-semibold text-[var(--text-primary)]">{candidate.name}</p>
+                        <p className="mt-1 break-all text-xs text-[var(--text-muted)]">{candidate.sku}</p>
+                        {candidate.supplierWarning && <SupplierWarning />}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="font-semibold text-[var(--text-primary)]">{candidate.currentStock}</span>
+                        {candidate.currentStock < 0 && <span className="ml-2 text-xs font-semibold text-red-500">Invalid stock</span>}
+                      </td>
+                      <td className="px-4 py-4"><PriorityBadge priority={candidate.priority} /></td>
+                      <td className="px-4 py-4"><StatusBadge status={candidate.requestStatus} /><StageHint request={candidate.request} /></td>
+                      <td className="break-words px-4 py-4 text-[var(--text-secondary)]">{candidate.warehouse}</td>
+                      <td className="px-4 py-4 text-right">
+                        {candidate.request ? (
+                          <button type="button" onClick={() => candidate.request && openDetail(candidate.request, candidate.currentStock)} aria-label="View replenishment request details" title="View details" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]">
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => openRequestDialog([candidate])} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-slate-950 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:outline-cyan-500">
+                            <Send className="h-4 w-4" /> Forward to Admin
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-[var(--border-color)] md:hidden">
+              {visibleCandidates.map((candidate) => (
+                <article key={candidate.id} className="p-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      aria-label={'Select ' + candidate.name}
+                      checked={selectedIds.includes(candidate.id)}
+                      disabled={!candidate.canRequest}
+                      onChange={() => toggleCandidate(candidate)}
+                      className="mt-1 h-5 w-5 rounded border-[var(--border-color)] accent-cyan-600 disabled:opacity-35"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-[var(--text-primary)]">{candidate.name}</p>
+                      <p className="mt-1 break-words text-xs text-[var(--text-muted)]">{candidate.sku} · {candidate.warehouse}</p>
+                      {candidate.supplierWarning && <SupplierWarning />}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <PriorityBadge priority={candidate.priority} />
+                        <StatusBadge status={candidate.requestStatus} />
+                      </div>
+                      <StageHint request={candidate.request} />
+                      <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                        Available stock: <strong className="text-[var(--text-primary)]">{candidate.currentStock}</strong>
+                        {candidate.currentStock < 0 && <span className="ml-2 font-semibold text-red-500">Invalid stock</span>}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => candidate.request
+                          ? openDetail(candidate.request, candidate.currentStock)
+                          : openRequestDialog([candidate])}
+                        aria-label={candidate.request ? 'View replenishment request details' : 'Forward to Admin'}
+                        title={candidate.request ? 'View details' : 'Forward to Admin'}
+                        className={'mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold ' + (candidate.request ? 'min-w-11 border border-slate-300 bg-white px-3 text-slate-950 hover:bg-slate-100 dark:border-[var(--border-color)] dark:bg-[var(--bg-surface-alt)] dark:text-[var(--text-primary)]' : 'w-full bg-slate-950 px-4 text-white hover:bg-slate-800 dark:bg-cyan-600 dark:hover:bg-cyan-500')}
+                      >
+                        {candidate.request ? <Eye className="h-4 w-4" /> : <><Send className="h-4 w-4" /> Forward to Admin</>}
+                      </button>
+                    </div>
                   </div>
-                  <PriorityBadge priority={product.priority} />
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-1 text-sm">
-                  <span className="text-[var(--text-muted)]">Current Stock</span>
-                  <span className="text-[var(--text-primary)] text-right">{product.currentStock}</span>
-                  <span className="text-[var(--text-muted)]">Forecast</span>
-                  <span className="text-[var(--text-primary)] text-right">{product.forecastedDemand}</span>
-                  <span className="text-[var(--text-muted)]">Recommended</span>
-                  <span className="text-[var(--text-primary)] text-right font-medium">{product.recommendedReorderQty}</span>
-                </div>
-                <button
-                  onClick={() => handleCreateRequest(product)}
-                  className="mt-3 w-full py-2 rounded-xl text-sm font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-all"
-                >
-                  Create Request
+                </article>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-[var(--border-color)] bg-[var(--bg-surface-alt)] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[var(--text-secondary)]">
+                Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredCandidates.length)} of {filteredCandidates.length}
+              </p>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <button type="button" aria-label="Previous page" disabled={safePage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-35">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="px-2 font-medium text-[var(--text-primary)]">Page {safePage} of {totalPages}</span>
+                <button type="button" aria-label="Next page" disabled={safePage === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-35">
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent replenishment activity</h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Your five most recently submitted requests.</p>
+          </div>
+          <Link to="/plant-manager/reports" className="whitespace-nowrap text-sm font-semibold text-cyan-600 hover:text-cyan-500 dark:text-cyan-400">
+            View full report →
+          </Link>
+        </div>
+        {recentActivity.length === 0 ? (
+          <p className="mt-5 rounded-xl bg-[var(--bg-surface-alt)] px-4 py-6 text-center text-sm text-[var(--text-secondary)]">
+            No recent replenishment activity.
+          </p>
+        ) : (
+          <div className="mt-4 divide-y divide-[var(--border-color)]">
+            {recentActivity.map((item) => (
+              <button key={item.id} type="button" onClick={() => openDetail(item)} className="flex min-h-16 w-full min-w-0 items-start justify-between gap-3 py-3 text-left hover:bg-[var(--bg-surface-alt)] sm:items-center sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{item.product_name}</p>
+                  <p className="mt-1 break-words text-xs text-[var(--text-muted)]">{item.request_no} · {formatDate(item.submitted_date)}</p>
+                </div>
+                <StatusBadge status={item.status} />
+              </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </section>
 
-      {/* New Request Modal */}
-      {showNewRequestModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setShowNewRequestModal(false)}
-        >
-          <div
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">New Request</h2>
-              <button
-                onClick={() => setShowNewRequestModal(false)}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-              >
-                <X className="w-5 h-5" />
+      {requestCandidates.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="request-dialog-title">
+          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl sm:max-w-2xl sm:rounded-2xl">
+            <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-[var(--border-color)] bg-[var(--bg-card)] p-5">
+              <div>
+                <h2 id="request-dialog-title" className="text-lg font-semibold text-[var(--text-primary)]">
+                  {requestCandidates.length === 1 ? 'Forward Replenishment Request' : 'Forward Bulk Replenishment Request'}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">Enter the requested quantity for every item before forwarding to Admin.</p>
+              </div>
+              <button type="button" aria-label="Close request dialog" onClick={() => setRequestCandidates([])} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)]">
+                <X className="h-5 w-5" />
               </button>
             </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="min-w-0">
-                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Request No.</label>
+            <div className="space-y-3 p-5">
+              {requestCandidates.map((candidate) => (
+                <div key={candidate.id} className="grid gap-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-alt)] p-4 sm:grid-cols-[1fr_170px] sm:items-end">
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">{candidate.name}</p>
+                    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                      <dt className="text-[var(--text-muted)]">Available stock</dt><dd className="font-medium text-[var(--text-primary)]">{candidate.currentStock}</dd>
+                      <dt className="text-[var(--text-muted)]">Priority</dt><dd><PriorityBadge priority={candidate.priority} /></dd>
+                      <dt className="text-[var(--text-muted)]">Assigned supplier</dt><dd className="font-medium text-[var(--text-primary)]">{candidate.primarySupplier?.name ?? <span className="text-amber-600 dark:text-amber-400">No Active Supplier Assigned</span>}</dd>
+                    </dl>
+                    {candidate.supplierWarning && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Admin will select an active supplier when creating the Purchase Order.</p>}
+                    {candidate.requestStatus === 'rejected' && candidate.request?.admin_decision && (
+                      <p className="mt-2 text-xs text-red-500">Previous decision: {candidate.request.admin_decision}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label htmlFor={`requested-qty-${candidate.id}`} className="text-sm font-medium text-[var(--text-primary)]">
+                      Requested quantity <span aria-hidden="true" className="text-red-500">*</span>
+                    </label>
                     <input
-                      type="text"
-                      value={newRequest.requestNo}
-                      readOnly
-                      placeholder="Assigned on submission"
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Date Submitted</label>
-                    <input
-                      type="date"
-                      value={newRequest.submittedDate}
-                      readOnly
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="procurement-category" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Category <span className="text-red-400">*</span></label>
-                    <select
-                      id="procurement-category"
-                      value={selectedCategory}
-                      onChange={(e) => handleCategoryChange(e.target.value)}
-                      className="w-full cursor-pointer bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    >
-                      <option value="">Select Category</option>
-                      {catalogCategories.map((category) => <option key={category} value={category}>{category}</option>)}
-                    </select>
-                  </div>
-                  <div className="min-w-0">
-                    <label id="procurement-product-label" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Product <span className="text-red-400">*</span></label>
-                    <div ref={productDropdownRef} className="relative min-w-0">
-                      <button
-                        id="procurement-product"
-                        type="button"
-                        aria-labelledby="procurement-product-label procurement-product"
-                        aria-haspopup="listbox"
-                        aria-expanded={productDropdownOpen}
-                        aria-controls="procurement-product-options"
-                        aria-activedescendant={productDropdownOpen && categoryProducts[activeProductIndex] ? `procurement-product-option-${categoryProducts[activeProductIndex].id}` : undefined}
-                        disabled={!selectedCategory || categoryProducts.length === 0}
-                        onClick={() => {
-                          setActiveProductIndex(Math.max(0, categoryProducts.findIndex((product) => String(product.id) === newRequest.product)));
-                          setProductDropdownOpen((open) => !open);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                            event.preventDefault();
-                            setProductDropdownOpen(true);
-                            setActiveProductIndex((current) => !productDropdownOpen
-                              ? (event.key === 'ArrowDown' ? 0 : categoryProducts.length - 1)
-                              : event.key === 'ArrowDown'
-                                ? Math.min(current + 1, categoryProducts.length - 1)
-                                : Math.max(current - 1, 0));
-                          }
-                          if (event.key === 'Enter' && productDropdownOpen && categoryProducts[activeProductIndex]) {
-                            event.preventDefault();
-                            setNewRequest((current) => ({ ...current, product: String(categoryProducts[activeProductIndex].id) }));
-                            setProductDropdownOpen(false);
-                          }
-                        }}
-                        className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-4 py-2.5 text-left text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-                        title={selectedCatalogProduct?.name}
-                      >
-                        <span className={`min-w-0 flex-1 break-words leading-5 ${selectedCatalogProduct ? '' : 'text-[var(--text-muted)]'}`}>
-                          {selectedCatalogProduct?.name
-                            ?? (!selectedCategory
-                              ? 'Select a category first'
-                              : categoryProducts.length === 0
-                                ? 'No products available in this category'
-                                : 'Select Product')}
-                        </span>
-                        <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform ${productDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {productDropdownOpen && (
-                        <div
-                          id="procurement-product-options"
-                          role="listbox"
-                          aria-labelledby="procurement-product-label"
-                          className="absolute inset-x-0 top-full z-[60] mt-1 max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1.5 shadow-2xl custom-scrollbar"
-                        >
-                          {categoryProducts.map((product, index) => {
-                            const selected = String(product.id) === newRequest.product;
-                            const active = index === activeProductIndex;
-                            return (
-                              <div
-                                id={`procurement-product-option-${product.id}`}
-                                key={product.id}
-                                role="option"
-                                aria-selected={selected}
-                                onMouseEnter={() => setActiveProductIndex(index)}
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => {
-                                  setNewRequest((current) => ({ ...current, product: String(product.id) }));
-                                  setProductDropdownOpen(false);
-                                }}
-                                className={`cursor-pointer whitespace-normal break-words rounded-lg px-3 py-2.5 text-sm leading-5 text-[var(--text-primary)] transition-colors ${active ? 'bg-cyan-500/10' : 'hover:bg-[var(--bg-surface-alt)]'} ${selected ? 'font-semibold text-cyan-700 dark:text-cyan-300' : ''}`}
-                              >
-                                {product.name}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Warehouse <span className="text-red-400">*</span></label>
-                    <input
-                      type="text"
-                      value={procurementWarehouse?.name ?? ''}
-                      readOnly
-                      disabled
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] opacity-80 cursor-not-allowed"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="mb-1.5 text-sm font-medium text-[var(--text-secondary)]">Priority</p>
-                    <div aria-live="polite" className="min-h-24 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-alt)] px-4 py-3">
-                      {selectedAutomaticPriority ? (
-                        <>
-                          <PriorityBadge priority={selectedAutomaticPriority} />
-                          <p className="mt-2 text-sm text-[var(--text-secondary)]">Current stock: <span className="font-semibold text-[var(--text-primary)]">{selectedCurrentStock}</span></p>
-                          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Automatically determined from the current warehouse stock level.</p>
-                        </>
-                      ) : (
-                        <p className="text-sm text-[var(--text-muted)]">Select a product to view its system-generated priority.</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Quantity <span className="text-red-400">*</span></label>
-                    <input
+                      id={`requested-qty-${candidate.id}`}
                       type="number"
-                      value={newRequest.quantity}
-                      onChange={(e) => setNewRequest({ ...newRequest, quantity: e.target.value })}
+                      inputMode="numeric"
+                      min={1}
+                      max={MAX_REQUESTED_QTY}
+                      step={1}
+                      required
                       placeholder="0"
-                      min="1"
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                      value={quantities[candidate.id] ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setQuantities((current) => ({ ...current, [candidate.id]: value }));
+                        setQuantityErrors((current) => ({ ...current, [candidate.id]: '' }));
+                      }}
+                      onBlur={() => setQuantities((current) => ({
+                        ...current,
+                        [candidate.id]: normalizeQuantity(current[candidate.id]),
+                      }))}
+                      aria-invalid={Boolean(quantityErrors[candidate.id])}
+                      aria-describedby={quantityErrors[candidate.id] ? `requested-qty-${candidate.id}-error` : undefined}
+                      className={'mt-2 min-h-11 w-full rounded-xl border bg-[var(--bg-input)] px-3 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-cyan-500/40 ' + (quantityErrors[candidate.id] ? 'border-red-500' : 'border-[var(--border-color)]')}
                     />
-                  </div>
-                <div className="min-w-0 sm:col-span-2">
-                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Status</label>
-                  <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium">
-                    <Clock className="w-4 h-4" />
-                    Pending Approval
+                    {quantityErrors[candidate.id] && <p id={`requested-qty-${candidate.id}-error`} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">{quantityErrors[candidate.id]}</p>}
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
-                <button
-                  onClick={() => setShowNewRequestModal(false)}
-                  className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleNewRequestSubmit}
-                  disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Submit Request
-                </button>
-              </div>
+              ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Request Modal */}
-      {showCreateModal && selectedProduct && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowCreateModal(false)}
-        >
-          <div
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Create Replenishment Request</h2>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-              >
-                <X className="w-5 h-5" />
+            <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-[var(--border-color)] bg-[var(--bg-card)] p-5 sm:flex-row sm:justify-end">
+              <button type="button" disabled={submitting} onClick={() => setRequestCandidates([])} className="min-h-11 rounded-xl border border-[var(--border-color)] px-4 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] disabled:opacity-50">
+                Cancel
               </button>
-            </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Product</p>
-                    <p className="text-[var(--text-primary)] font-medium">{selectedProduct.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Warehouse</p>
-                    <p className="text-[var(--text-primary)]">{selectedProduct.warehouse}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Current Stock</p>
-                    <p className="text-[var(--text-primary)]">{selectedProduct.currentStock}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">System-Generated Priority</p>
-                    <div className="mt-1"><PriorityBadge priority={selectedProduct.priority} /></div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Minimum Stock</p>
-                    <p className="text-[var(--text-primary)]">{selectedProduct.minStock}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Forecasted Demand</p>
-                    <p className="text-[var(--text-primary)]">{selectedProduct.forecastedDemand}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--text-muted)]">Recommended Quantity</p>
-                    <p className="text-[var(--text-primary)] font-semibold">{selectedProduct.recommendedReorderQty}</p>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Reason *</label>
-                  <input
-                    type="text"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    placeholder="e.g., Upcoming production surge"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Additional Notes</label>
-                  <textarea
-                    rows={3}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                    placeholder="Any additional information..."
-                  />
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitRequest}
-                  disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Submit Request
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View Details Modal */}
-      {showViewModal && selectedRequest && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowViewModal(false)}
-        >
-          <div
-            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">Replenishment Request Details</h2>
-              <button
-                onClick={() => setShowViewModal(false)}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-alt)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Request No.</p>
-                <p className="text-[var(--text-primary)] font-medium">{selectedRequest.requestNo}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Requested By</p>
-                <p className="text-[var(--text-primary)]">{selectedRequest.requestedBy}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Warehouse</p>
-                <p className="text-[var(--text-primary)]">{selectedRequest.warehouse}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Product</p>
-                <p className="text-[var(--text-primary)]">{selectedRequest.product}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Requested Quantity</p>
-                <p className="text-[var(--text-primary)]">{selectedRequest.requestedQty.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Date</p>
-                <p className="text-[var(--text-primary)]">{selectedRequest.submittedDate}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Priority</p>
-                <PriorityBadge priority={selectedRequest.priority} />
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Status</p>
-                <StatusBadge status={selectedRequest.status} />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowViewModal(false)}
-                className="px-5 py-2.5 border border-[var(--border-color)] rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] transition-all"
-              >
-                Close
+              <button type="button" disabled={submitting || !canForward} onClick={() => void submitRequests()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-slate-950 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:outline-cyan-500">
+                {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Forward to Admin
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Toast Notification */}
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="detail-dialog-title">
+          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-5 shadow-2xl sm:max-w-lg sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-cyan-400">{detail.request_no}</p>
+                <h2 id="detail-dialog-title" className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{detail.product_name}</h2>
+              </div>
+              <button type="button" aria-label="Close request details" onClick={() => setDetail(null)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)]"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {[
+                ['Warehouse', detail.warehouse_name],
+                ...(detailStock !== null ? [['Current available stock', String(detailStock)]] : []),
+                ['Requested quantity', String(detail.requested_qty)],
+                ['Submitted', formatDate(detail.submitted_date)],
+                ['Requested by', detail.requested_by],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl bg-[var(--bg-surface-alt)] p-3">
+                  <p className="text-xs text-[var(--text-muted)]">{label}</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PriorityBadge priority={detail.current_priority} />
+              <StatusBadge status={detail.status} />
+            </div>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Current stock priority, request status, and fulfillment stage are shown separately.</p>
+            {detail.current_fulfillment_stage_label && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-cyan-500/30 dark:bg-cyan-500/5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Current fulfillment stage</p>
+                <p className="mt-1 text-base font-semibold text-[var(--text-primary)]">{detail.current_fulfillment_stage_label}</p>
+              </div>
+            )}
+            {(() => {
+              const fulfillment = detail.fulfillment;
+              const purchaseOrder = fulfillment?.purchase_order ?? detail.linked_purchase_order ?? null;
+              const rows = [
+                purchaseOrder && ['Purchase Order', purchaseOrder.number, purchaseOrder.status],
+                fulfillment?.receiving && ['Receiving', fulfillment.receiving.number, fulfillment.receiving.status],
+                fulfillment?.qa_status && ['QA', fulfillment.qa_status, null],
+                fulfillment?.replacement && ['Replacement', replacementLabels[fulfillment.replacement.case_status] ?? fulfillment.replacement.case_status, fulfillment.replacement.receiving_number ? `${fulfillment.replacement.receiving_number} · ${fulfillment.replacement.receiving_status ?? ''}` : null],
+              ].filter(Boolean) as [string, string, string | null][];
+              if (!rows.length) return null;
+              return (
+                <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {rows.map(([label, value, sub]) => (
+                    <div key={label} className="min-w-0 rounded-xl border border-[var(--border-color)] p-3">
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{label}</dt>
+                      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-primary)]">{value}</dd>
+                      {sub && <dd className="mt-0.5 break-words text-xs text-[var(--text-secondary)]">{sub}</dd>}
+                    </div>
+                  ))}
+                </dl>
+              );
+            })()}
+            {detail.timeline && detail.timeline.length > 0 && (
+              <div className="mt-4 rounded-xl border border-[var(--border-color)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Timeline</p>
+                <Timeline steps={detail.timeline} />
+              </div>
+            )}
+            {detail.admin_decision && (
+              <div className="mt-4 rounded-xl border border-[var(--border-color)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Admin decision</p>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">{detail.admin_decision}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[var(--bg-surface)] text-[var(--text-primary)] px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-300">
-          {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400" />}
-          {toast.type === 'error' && <XCircle className="w-5 h-5 text-red-400" />}
-          {toast.type === 'info' && <Clock className="w-5 h-5 text-cyan-400" />}
-          <span className="text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+        <div className="fixed bottom-5 right-5 z-[60] flex max-w-sm items-start gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 text-sm text-[var(--text-primary)] shadow-2xl" role="status">
+          {toast.type === 'success' ? <CheckCircle className="h-5 w-5 shrink-0 text-emerald-500" /> : <XCircle className="h-5 w-5 shrink-0 text-red-500" />}
+          <span>{toast.message}</span>
+          <button type="button" aria-label="Dismiss message" onClick={() => setToast(null)} className="ml-auto text-[var(--text-muted)]"><X className="h-4 w-4" /></button>
         </div>
       )}
     </div>

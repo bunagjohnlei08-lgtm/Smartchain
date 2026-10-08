@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\BusinessTime;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,6 +20,9 @@ class SupplierApplicationAttachment extends Model
         self::TYPE_PRODUCT_SERVICE_IMAGE,
     ];
 
+    /** Persist with an explicit offset; see BusinessTime::DB_DATE_FORMAT. */
+    protected $dateFormat = BusinessTime::DB_DATE_FORMAT;
+
     protected $fillable = [
         'supplier_application_id',
         'attachment_type',
@@ -26,13 +30,16 @@ class SupplierApplicationAttachment extends Model
         'stored_path',
         'mime_type',
         'file_size',
+        'file_sha256',
+        'is_current',
+        'replaced_at',
     ];
 
-    protected $hidden = ['stored_path'];
+    protected $hidden = ['stored_path', 'file_sha256'];
 
     protected function casts(): array
     {
-        return ['file_size' => 'integer'];
+        return ['file_size' => 'integer', 'is_current' => 'boolean', 'replaced_at' => 'datetime'];
     }
 
     public function application(): BelongsTo

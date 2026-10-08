@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   X,
   Clock as ClockIcon,
-  CheckCircle as CheckCircleIcon,
   XCircle,
   FileText,
   RefreshCw,
@@ -21,7 +20,7 @@ import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverla
 // ============================================
 
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
-type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order';
+type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order' | 'po_created' | 'completed' | 'cancelled';
 type ViewMode = 'list' | 'grid';
 
 /**
@@ -44,6 +43,7 @@ interface ReplenishmentRequest {
   reviewed_by: string | null;
   approved_date: string | null;
   admin_decision: string | null;
+  primary_supplier?: { id: number; name: string } | null;
 }
 
 interface ProcurementSummary {
@@ -54,6 +54,8 @@ interface ProcurementSummary {
   po_created: number;
   draft: number;
   for_purchase_order: number;
+  completed: number;
+  cancelled: number;
 }
 
 const emptySummary: ProcurementSummary = {
@@ -64,6 +66,8 @@ const emptySummary: ProcurementSummary = {
   po_created: 0,
   draft: 0,
   for_purchase_order: 0,
+  completed: 0,
+  cancelled: 0,
 };
 
 // ============================================
@@ -105,8 +109,26 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       border: 'border dark:border-sky-500/20 border-sky-200',
       dotColor: 'bg-sky-500',
     },
+    po_created: {
+      color: 'text-violet-800 dark:text-violet-400',
+      bg: 'bg-violet-100 dark:bg-violet-500/10',
+      border: 'border dark:border-violet-500/20 border-violet-200',
+      dotColor: 'bg-violet-500',
+    },
+    completed: {
+      color: 'text-emerald-800 dark:text-emerald-400',
+      bg: 'bg-emerald-100 dark:bg-emerald-500/10',
+      border: 'border dark:border-emerald-500/20 border-emerald-200',
+      dotColor: 'bg-emerald-500',
+    },
+    cancelled: {
+      color: 'text-slate-700 dark:text-slate-300',
+      bg: 'bg-slate-100 dark:bg-slate-500/10',
+      border: 'border dark:border-slate-500/20 border-slate-200',
+      dotColor: 'bg-slate-500',
+    },
   };
-  const labels: Record<string, string> = { draft: 'Draft', pending: 'Pending Approval', approved: 'Approved', rejected: 'Rejected', for_purchase_order: 'For Purchase Order' };
+  const labels: Record<string, string> = { draft: 'Draft', pending: 'Pending Approval', approved: 'For Purchase Order', rejected: 'Rejected', for_purchase_order: 'For Purchase Order', po_created: 'PO Created', completed: 'Completed', cancelled: 'Cancelled' };
   const { color, bg, border, dotColor } = config[status] || config.pending;
   return (
     <span
@@ -242,6 +264,7 @@ const Procurement: React.FC = () => {
           productName: request.product_name,
           orderedQuantity: request.requested_qty,
           warehouseLocation: request.warehouse_name,
+          primarySupplierId: request.primary_supplier?.id ?? null,
         },
       },
     });
@@ -253,7 +276,7 @@ const Procurement: React.FC = () => {
   );
 
   const approvedRequests = useMemo(
-    () => requests.filter((request) => request.status === 'approved'),
+    () => requests.filter((request) => request.status === 'approved' || request.status === 'for_purchase_order'),
     [requests]
   );
 
@@ -316,7 +339,7 @@ const Procurement: React.FC = () => {
       )}
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KPICard
           label="Pending Requests"
           value={summary.pending_approval}
@@ -324,15 +347,9 @@ const Procurement: React.FC = () => {
           icon={<ClockIcon className="w-5 h-5 text-amber-500" />}
         />
         <KPICard
-          label="Approved Requests"
-          value={summary.approved}
-          indicator="Approved replenishment requests"
-          icon={<CheckCircleIcon className="w-5 h-5 text-emerald-500" />}
-        />
-        <KPICard
           label="For Purchase Order"
           value={summary.for_purchase_order}
-          indicator="Purchase Order created"
+          indicator="Approved requests awaiting PO creation"
           icon={<FileText className="w-5 h-5 text-cyan-500" />}
         />
         <KPICard
@@ -371,7 +388,6 @@ const Procurement: React.FC = () => {
               >
                 <option value="All Status">All Status</option>
                 <option value="pending">Pending Approval</option>
-                <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
                 <option value="for_purchase_order">For Purchase Order</option>
               </select>
@@ -443,7 +459,7 @@ const Procurement: React.FC = () => {
                           <button onClick={() => void handleDecision(request, 'approve')} disabled={decidingId === request.id} className="min-h-9 rounded-lg bg-[#00a3c4] px-3 text-xs font-semibold text-white hover:bg-[#008ca8] disabled:cursor-not-allowed disabled:opacity-50 transition-colors">Approve</button>
                         </>
                       )}
-                      {request.status === 'approved' && (
+                      {(request.status === 'approved' || request.status === 'for_purchase_order') && (
                         <button onClick={() => handleGeneratePo(request)} className="min-h-9 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors">Generate PO</button>
                       )}
                     </div>
@@ -786,15 +802,15 @@ const Procurement: React.FC = () => {
         </div>
       </div>
 
-      {/* Approved Requests - ready for the Purchase Order module */}
+      {/* Requests approved and still waiting for the Purchase Order module */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm rounded-xl p-6">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-base font-semibold text-[var(--text-primary)]">
-              Approved Requests
+              For Purchase Order
             </h3>
             <p className="text-xs text-[var(--text-muted)]">
-              Approved replenishment requests ready for Purchase Order processing.
+              Approved replenishment requests awaiting Purchase Order creation.
             </p>
           </div>
         </div>
@@ -910,8 +926,8 @@ const Procurement: React.FC = () => {
             accent="text-amber-600 dark:text-amber-400"
           />
           <SummaryStat
-            label="Approved"
-            value={summary.approved}
+            label="For Purchase Order"
+            value={summary.for_purchase_order}
             accent="text-emerald-600 dark:text-emerald-400"
           />
           <SummaryStat
@@ -920,7 +936,7 @@ const Procurement: React.FC = () => {
             accent="text-red-600 dark:text-red-400"
           />
           <SummaryStat
-            label="PO Created"
+            label="PO Created / Ordered"
             value={summary.po_created}
             accent="text-sky-600 dark:text-sky-400"
           />

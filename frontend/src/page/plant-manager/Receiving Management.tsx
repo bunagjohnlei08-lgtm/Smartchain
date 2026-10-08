@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { AxiosError } from 'axios';
 import { apiClient } from '../../lib/api';
+import { sha256File } from '../../lib/fileSha256';
 import type { ApiReceiving } from '../../types';
 import {
   Package,
@@ -275,8 +276,38 @@ const ReceiptFilePicker: React.FC<{
   onChange: (files: File[]) => void;
   disabled?: boolean;
   inputId: string;
-}> = ({ files, onChange, disabled, inputId }) => (
-  <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4" aria-labelledby={`${inputId}-title`}>
+}> = ({ files, onChange, disabled, inputId }) => {
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [processingFiles, setProcessingFiles] = useState(false);
+
+  const addFiles = async (incoming: File[]) => {
+    const availableSlots = Math.max(0, 3 - files.length);
+    const filesToAdd = incoming.slice(0, availableSlots);
+    if (filesToAdd.length === 0) return;
+
+    setProcessingFiles(true);
+    try {
+      const knownHashes = new Set(await Promise.all(files.map(sha256File)));
+      for (const file of filesToAdd) {
+        const hash = await sha256File(file);
+        if (knownHashes.has(hash)) {
+          setDuplicateError('Duplicate file detected. This exact receipt has already been added.');
+          return;
+        }
+        knownHashes.add(hash);
+      }
+      setDuplicateError(null);
+      onChange([...files, ...filesToAdd]);
+    } catch {
+      setDuplicateError('We could not read one of the selected receipts. Please select it again.');
+    } finally {
+      setProcessingFiles(false);
+    }
+  };
+
+  const pickerDisabled = disabled || processingFiles || files.length >= 3;
+
+  return <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4" aria-labelledby={`${inputId}-title`}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div>
         <h3 id={`${inputId}-title`} className="text-sm font-semibold text-slate-100">Supplier Delivery Receipt *</h3>
@@ -284,11 +315,12 @@ const ReceiptFilePicker: React.FC<{
       </div>
       <span className="rounded-full border border-slate-600 px-2.5 py-1 text-xs font-medium text-slate-300">{files.length} / 3 files</span>
     </div>
-    {files.length > 0 && <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{files.map((file, index) => <ReceiptPreview key={`${file.name}-${file.lastModified}-${index}`} file={file} disabled={disabled} onRemove={() => onChange(files.filter((_, fileIndex) => fileIndex !== index))} />)}</ul>}
-    <input id={inputId} type="file" accept="image/jpeg,image/png,application/pdf" multiple disabled={disabled || files.length >= 3} className="sr-only" onChange={(event) => { const selected = Array.from(event.currentTarget.files ?? []); onChange([...files, ...selected].slice(0, 3)); event.currentTarget.value = ''; }} />
-    <label htmlFor={inputId} aria-disabled={disabled || files.length >= 3} className={`mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-500/30 px-4 text-sm font-medium text-cyan-300 transition-colors focus-within:ring-2 focus-within:ring-cyan-500 ${disabled || files.length >= 3 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-cyan-500/10'}`}><Upload className="h-4 w-4" /> Add receipt</label>
+    {files.length > 0 && <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{files.map((file, index) => <ReceiptPreview key={`${file.name}-${file.lastModified}-${index}`} file={file} disabled={disabled || processingFiles} onRemove={() => { setDuplicateError(null); onChange(files.filter((_, fileIndex) => fileIndex !== index)); }} />)}</ul>}
+    <input id={inputId} type="file" accept="image/jpeg,image/png,application/pdf" multiple disabled={pickerDisabled} className="sr-only" onChange={(event) => { const selected = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ''; void addFiles(selected); }} />
+    <label htmlFor={inputId} aria-disabled={pickerDisabled} className={`mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-500/30 px-4 text-sm font-medium text-cyan-300 transition-colors focus-within:ring-2 focus-within:ring-cyan-500 ${pickerDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-cyan-500/10'}`}><Upload className="h-4 w-4" /> {processingFiles ? 'Checking receipts...' : 'Add receipt'}</label>
+    {duplicateError && <p role="alert" className="mt-2 text-sm text-rose-300">{duplicateError}</p>}
   </section>
-);
+};
 
 // ============================================
 // CREATE RECEIVING MODAL

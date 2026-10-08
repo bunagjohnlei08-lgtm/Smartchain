@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use App\Models\SupplierAlias;
+use App\Models\PurchaseOrder;
 use App\Support\SupplierName;
+use App\Support\SupplierLifecycle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,17 +17,28 @@ use Illuminate\Validation\ValidationException;
 
 class SupplierController extends Controller
 {
-    private const STATUSES = ['ACTIVE', 'ON_HOLD', 'INACTIVE'];
+    private const OPERATIONAL_STATUSES = [
+        Supplier::STATUS_ACTIVE,
+        Supplier::STATUS_ON_HOLD,
+        Supplier::STATUS_INACTIVE,
+    ];
+
+    private const FILTER_STATUSES = [
+        ...self::OPERATIONAL_STATUSES,
+        Supplier::STATUS_PENDING_REMOVAL,
+        Supplier::STATUS_ARCHIVED,
+    ];
 
     public function index(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', Rule::in(self::STATUSES)],
+            'status' => ['nullable', Rule::in(self::FILTER_STATUSES)],
         ]);
 
         $suppliers = Supplier::query()->with('aliases')
+            ->withCount(['purchaseOrders as open_purchase_orders_count' => fn ($query) => $query->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)])
             ->when($validated['search'] ?? null, function ($query, string $search) {
                 $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
                 $query->where(function ($nested) use ($term) {
@@ -41,13 +54,15 @@ class SupplierController extends Controller
             ->orderBy('name')
             ->get();
 
-        return response()->json(['data' => $suppliers]);
+        return response()->json(['data' => $suppliers->map(fn (Supplier $supplier) => $this->present($supplier))]);
     }
 
     public function show(Request $request, Supplier $supplier): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        return response()->json(['data' => $supplier->load('aliases')]);
+        $supplier->load('aliases')->loadCount(['purchaseOrders as open_purchase_orders_count' => fn ($query) => $query->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)]);
+
+        return response()->json(['data' => $this->present($supplier)]);
     }
 
     public function store(Request $request): JsonResponse
@@ -68,12 +83,13 @@ class SupplierController extends Controller
             return $supplier->load('aliases');
         });
 
-        return response()->json(['data' => $supplier->fresh('aliases')], 201);
+        return response()->json(['data' => $this->present($supplier->fresh('aliases'))], 201);
     }
 
     public function update(Request $request, Supplier $supplier): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
+        abort_if(in_array($supplier->status, [Supplier::STATUS_PENDING_REMOVAL, Supplier::STATUS_ARCHIVED], true), 422, 'Removed suppliers cannot be edited.');
         $validated = $request->validate($this->rules());
         $this->validateNames($validated, $supplier);
         DB::transaction(function () use ($supplier, $validated) {
@@ -82,21 +98,50 @@ class SupplierController extends Controller
                 $this->syncAliases($supplier, $validated['aliases']);
             }
         });
-        return response()->json(['data' => $supplier->fresh('aliases')]);
+        return response()->json(['data' => $this->present($supplier->fresh('aliases'))]);
     }
 
     public function updateStatus(Request $request, Supplier $supplier): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $supplier->update($request->validate(['status' => ['required', Rule::in(self::STATUSES)]]));
-        return response()->json(['data' => $supplier->fresh()]);
+        abort_if(in_array($supplier->status, [Supplier::STATUS_PENDING_REMOVAL, Supplier::STATUS_ARCHIVED], true), 422, 'Use the supplier recovery workflow to change this status.');
+        $supplier->update($request->validate(['status' => ['required', Rule::in([
+            Supplier::STATUS_ACTIVE,
+            Supplier::STATUS_ON_HOLD,
+            Supplier::STATUS_INACTIVE,
+        ])]]));
+        return response()->json(['data' => $this->present($supplier->fresh())]);
     }
 
-    public function destroy(Request $request, Supplier $supplier): JsonResponse
+    public function destroy(Request $request, Supplier $supplier, SupplierLifecycle $lifecycle): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $supplier->delete();
-        return response()->json(status: 204);
+        $result = $lifecycle->requestRemoval($supplier, $request->user());
+
+        return response()->json([
+            'data' => $this->present($result['supplier']),
+            'message' => $result['changed']
+                ? 'Supplier removed from active use. It can be restored within 30 days.'
+                : 'Supplier is already within the 30-day recovery period.',
+        ]);
+    }
+
+    public function restore(Request $request, Supplier $supplier, SupplierLifecycle $lifecycle): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $result = $lifecycle->restore($supplier, $request->user());
+
+        if ($result['expired']) {
+            return response()->json([
+                'message' => 'The 30-day recovery period has expired. The supplier has been archived.',
+                'data' => $this->present($result['supplier']),
+            ], 422);
+        }
+
+        return response()->json([
+            'data' => $this->present($result['supplier']),
+            'message' => $result['restored'] ? 'Supplier restored successfully.' : 'Supplier is already active.',
+        ]);
     }
 
     /**
@@ -128,11 +173,29 @@ class SupplierController extends Controller
             // Philippine numbers, digits only, kept as a string for the leading 0.
             'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:11'],
             'address' => ['nullable', 'string', 'max:2000'],
-            'status' => ['required', Rule::in(self::STATUSES)],
+            'status' => ['required', Rule::in(self::OPERATIONAL_STATUSES)],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'aliases' => ['sometimes', 'array', 'max:20'],
             'aliases.*' => ['required', 'string', 'max:255'],
+        ];
+    }
+
+    private function present(Supplier $supplier): array
+    {
+        $deadline = $supplier->recoveryDeadline();
+        $openPurchaseOrders = array_key_exists('open_purchase_orders_count', $supplier->getAttributes())
+            ? (int) $supplier->open_purchase_orders_count
+            : $supplier->purchaseOrders()->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)->count();
+
+        return [
+            ...$supplier->toArray(),
+            'open_purchase_orders_count' => $openPurchaseOrders,
+            'recovery_deadline' => $deadline?->toIso8601String(),
+            'restore_allowed' => $supplier->canBeRestored(),
+            'recovery_days_remaining' => $supplier->canBeRestored()
+                ? max(1, now(Supplier::BUSINESS_TIMEZONE)->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false))
+                : 0,
         ];
     }
 

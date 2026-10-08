@@ -1,5 +1,5 @@
 // src/pages/admin/Suppliers.tsx
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import { apiClient } from '../../lib/api';
 import {
@@ -20,6 +20,9 @@ import {
   X,
   Save,
   ExternalLink,
+  Trash2,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 
 // ============================================
@@ -36,15 +39,19 @@ interface Supplier {
   location: string;
   openPOs: number;
   paymentTerms: string;
-  status: 'Active' | 'On Hold' | 'Inactive';
+  status: 'Active' | 'On Hold' | 'Inactive' | 'Recently Removed' | 'Archived';
   notes: string;
+  removedAt: string | null;
+  recoveryDeadline: string | null;
+  recoveryDaysRemaining: number;
+  restoreAllowed: boolean;
 }
 
 // ============================================
 // CONSTANTS
 // ============================================
 
-const statusOptions = ['All', 'Active', 'On Hold', 'Inactive'];
+const statusOptions = ['All', 'Active', 'On Hold', 'Inactive', 'Recently Removed', 'Archived'];
 const PHONE_MAX_DIGITS = 11;
 
 // ============================================
@@ -65,6 +72,14 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       color: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
       dotColor: 'bg-rose-400',
     },
+    'Recently Removed': {
+      color: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+      dotColor: 'bg-orange-400',
+    },
+    Archived: {
+      color: 'text-slate-400 bg-slate-500/10 border-slate-500/20',
+      dotColor: 'bg-slate-400',
+    },
   };
   const { color, dotColor } = config[status] || config['Active'];
   return (
@@ -84,24 +99,31 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 const Suppliers: React.FC = () => {
   // State
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('Active');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  useAdminDetailOverlay(showEditModal && selectedSupplier !== null);
+  const [actionSupplier, setActionSupplier] = useState<Supplier | null>(null);
+  const [lifecycleAction, setLifecycleAction] = useState<'remove' | 'restore' | null>(null);
+  const actionDialogRef = useRef<HTMLDivElement>(null);
+  const cancelActionRef = useRef<HTMLButtonElement>(null);
+  const actionTriggerRef = useRef<HTMLElement | null>(null);
+  useAdminDetailOverlay((showEditModal && selectedSupplier !== null) || actionSupplier !== null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const apiStatus = (status: string) => status === 'On Hold' ? 'ON_HOLD' : status.toUpperCase();
-  const uiStatus = (status: string): Supplier['status'] => status === 'ON_HOLD' ? 'On Hold' : status === 'INACTIVE' ? 'Inactive' : 'Active';
+  const apiStatus = (status: string) => status === 'On Hold' ? 'ON_HOLD' : status === 'Recently Removed' ? 'PENDING_REMOVAL' : status.toUpperCase();
+  const uiStatus = (status: string): Supplier['status'] => status === 'ON_HOLD' ? 'On Hold' : status === 'INACTIVE' ? 'Inactive' : status === 'PENDING_REMOVAL' ? 'Recently Removed' : status === 'ARCHIVED' ? 'Archived' : 'Active';
   const mapSupplier = (supplier: any): Supplier => ({
     id: String(supplier.id), code: supplier.supplier_code, name: supplier.name,
     contactPerson: supplier.contact_person || '', email: supplier.email || '', phone: supplier.phone || '',
-    location: supplier.address || '', openPOs: 0, paymentTerms: supplier.payment_terms || '',
+    location: supplier.address || '', openPOs: Number(supplier.open_purchase_orders_count || 0), paymentTerms: supplier.payment_terms || '',
     status: uiStatus(supplier.status), notes: supplier.notes || '',
+    removedAt: supplier.removal_requested_at || null, recoveryDeadline: supplier.recovery_deadline || null,
+    recoveryDaysRemaining: Number(supplier.recovery_days_remaining || 0), restoreAllowed: Boolean(supplier.restore_allowed),
   });
 
   const loadSuppliers = useCallback(async () => {
@@ -175,6 +197,61 @@ const Suppliers: React.FC = () => {
     catch (requestError: any) { setError(requestError?.response?.data?.message || 'Supplier could not be updated.'); }
     finally { setSaving(false); }
   };
+
+  const closeLifecycleDialog = () => {
+    setActionSupplier(null);
+    setLifecycleAction(null);
+    window.setTimeout(() => actionTriggerRef.current?.focus(), 0);
+  };
+
+  const openLifecycleDialog = (supplier: Supplier, action: 'remove' | 'restore') => {
+    actionTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setError('');
+    setActionSupplier(supplier);
+    setLifecycleAction(action);
+  };
+
+  useEffect(() => {
+    if (!actionSupplier) return;
+    cancelActionRef.current?.focus();
+  }, [actionSupplier]);
+
+  const handleLifecycleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeLifecycleDialog();
+      return;
+    }
+    if (event.key !== 'Tab' || !actionDialogRef.current) return;
+    const focusable = Array.from(actionDialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled])'));
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    }
+  };
+
+  const confirmLifecycleAction = async () => {
+    if (!actionSupplier || !lifecycleAction) return;
+    setSaving(true); setError('');
+    try {
+      if (lifecycleAction === 'remove') await apiClient.delete(`/suppliers/${actionSupplier.id}`);
+      else await apiClient.post(`/suppliers/${actionSupplier.id}/restore`);
+      closeLifecycleDialog();
+      await loadSuppliers();
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.message || `Supplier could not be ${lifecycleAction === 'remove' ? 'removed' : 'restored'}.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatDate = (value: string | null) => value
+    ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'long', timeZone: 'Asia/Manila' }).format(new Date(value))
+    : 'Not available';
 
   // Refresh and the view toggle are declared once and rendered in
   // two places: the desktop header keeps them exactly where they were, while the
@@ -370,6 +447,14 @@ const Suppliers: React.FC = () => {
                 </div>
               </div>
 
+              {supplier.status === 'Recently Removed' && (
+                <div className="mt-4 rounded-xl border border-orange-500/20 bg-orange-500/10 px-3 py-2.5 text-xs leading-5 text-[var(--text-secondary)]">
+                  <p>Removed: <span className="font-medium text-[var(--text-primary)]">{formatDate(supplier.removedAt)}</span></p>
+                  <p>Restore until: <span className="font-medium text-[var(--text-primary)]">{formatDate(supplier.recoveryDeadline)}</span></p>
+                  <p>{supplier.recoveryDaysRemaining} day{supplier.recoveryDaysRemaining === 1 ? '' : 's'} remaining</p>
+                </div>
+              )}
+
               <div className="mt-4 flex items-center justify-between pt-3 border-t border-[var(--border-color)]">
                 <div className="flex items-center gap-4">
                   <div>
@@ -381,13 +466,22 @@ const Suppliers: React.FC = () => {
                     <p className="text-sm font-medium text-[var(--text-secondary)]">{supplier.paymentTerms}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleEdit(supplier)}
-                  className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                  title="Edit Supplier"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {['Active', 'On Hold', 'Inactive'].includes(supplier.status) && <button
+                    type="button" onClick={() => handleEdit(supplier)}
+                    className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    title="Edit Supplier" aria-label={`Edit ${supplier.name}`}
+                  ><Edit className="w-4 h-4" /></button>}
+                  {supplier.status === 'Active' && <button
+                    type="button" onClick={() => openLifecycleDialog(supplier, 'remove')}
+                    className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                    title="Remove Supplier" aria-label={`Remove ${supplier.name}`}
+                  ><Trash2 className="w-4 h-4" /></button>}
+                  {supplier.status === 'Recently Removed' && supplier.restoreAllowed && <button
+                    type="button" onClick={() => openLifecycleDialog(supplier, 'restore')}
+                    className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-500/10 dark:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  ><RotateCcw className="w-4 h-4" /> Restore</button>}
+                </div>
               </div>
             </div>
           ))}
@@ -456,23 +550,35 @@ const Suppliers: React.FC = () => {
                     </td>
                     <td className="px-4 py-3.5">
                       <StatusBadge status={supplier.status} />
+                      {supplier.status === 'Recently Removed' && <p className="mt-1 text-xs text-[var(--text-muted)]">Restore by {formatDate(supplier.recoveryDeadline)}</p>}
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1">
-                        <button
+                        {['Active', 'On Hold', 'Inactive'].includes(supplier.status) && <button
                           onClick={() => handleEdit(supplier)}
-                          className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                          className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                           title="Edit Supplier"
+                          aria-label={`Edit ${supplier.name}`}
                         >
                           <Edit className="w-4 h-4" />
-                        </button>
-                        <button
+                        </button>}
+                        {['Active', 'On Hold', 'Inactive'].includes(supplier.status) && <button
                           onClick={() => void handleViewDetails(supplier)}
-                          className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                          className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
                           title="View Details"
+                          aria-label={`View ${supplier.name} details`}
                         >
                           <ExternalLink className="w-4 h-4" />
-                        </button>
+                        </button>}
+                        {supplier.status === 'Active' && <button
+                          type="button" onClick={() => openLifecycleDialog(supplier, 'remove')}
+                          className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                          title="Remove Supplier" aria-label={`Remove ${supplier.name}`}
+                        ><Trash2 className="w-4 h-4" /></button>}
+                        {supplier.status === 'Recently Removed' && supplier.restoreAllowed && <button
+                          type="button" onClick={() => openLifecycleDialog(supplier, 'restore')}
+                          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-500/10 dark:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                        ><RotateCcw className="w-4 h-4" /> Restore</button>}
                       </div>
                     </td>
                   </tr>
@@ -785,6 +891,43 @@ const Suppliers: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {actionSupplier && lifecycleAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) closeLifecycleDialog(); }}>
+          <div
+            ref={actionDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="supplier-lifecycle-title"
+            aria-describedby="supplier-lifecycle-description"
+            onKeyDown={handleLifecycleDialogKeyDown}
+            className="w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-2xl"
+          >
+            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${lifecycleAction === 'remove' ? 'bg-rose-500/10 text-rose-400' : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-300'}`}>
+              {lifecycleAction === 'remove' ? <AlertTriangle className="h-6 w-6" aria-hidden="true" /> : <RotateCcw className="h-6 w-6" aria-hidden="true" />}
+            </div>
+            <h2 id="supplier-lifecycle-title" className="mt-5 text-xl font-bold text-[var(--text-primary)]">
+              {lifecycleAction === 'remove' ? 'Remove Supplier' : 'Restore Supplier'}
+            </h2>
+            <div id="supplier-lifecycle-description" className="mt-3 space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
+              {lifecycleAction === 'remove' ? <>
+                <p>Are you sure you want to remove <strong className="text-[var(--text-primary)]">{actionSupplier.name}</strong> as a supplier?</p>
+                <p>This supplier will no longer be available for new procurement transactions. You can restore it within 30 days.</p>
+                <p>Existing purchase orders and historical records will remain unchanged.</p>
+                {actionSupplier.openPOs > 0 && <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-200">This supplier has {actionSupplier.openPOs} open purchase order{actionSupplier.openPOs === 1 ? '' : 's'}. Existing orders will remain unchanged.</p>}
+              </> : <p>Restore <strong className="text-[var(--text-primary)]">{actionSupplier.name}</strong> as an active supplier? It will become available for new procurement transactions again.</p>}
+            </div>
+            {error && <p role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button ref={cancelActionRef} type="button" disabled={saving} onClick={closeLifecycleDialog} className="min-h-11 cursor-pointer rounded-xl border border-[var(--border-color)] px-5 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+              <button type="button" disabled={saving} onClick={() => void confirmLifecycleAction()} className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${lifecycleAction === 'remove' ? 'bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500/40' : 'bg-slate-900 text-white hover:bg-slate-800 focus:ring-cyan-500/40 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400'}`}>
+                {lifecycleAction === 'remove' ? <Trash2 className="h-4 w-4" aria-hidden="true" /> : <RotateCcw className="h-4 w-4" aria-hidden="true" />}
+                {saving ? 'Working…' : lifecycleAction === 'remove' ? 'Remove Supplier' : 'Restore Supplier'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Bell, CheckCheck, LoaderCircle } from 'lucide-react';
-import { useMarkAllNotificationsRead, useNotificationList, type NotificationRecord } from '../lib/notifications';
+import { Link } from 'react-router-dom';
+import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotificationList, type NotificationRecord } from '../lib/notifications';
 import { formatNotificationRelativeTime, getNotificationVisual } from '../lib/notificationPresentation';
+import { getNotificationDestination } from '../lib/notificationDestination';
+import { readStoredUser } from '../lib/authUser';
 
 interface NotificationCenterProps { breadcrumbLabel: string }
 
-function NotificationRow({ notification, last }: { notification: NotificationRecord; last: boolean }) {
+function NotificationRow({ notification, last, destination, onOpen }: { notification: NotificationRecord; last: boolean; destination: string | null; onOpen: () => void }) {
   const visual = getNotificationVisual(notification);
   const Icon = visual.Icon;
-  return (
-    <article role="listitem" className={`flex items-start gap-4 px-5 py-5 md:px-7 md:py-6 ${last ? '' : 'border-b border-slate-200 dark:border-slate-700'}`}>
+  const className = `flex items-start gap-4 px-5 py-5 md:px-7 md:py-6 ${last ? '' : 'border-b border-slate-200 dark:border-slate-700'}`;
+  const content = (
+    <>
       <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full md:h-12 md:w-12 ${visual.tone}`}><Icon className="h-5 w-5 md:h-6 md:w-6" aria-hidden="true" /></span>
       <div className="min-w-0 flex-1">
         <p className={`break-words text-base text-slate-900 dark:text-slate-100 ${notification.read_at ? 'font-medium' : 'font-semibold'}`}>{notification.title}</p>
@@ -17,8 +21,12 @@ function NotificationRow({ notification, last }: { notification: NotificationRec
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{notification.category ?? 'System'} • {formatNotificationRelativeTime(notification.created_at)}</p>
       </div>
       {!notification.read_at && <span className="mt-2.5 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" aria-label="Unread" />}
-    </article>
+    </>
   );
+  // Same destinations as the notification bell; rows without one stay non-navigating.
+  return destination
+    ? <div role="listitem"><Link to={destination} onClick={onOpen} className={`${className} cursor-pointer transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500 dark:hover:bg-slate-700/60`}>{content}</Link></div>
+    : <article role="listitem" className={className}>{content}</article>;
 }
 
 export default function NotificationCenter({ breadcrumbLabel }: NotificationCenterProps) {
@@ -26,6 +34,8 @@ export default function NotificationCenter({ breadcrumbLabel }: NotificationCent
   const [page, setPage] = useState(1);
   const { data, isLoading, isError, refetch } = useNotificationList(filter, page);
   const markAllRead = useMarkAllNotificationsRead();
+  const markRead = useMarkNotificationRead();
+  const role = readStoredUser()?.role?.slug || sessionStorage.getItem('userRole');
   useEffect(() => setPage(1), [filter]);
 
   const filterClass = (active: boolean) => `min-h-11 cursor-pointer rounded-xl px-4 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#092635] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${active ? 'bg-[#092635] font-semibold text-white' : 'border border-slate-300 bg-white font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`;
@@ -52,7 +62,7 @@ export default function NotificationCenter({ breadcrumbLabel }: NotificationCent
         {isLoading && <div className="flex min-h-72 items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400"><LoaderCircle className="h-5 w-5 animate-spin" /> Loading notifications…</div>}
         {isError && <div className="flex min-h-72 flex-col items-center justify-center px-6 text-center"><p className="text-sm text-rose-600 dark:text-rose-300">Unable to load notifications.</p><button type="button" onClick={() => refetch()} className="mt-3 min-h-11 cursor-pointer rounded-xl border border-slate-300 px-4 text-sm font-medium dark:border-slate-600">Try again</button></div>}
         {!isLoading && !isError && data?.data.length === 0 && <div className="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400"><Bell className="h-7 w-7" aria-hidden="true" /></span><h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-white">{filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{filter === 'unread' ? "You're all caught up." : 'New activity and system updates will appear here.'}</p></div>}
-        {!isLoading && !isError && data && data.data.length > 0 && <div role="list">{data.data.map((notification, index) => <NotificationRow key={notification.id} notification={notification} last={index === data.data.length - 1} />)}</div>}
+        {!isLoading && !isError && data && data.data.length > 0 && <div role="list">{data.data.map((notification, index) => <NotificationRow key={notification.id} notification={notification} last={index === data.data.length - 1} destination={getNotificationDestination(notification, role)} onOpen={() => markRead(notification)} />)}</div>}
       </section>
 
       {data && data.meta.last_page > 1 && <nav aria-label="Notification pages" className="flex items-center justify-end gap-3 text-sm text-slate-600 dark:text-slate-300"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="min-h-11 cursor-pointer rounded-xl border border-slate-300 px-4 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700">Previous</button><span>Page {data.meta.current_page} of {data.meta.last_page}</span><button type="button" disabled={page >= data.meta.last_page} onClick={() => setPage((value) => value + 1)} className="min-h-11 cursor-pointer rounded-xl border border-slate-300 px-4 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700">Next</button></nav>}

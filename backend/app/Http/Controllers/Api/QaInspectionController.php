@@ -11,6 +11,7 @@ use App\Models\ReceivingItem;
 use App\Models\ReceivingReceiptAttachment;
 use App\Models\ReceivingTimeline;
 use App\Notifications\WorkflowNotification;
+use App\Support\ExactFileDuplicateGuard;
 use App\Support\WorkflowNotificationSender;
 use App\Support\SupplierRejectionWorkflow;
 use Illuminate\Http\JsonResponse;
@@ -397,12 +398,22 @@ class QaInspectionController extends Controller
                     ]);
                 }
 
+                $remainingHashes = $inspection->attachments
+                    ->whereNotIn('id', $removeIds)
+                    ->pluck('file_sha256');
+                $uploadHashes = ExactFileDuplicateGuard::hashes(
+                    $uploads,
+                    $remainingHashes,
+                    'attachments',
+                    'Duplicate file detected. This exact file has already been added.',
+                );
+
                 foreach ($attachmentsToRemove as $attachment) {
                     $pathsToDelete[] = $attachment->stored_path;
                     $attachment->delete();
                 }
 
-                foreach ($uploads as $upload) {
+                foreach ($uploads as $index => $upload) {
                     $storedPath = Storage::disk('local')->putFile('qa-attachments', $upload);
                     if (! $storedPath) {
                         throw new \RuntimeException('QA attachment storage failed.');
@@ -413,6 +424,7 @@ class QaInspectionController extends Controller
                         'stored_path' => $storedPath,
                         'mime_type' => $upload->getMimeType(),
                         'file_size' => $upload->getSize(),
+                        'file_sha256' => $uploadHashes[$index],
                         'uploaded_by' => $user->id,
                     ]);
                 }

@@ -8,11 +8,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Warehouse extends Model
 {
-    protected $fillable = ['name', 'code', 'branch_id', 'address', 'latitude', 'longitude', 'capacity', 'status'];
+    protected $fillable = ['name', 'code', 'branch_id', 'address', 'latitude', 'longitude', 'capacity', 'status', 'show_on_public_website'];
 
     protected function casts(): array
     {
-        return ['latitude' => 'decimal:7', 'longitude' => 'decimal:7', 'capacity' => 'integer'];
+        return [
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+            'capacity' => 'integer',
+            'show_on_public_website' => 'boolean',
+        ];
     }
 
     public function branch(): BelongsTo

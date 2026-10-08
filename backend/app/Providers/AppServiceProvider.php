@@ -55,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('password-reset-request', function (Request $request) {
             $email = mb_strtolower(trim((string) $request->input('email')));
+
             return [
                 Limit::perMinutes(15, 5)->by('password-reset-request-ip:'.$request->ip()),
                 Limit::perMinutes(15, 5)->by('password-reset-request-account:'.hash('sha256', $email)),
@@ -99,5 +100,19 @@ class AppServiceProvider extends ServiceProvider
             ->response(fn (Request $request, array $headers) => response()->json([
                 'message' => 'Too many application attempts were submitted. Please try again later.',
             ], 429, $headers)));
+
+        RateLimiter::for('supplier-portal-access', fn (Request $request) => [
+            Limit::perMinute(10)->by('supplier-portal-access-ip:'.$request->ip()),
+            Limit::perMinute(5)->by('supplier-portal-access-token:'.hash('sha256', (string) $request->input('access_token'))),
+        ]);
+
+        RateLimiter::for('supplier-portal', fn (Request $request) => Limit::perMinute(60)->by(
+            'supplier-portal-session:'.hash('sha256', (string) $request->header('X-Supplier-Portal-Session', $request->ip()))
+        ));
+
+        RateLimiter::for('supplier-portal-selection', fn (Request $request) => [
+            Limit::perMinute(10)->by('supplier-portal-selection-ip:'.$request->ip()),
+            Limit::perMinute(5)->by('supplier-portal-selection-session:'.hash('sha256', (string) $request->header('X-Supplier-Portal-Session'))),
+        ]);
     }
 }

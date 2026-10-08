@@ -30,9 +30,12 @@ class QaInspectionTest extends TestCase
         Storage::fake('local');
     }
 
-    private function proof(string $name = 'proof.pdf'): UploadedFile
+    private function proof(string $name = 'proof.pdf', ?string $content = null): UploadedFile
     {
-        return UploadedFile::fake()->createWithContent($name, "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n");
+        return UploadedFile::fake()->createWithContent(
+            $name,
+            $content ?? "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Evidence ({$name}) >>\nendobj\n%%EOF\n",
+        );
     }
 
     private function qaUser(): User
@@ -571,6 +574,87 @@ class QaInspectionTest extends TestCase
             ...$this->attachmentPayload($receiving), 'submit' => '0', '_method' => 'PUT',
             'attachments' => [$this->proof('three.pdf'), $this->proof('four.pdf'), $this->proof('five.pdf')],
         ])->assertOk()->assertJsonCount(5, 'inspection.attachments');
+    }
+
+    public function test_exact_duplicate_evidence_in_one_request_is_rejected_even_when_renamed(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Duplicate evidence', 'qty' => 5]]);
+        $bytes = "%PDF-1.4\nexact duplicate evidence\n%%EOF";
+
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, [
+            ...$this->attachmentPayload($receiving),
+            'submit' => '0',
+            'attachments' => [
+                $this->proof('evidence.pdf', $bytes),
+                $this->proof('evidence-renamed.pdf', $bytes),
+            ],
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('attachments')
+            ->assertJsonPath('errors.attachments.0', 'Duplicate file detected. This exact file has already been added.');
+
+        $this->assertDatabaseCount('qa_inspection_attachments', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles('qa-attachments'));
+    }
+
+    public function test_persisted_exact_duplicate_evidence_is_rejected_when_renamed(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Persisted duplicate evidence', 'qty' => 5]]);
+        $bytes = "%PDF-1.4\npersisted duplicate evidence\n%%EOF";
+        $payload = [...$this->attachmentPayload($receiving), 'submit' => '0'];
+
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, [
+            ...$payload,
+            'attachments' => [$this->proof('original.pdf', $bytes)],
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, [
+            ...$payload,
+            '_method' => 'PUT',
+            'attachments' => [$this->proof('renamed.pdf', $bytes)],
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('attachments');
+
+        $this->assertDatabaseCount('qa_inspection_attachments', 1);
+        $this->assertCount(1, Storage::disk('local')->allFiles('qa-attachments'));
+    }
+
+    public function test_same_evidence_name_with_different_content_is_allowed(): void
+    {
+        $qa = $this->qaUser();
+        $receiving = $this->makeReceiving([['product' => 'Different evidence', 'qty' => 5]]);
+
+        $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, [
+            ...$this->attachmentPayload($receiving),
+            'submit' => '0',
+            'attachments' => [
+                $this->proof('evidence.pdf', "%PDF-1.4\nfirst content\n%%EOF"),
+                $this->proof('evidence.pdf', "%PDF-1.4\nsecond content\n%%EOF"),
+            ],
+        ], ['Accept' => 'application/json'])->assertOk()->assertJsonCount(2, 'inspection.attachments');
+
+        $this->assertSame(2, $receiving->fresh()->qaInspection->attachments()->distinct('file_sha256')->count('file_sha256'));
+    }
+
+    public function test_same_exact_evidence_is_allowed_for_different_inspections(): void
+    {
+        $qa = $this->qaUser();
+        $first = $this->makeReceiving([['product' => 'First inspection evidence', 'qty' => 5]]);
+        $second = $this->makeReceiving([['product' => 'Second inspection evidence', 'qty' => 5]]);
+        $bytes = "%PDF-1.4\nshared legitimate evidence\n%%EOF";
+
+        foreach ([[$first, 'first.pdf'], [$second, 'second-renamed.pdf']] as [$receiving, $name]) {
+            $this->actingAs($qa)->post('/api/qa/inspections/'.$receiving->id, [
+                ...$this->attachmentPayload($receiving),
+                'submit' => '0',
+                'attachments' => [$this->proof($name, $bytes)],
+            ], ['Accept' => 'application/json'])->assertOk();
+        }
+
+        $this->assertDatabaseCount('qa_inspection_attachments', 2);
     }
 
     public function test_sixth_attachment_and_existing_three_plus_new_three_are_rejected(): void

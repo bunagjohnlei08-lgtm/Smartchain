@@ -12,3 +12,4 @@ Artisan::command('inspire', function () {
 // (`php artisan schedule:run` every minute via cron/worker) is configured.
 Schedule::command('reports:run-scheduled')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('inventory-audits:process-schedule')->dailyAt('08:00')->timezone('Asia/Manila')->withoutOverlapping();
+Schedule::command('suppliers:archive-expired-removals')->dailyAt('00:15')->timezone('Asia/Manila')->withoutOverlapping();

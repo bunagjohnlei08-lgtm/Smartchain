@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrder;
 use App\Models\ReceivingDiscrepancy;
 use App\Support\AuditLogger;
+use App\Support\ReplenishmentLifecycle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,7 @@ class ReceivingDiscrepancyController extends Controller
         return response()->json(['data' => $cases]);
     }
 
-    public function update(Request $request, ReceivingDiscrepancy $receivingDiscrepancy): JsonResponse
+    public function update(Request $request, ReceivingDiscrepancy $receivingDiscrepancy, ReplenishmentLifecycle $replenishmentLifecycle): JsonResponse
     {
         abort_unless($request->user()?->isAdmin(), 403);
 
@@ -43,7 +44,7 @@ class ReceivingDiscrepancyController extends Controller
             'resolution_notes' => ['nullable', 'string', 'max:2000', Rule::requiredIf($request->input('action') === 'CLOSE_SHORTAGE')],
         ]);
 
-        $case = DB::transaction(function () use ($validated, $request, $receivingDiscrepancy) {
+        $case = DB::transaction(function () use ($validated, $request, $receivingDiscrepancy, $replenishmentLifecycle) {
             $case = ReceivingDiscrepancy::query()->lockForUpdate()->findOrFail($receivingDiscrepancy->id);
             abort_if(in_array($case->status, [ReceivingDiscrepancy::STATUS_RESOLVED, ReceivingDiscrepancy::STATUS_CLOSED_SHORTAGE], true), 422, 'This discrepancy is already closed.');
 
@@ -86,11 +87,13 @@ class ReceivingDiscrepancyController extends Controller
             }
 
             $case->update($attributes);
+            $purchaseOrder = PurchaseOrder::query()->lockForUpdate()->findOrFail($case->purchase_order_id);
             if ($validated['action'] === 'CLOSE_SHORTAGE') {
-                PurchaseOrder::query()->whereKey($case->purchase_order_id)->update(['status' => 'Closed with Shortage']);
-            } else {
-                PurchaseOrder::query()->whereKey($case->purchase_order_id)->where('status', '!=', 'Completed')->update(['status' => 'Partially Received']);
+                $purchaseOrder->update(['status' => PurchaseOrder::STATUS_CLOSED_WITH_SHORTAGE]);
+            } elseif ($purchaseOrder->status !== PurchaseOrder::STATUS_COMPLETED) {
+                $purchaseOrder->update(['status' => PurchaseOrder::STATUS_PARTIALLY_RECEIVED]);
             }
+            $replenishmentLifecycle->synchronize($purchaseOrder);
 
             $auditAction = match ($validated['action']) {
                 'CONTACT_SUPPLIER' => 'SUPPLIER_CONTACTED',

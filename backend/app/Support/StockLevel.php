@@ -43,6 +43,11 @@ final class StockLevel
         return self::classify($quantity)['priority'];
     }
 
+    public static function needsReplenishment(int $quantity): bool
+    {
+        return $quantity <= 30;
+    }
+
     public static function alertTransition(int $oldQuantity, int $newQuantity): ?string
     {
         if ($newQuantity >= $oldQuantity) {

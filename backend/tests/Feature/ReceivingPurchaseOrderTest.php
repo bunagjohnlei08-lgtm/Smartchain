@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Branch;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\ReplenishmentRequest;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -64,6 +67,20 @@ class ReceivingPurchaseOrderTest extends TestCase
     public function test_receiving_data_is_mapped_from_the_purchase_order_and_completion_updates_status(): void
     {
         Notification::fake();
+        $branch = Branch::create(['name' => 'Receiving Branch', 'code' => 'RECV']);
+        $warehouse = Warehouse::create(['name' => 'Receiving Warehouse', 'code' => 'RECV-WH', 'branch_id' => $branch->id]);
+        $product = Product::query()->where('name', 'IPAD AIR')->firstOrFail();
+        $replenishmentRequest = ReplenishmentRequest::create([
+            'request_no' => 'RR-RECEIVING-COMPLETE',
+            'requested_by' => $this->plantManager->id,
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $product->id,
+            'requested_qty' => 10,
+            'priority' => 'Critical',
+            'status' => ReplenishmentRequest::STATUS_PO_CREATED,
+            'submitted_at' => now(),
+        ]);
+        $this->purchaseOrder->update(['replenishment_request_id' => $replenishmentRequest->id]);
         $qa = $this->user('QA_SUPERVISOR');
         $inactiveQa = $this->user('QA_SUPERVISOR');
         $inactiveQa->update(['status' => 'SUSPENDED']);
@@ -80,6 +97,14 @@ class ReceivingPurchaseOrderTest extends TestCase
 
         $this->assertDatabaseHas('receivings', ['id' => $response->json('id'), 'purchase_order_id' => $this->purchaseOrder->id]);
         $this->assertDatabaseHas('purchase_orders', ['id' => $this->purchaseOrder->id, 'status' => 'Completed']);
+        $this->assertDatabaseHas('replenishment_requests', [
+            'id' => $replenishmentRequest->id,
+            'status' => ReplenishmentRequest::STATUS_COMPLETED,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'REPLENISHMENT_REQUEST_COMPLETED',
+            'resource_id' => (string) $replenishmentRequest->id,
+        ]);
         $receivingNumber = $response->json('receiving_no');
         Notification::assertNothingSent();
         $this->patchJson("/api/receivings/{$response->json('id')}/assign-qa", ['qa_user_id' => $qa->id])->assertOk();
@@ -98,6 +123,29 @@ class ReceivingPurchaseOrderTest extends TestCase
             'items' => [['purchase_order_item_id' => $item->id, 'delivered_quantity' => 11]], 'receipts' => [$this->receipt()]];
         $this->actingAs($this->plantManager)->post('/api/receivings', $payload, ['Accept' => 'application/json'])->assertUnprocessable();
         $this->assertDatabaseCount('receivings', 0);
+    }
+
+    public function test_receiving_dropdown_excludes_completed_and_cancelled_purchase_orders(): void
+    {
+        $cancelled = PurchaseOrder::create([
+            'po_number' => 'PO-2026-CANCELLED', 'supplier_name' => 'Approved Supplier',
+            'delivery_details' => 'Main warehouse', 'expected_delivery_date' => '2026-09-01',
+            'total_amount' => 100, 'status' => PurchaseOrder::STATUS_CANCELLED, 'approved_by' => $this->admin->id,
+        ]);
+        $completed = PurchaseOrder::create([
+            'po_number' => 'PO-2026-COMPLETED', 'supplier_name' => 'Approved Supplier',
+            'delivery_details' => 'Main warehouse', 'expected_delivery_date' => '2026-09-01',
+            'total_amount' => 100, 'status' => PurchaseOrder::STATUS_COMPLETED, 'approved_by' => $this->admin->id,
+        ]);
+
+        $rows = collect($this->actingAs($this->plantManager)
+            ->getJson('/api/purchase-orders/approved')
+            ->assertOk()
+            ->json('data'));
+
+        $this->assertTrue($rows->contains('id', $this->purchaseOrder->id));
+        $this->assertFalse($rows->contains('id', $cancelled->id));
+        $this->assertFalse($rows->contains('id', $completed->id));
     }
 
     public function test_receiving_preserves_null_when_no_legitimate_unit_exists(): void

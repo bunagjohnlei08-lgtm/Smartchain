@@ -13,7 +13,9 @@ use App\Models\ReceivingTimeline;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
 use App\Support\AuditLogger;
+use App\Support\ExactFileDuplicateGuard;
 use App\Support\WorkflowNotificationSender;
+use App\Support\ReplenishmentLifecycle;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -145,9 +147,10 @@ class ReceivingController extends Controller
         ];
     }
 
-    private function storeReceiptAttachments(Receiving $receiving, Request $request, array &$storedPaths): void
+    /** @param array<int|string, string> $receiptHashes */
+    private function storeReceiptAttachments(Receiving $receiving, Request $request, array $receiptHashes, array &$storedPaths): void
     {
-        foreach ($request->file('receipts', []) as $upload) {
+        foreach ($request->file('receipts', []) as $index => $upload) {
             $storedPath = Storage::disk('local')->putFile("receiving-receipts/{$receiving->id}", $upload);
             if (! $storedPath) {
                 throw new \RuntimeException('Receiving receipt storage failed.');
@@ -158,6 +161,7 @@ class ReceivingController extends Controller
                 'stored_path' => $storedPath,
                 'mime_type' => $upload->getMimeType(),
                 'file_size' => $upload->getSize(),
+                'file_sha256' => $receiptHashes[$index],
                 'uploaded_by' => $request->user()->id,
             ]);
         }
@@ -307,7 +311,7 @@ class ReceivingController extends Controller
         return Receiving::nextReceivingNo();
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ReplenishmentLifecycle $replenishmentLifecycle)
     {
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
@@ -321,9 +325,16 @@ class ReceivingController extends Controller
             ...$this->receiptValidationRules(),
         ], $this->receiptValidationMessages());
 
+        $receiptHashes = ExactFileDuplicateGuard::hashes(
+            $request->file('receipts', []),
+            [],
+            'receipts',
+            'Duplicate file detected. This exact receipt has already been added.',
+        );
+
         $storedPaths = [];
         try {
-            $receiving = DB::transaction(function () use ($validated, $request, &$storedPaths) {
+            $receiving = DB::transaction(function () use ($validated, $request, $receiptHashes, &$storedPaths, $replenishmentLifecycle) {
                 $purchaseOrder = PurchaseOrder::query()->with('items')->lockForUpdate()->findOrFail($validated['purchase_order_id']);
                 abort_unless(in_array($purchaseOrder->status, ['Approved', 'Sent to Supplier', 'Partially Received'], true), 422, 'This Purchase Order is not active for receiving.');
 
@@ -354,7 +365,7 @@ class ReceivingController extends Controller
                     'prepared_by_id' => $request->user()->id,
                 ]);
 
-                $this->storeReceiptAttachments($receiving, $request, $storedPaths);
+                $this->storeReceiptAttachments($receiving, $request, $receiptHashes, $storedPaths);
 
                 foreach ($purchaseOrder->items as $poItem) {
                     $itemData = $submitted[$poItem->id];
@@ -428,6 +439,7 @@ class ReceivingController extends Controller
                 }
 
                 $purchaseOrder->update(['status' => $receivedNow ? 'Completed' : 'Partially Received']);
+                $replenishmentLifecycle->synchronize($purchaseOrder);
                 if ($receivedNow) {
                     $resolvedCases = ReceivingDiscrepancy::query()
                         ->where('purchase_order_id', $purchaseOrder->id)
@@ -552,6 +564,13 @@ class ReceivingController extends Controller
             ...$this->receiptValidationRules(),
         ], $this->receiptValidationMessages());
 
+        ExactFileDuplicateGuard::hashes(
+            $request->file('receipts', []),
+            [],
+            'receipts',
+            'Duplicate file detected. This exact receipt has already been added.',
+        );
+
         $storedPaths = [];
         try {
             $receiving = DB::transaction(function () use ($validated, $request, $receiving, &$storedPaths) {
@@ -571,7 +590,14 @@ class ReceivingController extends Controller
                     $item->update(['delivered_quantity' => (int) $submitted[$item->id]['delivered_quantity'], 'inspection_status' => 'Pending QA']);
                 }
 
-                $this->storeReceiptAttachments($locked, $request, $storedPaths);
+                $lockedReceiptHashes = ExactFileDuplicateGuard::hashes(
+                    $request->file('receipts', []),
+                    $locked->receiptAttachments()->whereNotNull('file_sha256')->pluck('file_sha256'),
+                    'receipts',
+                    'Duplicate file detected. This exact receipt has already been added.',
+                );
+
+                $this->storeReceiptAttachments($locked, $request, $lockedReceiptHashes, $storedPaths);
 
                 $locked->update([
                     'status' => 'Pending QA',

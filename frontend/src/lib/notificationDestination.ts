@@ -11,7 +11,8 @@ const destinations: {
   { role: 'ADMIN', category: 'Procurement', types: ['info'], path: '/admin/procurement' },
   { role: 'ADMIN', category: 'Logistics', types: ['success'], path: '/admin/logistics' },
   { role: 'ADMIN', category: 'Rejected Items', types: ['warning'], path: '/admin/rejected-items' },
-  { role: 'ADMIN', category: 'Supplier Applications', types: ['info'], path: '/admin/suppliers?tab=applications' },
+  // New application (info), meeting confirmed (success), schedule/correction requests (warning).
+  { role: 'ADMIN', category: 'Supplier Applications', types: ['info', 'success', 'warning'], path: '/admin/suppliers?tab=applications' },
   { role: 'ADMIN', category: 'Inventory Audit Approval', types: ['warning'], path: '/admin/inventory-audit-approvals' },
   { role: 'PLANT_MANAGER', category: 'Procurement', types: ['success', 'warning'], path: '/plant-manager/procurement' },
   { role: 'PLANT_MANAGER', category: 'Inventory', types: ['warning', 'error'], path: '/plant-manager/procurement' },
@@ -24,9 +25,18 @@ const destinations: {
 ];
 
 export function getNotificationDestination(notification: NotificationRecord, role: string | null | undefined): string | null {
-  return destinations.find((destination) =>
+  const path = destinations.find((destination) =>
     destination.role === role
     && destination.category === notification.category
     && destination.types.includes(notification.type),
   )?.path ?? null;
+
+  // Supplier application notifications reference the application number; the
+  // Applications tab opens it through the Admin-only API (no payload is trusted).
+  const reference = notification.reference_id?.trim();
+  if (path && notification.category === 'Supplier Applications' && reference) {
+    return `${path}&application=${encodeURIComponent(reference)}`;
+  }
+
+  return path;
 }

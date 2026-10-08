@@ -13,10 +13,11 @@ class QaInspectionAttachment extends Model
         'stored_path',
         'mime_type',
         'file_size',
+        'file_sha256',
         'uploaded_by',
     ];
 
-    protected $hidden = ['stored_path'];
+    protected $hidden = ['stored_path', 'file_sha256'];
 
     protected function casts(): array
     {

@@ -93,7 +93,8 @@ class InventoryAuthorizationTest extends TestCase
 
     public function test_inventory_index_is_newest_first_for_admin_and_plant_manager(): void
     {
-        $product = $this->ownInventory->product;
+        // Inventory is unique per product and warehouse, so the newest row uses its own product.
+        $product = Product::create(['name' => 'Newest Inventory Product']);
         $newestInventory = $this->inventory($product, $this->ownWarehouse, 'NEWEST-BARCODE');
 
         $this->ownInventory->timestamps = false;

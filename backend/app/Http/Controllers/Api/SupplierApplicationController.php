@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use App\Models\SupplierApplication;
 use App\Models\SupplierApplicationAttachment;
+use App\Models\SupplierApplicationEvent;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
 use App\Support\AuditLogger;
+use App\Support\SupplierApplicationOfferings;
 use App\Support\SupplierName;
+use App\Support\SupplierPortalNotifications;
 use App\Support\WorkflowNotificationSender;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +37,7 @@ class SupplierApplicationController extends Controller
 
         $request->merge([
             'company_name' => SupplierName::display((string) $request->input('company_name')),
+            'owner_name' => trim((string) $request->input('owner_name')),
             'address' => trim((string) $request->input('address')),
             'contact_person' => trim((string) $request->input('contact_person')),
             'email' => mb_strtolower(trim((string) $request->input('email'))),
@@ -41,17 +45,20 @@ class SupplierApplicationController extends Controller
             'business_type' => trim((string) $request->input('business_type')),
             'supply_category' => trim((string) $request->input('supply_category')),
             'products_services' => trim((string) $request->input('products_services')),
+            'offerings' => SupplierApplicationOfferings::trimInput($request->input('offerings')),
         ]);
 
         $validated = $request->validate([
             'company_name' => ['required', 'string', 'min:2', 'max:255'],
+            'owner_name' => ['required', 'string', 'min:2', 'max:255'],
             'address' => ['required', 'string', 'min:5', 'max:2000'],
             'contact_person' => ['required', 'string', 'min:2', 'max:255'],
             'email' => ['required', 'email:rfc', 'max:255'],
-            'phone' => ['required', 'string', 'regex:/^[0-9+() .-]+$/', 'max:30'],
+            'phone' => ['required', 'string', 'regex:/^[0-9]+$/', 'max:30'],
             'business_type' => ['required', 'string', 'min:2', 'max:100'],
             'supply_category' => ['required', 'string', 'min:2', 'max:150'],
-            'products_services' => ['required', 'string', 'min:10', 'max:5000'],
+            'products_services' => ['nullable', 'string', 'max:5000'],
+            ...SupplierApplicationOfferings::rules(),
             'business_certificate' => ['required', 'array', 'min:1', 'max:2'],
             'business_certificate.*' => [
                 'required', 'file', 'mimes:pdf,jpg,jpeg,png',
@@ -70,6 +77,9 @@ class SupplierApplicationController extends Controller
                 'mimetypes:image/jpeg,image/png', 'extensions:jpg,jpeg,png', 'max:5120',
             ],
         ], [
+            ...SupplierApplicationOfferings::messages(),
+            'owner_name.required' => 'Owner name is required.',
+            'phone.regex' => 'Phone number must contain numbers only.',
             'business_certificate.required' => 'At least one Business Certificate is required.',
             'business_certificate.array' => 'The Business Certificate files must be uploaded as a collection.',
             'business_certificate.min' => 'At least one Business Certificate is required.',
@@ -99,17 +109,20 @@ class SupplierApplicationController extends Controller
 
         $companyName = $validated['company_name'];
         $email = $validated['email'];
+        $offerings = SupplierApplicationOfferings::normalize($validated['offerings']);
+        $attachmentHashes = $this->validateUniqueAttachmentContents($request);
 
         $storedPaths = [];
 
         try {
-            $application = DB::transaction(function () use ($validated, $companyName, $email, $request, &$storedPaths) {
+            $application = DB::transaction(function () use ($validated, $companyName, $email, $offerings, $request, $attachmentHashes, &$storedPaths) {
                 $this->lockSupplierIdentityChecks();
                 $this->ensureApplicantMaySubmit($email);
 
                 $application = SupplierApplication::create([
                     'application_number' => 'SUP-APP-'.now()->format('Y').'-'.Str::upper(Str::substr(Str::replace('-', '', (string) Str::uuid()), 0, 10)),
                     'company_name' => $companyName,
+                    'owner_name' => trim($validated['owner_name']),
                     'normalized_company_name' => SupplierName::normalize($companyName),
                     'email' => $email,
                     'normalized_email' => $email,
@@ -118,12 +131,19 @@ class SupplierApplicationController extends Controller
                     'business_type' => trim($validated['business_type']),
                     'supply_category' => trim($validated['supply_category']),
                     'address' => trim($validated['address']),
-                    'products_services' => trim($validated['products_services']),
+                    'products_services' => filled($validated['products_services'] ?? null) ? trim($validated['products_services']) : null,
                     'status' => SupplierApplication::STATUS_PENDING,
                     'submitted_at' => now(),
                 ]);
 
-                $this->storeAttachments($application, $request, $storedPaths);
+                $application->offerings()->createMany($offerings);
+                $this->storeAttachments($application, $request, $attachmentHashes, $storedPaths);
+                $application->events()->create([
+                    'event_type' => SupplierApplicationEvent::SUBMITTED,
+                    'title' => 'Application Submitted',
+                    'description' => 'Your supplier application was received for review.',
+                    'occurred_at' => now(),
+                ]);
 
                 return $application;
             });
@@ -147,6 +167,18 @@ class SupplierApplicationController extends Controller
         ]);
 
         $this->notifyAdmins($application);
+        SupplierPortalNotifications::sendStatus(
+            $application,
+            'Supplier Application Received',
+            'Application received',
+            'Your supplier application was received and is pending Admin review. Use the secure link below to track its status.',
+        );
+
+        AuditLogger::success('SUPPLIER_PORTAL_ACCESS_CREATED', AuditLogger::MODULE_SUPPLIERS, [
+            'resource' => $application,
+            'resource_label' => $application->application_number,
+            'details' => 'Temporary supplier portal access was created. No access token was recorded in the audit log.',
+        ]);
 
         return response()->json([
             'message' => 'Application submitted successfully. Keep your reference number for your records.',
@@ -188,7 +220,37 @@ class SupplierApplicationController extends Controller
         }
     }
 
-    private function storeAttachments(SupplierApplication $application, Request $request, array &$storedPaths): void
+    private function validateUniqueAttachmentContents(Request $request): array
+    {
+        $hashes = [];
+        $seenHashes = [];
+
+        foreach (['business_certificate', 'business_permit', 'product_service_image'] as $field) {
+            foreach ($request->file($field, []) as $index => $upload) {
+                $temporaryPath = $upload->getRealPath();
+                $hash = is_string($temporaryPath) ? hash_file('sha256', $temporaryPath) : false;
+
+                if (! is_string($hash)) {
+                    throw ValidationException::withMessages([
+                        $field => ['One of the uploaded files could not be read. Please select it again.'],
+                    ]);
+                }
+
+                if (isset($seenHashes[$hash])) {
+                    throw ValidationException::withMessages([
+                        $field => ['The same file cannot be submitted more than once.'],
+                    ]);
+                }
+
+                $seenHashes[$hash] = true;
+                $hashes[$field][$index] = $hash;
+            }
+        }
+
+        return $hashes;
+    }
+
+    private function storeAttachments(SupplierApplication $application, Request $request, array $attachmentHashes, array &$storedPaths): void
     {
         $attachmentTypes = [
             'business_certificate' => SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE,
@@ -197,7 +259,7 @@ class SupplierApplicationController extends Controller
         ];
 
         foreach ($attachmentTypes as $field => $type) {
-            foreach ($request->file($field, []) as $upload) {
+            foreach ($request->file($field, []) as $index => $upload) {
                 $storedPath = Storage::disk('local')->putFile("supplier-applications/{$application->id}", $upload);
                 if (! $storedPath) {
                     throw new \RuntimeException('Supplier application attachment storage failed.');
@@ -210,6 +272,7 @@ class SupplierApplicationController extends Controller
                     'stored_path' => $storedPath,
                     'mime_type' => (string) $upload->getMimeType(),
                     'file_size' => $upload->getSize(),
+                    'file_sha256' => $attachmentHashes[$field][$index],
                 ]);
             }
         }

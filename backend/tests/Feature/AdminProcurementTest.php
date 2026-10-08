@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ReplenishmentRequest;
 use App\Models\Branch;
+use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Role;
@@ -39,6 +40,12 @@ class AdminProcurementTest extends TestCase
         $this->requester->update([
             'branch_id' => $branch->id,
             'warehouse_id' => $this->warehouse->id,
+        ]);
+        Inventory::create([
+            'barcode' => 'INV-PROCUREMENT-TEST',
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'available_stock' => 5,
         ]);
     }
 
@@ -253,12 +260,16 @@ class AdminProcurementTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('request_no', 'RR-1001')
-            ->assertJsonPath('status', ReplenishmentRequest::STATUS_APPROVED)
+            ->assertJsonPath('status', ReplenishmentRequest::STATUS_FOR_PURCHASE_ORDER)
             ->assertJsonPath('available_for_purchase_order', true);
 
         $this->assertDatabaseHas('replenishment_requests', [
             'request_no' => 'RR-1001',
-            'status' => ReplenishmentRequest::STATUS_APPROVED,
+            'status' => ReplenishmentRequest::STATUS_FOR_PURCHASE_ORDER,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'PROCUREMENT_APPROVED',
+            'resource_id' => (string) $replenishmentRequest->id,
         ]);
         Notification::assertSentTo($this->requester, WorkflowNotification::class, fn ($notification) =>
             $notification->title === 'Request Approved'
@@ -281,6 +292,10 @@ class AdminProcurementTest extends TestCase
             ->assertJsonPath('admin_decision', 'Insufficient budget');
 
         $this->assertDatabaseHas('replenishment_requests', ['request_no' => 'RR-1001', 'status' => ReplenishmentRequest::STATUS_REJECTED]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'PROCUREMENT_DECLINED',
+            'resource_id' => (string) $replenishmentRequest->id,
+        ]);
         Notification::assertSentTo($this->requester, WorkflowNotification::class, fn ($notification) =>
             $notification->title === 'Request Rejected'
             && $notification->message === 'Your request #RR-1001 has been Rejected.'
@@ -296,6 +311,67 @@ class AdminProcurementTest extends TestCase
         $this->actingAs($this->userWithRole('ADMIN'))
             ->postJson("/api/admin/procurement/requests/{$replenishmentRequest->id}/approve")
             ->assertStatus(422);
+    }
+
+    public function test_for_purchase_order_request_transitions_to_po_created_when_po_is_created(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $supplier = Supplier::create([
+            'supplier_code' => 'SUP-APPROVED',
+            'name' => 'Approved Request Supplier',
+            'email' => 'approved@example.test',
+            'status' => 'ACTIVE',
+        ]);
+        $approved = $this->replenishmentRequest([
+            'request_no' => 'RR-APPROVED-PO',
+            'status' => ReplenishmentRequest::STATUS_FOR_PURCHASE_ORDER,
+        ]);
+
+        $response = $this->actingAs($admin)->postJson('/api/purchase-orders', [
+            'supplier_id' => $supplier->id,
+            'replenishment_request_id' => $approved->id,
+            'delivery_details' => 'Main Warehouse',
+            'expected_delivery_date' => now()->addDay()->toDateString(),
+            'items' => [[
+                'product_name' => $this->product->name,
+                'ordered_quantity' => 60,
+                'unit_price' => 100,
+            ]],
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('purchase_orders', [
+            'id' => $response->json('id'),
+            'replenishment_request_id' => $approved->id,
+        ]);
+        $this->assertDatabaseHas('replenishment_requests', [
+            'id' => $approved->id,
+            'status' => ReplenishmentRequest::STATUS_PO_CREATED,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'PURCHASE_ORDER_GENERATED',
+            'resource_id' => (string) $response->json('id'),
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'REPLENISHMENT_PURCHASE_ORDER_CREATED',
+            'resource_id' => (string) $approved->id,
+        ]);
+
+        $this->actingAs($admin)->postJson('/api/purchase-orders', [
+            'supplier_id' => $supplier->id,
+            'replenishment_request_id' => $approved->id,
+            'delivery_details' => 'Main Warehouse',
+            'expected_delivery_date' => now()->addDay()->toDateString(),
+            'items' => [[
+                'product_name' => $this->product->name,
+                'ordered_quantity' => 60,
+                'unit_price' => 100,
+            ]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('replenishment_request_id');
+
+        $this->assertDatabaseCount('purchase_orders', 1);
+        $this->actingAs($admin)->getJson('/api/admin/procurement/requests')
+            ->assertOk()
+            ->assertJsonMissing(['id' => $approved->id]);
     }
 
     public function test_summary_counts_come_from_the_request_records(): void
@@ -314,8 +390,32 @@ class AdminProcurementTest extends TestCase
                 'approved' => 1,
                 'rejected' => 1,
                 'po_created' => 2,
-                'for_purchase_order' => 2,
+                'for_purchase_order' => 1,
             ]);
+    }
+
+    public function test_summary_excludes_linked_historical_request_from_for_purchase_order_count(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $stale = $this->replenishmentRequest([
+            'request_no' => 'RR-HISTORICAL-LINKED',
+            'status' => ReplenishmentRequest::STATUS_FOR_PURCHASE_ORDER,
+        ]);
+        PurchaseOrder::create([
+            'po_number' => 'PO-HISTORICAL-LINKED',
+            'replenishment_request_id' => $stale->id,
+            'supplier_name' => 'Historical Supplier',
+            'delivery_details' => 'Main Warehouse',
+            'expected_delivery_date' => now()->addDay()->toDateString(),
+            'total_amount' => 100,
+            'status' => PurchaseOrder::STATUS_COMPLETED,
+            'approved_by' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)->getJson('/api/admin/procurement/summary')
+            ->assertOk()
+            ->assertJsonPath('for_purchase_order', 0)
+            ->assertJsonPath('approved', 0);
     }
 
     public function test_drafts_are_excluded_from_admin_results_and_summary(): void
@@ -364,7 +464,7 @@ class AdminProcurementTest extends TestCase
             ->getJson('/api/plant-manager/procurement/requests?scope=history')
             ->assertOk()
             ->assertJsonPath('data.0.id', $replenishmentRequest->id)
-            ->assertJsonPath('data.0.status', ReplenishmentRequest::STATUS_APPROVED);
+            ->assertJsonPath('data.0.status', ReplenishmentRequest::STATUS_FOR_PURCHASE_ORDER);
     }
 
     public function test_plant_manager_default_queue_contains_only_active_requests(): void
@@ -419,7 +519,7 @@ class AdminProcurementTest extends TestCase
         );
     }
 
-    public function test_plant_manager_request_history_is_a_rolling_24_hour_submitted_activity_window(): void
+    public function test_plant_manager_recent_activity_returns_the_five_latest_submitted_requests(): void
     {
         $this->travelTo(Carbon::parse('2026-09-30 04:00:00'));
 
@@ -444,19 +544,23 @@ class AdminProcurementTest extends TestCase
                 'request_no' => 'RR-OLDER',
                 'submitted_at' => now()->subHours(25),
             ]);
+            $oldestRequest = $this->replenishmentRequest([
+                'request_no' => 'RR-OLDEST',
+                'submitted_at' => now()->subDays(2),
+            ]);
 
             $history = $this->actingAs($this->requester)
                 ->getJson('/api/plant-manager/procurement/requests?scope=history')
                 ->assertOk()
-                ->assertJsonCount(3, 'data')
+                ->assertJsonCount(5, 'data')
                 ->json('data');
 
             $this->assertSame(
-                [$now->id, $oneHourAgo->id, $twentyThreeHoursAgo->id],
+                [$now->id, $oneHourAgo->id, $twentyThreeHoursAgo->id, $exactlyTwentyFourHoursAgo->id, $olderRequest->id],
                 array_column($history, 'id'),
             );
-            $this->assertDatabaseHas('replenishment_requests', ['id' => $exactlyTwentyFourHoursAgo->id]);
-            $this->assertDatabaseHas('replenishment_requests', ['id' => $olderRequest->id]);
+            $this->assertNotContains($oldestRequest->id, array_column($history, 'id'));
+            $this->assertDatabaseHas('replenishment_requests', ['id' => $oldestRequest->id]);
 
             $activeIds = collect($this->actingAs($this->requester)
                 ->getJson('/api/plant-manager/procurement/requests')

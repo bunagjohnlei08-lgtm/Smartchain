@@ -23,8 +23,8 @@ class AdminProcurementController extends Controller
     private const STATUS_PENDING = ReplenishmentRequest::STATUS_PENDING;
     private const STATUS_APPROVED = ReplenishmentRequest::STATUS_APPROVED;
     private const STATUS_REJECTED = ReplenishmentRequest::STATUS_REJECTED;
-    private const STATUS_FOR_PURCHASE_ORDER = ReplenishmentRequest::STATUS_PO_CREATED;
-    private const STATUSES = [self::STATUS_DRAFT, self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_REJECTED, self::STATUS_FOR_PURCHASE_ORDER];
+    private const STATUS_FOR_PURCHASE_ORDER = ReplenishmentRequest::STATUS_FOR_PURCHASE_ORDER;
+    private const STATUSES = ReplenishmentRequest::STATUSES;
 
     public function index(Request $request): JsonResponse
     {
@@ -39,9 +39,17 @@ class AdminProcurementController extends Controller
         // The default endpoint is Admin Procurement's operational queue.
         // Approved requests remain actionable until a Purchase Order consumes them.
         $query = ReplenishmentRequest::query()
-            ->whereIn('status', [self::STATUS_PENDING, self::STATUS_APPROVED])
+            ->whereIn('status', [
+                self::STATUS_PENDING,
+                self::STATUS_APPROVED,
+                self::STATUS_FOR_PURCHASE_ORDER,
+            ])
             ->whereDoesntHave('purchaseOrder')
-            ->with(['requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name']);
+            ->with([
+                'requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name',
+                'purchaseOrder:id,replenishment_request_id,po_number,status',
+                'product.suppliers:id,name,status',
+            ]);
 
         if (!empty($validated['search'])) {
             $search = $validated['search'];
@@ -75,32 +83,38 @@ class AdminProcurementController extends Controller
             ->groupBy('status')
             ->pluck('aggregate', 'status');
 
-        $byStatus = collect(self::STATUSES)->mapWithKeys(
+        $byStatus = collect(ReplenishmentRequest::STATUSES)->mapWithKeys(
             fn (string $status) => [$status => (int) ($counts[$status] ?? 0)]
         );
+        $awaitingPurchaseOrder = ReplenishmentRequest::query()->awaitingPurchaseOrder()->count();
 
         return response()->json([
             'total_requests' => (int) $counts->sum(),
             'pending_approval' => $byStatus[self::STATUS_PENDING],
-            'approved' => $byStatus[self::STATUS_APPROVED],
+            'approved' => $awaitingPurchaseOrder,
             'rejected' => $byStatus[self::STATUS_REJECTED],
-            'po_created' => $byStatus[self::STATUS_FOR_PURCHASE_ORDER],
+            'po_created' => $byStatus[ReplenishmentRequest::STATUS_PO_CREATED],
             'draft' => $byStatus[self::STATUS_DRAFT],
-            'for_purchase_order' => $byStatus[self::STATUS_FOR_PURCHASE_ORDER],
+            'for_purchase_order' => $awaitingPurchaseOrder,
+            'completed' => $byStatus[ReplenishmentRequest::STATUS_COMPLETED],
+            'cancelled' => $byStatus[ReplenishmentRequest::STATUS_CANCELLED],
         ]);
     }
 
     public function show(Request $request, ReplenishmentRequest $replenishmentRequest): JsonResponse
     {
         $this->authorize('view', $replenishmentRequest);
-        $replenishmentRequest->load(['requester:id,name,employee_id', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name']);
+        $replenishmentRequest->load([
+            'requester:id,name,employee_id', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name',
+            'purchaseOrder:id,replenishment_request_id,po_number,status',
+        ]);
 
         return response()->json($this->requestData($replenishmentRequest));
     }
 
     public function approve(Request $request, ReplenishmentRequest $replenishmentRequest): JsonResponse
     {
-        return $this->decide($request, $replenishmentRequest, self::STATUS_APPROVED);
+        return $this->decide($request, $replenishmentRequest, self::STATUS_FOR_PURCHASE_ORDER);
     }
 
     public function decline(Request $request, ReplenishmentRequest $replenishmentRequest): JsonResponse
@@ -132,7 +146,7 @@ class AdminProcurementController extends Controller
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
             'admin_decision' => $validated['remarks']
-                ?? ($status === self::STATUS_APPROVED
+                ?? ($status === self::STATUS_FOR_PURCHASE_ORDER
                     ? 'Approved by Admin Procurement'
                     : 'Declined by Admin Procurement'),
         ])->save();
@@ -140,14 +154,14 @@ class AdminProcurementController extends Controller
         $replenishmentRequest->load(['requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name']);
 
         AuditLogger::success(
-            $status === self::STATUS_APPROVED ? 'PROCUREMENT_APPROVED' : 'PROCUREMENT_DECLINED',
+            $status === self::STATUS_FOR_PURCHASE_ORDER ? 'PROCUREMENT_APPROVED' : 'PROCUREMENT_DECLINED',
             AuditLogger::MODULE_PROCUREMENT,
             [
                 'resource' => $replenishmentRequest,
                 'resource_label' => $replenishmentRequest->request_no,
                 'details' => sprintf(
                     '%s request %s%s',
-                    $status === self::STATUS_APPROVED ? 'Approved' : 'Declined',
+                    $status === self::STATUS_FOR_PURCHASE_ORDER ? 'Approved for Purchase Order' : 'Declined',
                     $replenishmentRequest->request_no,
                     $replenishmentRequest->product ? " for {$replenishmentRequest->product->name}" : '',
                 ),
@@ -156,11 +170,11 @@ class AdminProcurementController extends Controller
         );
 
         if ($replenishmentRequest->requester) {
-            $label = $status === self::STATUS_APPROVED ? 'Approved' : 'Rejected';
+            $label = $status === self::STATUS_FOR_PURCHASE_ORDER ? 'Approved' : 'Rejected';
             WorkflowNotificationSender::send($replenishmentRequest->requester, new WorkflowNotification(
                 "Request {$label}",
                 "Your request #{$replenishmentRequest->request_no} has been {$label}.",
-                $status === self::STATUS_APPROVED ? 'success' : 'warning',
+                $status === self::STATUS_FOR_PURCHASE_ORDER ? 'success' : 'warning',
                 $replenishmentRequest->request_no,
                 'Procurement',
             ));
@@ -171,6 +185,10 @@ class AdminProcurementController extends Controller
 
     private function requestData(ReplenishmentRequest $replenishmentRequest): array
     {
+        $replenishmentRequest->loadMissing('product.suppliers:id,name,status');
+        // Only an ACTIVE mapped primary supplier may be preselected for the PO.
+        $primarySupplier = $replenishmentRequest->product?->activePrimarySupplier();
+
         return [
             'id' => $replenishmentRequest->id,
             'request_no' => $replenishmentRequest->request_no,
@@ -180,16 +198,30 @@ class AdminProcurementController extends Controller
             'warehouse_name' => $replenishmentRequest->warehouse?->name,
             'requested_qty' => $replenishmentRequest->requested_qty,
             'priority' => $replenishmentRequest->priority,
-            'status' => $replenishmentRequest->status,
+            'status' => $replenishmentRequest->lifecycleStatus(),
             'requested_by' => $replenishmentRequest->requester?->name,
             'submitted_date' => $replenishmentRequest->submitted_at?->toDateString(),
             'reviewed_by' => $replenishmentRequest->reviewer?->name,
             'reviewed_at' => $replenishmentRequest->reviewed_at,
-            'approved_date' => $replenishmentRequest->status === self::STATUS_APPROVED
+            'approved_date' => in_array($replenishmentRequest->status, [
+                self::STATUS_APPROVED,
+                self::STATUS_FOR_PURCHASE_ORDER,
+                ReplenishmentRequest::STATUS_PO_CREATED,
+                ReplenishmentRequest::STATUS_COMPLETED,
+            ], true)
                 ? $replenishmentRequest->reviewed_at?->toDateString()
                 : null,
             'admin_decision' => $replenishmentRequest->admin_decision,
-            'available_for_purchase_order' => $replenishmentRequest->status === self::STATUS_APPROVED,
+            'available_for_purchase_order' => in_array(
+                $replenishmentRequest->status,
+                ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES,
+                true,
+            ) && ! $replenishmentRequest->purchaseOrder,
+            'linked_purchase_order' => $replenishmentRequest->purchaseOrder ? [
+                'number' => $replenishmentRequest->purchaseOrder->po_number,
+                'status' => $replenishmentRequest->purchaseOrder->status,
+            ] : null,
+            'primary_supplier' => $primarySupplier?->only(['id', 'name']),
         ];
     }
 }

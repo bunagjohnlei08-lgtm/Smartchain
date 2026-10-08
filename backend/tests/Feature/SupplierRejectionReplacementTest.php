@@ -238,6 +238,35 @@ class SupplierRejectionReplacementTest extends TestCase
         $this->actingAs($this->manager)->post("/api/receivings/{$original->id}/confirm-replacement", $payload(1), ['Accept' => 'application/json'])->assertUnprocessable();
     }
 
+    public function test_replacement_confirmation_rejects_a_renamed_persisted_receipt_duplicate(): void
+    {
+        $replacement = $this->route($this->sentCase());
+        $item = $replacement->items()->sole();
+        $bytes = "%PDF-1.4\npersisted replacement receipt\n%%EOF";
+        $path = "receiving-receipts/{$replacement->id}/persisted.pdf";
+        Storage::disk('local')->put($path, $bytes);
+        $replacement->receiptAttachments()->create([
+            'original_name' => 'persisted.pdf',
+            'stored_path' => $path,
+            'mime_type' => 'application/pdf',
+            'file_size' => strlen($bytes),
+            'file_sha256' => hash('sha256', $bytes),
+            'uploaded_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager)->post("/api/receivings/{$replacement->id}/confirm-replacement", [
+            'delivery_date' => now()->toDateString(),
+            'items' => [['receiving_item_id' => $item->id, 'delivered_quantity' => $item->ordered_quantity]],
+            'receipts' => [UploadedFile::fake()->createWithContent('renamed.pdf', $bytes)],
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('receipts');
+
+        $this->assertSame(Receiving::STATUS_AWAITING_REPLACEMENT, $replacement->fresh()->status);
+        $this->assertDatabaseCount('receiving_receipt_attachments', 1);
+        $this->assertCount(1, Storage::disk('local')->allFiles("receiving-receipts/{$replacement->id}"));
+    }
+
     public function test_replacement_appears_in_plant_manager_receiving_with_traceability(): void
     {
         $case = $this->sentCase();

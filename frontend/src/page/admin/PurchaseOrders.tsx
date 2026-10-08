@@ -114,6 +114,8 @@ const PurchaseOrders: React.FC = () => {
   const [summary, setSummary] = useState<PurchaseOrderSummary>({ total: 0, pending: 0, approved: 0, completed: 0, cancelled: 0 });
   const [productNames, setProductNames] = useState<string[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+  // Mapped primary supplier of the linked product; applied only if it is in the ACTIVE list.
+  const [preferredSupplierId, setPreferredSupplierId] = useState<number | null>(null);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [supplierError, setSupplierError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -156,6 +158,7 @@ const PurchaseOrders: React.FC = () => {
   useEffect(() => {
     const linkedRequest = (location.state as any)?.replenishmentRequest;
     if (!linkedRequest) return;
+    setPreferredSupplierId(linkedRequest.primarySupplierId ? Number(linkedRequest.primarySupplierId) : null);
     setNewOrder({
       replenishmentRequestId: Number(linkedRequest.id),
       requestNo: linkedRequest.requestNo,
@@ -224,6 +227,14 @@ const PurchaseOrders: React.FC = () => {
   useEffect(() => {
     if (showCreateModal) void loadActiveSuppliers();
   }, [showCreateModal, loadActiveSuppliers]);
+
+  useEffect(() => {
+    if (!preferredSupplierId || !supplierOptions.length) return;
+    if (supplierOptions.some((supplier) => Number(supplier.id) === preferredSupplierId)) {
+      setNewOrder((current) => current.supplierId ? current : { ...current, supplierId: String(preferredSupplierId) });
+    }
+    setPreferredSupplierId(null);
+  }, [preferredSupplierId, supplierOptions]);
 
   const paginationPages = useMemo(() => {
     if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1);

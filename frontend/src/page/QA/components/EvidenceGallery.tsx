@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FileText, Image as ImageIcon, Plus, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import { sha256File } from '../../../lib/fileSha256';
 
 export interface QaAttachment {
   id: number;
@@ -68,6 +69,7 @@ export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ attachments, e
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [processingFiles, setProcessingFiles] = useState(false);
   const [preview, setPreview] = useState<{ url: string; name: string; owned: boolean } | null>(null);
   const visibleSaved = attachments.filter((item) => !removedIds.includes(item.id));
   const total = visibleSaved.length + selectedFiles.length;
@@ -106,12 +108,30 @@ export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ attachments, e
     } catch { setLocalError('Unable to download this file. Please try again.'); }
   };
 
-  const addFiles = (incoming: File[]) => {
+  const addFiles = async (incoming: File[]) => {
     const validation = incoming.map(validateEvidenceFile).find(Boolean);
     if (validation) { setLocalError(validation); return; }
     if (incoming.length > slots) { setLocalError(`Only ${slots} attachment slot${slots === 1 ? '' : 's'} remaining.`); return; }
-    setLocalError(null);
-    onSelectedFilesChange?.([...selectedFiles, ...incoming]);
+    setProcessingFiles(true);
+    try {
+      const knownHashes = new Set(await Promise.all(selectedFiles.map(sha256File)));
+      const nextFiles: File[] = [];
+      for (const file of incoming) {
+        const hash = await sha256File(file);
+        if (knownHashes.has(hash)) {
+          setLocalError('Duplicate file detected. This exact file has already been added.');
+          return;
+        }
+        knownHashes.add(hash);
+        nextFiles.push(file);
+      }
+      setLocalError(null);
+      onSelectedFilesChange?.([...selectedFiles, ...nextFiles]);
+    } catch {
+      setLocalError('We could not read one of the selected files. Please select it again.');
+    } finally {
+      setProcessingFiles(false);
+    }
   };
 
   return <div className="space-y-4">
@@ -128,16 +148,16 @@ export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ attachments, e
         {showMetadata && <div className="mt-1 space-y-0.5 text-xs text-(--text-secondary)">{attachment.receiving_no && <p className="truncate">Receiving {attachment.receiving_no}</p>}{formatUploadedAt(attachment.created_at) && <p>Uploaded {formatUploadedAt(attachment.created_at)}{attachment.uploaded_by ? ` by ${attachment.uploaded_by}` : ''}</p>}</div>}
         <div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => openSaved(attachment)} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 text-sm hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500">{attachment.mime_type === 'application/pdf' ? 'View PDF' : 'Preview'}</button>
           {showDownload && <button type="button" onClick={() => void downloadSaved(attachment)} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 text-sm hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500">Download</button>}
-          {editable && <button type="button" disabled={disabled} onClick={() => onRemovedIdsChange?.([...removedIds, attachment.id])} aria-label={`Remove ${attachment.original_name}`} className="min-h-11 cursor-pointer rounded-lg px-3 text-sm text-red-700 hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-red-500 disabled:opacity-50 dark:text-red-300"><Trash2 className="mr-1 inline h-4 w-4" />Remove</button>}
+          {editable && <button type="button" disabled={disabled || processingFiles} onClick={() => onRemovedIdsChange?.([...removedIds, attachment.id])} aria-label={`Remove ${attachment.original_name}`} className="min-h-11 cursor-pointer rounded-lg px-3 text-sm text-red-700 hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-red-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300"><Trash2 className="mr-1 inline h-4 w-4" />Remove</button>}
         </div>
       </article>)}
       {selectedUrls.map(({ file, url }, index) => <article key={`${file.name}-${file.lastModified}-${index}`} className="min-w-0 rounded-xl border border-cyan-500/40 bg-cyan-500/5 p-3">
         {url ? <button type="button" onClick={() => setPreview({ url, name: file.name, owned: false })} className="aspect-video w-full cursor-pointer overflow-hidden rounded-lg bg-slate-200 focus-visible:outline-2 focus-visible:outline-cyan-500 dark:bg-slate-800"><img src={url} alt={`Selected evidence: ${file.name}`} className="h-full w-full object-contain" /></button> : <div className="flex aspect-video items-center justify-center rounded-lg bg-red-500/10"><FileText className="h-10 w-10 text-red-500" /></div>}
         <p className="mt-2 truncate text-sm font-medium" title={file.name}>{file.name}</p><p className="text-xs text-(--text-secondary)">{formatSize(file.size)} • Ready to upload</p>
-        <div className="mt-2 flex gap-2">{file.type === 'application/pdf' && <button type="button" onClick={() => { const pdfUrl = URL.createObjectURL(file); window.open(pdfUrl, '_blank', 'noopener,noreferrer'); setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000); }} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 text-sm">View PDF</button>}<button type="button" disabled={disabled} onClick={() => onSelectedFilesChange?.(selectedFiles.filter((_, itemIndex) => itemIndex !== index))} className="min-h-11 cursor-pointer rounded-lg px-3 text-sm text-red-700 hover:bg-red-500/10 dark:text-red-300">Remove</button></div>
+        <div className="mt-2 flex gap-2">{file.type === 'application/pdf' && <button type="button" onClick={() => { const pdfUrl = URL.createObjectURL(file); window.open(pdfUrl, '_blank', 'noopener,noreferrer'); setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000); }} className="min-h-11 cursor-pointer rounded-lg border border-(--border-color-strong) px-3 text-sm">View PDF</button>}<button type="button" disabled={disabled || processingFiles} onClick={() => onSelectedFilesChange?.(selectedFiles.filter((_, itemIndex) => itemIndex !== index))} className="min-h-11 cursor-pointer rounded-lg px-3 text-sm text-red-700 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300">Remove</button></div>
       </article>)}
     </div>
-    {editable && slots > 0 && <><input ref={inputRef} id={inputId} type="file" multiple accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" className="sr-only" disabled={disabled} onChange={(event) => { addFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ''; }} /><button type="button" disabled={disabled} onClick={() => inputRef.current?.click()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-(--border-color-strong) px-4 text-sm font-medium hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-50"><Plus className="h-4 w-4" />Add files <span className="text-(--text-secondary)">({slots} remaining)</span></button></>}
+    {editable && slots > 0 && <><input ref={inputRef} id={inputId} type="file" multiple accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" className="sr-only" disabled={disabled || processingFiles} onChange={(event) => { const incoming = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ''; void addFiles(incoming); }} /><button type="button" disabled={disabled || processingFiles} onClick={() => inputRef.current?.click()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-(--border-color-strong) px-4 text-sm font-medium hover:bg-(--bg-hover) focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-4 w-4" />{processingFiles ? 'Checking files...' : 'Add files'} <span className="text-(--text-secondary)">({slots} remaining)</span></button></>}
     {(error || localError) && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error || localError}</p>}
     {preview && <div role="dialog" aria-modal="true" aria-label={`Preview ${preview.name}`} onClick={() => setPreview(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-3 sm:p-6"><div onClick={(event) => event.stopPropagation()} className="flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-[#0d1322]"><div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700"><p className="truncate font-medium">{preview.name}</p><button type="button" onClick={() => setPreview(null)} aria-label="Close preview" className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-cyan-500 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button></div><div className="min-h-0 flex-1 overflow-auto p-3"><img src={preview.url} alt={`Large preview of ${preview.name}`} className="mx-auto max-h-[calc(100vh-8rem)] max-w-full object-contain" /></div></div></div>}
   </div>;

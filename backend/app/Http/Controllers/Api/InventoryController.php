@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class InventoryController extends Controller
 {
@@ -95,6 +96,18 @@ class InventoryController extends Controller
         return response()->json($this->present($inventory, $user));
     }
 
+    /** One inventory record per product and warehouse (enforced by a unique index). */
+    private function ensureNoDuplicateInventory(int $productId, int $warehouseId, ?int $ignoreId = null): void
+    {
+        $exists = Inventory::query()->where('product_id', $productId)->where('warehouse_id', $warehouseId)
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))->exists();
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'warehouse_id' => ['This product already has an inventory record in the selected warehouse.'],
+            ]);
+        }
+    }
+
     private function resolveProduct(array $validated): Product
     {
         return Product::firstOrCreate(
@@ -129,6 +142,7 @@ class InventoryController extends Controller
         $inventory = DB::transaction(function () use ($validated) {
             $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($validated['warehouse_id']);
             $product = $this->resolveProduct($validated);
+            $this->ensureNoDuplicateInventory($product->id, $warehouse->id);
             $inventory = Inventory::create([
                 'barcode' => $validated['barcode'], 'product_id' => $product->id,
                 'warehouse_id' => $warehouse->id, 'available_stock' => $validated['available_stock'],
@@ -170,6 +184,7 @@ class InventoryController extends Controller
             if (array_key_exists('product', $validated)) {
                 $inventory->product_id = $this->resolveProduct($validated)->id;
             }
+            $this->ensureNoDuplicateInventory($inventory->product_id, (int) ($validated['warehouse_id'] ?? $inventory->warehouse_id), $inventory->id);
             $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray())->save();
             foreach ($warehouses as $warehouse) WarehouseCapacity::recordTransition($warehouse);
             return $inventory;
