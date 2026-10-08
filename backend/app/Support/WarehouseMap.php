@@ -12,8 +12,6 @@ use App\Models\Warehouse;
  */
 class WarehouseMap
 {
-    public const MAIN_WAREHOUSE_CODE = 'WH-MAIN';
-
     public static function embedUrl(Warehouse $warehouse): ?string
     {
         $coordinates = self::coordinates($warehouse);
@@ -22,7 +20,7 @@ class WarehouseMap
         }
 
         $place = config('services.google_maps.main_warehouse_place');
-        if ($warehouse->code === self::MAIN_WAREHOUSE_CODE && ! empty($place['feature_id']) && ! empty($place['name'])) {
+        if (self::isMainWarehousePlace($warehouse, $place) && ! empty($place['feature_id']) && ! empty($place['name'])) {
             [$latitude, $longitude] = $coordinates;
 
             return 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3679.48874398943'
@@ -43,6 +41,14 @@ class WarehouseMap
         return $coordinates === null
             ? null
             : 'https://www.google.com/maps/dir/?api=1&destination='.rawurlencode(implode(',', $coordinates));
+    }
+
+    private static function isMainWarehousePlace(Warehouse $warehouse, mixed $place): bool
+    {
+        $code = strtoupper(trim((string) $warehouse->code));
+        $codes = array_map(fn ($value) => strtoupper(trim((string) $value)), (array) ($place['warehouse_codes'] ?? []));
+
+        return $code !== '' && in_array($code, $codes, true);
     }
 
     /** @return array{0: string, 1: string}|null */

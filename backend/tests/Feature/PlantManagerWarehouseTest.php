@@ -56,6 +56,22 @@ class PlantManagerWarehouseTest extends TestCase
             ->assertJsonPath('inventory.backload', 10);
     }
 
+    public function test_production_wh_pamp_code_uses_the_archon_nell_place(): void
+    {
+        $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
+        $warehouse = Warehouse::create([
+            'name' => 'Main Warehouse', 'code' => 'WH-PAMP', 'branch_id' => $branch->id,
+            'address' => 'G/F, Brgy, New Marikina Subd, 29 Flamingo, Marikina, 1800 Metro Manila', 'latitude' => 14.6305374,
+            'longitude' => 121.1010625, 'capacity' => 1000, 'status' => 'Active',
+        ]);
+
+        $this->actingAs($this->user('PLANT_MANAGER', ['warehouse_id' => $warehouse->id]))->getJson('/api/plant-manager/warehouse')
+            ->assertOk()
+            ->assertJsonPath('code', 'WH-PAMP')
+            ->assertJsonPath('map_embed_url', 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3679.48874398943!2d121.1010625!3d14.6305374!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b9485ea55b87%3A0x2e093784a1e3763b!2sArchon%20Nell%20Incorporated!5e1!3m2!1sen!2sph!4v1791469640495!5m2!1sen!2sph')
+            ->assertJsonPath('directions_url', 'https://www.google.com/maps/dir/?api=1&destination=14.6305374%2C121.1010625');
+    }
+
     public function test_warehouse_overview_is_read_only_and_plant_manager_only(): void
     {
         $this->getJson('/api/plant-manager/warehouse')->assertUnauthorized();

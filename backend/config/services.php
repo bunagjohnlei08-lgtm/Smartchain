@@ -43,6 +43,12 @@ return [
         'main_warehouse_place' => [
             'name' => env('GOOGLE_MAPS_MAIN_WAREHOUSE_PLACE_NAME', 'Archon Nell Incorporated'),
             'feature_id' => env('GOOGLE_MAPS_MAIN_WAREHOUSE_PLACE_FEATURE_ID', '0x3397b9485ea55b87:0x2e093784a1e3763b'),
+            // Warehouse codes that are this physical location. Local seeds use WH-MAIN while
+            // production keeps its original WH-PAMP code, so both must resolve to the same place.
+            'warehouse_codes' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('GOOGLE_MAPS_MAIN_WAREHOUSE_CODES', 'WH-MAIN,WH-PAMP')),
+            ))),
         ],
     ],
 
