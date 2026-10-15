@@ -1,3 +1,6 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import { ClassificationBadge } from '../../components/catalog/ProductFields';
+import type { Classification } from '../../lib/catalog';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -30,6 +33,8 @@ interface RequestRecord {
   warehouse_name: string;
   product_id: number;
   product_name: string;
+  unit?: string;
+  item_classification?: Classification;
   requested_qty: number;
   priority: Priority;
   current_priority: Priority;
@@ -55,6 +60,8 @@ interface Candidate {
   productId: number;
   warehouseId: number;
   name: string;
+  unit?: string;
+  item_classification?: Classification;
   sku: string;
   warehouse: string;
   currentStock: number;
@@ -347,7 +354,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const selectedCandidates = candidates.filter((candidate) => selectedIds.includes(candidate.id));
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1400px] space-y-6 p-4 pb-10 sm:p-6 sm:pb-10 lg:p-8 lg:pb-10">
+    <div className={`${PAGE_CONTENT_CLASS} space-y-6`}>
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 dark:text-cyan-400">
@@ -522,7 +529,7 @@ const ReplenishmentPlanning: React.FC = () => {
                         {candidate.supplierWarning && <SupplierWarning />}
                       </td>
                       <td className="px-4 py-4">
-                        <span className="font-semibold text-[var(--text-primary)]">{candidate.currentStock}</span>
+                        <span className="font-semibold text-[var(--text-primary)]">{candidate.currentStock} {candidate.unit}</span>
                         {candidate.currentStock < 0 && <span className="ml-2 text-xs font-semibold text-red-500">Invalid stock</span>}
                       </td>
                       <td className="px-4 py-4"><PriorityBadge priority={candidate.priority} /></td>
@@ -567,7 +574,7 @@ const ReplenishmentPlanning: React.FC = () => {
                       </div>
                       <StageHint request={candidate.request} />
                       <p className="mt-3 text-sm text-[var(--text-secondary)]">
-                        Available stock: <strong className="text-[var(--text-primary)]">{candidate.currentStock}</strong>
+                        Available stock: <strong className="text-[var(--text-primary)]">{candidate.currentStock} {candidate.unit}</strong>
                         {candidate.currentStock < 0 && <span className="ml-2 font-semibold text-red-500">Invalid stock</span>}
                       </p>
                       <button
@@ -654,7 +661,7 @@ const ReplenishmentPlanning: React.FC = () => {
                   <div>
                     <p className="font-semibold text-[var(--text-primary)]">{candidate.name}</p>
                     <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                      <dt className="text-[var(--text-muted)]">Available stock</dt><dd className="font-medium text-[var(--text-primary)]">{candidate.currentStock}</dd>
+                      <dt className="text-[var(--text-muted)]">Available stock</dt><dd className="font-medium text-[var(--text-primary)]">{candidate.currentStock} {candidate.unit}</dd>
                       <dt className="text-[var(--text-muted)]">Priority</dt><dd><PriorityBadge priority={candidate.priority} /></dd>
                       <dt className="text-[var(--text-muted)]">Assigned supplier</dt><dd className="font-medium text-[var(--text-primary)]">{candidate.primarySupplier?.name ?? <span className="text-amber-600 dark:text-amber-400">No Active Supplier Assigned</span>}</dd>
                     </dl>
@@ -714,7 +721,7 @@ const ReplenishmentPlanning: React.FC = () => {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-cyan-400">{detail.request_no}</p>
-                <h2 id="detail-dialog-title" className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{detail.product_name}</h2>
+                <h2 id="detail-dialog-title" className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{detail.product_name}</h2>{detail.item_classification && <div className="mt-2"><ClassificationBadge value={detail.item_classification}/><span className="ml-2 text-xs">Stock Unit: {detail.unit}</span></div>}
               </div>
               <button type="button" aria-label="Close request details" onClick={() => setDetail(null)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-surface-alt)]"><X className="h-5 w-5" /></button>
             </div>

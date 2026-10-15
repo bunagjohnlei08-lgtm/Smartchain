@@ -1,3 +1,6 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import { ClassificationBadge, ClassificationSelect } from '../../components/catalog/ProductFields';
+import type { Classification } from '../../lib/catalog';
 // src/page/plant-manager/Inventory.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -138,6 +141,7 @@ const Inventory: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [classification, setClassification] = useState<Classification | ''>('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
 
   const fetchInventory = useCallback(async () => {
@@ -160,6 +164,7 @@ const Inventory: React.FC = () => {
   // Filtered inventory
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
+      if (classification && (item.item_classification ?? 'FINISHED_PRODUCT') !== classification) return false;
       const query = searchQuery.toLowerCase();
       const matchSearch =
         item.product.toLowerCase().includes(query) ||
@@ -169,7 +174,7 @@ const Inventory: React.FC = () => {
         statusFilter === 'All statuses' || item.status === statusFilter;
       return matchSearch && matchStatus;
     });
-  }, [inventory, searchQuery, statusFilter]);
+  }, [inventory, searchQuery, statusFilter, classification]);
 
   // Calculate totals
   const totalAvailable = inventory.reduce((sum, item) => sum + item.available_stock, 0);
@@ -177,7 +182,7 @@ const Inventory: React.FC = () => {
   const totalBackload = inventory.reduce((sum, item) => sum + item.backload, 0);
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+    <div className={`${PAGE_CONTENT_CLASS} space-y-6 bg-[#090d16] text-slate-100 min-h-screen`}>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Plant Manager</span>
@@ -225,6 +230,7 @@ const Inventory: React.FC = () => {
 
       {/* Filter & Table Container */}
       <div className="bg-[#0f172a]/60 border border-slate-800/80 rounded-2xl p-5 space-y-4">
+        <div className="max-w-sm"><ClassificationSelect value={classification} onChange={setClassification} label="Inventory Classification"/></div>
         {/* Search & Filter Row */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative flex-1 w-full">
@@ -311,20 +317,21 @@ const Inventory: React.FC = () => {
                   </td>
                   <td className="px-4 py-3.5 text-sm font-medium text-white">
                     {item.product}
+                    <div className="mt-1"><ClassificationBadge value={item.item_classification ?? 'FINISHED_PRODUCT'}/></div>
                   </td>
                   <td className="px-4 py-3.5 text-sm text-slate-400">
                     {item.warehouse}
                   </td>
                   <td className="px-4 py-3.5 text-right text-sm text-white">
-                    {item.available_stock}
+                    {item.available_stock} {item.unit}
                   </td>
                   <td className="px-4 py-3.5 text-right text-sm font-medium text-cyan-400">
-                    {item.reserved_stock}
+                    {item.reserved_stock} {item.unit}
                   </td>
                   <td className={`px-4 py-3.5 text-right text-sm font-medium ${
                     item.backload > 0 ? 'text-rose-400' : 'text-slate-500'
                   }`}>
-                    {item.backload}
+                    {item.backload} {item.unit}
                   </td>
                   <td className="px-4 py-3.5">
                     <StatusBadge status={item.status} />
@@ -343,7 +350,7 @@ const Inventory: React.FC = () => {
               )}
             </tbody>
           </table>
-        </div> : isLoading ? <div className="py-8 text-center text-slate-400">Loading inventory...</div> : filteredInventory.length > 0 ? <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{filteredInventory.map((item) => <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{item.product}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.warehouse}</p></div><StatusBadge status={item.status} /></div><div className="mt-3"><BarcodeDisplay value={item.barcode} /></div><dl className="mt-4 grid grid-cols-3 gap-2 text-center text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Available</dt><dd className="font-semibold text-slate-900 dark:text-white">{item.available_stock}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Reserved</dt><dd className="font-semibold text-cyan-600 dark:text-cyan-400">{item.reserved_stock}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Backload</dt><dd className={item.backload > 0 ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-500'}>{item.backload}</dd></div></dl><p className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">Updated {formatLastUpdated(item.updated_at)}</p></article>)}</div> : <div className="py-8 text-center text-slate-400">No inventory items found matching your filters.</div>}
+        </div> : isLoading ? <div className="py-8 text-center text-slate-400">Loading inventory...</div> : filteredInventory.length > 0 ? <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{filteredInventory.map((item) => <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{item.product} <ClassificationBadge value={item.item_classification ?? 'FINISHED_PRODUCT'}/></h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.warehouse}</p></div><StatusBadge status={item.status} /></div><div className="mt-3"><BarcodeDisplay value={item.barcode} /></div><dl className="mt-4 grid grid-cols-3 gap-2 text-center text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Available</dt><dd className="font-semibold text-slate-900 dark:text-white">{item.available_stock} {item.unit}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Reserved</dt><dd className="font-semibold text-cyan-600 dark:text-cyan-400">{item.reserved_stock} {item.unit}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Backload</dt><dd className={item.backload > 0 ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-500'}>{item.backload} {item.unit}</dd></div></dl><p className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">Updated {formatLastUpdated(item.updated_at)}</p></article>)}</div> : <div className="py-8 text-center text-slate-400">No inventory items found matching your filters.</div>}
 
         {/* Pagination (static) */}
         <div className="flex items-center justify-between px-2 py-3 border-t border-slate-800/60">

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\AuditLogger;
 use App\Support\WarehouseCapacity;
+use App\Support\CatalogProductRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class InventoryController extends Controller
             'category' => $inventory->product->category,
             'brand' => $inventory->product->brand,
             'unit' => $inventory->product->unit,
+            'item_classification' => $inventory->product->item_classification,
             'warehouse' => $inventory->warehouse->name,
             'warehouse_id' => $inventory->warehouse_id,
             'available_stock' => $inventory->available_stock,
@@ -54,6 +56,8 @@ class InventoryController extends Controller
         $this->authorize('viewAny', Inventory::class);
         $user = $request->user();
         $query = $this->readableInventoryQuery($user)->with(['product', 'warehouse']);
+        $request->validate(['item_classification' => ['nullable', Rule::in(Product::CLASSIFICATIONS)]]);
+        if ($request->filled('item_classification')) $query->whereHas('product', fn ($products) => $products->where('item_classification', $request->input('item_classification')));
 
         if ($request->filled('warehouse_id')) {
             $query->where('warehouse_id', $request->warehouse_id);
@@ -142,7 +146,11 @@ class InventoryController extends Controller
         $inventory = DB::transaction(function () use ($validated) {
             $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($validated['warehouse_id']);
             $product = $this->resolveProduct($validated);
+            CatalogProductRules::ensureSupported($warehouse, $product->unit);
             $this->ensureNoDuplicateInventory($product->id, $warehouse->id);
+            WarehouseCapacity::ensureAdditionsFit($warehouse, [
+                WarehouseCapacity::normalizeUnit($product->unit) => (int) $validated['available_stock'] + (int) $validated['reserved_stock'],
+            ]);
             $inventory = Inventory::create([
                 'barcode' => $validated['barcode'], 'product_id' => $product->id,
                 'warehouse_id' => $warehouse->id, 'available_stock' => $validated['available_stock'],
@@ -181,11 +189,22 @@ class InventoryController extends Controller
             $warehouseIds = collect([$inventory->warehouse_id, $validated['warehouse_id'] ?? $inventory->warehouse_id])->unique()->sort()->values();
             $warehouses = Warehouse::query()->whereIn('id', $warehouseIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $inventory = Inventory::query()->lockForUpdate()->findOrFail($inventory->id);
+            abort_unless($warehouses->has($inventory->warehouse_id), 409, 'Inventory warehouse changed during this update. Refresh and try again.');
+            $oldWarehouseId = $inventory->warehouse_id;
+            $oldUnit = WarehouseCapacity::normalizeUnit($inventory->product->unit);
+            $oldQuantity = $inventory->available_stock + $inventory->reserved_stock;
             if (array_key_exists('product', $validated)) {
                 $inventory->product_id = $this->resolveProduct($validated)->id;
+                $inventory->unsetRelation('product');
             }
             $this->ensureNoDuplicateInventory($inventory->product_id, (int) ($validated['warehouse_id'] ?? $inventory->warehouse_id), $inventory->id);
-            $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray())->save();
+            $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray());
+            $unit = WarehouseCapacity::normalizeUnit($inventory->product->unit);
+            if ((int) $oldWarehouseId !== (int) $inventory->warehouse_id) CatalogProductRules::ensureSupported($warehouses[$inventory->warehouse_id], $inventory->product->unit);
+            $quantity = $inventory->available_stock + $inventory->reserved_stock;
+            $addition = $quantity - ((int) $oldWarehouseId === (int) $inventory->warehouse_id && $oldUnit === $unit ? $oldQuantity : 0);
+            WarehouseCapacity::ensureAdditionsFit($warehouses[$inventory->warehouse_id], [$unit => $addition]);
+            $inventory->save();
             foreach ($warehouses as $warehouse) WarehouseCapacity::recordTransition($warehouse);
             return $inventory;
         });
@@ -216,7 +235,11 @@ class InventoryController extends Controller
         $inventory = DB::transaction(function () use ($id) {
             $current = Inventory::findOrFail($id);
             $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($current->warehouse_id);
+            $product = Product::query()->lockForUpdate()->findOrFail($current->product_id);
             $inventory = Inventory::query()->lockForUpdate()->findOrFail($id);
+            abort_if((int) $inventory->warehouse_id !== (int) $warehouse->id || (int) $inventory->product_id !== (int) $product->id, 409, 'Inventory assignments changed. Refresh and retry deletion.');
+            abort_if(! CatalogProductRules::isDisposableSetup($inventory), 409, 'Inventory cannot be deleted: stock or stock history exists, or this is not proven unused catalog setup.');
+            abort_if(CatalogProductRules::historyReferences($product) !== [], 409, 'Inventory cannot be deleted because its product has transaction history or BOM/production dependencies.');
             $inventory->delete();
             WarehouseCapacity::recordTransition($warehouse);
             return $inventory;

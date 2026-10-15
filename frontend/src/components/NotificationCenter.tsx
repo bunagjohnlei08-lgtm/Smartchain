@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from './layout/pageLayout';
 import { useEffect, useState } from 'react';
 import { Bell, CheckCheck, LoaderCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -41,7 +42,7 @@ export default function NotificationCenter({ breadcrumbLabel }: NotificationCent
   const filterClass = (active: boolean) => `min-h-11 cursor-pointer rounded-xl px-4 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#092635] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${active ? 'bg-[#092635] font-semibold text-white' : 'border border-slate-300 bg-white font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`;
 
   return (
-    <div className="w-full space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={`${PAGE_CONTENT_CLASS} space-y-6`}>
       <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><span>{breadcrumbLabel}</span><span aria-hidden="true">/</span><span className="text-slate-900 dark:text-slate-100">Notifications</span></div>
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">

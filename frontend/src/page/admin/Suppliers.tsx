@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 // src/pages/admin/Suppliers.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
@@ -300,7 +301,7 @@ const Suppliers: React.FC = () => {
 
   {/* FIX: Dark mode canvas adaptation */}
   return (
-    <div className="admin-suppliers w-full max-w-7xl mx-auto p-6 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200">
+    <div className={`${PAGE_CONTENT_CLASS} admin-suppliers space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200`}>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
         <span>Admin</span>

@@ -115,7 +115,6 @@ class PublicCompanyLocationTest extends TestCase
             'address' => $warehouse->address,
             'latitude' => (float) $warehouse->latitude,
             'longitude' => (float) $warehouse->longitude,
-            'capacity' => $warehouse->capacity,
             'status' => 'Active',
             'show_on_public_website' => true,
         ];

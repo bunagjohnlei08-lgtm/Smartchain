@@ -24,10 +24,10 @@ class AdminDashboardWarehouseUtilizationTest extends TestCase
             'name' => 'Main Warehouse',
             'code' => 'WH-MAIN',
             'branch_id' => $branch->id,
-            'capacity' => 1000,
+            'capacity' => 1000, 'capacity_kg' => 0, 'capacity_pcs' => 1000, 'capacity_l' => 0,
             'status' => 'Active',
         ]);
-        $product = Product::create(['name' => 'Capacity Product']);
+        $product = Product::create(['name' => 'Capacity Product', 'unit' => 'PCS']);
 
         Inventory::create([
             'barcode' => 'CAPACITY-1',
@@ -40,7 +40,7 @@ class AdminDashboardWarehouseUtilizationTest extends TestCase
         $this->actingAs($admin)->getJson('/api/admin/dashboard')
             ->assertOk()
             ->assertJsonPath('data.metrics.warehouse_name', 'Main Warehouse')
-            ->assertJsonPath('data.metrics.warehouse_utilization', 68);
+            ->assertJsonPath('data.metrics.warehouse_capacity.unit_capacity.PCS.utilization_percentage', 68);
     }
 
     public function test_dashboard_returns_null_utilization_when_capacity_is_not_configured(): void
@@ -52,7 +52,7 @@ class AdminDashboardWarehouseUtilizationTest extends TestCase
             'name' => 'Main Warehouse',
             'code' => 'WH-MAIN',
             'branch_id' => $branch->id,
-            'capacity' => 0,
+            'capacity' => 0, 'capacity_kg' => 0, 'capacity_pcs' => 0, 'capacity_l' => 0,
             'status' => 'Active',
         ]);
 

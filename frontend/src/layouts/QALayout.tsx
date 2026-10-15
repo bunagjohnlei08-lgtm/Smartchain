@@ -1,5 +1,6 @@
+import { MAIN_SCROLL_OFFSET_CLASS } from '../components/layout/pageLayout';
 import React from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Moon,
   Sun,
@@ -18,6 +19,9 @@ const QALayout: React.FC = () => {
   const [userName, setUserName] = React.useState('User');
   const [profilePhotoUrl, setProfilePhotoUrl] = React.useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [productionWarehouse, setProductionWarehouse] = React.useState<string | null>(null);
+  const production = location.pathname.startsWith('/qa/production');
   const { theme, toggleTheme } = useTheme();
 
   React.useEffect(() => {
@@ -78,7 +82,7 @@ const QALayout: React.FC = () => {
             <div className="operations-mobile-menu-spacer w-10 flex-shrink-0 xl:hidden" />
             <div className="hidden min-w-0 md:block">
               <h1 className="truncate whitespace-nowrap text-sm font-semibold text-white">Quality Assurance & Control</h1>
-              <p className="truncate whitespace-nowrap text-xs text-slate-400">Plant 02 — Receiving Inspection</p>
+              <p className="truncate whitespace-nowrap text-xs text-slate-400">{production ? `Production Inspections — ${productionWarehouse ?? 'Assigned Batches'}` : 'Assigned Receiving Inspections'}</p>
             </div>
           </div>
 
@@ -111,8 +115,8 @@ const QALayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="qa-main flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16] pt-14 xl:pt-0">
-          <Outlet />
+        <main className={`qa-main flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16] ${MAIN_SCROLL_OFFSET_CLASS}`}>
+          <Outlet context={{ setProductionWarehouse }} />
         </main>
       </div>
     </div>

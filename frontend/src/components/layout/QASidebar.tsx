@@ -11,6 +11,7 @@ import {
   Bell,
   X,
   ClipboardCheck,
+  Factory,
 } from 'lucide-react';
 
 const navGroups = [
@@ -19,6 +20,7 @@ const navGroups = [
     items: [
       { id: 'dashboard', icon: ClipboardList, label: 'Dashboard', path: '/qa/dashboard' },
       { id: 'inspection', icon: Search, label: 'Quality Inspection', path: '/qa/inspection' },
+      { id: 'production', icon: Factory, label: 'Production Inspections', path: '/qa/production' },
       { id: 'rejected-items', icon: Ban, label: 'Rejected Items', path: '/qa/rejected-items' },
       { id: 'history', icon: History, label: 'Inspection History', path: '/qa/history' },
       { id: 'inventory-audit', icon: ClipboardCheck, label: 'Inventory Quality Audit', path: '/qa/inventory-audit' },

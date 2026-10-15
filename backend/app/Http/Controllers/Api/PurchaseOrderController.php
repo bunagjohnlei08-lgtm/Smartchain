@@ -101,8 +101,11 @@ class PurchaseOrderController extends Controller
                 abort_unless($replenishmentRequest->isAvailableForPurchaseOrder(), 422, 'Only approved replenishment requests can generate a Purchase Order.');
             }
             $items = collect($validated['items'])->map(function (array $item) {
-                $product = Product::query()->where('name', $item['product_name'])->firstOrFail();
+                $product = Product::query()->where('name', $item['product_name'])->lockForUpdate()->firstOrFail();
                 return [
+                    'product_id' => $product->id,
+                    'unit' => $product->unit,
+                    'item_classification' => $product->item_classification,
                     'product_name' => $product->name,
                     'ordered_quantity' => (int) $item['ordered_quantity'],
                     'unit_price' => round((float) $item['unit_price'], 2),
@@ -282,7 +285,9 @@ class PurchaseOrderController extends Controller
                 'ordered_quantity' => $item->ordered_quantity,
                 'received_quantity' => $received,
                 'remaining_quantity' => max(0, $item->ordered_quantity - $received),
-                'unit' => Product::query()->where('name', $item->product_name)->value('unit'),
+                'unit' => $item->unit ?? Product::query()->where('name', $item->product_name)->value('unit'),
+                'item_classification' => $item->item_classification ?? Product::query()->where('name', $item->product_name)->value('item_classification'),
+                'product_id' => $item->product_id,
                 'unit_price' => (float) $item->unit_price,
                 'total_price' => (float) $item->total_price,
                 ];

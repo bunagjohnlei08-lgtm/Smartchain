@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -16,7 +17,7 @@ use Throwable;
  * Issues and delivers the emailed second-step login codes.
  *
  * - Codes are 6 digits from random_int(); only a Hash::make() digest is stored.
- * - A challenge accepts a code only after its email was delivered
+ * - A challenge accepts a code only after its email was submitted
  *   (last_sent_at is set), so a failed send never leaves a live code behind.
  * - The plaintext code is returned to the caller only so it can be mailed;
  *   it is never logged, audited or returned from an API response.
@@ -73,7 +74,7 @@ class LoginChallenges
             'otp_hash' => Hash::make($code),
             'expires_at' => now()->addMinutes(self::expirationMinutes()),
             'resend_count' => $challenge->resend_count + 1,
-            // Not usable again until this code's email is delivered.
+            // Not usable again until this code's email is submitted.
             'last_sent_at' => null,
         ])->save();
 
@@ -81,28 +82,66 @@ class LoginChallenges
     }
 
     /**
-     * Email the code, then mark it deliverable. On failure the challenge is
-     * revoked so the user has to start over. Must run outside a transaction.
+     * Submit synchronously, then enable only this exact code generation.
+     * A failed initial send is revoked; a failed resend stays open for retry,
+     * with both old and unsent codes unusable. Resend callers hold a row lock.
      */
     public static function deliver(LoginChallenge $challenge, User $user, string $code): bool
     {
+        $current = $challenge->fresh();
+        if (! $current || ! $current->isOpen() || ! $current->expires_at->isFuture()
+            || $current->user_id !== $user->id || $current->otp_hash !== $challenge->otp_hash) {
+            return false;
+        }
         try {
-            Mail::to($user->email)->send(new LoginOtpMail(
+            // Log/array (including failover to log) cannot deliver login codes
+            // and may expose their plaintext. Mail::fake remains usable in tests.
+            if (! app()->environment('testing') && ! self::usesLiveTransport((string) config('mail.default'))) {
+                throw new \RuntimeException('Login mail transport is not a delivery transport.');
+            }
+            $sent = Mail::to($user->email)->send(new LoginOtpMail(
                 name: $user->name,
                 code: $code,
                 expiresInMinutes: self::expirationMinutes(),
             ));
+            if ($sent === null && ! app()->environment('testing')) {
+                throw new \RuntimeException('Login mail submission was cancelled.');
+            }
         } catch (Throwable $exception) {
-            // Transport errors carry no message body, so the code is not logged.
-            report($exception);
-            $challenge->forceFill(['revoked_at' => now()])->save();
+            // Arbitrary transport exceptions can contain headers or message
+            // content. Never report their raw message, arguments or trace.
+            Log::warning('Login verification email submission failed', [
+                'mailer' => config('mail.default'),
+                'exception_type' => class_basename($exception),
+            ]);
+            LoginChallenge::query()->whereKey($challenge->id)
+                ->where('otp_hash', $challenge->otp_hash)
+                ->whereNull('revoked_at')->whereNull('consumed_at')
+                ->update(['revoked_at' => (int) $challenge->resend_count === 0 ? now() : null]);
 
             return false;
         }
 
-        $challenge->forceFill(['last_sent_at' => now()])->save();
+        $updated = LoginChallenge::query()->whereKey($challenge->id)
+            ->where('otp_hash', $challenge->otp_hash)
+            ->whereNull('revoked_at')->whereNull('consumed_at')
+            ->where('expires_at', '>', now())
+            ->update(['last_sent_at' => now()]);
+        $challenge->refresh();
 
-        return true;
+        return $updated === 1;
+    }
+
+    private static function usesLiveTransport(string $mailer, array $visited = []): bool
+    {
+        if (in_array($mailer, $visited, true)) return false;
+        $config = config('mail.mailers.'.$mailer, []);
+        $transport = $config['transport'] ?? null;
+        if (in_array($transport, ['failover', 'roundrobin'], true)) {
+            $children = $config['mailers'] ?? [];
+            return $children !== [] && collect($children)->every(fn ($child) => self::usesLiveTransport($child, [...$visited, $mailer]));
+        }
+        return is_string($transport) && ! in_array($transport, ['log', 'array'], true);
     }
 
     /** Seconds until another code may be sent for this challenge (0 = now). */

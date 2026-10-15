@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 // src/page/plant-manager/Dashboard.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../lib/api';
@@ -218,7 +219,7 @@ const Dashboard: React.FC = () => {
     trend === 'up' ? ArrowUp : trend === 'down' ? ArrowDown : Minus;
 
   return (
-    <div className="w-full min-h-screen bg-[#090d16] p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen bg-[#090d16] space-y-6`}>
       {/* ============================================================
           HEADER
       ============================================================ */}

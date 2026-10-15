@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, Printer, XCircle } from 'lucide-react';
 import { CartesianGrid, Cell, Legend as ChartLegend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -165,7 +166,7 @@ const QualityReports: React.FC = () => {
   };
 
   return (
-    <div className="qa-quality-reports min-h-screen w-full max-w-7xl mx-auto space-y-6 bg-slate-50 p-4 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 md:p-6">
+    <div className={`${PAGE_CONTENT_CLASS} qa-quality-reports min-h-screen space-y-6 bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100`}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quality Reports</h1><p className="text-sm text-slate-600 dark:text-slate-400">Aggregated quality performance from completed QA inspections.</p></div><div className="flex flex-wrap items-center gap-3"><button onClick={printReport} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileText className="w-4 h-4" /> Export PDF</button><button onClick={exportExcel} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileSpreadsheet className="w-4 h-4" /> Export Excel</button><button onClick={printReport} disabled={!report || loading} className="cursor-pointer bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"><Printer className="w-4 h-4" /> Print</button></div></div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none" aria-labelledby="quality-report-period-heading">

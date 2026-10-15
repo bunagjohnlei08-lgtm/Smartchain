@@ -426,19 +426,97 @@ class LoginOtpTest extends TestCase
         Mail::assertSentCount(1);
     }
 
-    public function test_resend_email_failure_invalidates_challenge(): void
+    public function test_failed_resend_keeps_retryable_challenge_without_reactivating_old_code(): void
     {
         $user = $this->user();
         [$challengeId, $code] = $this->startLogin($user);
+        $fake = Mail::getFacadeRoot();
 
         $this->travel(61)->seconds();
         Mail::shouldReceive('to')->andThrow(new RuntimeException('SMTP down'));
 
         $this->postJson('/api/login/resend-otp', ['challenge_id' => $challengeId])
-            ->assertStatus(503)->assertJsonPath('reason', 'delivery_failed');
+            ->assertStatus(503)->assertJsonPath('reason', 'delivery_failed')
+            ->assertJsonPath('delivery_status', 'failed')
+            ->assertJsonPath('resend_available_in', 60);
 
-        $this->verify($challengeId, $code)->assertUnprocessable()->assertJsonPath('reason', 'challenge_invalid');
+        $this->verify($challengeId, $code)->assertUnprocessable()->assertJsonPath('reason', 'delivery_failed');
+        $challenge = LoginChallenge::query()->sole();
+        $this->assertNull($challenge->revoked_at);
+        $this->assertNull($challenge->last_sent_at);
+        $this->assertFalse($challenge->acceptsCode());
         $this->assertSame(0, $user->tokens()->count());
+        Mail::swap($fake);
+        $this->postJson('/api/login/resend-otp', ['challenge_id' => $challengeId])
+            ->assertTooManyRequests()->assertJsonPath('reason', 'cooldown');
+        $this->travel(61)->seconds();
+        $this->postJson('/api/login/resend-otp', ['challenge_id' => $challengeId])
+            ->assertOk()->assertJsonPath('delivery_status', 'submitted');
+        $this->verify($challengeId, $this->lastLoginCode())->assertOk();
+    }
+
+    public function test_all_roles_receive_initial_and_resend_for_their_own_account(): void
+    {
+        foreach (['ADMIN', 'PLANT_MANAGER', 'QA_SUPERVISOR'] as $slug) {
+            $role = Role::firstOrCreate(['slug' => $slug], ['name' => $slug]);
+            $user = $this->user(['role_id' => $role->id]);
+            $response = $this->postJson('/api/login', ['email' => $user->email, 'password' => self::PASSWORD])
+                ->assertOk()->assertJsonPath('delivery_status', 'submitted')
+                ->assertJsonPath('expires_in', 300)->assertJsonMissingPath('token');
+            $this->assertNotNull($response->json('server_time'));
+            $this->assertNotNull($response->json('expires_at'));
+            $this->assertStringContainsString('***@', $response->json('masked_email'));
+            $this->assertSame(0, $user->tokens()->count());
+            $this->assertTrue(Mail::sent(LoginOtpMail::class)->last()->hasTo($user->email));
+            $this->travel(61)->seconds();
+            $this->postJson('/api/login/resend-otp', ['challenge_id' => $response->json('challenge_id')])
+                ->assertOk()->assertJsonPath('delivery_status', 'submitted');
+            $this->assertTrue(Mail::sent(LoginOtpMail::class)->last()->hasTo($user->email));
+            $this->verify($response->json('challenge_id'), $this->lastLoginCode())
+                ->assertOk()->assertJsonPath('user.role.slug', $slug);
+        }
+    }
+
+    public function test_late_transport_completion_cannot_enable_a_replaced_code(): void
+    {
+        $user = $this->user();
+        [$id] = $this->startLogin($user);
+        $old = LoginChallenge::where('challenge_id', $id)->first();
+        $this->travel(61)->seconds();
+        $this->postJson('/api/login/resend-otp', ['challenge_id' => $id])->assertOk();
+        $currentHash = $old->fresh()->otp_hash;
+        $this->assertFalse(\App\Support\LoginChallenges::deliver($old, $user, '000000'));
+        $this->assertSame($currentHash, $old->fresh()->otp_hash);
+    }
+
+    public function test_another_accounts_code_cannot_verify_the_pending_account(): void
+    {
+        $first = $this->user();
+        $second = $this->user();
+        [, $firstCode] = $this->startLogin($first);
+        [$secondId, $secondCode] = $this->startLogin($second);
+        // Random codes can legitimately collide; select a nonmatching
+        // isolated value if so, instead of a flaky probability assertion.
+        $foreignCode = $firstCode === $secondCode ? $this->wrongCode($secondCode) : $firstCode;
+        $this->verify($secondId, $foreignCode)->assertUnprocessable()->assertJsonPath('reason', 'invalid_code');
+        $this->assertSame(0, $first->tokens()->count());
+        $this->assertSame(0, $second->tokens()->count());
+        $this->verify($secondId, $secondCode)->assertOk()->assertJsonPath('user.id', $second->id);
+    }
+
+    public function test_non_delivery_transport_is_rejected_without_logging_code(): void
+    {
+        $user = $this->user();
+        $this->app->instance('env', 'local');
+        config(['mail.default' => 'log']);
+        try {
+            $this->postJson('/api/login', ['email' => $user->email, 'password' => self::PASSWORD])
+                ->assertStatus(503)->assertJsonMissingPath('challenge_id');
+            Mail::assertNothingSent();
+            $this->assertFalse(LoginChallenge::query()->sole()->acceptsCode());
+        } finally {
+            $this->app->instance('env', 'testing');
+        }
     }
 
     public function test_challenge_start_is_limited_per_account(): void

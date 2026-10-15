@@ -1,3 +1,4 @@
+import { MAIN_SCROLL_OFFSET_CLASS } from '../components/layout/pageLayout';
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
@@ -111,7 +112,7 @@ const PlantManagerLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="plant-manager-main flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16] pt-14 xl:pt-0">
+        <main className={`plant-manager-main flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-[#090d16] ${MAIN_SCROLL_OFFSET_CLASS}`}>
           <Outlet />
         </main>
       </div>

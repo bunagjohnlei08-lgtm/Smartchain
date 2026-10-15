@@ -1,3 +1,6 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import { ClassificationBadge } from '../../components/catalog/ProductFields';
+import type { Classification } from '../../lib/catalog';
 // src/page/admin/PurchaseOrders.tsx
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { apiClient } from '../../lib/api';
@@ -34,7 +37,7 @@ import {
 
 type POStatus = 'Pending Approval' | 'Approved' | 'Sent to Supplier' | 'Partially Received' | 'Completed' | 'Closed with Shortage' | 'Cancelled';
 
-interface PurchaseOrderItem { productName: string; quantity: number; receivedQuantity: number; remainingQuantity: number; unitPrice: number; amount: number; }
+interface PurchaseOrderItem { unit: string | null; item_classification?: Classification | null; productName: string; quantity: number; receivedQuantity: number; remainingQuantity: number; unitPrice: number; amount: number; }
 interface ReceivingHistory { id: number; receivingNo: string; deliveryDate: string; deliveredQuantity: number; status: string; }
 type SupplierResponseCode = 'WILL_FULFILL' | 'WILL_NOT_FULFILL' | 'OTHER';
 interface ReceivingDiscrepancy {
@@ -148,7 +151,7 @@ const PurchaseOrders: React.FC = () => {
     status: order.status as POStatus, createdAt: order.created_at,
     approvedBy: order.approved_by, signatureData: order.signature_data, sentAt: order.sent_at,
     items: (order.items ?? []).map((item: any) => ({
-      productName: item.product_name, quantity: Number(item.ordered_quantity), receivedQuantity: Number(item.received_quantity ?? 0), remainingQuantity: Number(item.remaining_quantity ?? item.ordered_quantity),
+      unit: item.unit ?? null, item_classification: item.item_classification ?? null, productName: item.product_name, quantity: Number(item.ordered_quantity), receivedQuantity: Number(item.received_quantity ?? 0), remainingQuantity: Number(item.remaining_quantity ?? item.ordered_quantity),
       unitPrice: Number(item.unit_price), amount: Number(item.total_price),
     })),
     receivingHistory: (order.receiving_history ?? []).map((receiving: any) => ({ id: Number(receiving.id), receivingNo: receiving.receiving_no, deliveryDate: receiving.delivery_date, deliveredQuantity: Number(receiving.delivered_quantity), status: receiving.status })),
@@ -407,7 +410,7 @@ const PurchaseOrders: React.FC = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#0a0e17] text-slate-100 p-4 md:p-6 space-y-6 overflow-x-hidden">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen bg-[#0a0e17] text-slate-100 space-y-6`}>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-400">
         <span>Admin</span>
@@ -676,11 +679,11 @@ const PurchaseOrders: React.FC = () => {
               <div className="space-y-2 sm:hidden">
                 {selectedOrder.items.map((item, idx) => (
                   <article key={idx} className="min-w-0 rounded-xl border border-[#1f2937] bg-[#1e293b]/30 p-3">
-                    <h4 className="break-words text-[13px] font-semibold leading-4 text-white" title={item.productName}>{item.productName}</h4>
+                    <h4 className="break-words text-[13px] font-semibold leading-4 text-white" title={item.productName}>{item.productName}</h4>{item.item_classification && <div className="mt-2"><ClassificationBadge value={item.item_classification}/></div>}
                     <dl className="mt-2 grid grid-cols-3 gap-2">
                       <div className="min-w-0">
                         <dt className="text-xs leading-4 text-slate-400">Ordered</dt>
-                        <dd className="text-[13px] font-medium leading-4 text-white">{item.quantity}</dd>
+                        <dd className="text-[13px] font-medium leading-4 text-white">{item.quantity} {item.unit}</dd>
                       </div>
                       <div className="min-w-0">
                         <dt className="text-xs leading-4 text-slate-400">Received</dt>
@@ -721,8 +724,8 @@ const PurchaseOrders: React.FC = () => {
                   <tbody>
                     {selectedOrder.items.map((item, idx) => (
                       <tr key={idx} className="border-b border-[#1f2937]">
-                        <td className="px-2 py-2 text-gray-300 sm:px-3">{item.productName}</td>
-                        <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3"><span className="block">{item.quantity}</span><span className="block text-[10px] font-normal text-slate-400">Received {item.receivedQuantity} / Remaining {item.remainingQuantity}</span></td>
+                        <td className="px-2 py-2 text-gray-300 sm:px-3">{item.productName}{item.item_classification && <div className="mt-1"><ClassificationBadge value={item.item_classification}/></div>}</td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3"><span className="block">{item.quantity} {item.unit}</span><span className="block text-[10px] font-normal text-slate-400">Received {item.receivedQuantity} / Remaining {item.remainingQuantity}</span></td>
                         <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">₱{item.unitPrice.toLocaleString()}</td>
                         <td className="whitespace-nowrap px-2 py-2 text-right text-white sm:px-3">₱{item.amount.toLocaleString()}</td>
                       </tr>

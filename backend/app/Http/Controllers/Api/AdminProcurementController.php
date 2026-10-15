@@ -46,7 +46,7 @@ class AdminProcurementController extends Controller
             ])
             ->whereDoesntHave('purchaseOrder')
             ->with([
-                'requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name',
+                'requester:id,name', 'reviewer:id,name', 'product:id,name,unit,item_classification', 'warehouse:id,name',
                 'purchaseOrder:id,replenishment_request_id,po_number,status',
                 'product.suppliers:id,name,status',
             ]);
@@ -105,7 +105,7 @@ class AdminProcurementController extends Controller
     {
         $this->authorize('view', $replenishmentRequest);
         $replenishmentRequest->load([
-            'requester:id,name,employee_id', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name',
+            'requester:id,name,employee_id', 'reviewer:id,name', 'product:id,name,unit,item_classification', 'warehouse:id,name',
             'purchaseOrder:id,replenishment_request_id,po_number,status',
         ]);
 
@@ -151,7 +151,7 @@ class AdminProcurementController extends Controller
                     : 'Declined by Admin Procurement'),
         ])->save();
 
-        $replenishmentRequest->load(['requester:id,name', 'reviewer:id,name', 'product:id,name', 'warehouse:id,name']);
+        $replenishmentRequest->load(['requester:id,name', 'reviewer:id,name', 'product:id,name,unit,item_classification', 'warehouse:id,name']);
 
         AuditLogger::success(
             $status === self::STATUS_FOR_PURCHASE_ORDER ? 'PROCUREMENT_APPROVED' : 'PROCUREMENT_DECLINED',
@@ -194,6 +194,8 @@ class AdminProcurementController extends Controller
             'request_no' => $replenishmentRequest->request_no,
             'product_id' => $replenishmentRequest->product_id,
             'product_name' => $replenishmentRequest->product?->name,
+            'item_classification' => $replenishmentRequest->product?->item_classification,
+            'unit' => $replenishmentRequest->product?->unit,
             'warehouse_id' => $replenishmentRequest->warehouse_id,
             'warehouse_name' => $replenishmentRequest->warehouse?->name,
             'requested_qty' => $replenishmentRequest->requested_qty,

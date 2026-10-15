@@ -256,7 +256,7 @@ class QaInspectionTest extends TestCase
         ]);
         $plantManager = User::factory()->create(['role_id' => $plantManagerRole->id]);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'BR-MAIN']);
-        Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id]);
+        Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 10000, 'capacity_kg' => 0, 'capacity_pcs' => 10000, 'capacity_l' => 0]);
         $receiving = $this->makeReceiving([
             ['product' => 'Partial Widget', 'qty' => 5],
         ]);

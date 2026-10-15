@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Award, ChevronDown, ChevronUp, Info, RefreshCw, Search, TrendingUp } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -17,7 +18,7 @@ const SupplierPerformanceTab: React.FC = () => {
   const load = useCallback(async () => { setLoading(true); try { const response = await apiClient.get('/admin/supplier-performance', { params: { search: search || undefined } }); setItems(response.data?.data || []); setDefinitions(response.data?.definitions || {}); setError(''); } catch (e: any) { setError(e?.response?.data?.message || 'Unable to load supplier performance.'); } finally { setLoading(false); } }, [search]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 250); return () => window.clearTimeout(timer); }, [load]);
 
-  return <section className="mx-auto w-full max-w-7xl space-y-5 p-4 sm:p-6">
+  return <section className={`${PAGE_CONTENT_CLASS} space-y-5`}>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-bold text-[var(--text-primary)]">Supplier performance</h1><p className="mt-1 max-w-3xl text-sm text-[var(--text-muted)]">Decision support from completed PO, Receiving, QA, and discrepancy records. No purchasing action is automated.</p></div><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] px-4 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</button></div>
     <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4"><div className="flex gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-sky-700 dark:text-sky-300" /><div><p className="font-semibold text-sky-900 dark:text-sky-100">Governed scoring</p><p className="mt-1 text-sm leading-6 text-sky-800 dark:text-sky-200">Individual metrics are shown whenever their source data is reliable. Overall scores, recognition, and top-supplier labels appear only after centrally approved minimum history, weights, and thresholds are configured.</p></div></div></div>
     {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-600 dark:text-rose-300">{error}</div>}

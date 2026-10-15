@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 // src/page/plant-manager/Shipments.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { apiClient } from '../../lib/api';
@@ -289,8 +290,6 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
     itemsComplete: false,
   });
 
-  if (!shipment) return null;
-
   // Initialize state when shipment changes
   React.useEffect(() => {
     if (shipment) {
@@ -309,6 +308,8 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
       });
     }
   }, [shipment]);
+
+  if (!shipment) return null;
 
   const checklistComplete = Object.values(checklist).every(v => v === true);
   const boxes = Number(packing.boxes);
@@ -675,7 +676,7 @@ const Shipments: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+    <div className={`${PAGE_CONTENT_CLASS} space-y-6 bg-[#090d16] text-slate-100 min-h-screen`}>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Plant Manager</span>

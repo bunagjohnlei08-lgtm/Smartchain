@@ -64,14 +64,14 @@ const LoginPage: React.FC = () => {
 
         // A correct password only starts the emailed-code step; nothing is
         // stored and no navigation happens until the code is verified.
-        if (response.data?.requires_otp && typeof response.data.challenge_id === 'string') {
+        if (response.data?.requires_otp && response.data.delivery_status === 'submitted' && typeof response.data.challenge_id === 'string') {
           updateField('password', '');
           setLoginErrors({});
           setChallenge({
             id: response.data.challenge_id,
-            email: data.email.trim(),
-            resendIn: Number(response.data.resend_available_in) || 60,
-            expiresIn: Number(response.data.expires_in) || 300,
+            email: response.data.masked_email || data.email.trim(),
+            resendIn: Math.max(0, Number(response.data.resend_available_in) || 0),
+            expiresIn: Math.max(0, Number(response.data.expires_in) || 0),
           });
           return;
         }
@@ -177,6 +177,11 @@ const LoginPage: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="mx-auto w-[90%] space-y-3 sm:w-full">
+        {isLoginBusy && (
+          <div role="status" aria-live="polite" className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-[13px] text-sky-700 lg:text-xs">
+            Checking your credentials and sending your verification code...
+          </div>
+        )}
         {notice && !loginErrors.form && (
           <div role="status" aria-live="polite" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] text-emerald-700 lg:text-xs">
             {notice}

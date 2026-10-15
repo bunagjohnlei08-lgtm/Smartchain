@@ -37,7 +37,7 @@ class PlantManagerProcurementController extends Controller
         $inventories = Inventory::query()
             ->where('warehouse_id', $warehouseId)
             ->where('available_stock', '<=', 30)
-            ->with(['product:id,name', 'product.suppliers:id,name,status', 'warehouse:id,name'])
+            ->with(['product:id,name,unit,item_classification', 'product.suppliers:id,name,status', 'warehouse:id,name'])
             ->orderBy('available_stock')
             ->orderBy('product_id')
             ->get();
@@ -47,7 +47,7 @@ class PlantManagerProcurementController extends Controller
             ->whereIn('product_id', $inventories->pluck('product_id'))
             ->active()
             ->with([
-                'product:id,name', 'warehouse:id,name', 'requester:id,name',
+                'product:id,name,unit,item_classification', 'warehouse:id,name', 'requester:id,name',
                 ...ReplenishmentFulfillmentStage::RELATIONS,
             ])
             ->orderByDesc('created_at')
@@ -69,6 +69,8 @@ class PlantManagerProcurementController extends Controller
                 'productId' => $inventory->product_id,
                 'warehouseId' => $inventory->warehouse_id,
                 'name' => $inventory->product?->name,
+                'unit' => $inventory->product?->unit,
+                'item_classification' => $inventory->product?->item_classification,
                 'sku' => $inventory->barcode,
                 'warehouse' => $inventory->warehouse?->name,
                 'currentStock' => $quantity,
@@ -104,7 +106,7 @@ class PlantManagerProcurementController extends Controller
         $query = ReplenishmentRequest::query()
             ->where('requested_by', $request->user()->id)
             ->with([
-                'product:id,name', 'warehouse:id,name', 'requester:id,name',
+                'product:id,name,unit,item_classification', 'warehouse:id,name', 'requester:id,name',
                 ...ReplenishmentFulfillmentStage::RELATIONS,
             ]);
 
@@ -294,7 +296,7 @@ class PlantManagerProcurementController extends Controller
 
     private function afterRequestCreated(ReplenishmentRequest $replenishmentRequest, bool $submitted): void
     {
-        $replenishmentRequest->load(['product:id,name', 'warehouse:id,name', 'requester:id,name']);
+        $replenishmentRequest->load(['product:id,name,unit,item_classification', 'warehouse:id,name', 'requester:id,name']);
         if (!$submitted) {
             return;
         }
@@ -358,6 +360,8 @@ class PlantManagerProcurementController extends Controller
             'warehouse_name' => $request->warehouse?->name,
             'product_id' => $request->product_id,
             'product_name' => $request->product?->name,
+            'unit' => $request->product?->unit,
+            'item_classification' => $request->product?->item_classification,
             'requested_qty' => $request->requested_qty,
             'priority' => $request->priority,
             'current_priority' => $currentPriority,

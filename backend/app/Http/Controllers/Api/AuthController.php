@@ -115,11 +115,9 @@ class AuthController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'A verification code has been sent to your email.',
+            'message' => 'Your verification code was submitted to the email service. Check your inbox and spam folder.',
             'requires_otp' => true,
-            'challenge_id' => $challenge->challenge_id,
-            'expires_in' => LoginChallenges::expirationMinutes() * 60,
-            'resend_available_in' => LoginChallenges::resendCooldownSeconds(),
+            ...$this->challengeState($challenge, $user),
         ]);
     }
 
@@ -150,8 +148,11 @@ class AuthController extends Controller
                 return ['ALREADY_USED', null, null, $challenge];
             }
 
-            if (! $challenge->isOpen() || $challenge->last_sent_at === null) {
+            if (! $challenge->isOpen()) {
                 return ['CHALLENGE_INVALID', null, null, $challenge];
+            }
+            if ($challenge->last_sent_at === null) {
+                return ['NOT_SENT', null, null, $challenge];
             }
 
             $user = User::query()->whereKey($challenge->user_id)->lockForUpdate()->first();
@@ -219,6 +220,7 @@ class AuthController extends Controller
                 'ALREADY_USED' => ['already_used', 'This verification code has already been used. Please sign in again.'],
                 'INVALID_CODE' => ['invalid_code', 'The verification code is incorrect.'],
                 'ATTEMPTS_EXHAUSTED' => ['attempts_exhausted', 'Too many incorrect codes. Please sign in again.'],
+                'NOT_SENT' => ['delivery_failed', 'We couldn\'t send your verification code. Please request a new code shortly.'],
                 default => ['challenge_invalid', 'This verification session is no longer valid. Please sign in again.'],
             };
 
@@ -258,14 +260,14 @@ class AuthController extends Controller
             'challenge_id' => ['required', 'string', 'uuid'],
         ]);
 
-        [$outcome, $challenge, $user, $code, $retryAfter] = DB::transaction(function () use ($data) {
+        [$outcome, $challenge, $user, $retryAfter] = DB::transaction(function () use ($data) {
             $challenge = LoginChallenge::query()
                 ->where('challenge_id', $data['challenge_id'])
                 ->lockForUpdate()
                 ->first();
 
             if (! $challenge || ! $challenge->isOpen()) {
-                return ['CHALLENGE_INVALID', null, null, null, null];
+                return ['CHALLENGE_INVALID', null, null, null];
             }
 
             $user = User::query()->whereKey($challenge->user_id)->lockForUpdate()->first();
@@ -273,19 +275,23 @@ class AuthController extends Controller
             if (! $user || $user->status !== 'ACTIVE') {
                 $challenge->forceFill(['revoked_at' => now()])->save();
 
-                return ['CHALLENGE_INVALID', null, null, null, null];
+                return ['CHALLENGE_INVALID', null, null, null];
             }
 
             if ($challenge->resend_count >= LoginChallenges::maxResends()) {
-                return ['RESEND_LIMIT', null, null, null, null];
+                return ['RESEND_LIMIT', null, null, null];
             }
 
             $wait = LoginChallenges::resendAvailableIn($challenge);
             if ($wait > 0) {
-                return ['COOLDOWN', null, null, null, $wait];
+                return ['COOLDOWN', null, null, $wait];
             }
 
-            return ['SEND', $challenge, $user, LoginChallenges::rotate($challenge), null];
+            // Keep rotation and synchronous submission under this row lock.
+            // Concurrent resends/verifications cannot reactivate an older code.
+            $code = LoginChallenges::rotate($challenge);
+            $sent = LoginChallenges::deliver($challenge, $user, $code);
+            return [$sent ? 'SENT' : 'DELIVERY_FAILED', $challenge, $user, null];
         });
 
         if ($outcome === 'CHALLENGE_INVALID') {
@@ -310,12 +316,13 @@ class AuthController extends Controller
             ], 429)->header('Retry-After', (string) $retryAfter);
         }
 
-        if (! LoginChallenges::deliver($challenge, $user, $code)) {
+        if ($outcome === 'DELIVERY_FAILED') {
             $this->auditCodeFailure($user, 'DELIVERY_FAILED', 'Verification code email could not be resent');
 
             return response()->json([
-                'message' => 'We could not send a new verification code. Please sign in again.',
+                'message' => 'We couldn\'t send your verification code. Please try again shortly.',
                 'reason' => 'delivery_failed',
+                ...$this->challengeState($challenge->fresh(), $user),
             ], 503);
         }
 
@@ -328,11 +335,23 @@ class AuthController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'A new verification code has been sent to your email.',
-            'challenge_id' => $challenge->challenge_id,
-            'expires_in' => LoginChallenges::expirationMinutes() * 60,
-            'resend_available_in' => LoginChallenges::resendCooldownSeconds(),
+            'message' => 'A new code was submitted to the email service. Earlier codes no longer work.',
+            ...$this->challengeState($challenge, $user),
         ]);
+    }
+
+    private function challengeState(LoginChallenge $challenge, User $user): array
+    {
+        [$local, $domain] = explode('@', $user->email, 2);
+        return [
+            'challenge_id' => $challenge->challenge_id,
+            'masked_email' => substr($local, 0, 1).'***@'.$domain,
+            'delivery_status' => $challenge->last_sent_at === null ? 'failed' : 'submitted',
+            'server_time' => now()->toIso8601String(),
+            'expires_at' => $challenge->expires_at->toIso8601String(),
+            'expires_in' => max(0, $challenge->expires_at->getTimestamp() - now()->getTimestamp()),
+            'resend_available_in' => LoginChallenges::resendAvailableIn($challenge),
+        ];
     }
 
     private function userPayload(User $user): array
@@ -443,7 +462,6 @@ class AuthController extends Controller
 
         Log::warning('Login OTP verification failed', [
             'reason' => $outcome,
-            'challenge_id' => $challenge?->challenge_id,
             'user_id' => $challenge?->user_id,
             'created_at' => $challenge?->created_at?->toIso8601String(),
             'expires_at' => $challenge?->expires_at?->toIso8601String(),

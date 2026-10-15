@@ -1,3 +1,7 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import CapacitySummary from '../../components/warehouse/CapacitySummary';
+import { allocationLabel } from '../../lib/warehouseCapacity';
+import type { CapacitySnapshot } from '../../lib/warehouseCapacity';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowDown, ArrowUp, BarChart3, CheckCircle, ChevronRight, Download, Eye, FileSpreadsheet, Package, Printer, RefreshCw, Search, TrendingDown, TrendingUp, Truck, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -15,13 +19,14 @@ interface DashboardData {
   weekly_stock: Array<{ week: string; stock_in: number; stock_out: number }>;
   weekly_stock_period: { from: string; to: string; grouping: 'daily' | 'weekly' };
   inventory_status: Array<{ name: string; value: number }>;
-  warehouse_capacity: { used: number; free: number | null; total: number | null; utilization_percentage: number | null };
+  warehouse_capacity: CapacitySnapshot & { used: number | null; free: number | null; total: number | null; utilization_percentage: number | null };
 }
 interface GeneratedReport { type: string; title: string; generated_at: string; format: ReportFormat; filters: { from: string | null; to: string | null }; date_filter?: { supported: boolean; field: string | null; timezone: string }; columns: string[]; rows: Row[]; summary: Record<string, unknown> }
 interface RecentReport { id: string | number; name: string; type?: string; category?: string; generated_at?: string; dateGenerated?: string; generated_by?: string; generatedBy?: string; format: string }
 interface ReportCardData { type: string; title: string; description: string; icon: React.ReactNode }
 
 const reportCards: ReportCardData[] = [
+  { type: 'production', title: 'Production Batch History', description: 'Internal batches, manual QA and stock-in in your warehouse.', icon: <Package className="w-5 h-5 text-cyan-400" /> },
   { type: 'inventory', title: 'Inventory Report', description: 'Comprehensive inventory levels, valuation and aging.', icon: <Package className="w-5 h-5 text-blue-400" /> },
   { type: 'receiving', title: 'Receiving Report', description: 'Delivery receiving summary, QA results and inspection.', icon: <Truck className="w-5 h-5 text-emerald-400" /> },
   { type: 'stock-in', title: 'Stock In Report', description: 'Items received into warehouse and stock in summary.', icon: <ArrowUp className="w-5 h-5 text-cyan-400" /> },
@@ -135,8 +140,8 @@ const Reports: React.FC = () => {
   const weekly = (dashboard?.weekly_stock ?? []).map((point) => ({ week: point.week, stockIn: num(point.stock_in), stockOut: num(point.stock_out) }));
   const inventory = (dashboard?.inventory_status ?? []).map((item) => ({ name: item.name, value: num(item.value), color: colors[item.name] ?? '#64748b' }));
   const capacity = dashboard?.warehouse_capacity;
-  const capacityData = [{ name: 'Used Space', value: num(capacity?.used), color: '#06b6d4' }, { name: 'Free Space', value: num(capacity?.free), color: '#1e293b' }];
-  const utilization = dashboard?.kpis.warehouse_utilization.value;
+
+
   const movementTitle = dashboard?.filters.custom ? 'Stock Movement Trend (Selected Period)' : 'Stock Movement Trend (30 Days)';
   const comparisonTitle = `Stock In vs Stock Out (${dashboard?.weekly_stock_period.grouping === 'daily' ? 'Daily' : 'Weekly'})`;
   const kpis = dashboard ? [
@@ -145,11 +150,11 @@ const Reports: React.FC = () => {
     ["Today's Stock Out", num(dashboard.kpis.todays_stock_out.value), 'Items released', dashboard.kpis.todays_stock_out, <ArrowDown key="stock-out" className="w-4 h-4 text-rose-400" />],
     ['Pending QA', num(dashboard.kpis.pending_qa.value), 'Receivings awaiting QA', dashboard.kpis.pending_qa, <AlertCircle key="qa" className="w-4 h-4 text-yellow-400" />],
     ['Pending Shipment', num(dashboard.kpis.pending_shipment.value), 'Orders ready to ship', dashboard.kpis.pending_shipment, <Package key="shipment" className="w-4 h-4 text-purple-400" />],
-    ['Warehouse Utilization', utilization === null || utilization === undefined ? '—' : `${num(utilization)}%`, 'Configured capacity used', dashboard.kpis.warehouse_utilization, <BarChart3 key="capacity" className="w-4 h-4 text-cyan-400" />],
+    ['Warehouse Allocation', capacity ? allocationLabel(capacity) : 'Not configured', 'Usage is shown per unit', dashboard.kpis.warehouse_utilization, <BarChart3 key="capacity" className="w-4 h-4 text-cyan-400" />],
   ] as Array<[string, number | string, string, Metric, React.ReactNode]> : [];
   const filtered = useMemo(() => recent.filter((report) => { const kind = report.category ?? report.type ?? ''; return `${report.name} ${kind} ${report.generated_by ?? report.generatedBy ?? ''}`.toLowerCase().includes(search.toLowerCase()) && (category === 'All' || kind === category); }), [recent, search, category]);
 
-  return <div className="pm-reports w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+  return <div className={`${PAGE_CONTENT_CLASS} pm-reports space-y-6 bg-[#090d16] text-slate-100 min-h-screen`}>
     <div className="flex items-center gap-2 text-sm text-slate-400"><span>Plant Manager</span><ChevronRight className="w-4 h-4" /><span className="text-slate-100">Reports</span></div>
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4"><div><h1 className="text-2xl font-bold text-white">Reports</h1><p className="text-sm text-slate-400">Operational reporting for warehouse, inventory, receiving, shipping and stock activities.</p></div><div className="grid grid-cols-1 gap-3 min-[430px]:grid-cols-2 md:flex md:flex-wrap md:items-end"><div className="text-xs text-slate-400"><span className="mb-1.5 block">From</span><CompactDatePicker label="Report from date" value={from} max={to || undefined} onChange={setFrom} className="min-[430px]:w-40" /></div><div className="text-xs text-slate-400"><span className="mb-1.5 block">To</span><CompactDatePicker label="Report to date" value={to} min={from || undefined} onChange={setTo} className="min-[430px]:w-40" /></div><button onClick={() => void load()} disabled={loading} className="min-h-11 cursor-pointer flex items-center justify-center gap-2 rounded-xl border border-[#1f2937] px-4 py-2 text-sm hover:bg-slate-800/50 focus:ring-2 focus:ring-cyan-500/40 disabled:opacity-50 min-[430px]:col-span-2 md:col-span-1"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />Refresh</button></div></div>
     {error && <Alert text={error}><button onClick={() => void load()} className="underline cursor-pointer">Retry</button></Alert>}{actionError && <Alert text={actionError} warning />}
@@ -160,7 +165,7 @@ const Reports: React.FC = () => {
       <Chart title={movementTitle} empty={!movement.length}><ResponsiveContainer width="100%" height={200}><LineChart data={movement}><CartesianGrid strokeDasharray="3 3" stroke="var(--report-grid-stroke)" className="[--report-grid-stroke:#e2e8f0] dark:[--report-grid-stroke:#1e293b]" /><XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 10 }} /><YAxis stroke="#64748b" tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} /><Legend /><Line type="monotone" dataKey="stockIn" stroke="#3b82f6" name="Stock In" strokeWidth={2} /><Line type="monotone" dataKey="stockOut" stroke="#ef4444" name="Stock Out" strokeWidth={2} /></LineChart></ResponsiveContainer></Chart>
       <Chart title={comparisonTitle} empty={!weekly.length}><ResponsiveContainer width="100%" height={200}><BarChart data={weekly}><CartesianGrid strokeDasharray="3 3" stroke="var(--report-grid-stroke)" className="[--report-grid-stroke:#e2e8f0] dark:[--report-grid-stroke:#1e293b]" /><XAxis dataKey="week" stroke="#64748b" tick={{ fontSize: 10 }} /><YAxis stroke="#64748b" tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} /><Legend /><Bar dataKey="stockIn" fill="#3b82f6" name="Stock In" radius={[6, 6, 0, 0]} /><Bar dataKey="stockOut" fill="#ef4444" name="Stock Out" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></Chart>
       <Chart title="Inventory Status Overview" empty={!inventory.some((item) => item.value > 0)}><Donut data={inventory} /></Chart>
-      <Chart title="Warehouse Capacity" empty={num(capacity?.total) === 0}><Donut data={capacityData} /><p className="text-center text-xs text-slate-400">{capacity?.utilization_percentage === null || capacity?.utilization_percentage === undefined ? 'Capacity not configured' : `${num(capacity.utilization_percentage)}% used`} · {num(capacity?.used).toLocaleString()} used · {capacity?.free === null || capacity?.free === undefined ? '—' : num(capacity.free).toLocaleString()} free</p></Chart>
+      <Chart title="Warehouse Allocations" empty={!capacity}>{capacity && <CapacitySummary capacity={capacity} />}</Chart>
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{reportCards.map((report) => <div key={report.type} className="bg-[#111827] border border-[#1f2937] rounded-xl p-4 flex flex-col hover:border-gray-600 transition-colors"><div className="flex gap-3"><div className="p-2 h-fit rounded-lg bg-slate-800/30">{report.icon}</div><div><h4 className="text-sm font-semibold text-white">{report.title}</h4><p className="text-xs text-slate-400">Real-time database records</p></div></div><p className="text-xs text-slate-400 mt-2 flex-1">{report.description}</p><div className="grid grid-cols-2 gap-2 mt-3">{(['preview', 'print', 'pdf', 'excel'] as ReportFormat[]).map((format) => { const busy = generating === `${report.type}:${format}`; const Icon = format === 'preview' ? Eye : format === 'print' ? Printer : format === 'excel' ? FileSpreadsheet : Download; return <button key={format} onClick={() => void generate(report.type, format)} disabled={generating !== null} className="min-h-11 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-inherit transition-colors disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer focus:ring-2 focus:ring-cyan-500/40"><Icon className={`w-3.5 h-3.5 ${busy ? 'animate-pulse' : ''}`} />{busy ? 'Working…' : format[0].toUpperCase() + format.slice(1)}</button>; })}</div></div>)}</div>

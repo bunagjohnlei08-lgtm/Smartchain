@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Archive, CheckCircle2, Eye, LayoutGrid, LayoutList, Loader2, PackageCheck, RefreshCw, Search, Send, X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -112,7 +113,7 @@ export default function AdminRejectedItems() {
     } finally { setSaving(false); }
   };
 
-  return <main className="min-h-full overflow-y-auto bg-slate-50 px-4 pb-10 pt-4 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 sm:px-6 sm:pt-6 xl:px-8 xl:pt-8">
+  return <main className={`${PAGE_CONTENT_CLASS} min-h-full overflow-y-auto bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100`}>
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-bold sm:text-3xl">Rejected Items</h1><p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Review QA rejections, notify the original supplier, and record the final resolution.</p></div><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-white focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800 sm:min-h-11 sm:self-auto"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</button></header>
       <section aria-label="Case totals" className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[['Pending review', totals.pending, 'text-amber-600'], ['Delivery failed', totals.failed, 'text-red-600'], ['Sent', totals.sent, 'text-blue-600'], ['Resolved', totals.resolved, 'text-emerald-600']].map(([label, value, color]) => <article key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#0d1322]"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p></article>)}</section>

@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Barcode, CheckCircle, ChevronRight, Download, FileText, LoaderCircle, Printer, Search, X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
@@ -114,7 +115,7 @@ const BarcodeCenter: React.FC = () => {
     showNotification(opened ? (saveAsPdf ? 'Choose “Save as PDF” in the print dialog.' : `Prepared ${items.length} barcode label${items.length === 1 ? '' : 's'} for printing.`) : 'The print window was blocked. Please allow pop-ups and try again.');
   };
 
-  return <div className="mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#090d16] p-4 text-slate-100 md:p-6">
+  return <div className={`${PAGE_CONTENT_CLASS} min-h-screen space-y-6 bg-[#090d16] text-slate-100`}>
     <div className="flex items-center gap-2 text-[11px] text-gray-400 sm:text-sm"><span>Admin</span><ChevronRight className="h-3 w-3 sm:h-4 sm:w-4"/><span className="text-slate-100">Barcode Center</span></div>
     <div className="flex flex-col justify-between gap-3 xl:flex-row xl:items-center xl:gap-4"><div><h1 className="admin-barcode-title text-[15px] font-bold text-white sm:text-2xl">Barcode Center</h1><p className="admin-barcode-subtitle text-[11px] text-gray-400 sm:text-sm">{loading ? 'Loading barcode records…' : `${barcodes.length} inventory barcode${barcodes.length === 1 ? '' : 's'}`}</p></div><div className="flex flex-wrap items-end gap-2 sm:gap-3">
       <label className="grid gap-1 text-[11px] font-medium text-slate-400"><span>Print layout</span><select value={printLayout} onChange={(event) => setPrintLayout(event.target.value as PrintLayout)} className="min-h-11 cursor-pointer rounded-xl border border-slate-700/60 bg-[#0d1322] px-3 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"><option value="single">Single label — 4.25 × 5.5 in</option><option value="letter4">4 labels on Letter</option></select></label>

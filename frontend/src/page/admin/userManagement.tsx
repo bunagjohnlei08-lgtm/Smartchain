@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
@@ -597,7 +598,7 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-6 py-8 space-y-6 text-white">
+    <div className={`${PAGE_CONTENT_CLASS} space-y-6 text-white`}>
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 text-sm">
           {error}

@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Boxes,
   Warehouse,
+  Factory,
   Box,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -36,6 +37,7 @@ const navGroups = [
     title: 'WAREHOUSE',
     items: [
       { id: 'warehouse', icon: Warehouse, label: 'Warehouse', path: '/plant-manager/warehouse' },
+      { id: 'production', icon: Factory, label: 'Production Batches', path: '/plant-manager/production' },
       { id: 'inventory', icon: Box, label: 'Inventory', path: '/plant-manager/inventory' },
       { id: 'stock-in', icon: ArrowDownToLine, label: 'Stock In', path: '/plant-manager/stock-in' },
       { id: 'stock-out', icon: ArrowUpFromLine, label: 'Stock Out', path: '/plant-manager/stock-out' },
@@ -66,7 +68,7 @@ interface PlantManagerSidebarProps {
 const PlantManagerSidebar = ({ onClose }: PlantManagerSidebarProps) => {
   const location = useLocation();
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname === path || (path === '/plant-manager/production' && location.pathname.startsWith(`${path}/`));
 
   return (
     <aside className="sidebar sticky top-0 flex h-dvh w-64 flex-col justify-between overflow-hidden border-r border-slate-800/80 bg-[#090d16] text-slate-300 xl:h-screen">

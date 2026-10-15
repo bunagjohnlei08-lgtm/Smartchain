@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 // src/pages/admin/OrderManagement.tsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '../../lib/api';
@@ -499,7 +500,7 @@ const OrderManagement: React.FC = () => {
   const lifecycleSteps: OrderStatus[] = ['New', 'Assigned', 'Preparing', 'Ready for Stock Out', 'Stock Out In Progress', 'Stock Out Completed', 'For Packing', 'Packing', 'Ready for Shipment', 'Forwarded to Logistics', 'In Transit', 'Delivered'];
 
   return (
-    <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen bg-[#070a12] text-slate-100 space-y-6`}>
       {/* ============================================================
       HEADER
       ============================================================ */}

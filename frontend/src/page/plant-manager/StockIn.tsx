@@ -1,3 +1,7 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import CapacitySummary from '../../components/warehouse/CapacitySummary';
+import { stockAdditionIssue } from '../../lib/warehouseCapacity';
+import type { CapacitySnapshot } from '../../lib/warehouseCapacity';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { apiClient } from '../../lib/api';
@@ -41,6 +45,7 @@ interface ReceivingLineItem {
   deliveredQuantity: number;
   acceptedQuantity: number;
   stockableQuantity: number;
+  capacityUnit?: string;
   stockedQuantity: number;
   unit: string;
   inspectionStatus: QaStatus;
@@ -90,6 +95,7 @@ interface ApiReceivingLineItem {
   delivered_quantity: number;
   accepted_quantity: number;
   stockable_quantity: number;
+  capacity_unit?: string;
   stocked_quantity: number;
   unit: string;
   inspection_status: QaStatus;
@@ -132,12 +138,7 @@ interface ApiRecentlyStockedItem {
   status: 'Stocked In';
 }
 
-interface WarehouseCapacity {
-  name: string;
-  capacity: number | null;
-  utilized: number;
-  available: number | null;
-}
+interface WarehouseCapacity extends CapacitySnapshot { name: string }
 
 const mapReceiving = (record: ApiReceiving): ReceivingItem => ({
   id: record.id,
@@ -162,6 +163,7 @@ const mapReceiving = (record: ApiReceiving): ReceivingItem => ({
     deliveredQuantity: item.delivered_quantity,
     acceptedQuantity: item.accepted_quantity,
     stockableQuantity: item.stockable_quantity,
+    capacityUnit: item.capacity_unit,
     stockedQuantity: item.stocked_quantity,
     unit: item.unit,
     inspectionStatus: item.inspection_status,
@@ -370,7 +372,7 @@ const StockIn: React.FC = () => {
   const fetchWarehouseCapacity = useCallback(async () => {
     setCapacityError(null);
     try {
-      const response = await apiClient.get<WarehouseCapacity>('/plant-manager/warehouse');
+      const response = await apiClient.get<WarehouseCapacity>('/stock-in/capacity');
       setWarehouseCapacity(response.data);
     } catch (error) {
       setWarehouseCapacity(null);
@@ -407,10 +409,8 @@ const StockIn: React.FC = () => {
     { label: 'Total Received Value', value: `₱${totalValue.toLocaleString()}`, subtitle: 'Stock In view', trend: 'up' },
   ];
 
-  const exceedsAvailableCapacity = selectedReceiving !== null
-    && warehouseCapacity?.available !== null
-    && warehouseCapacity?.available !== undefined
-    && selectedReceiving.eligibleQuantity > warehouseCapacity.available;
+  const allocationIssue = selectedReceiving ? stockAdditionIssue(warehouseCapacity, selectedReceiving.items) : null;
+  const exceedsAvailableCapacity = allocationIssue !== null;
   const canPerformStockIn = selectedReceiving !== null
     && selectedReceiving.eligibleQuantity > 0
     && selectedReceiving.status !== 'Completed'
@@ -448,9 +448,7 @@ const StockIn: React.FC = () => {
     const firstEligible = receivings.find((receiving) =>
       receiving.eligibleQuantity > 0
       && receiving.status !== 'Completed'
-      && (warehouseCapacity?.available === null
-        || warehouseCapacity?.available === undefined
-        || receiving.eligibleQuantity <= warehouseCapacity.available)
+      && !stockAdditionIssue(warehouseCapacity, receiving.items)
     );
     if (!firstEligible) {
       setActionMessage({ type: 'error', text: 'No QA-approved receiving is ready for Stock In right now.' });
@@ -494,7 +492,7 @@ const StockIn: React.FC = () => {
   const pendingPercentage = pieTotal > 0 ? 100 - readyPercentage : 0;
 
   return (
-    <div className="w-full min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen bg-[#070a12] text-slate-100 space-y-6`}>
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Plant Manager</span>
         <ChevronRight className="w-4 h-4" />
@@ -958,14 +956,9 @@ const StockIn: React.FC = () => {
                   <div><span className="text-slate-400">Prepared By</span><p className="text-white">{selectedReceiving.preparedBy ?? '—'}</p></div>
                   <div><span className="text-slate-400">Product</span><p className="text-white [overflow-wrap:anywhere]">{selectedReceiving.productSummary}</p></div>
                   <div><span className="text-slate-400">Quantity</span><p className="text-white">{selectedReceiving.eligibleQuantity} units</p></div>
-                  <div>
-                    <span className="text-slate-400">Available Capacity</span>
-                    <p className="text-white">
-                      {warehouseCapacity?.available === null || warehouseCapacity?.available === undefined
-                        ? 'Not configured'
-                        : `${warehouseCapacity.available.toLocaleString()} units`}
-                    </p>
-                    {capacityError && <p className="mt-1 text-xs text-amber-400">Live capacity could not be loaded. The server will validate capacity on submission.</p>}
+                  <div className="col-span-full">
+                    {warehouseCapacity && <CapacitySummary capacity={warehouseCapacity} />}
+                    {capacityError && <p className="mt-1 text-xs text-amber-400">Live allocations could not be loaded. The server will validate capacity on submission.</p>}
                   </div>
                   <div><span className="text-slate-400">Status</span><div className="w-fit max-w-full whitespace-nowrap pt-1 [&_.plant-manager-badge]:px-2 [&_.plant-manager-badge]:py-0.5 [&_.plant-manager-badge]:text-[11px] sm:[&_.plant-manager-badge]:px-2.5 sm:[&_.plant-manager-badge]:py-1 sm:[&_.plant-manager-badge]:text-xs"><ReceivingStatusBadge status={selectedReceiving.status} /></div></div>
                   <div><span className="text-slate-400">Received Value</span><p className="text-white">₱{selectedReceiving.receivedValue.toLocaleString()}</p></div>
@@ -1001,9 +994,7 @@ const StockIn: React.FC = () => {
                   </button>
                   {!canPerformStockIn && (
                     <p className="text-xs text-amber-400 text-center">
-                      {exceedsAvailableCapacity && warehouseCapacity?.available !== null && warehouseCapacity?.available !== undefined
-                        ? `Only ${warehouseCapacity.available.toLocaleString()} units of warehouse capacity are available.`
-                        : selectedReceiving.eligibilityMessage}
+                      {allocationIssue || selectedReceiving.eligibilityMessage}
                     </p>
                   )}
                   <button

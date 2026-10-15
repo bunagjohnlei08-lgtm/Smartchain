@@ -6,7 +6,6 @@ use App\Exceptions\BrevoDeliveryException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -19,7 +18,7 @@ use Throwable;
  *
  * Nothing that identifies a secret is ever logged: not the API key, not the
  * HTML body (which carries the OTP or the activation link), not the request
- * headers. Failures log the HTTP status and Brevo's own error code/message
+ * headers. Failures log the HTTP status and a known Brevo error category
  * only, and raise BrevoDeliveryException so callers never report a send that
  * Brevo rejected as successful.
  */
@@ -118,7 +117,7 @@ class BrevoTransactionalMail
             // Rethrown without chaining: the original exception's stack frames
             // carry the request arguments, including the api-key header.
             $this->fail('Brevo API request failed: '.class_basename($exception), [
-                'reason' => Str::limit($exception->getMessage(), 200, ''),
+                'exception_type' => class_basename($exception),
             ]);
         }
 
@@ -126,7 +125,6 @@ class BrevoTransactionalMail
             $this->fail('Brevo rejected the message.', [
                 'status' => $response->status(),
                 'brevo_code' => $this->errorField($response, 'code'),
-                'brevo_message' => $this->errorField($response, 'message'),
             ]);
         }
 
@@ -150,11 +148,18 @@ class BrevoTransactionalMail
         throw new BrevoDeliveryException($message);
     }
 
-    /** Pull one field out of a Brevo error body, truncated and never trusted. */
+    /** Read only a known machine category from the untrusted response. */
     private function errorField(Response $response, string $key): ?string
     {
         $value = $response->json($key);
 
-        return is_scalar($value) ? Str::limit((string) $value, 200, '') : null;
+        // Provider text can echo recipient data or message content. Retain
+        // only documented machine categories, never arbitrary response text.
+        return in_array($value, [
+            'invalid_parameter', 'missing_parameter', 'unauthorized',
+            'permission_denied', 'not_enough_credits', 'duplicate_parameter',
+            'document_not_found', 'method_not_allowed', 'out_of_range',
+            'bad_request', 'rate_limit_exceeded',
+        ], true) ? $value : 'unknown';
     }
 }

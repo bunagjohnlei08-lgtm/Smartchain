@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
@@ -496,7 +497,7 @@ const StockOut: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen w-full space-y-6 overflow-x-hidden bg-[#070a12] p-4 text-slate-100 sm:p-6 lg:p-8">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen space-y-6 bg-[#070a12] text-slate-100`}>
       <header className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Stock Out & Inventory Release</h1>

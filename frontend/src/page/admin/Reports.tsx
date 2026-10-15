@@ -1,3 +1,6 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import CapacitySummary from '../../components/warehouse/CapacitySummary';
+import type { CapacitySnapshot } from '../../lib/warehouseCapacity';
 // src/pages/admin/Reports.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/api';
@@ -61,12 +64,12 @@ interface ReportsDashboardResponse {
     pending_reports: number;
     generated_today: number;
     last_generated_at: string | null;
-    warehouse_capacity: { used: number; total: number | null; utilization_percentage: number | null };
+    warehouse_capacity: { allocated_total: number; used: number | null; total: number | null; utilization_percentage: number | null };
     total_stock_units: number;
     ai_forecast_accuracy: number | null;
   };
   reports_list: ReportDefinition[];
-  warehouse_capacity_overview: Array<{ name: string; code: string; used: number; capacity: number | null; available: number | null; utilization_percentage: number | null; alert_level: string; color: string }>;
+  warehouse_capacity_overview: Array<CapacitySnapshot & { name: string; code: string; used: number | null; capacity: number | null; available: number | null; utilization_percentage: number | null; alert_level: string; color: string }>;
   stock_status_overview: Array<{ name: string; value: number; color: string }>;
   recent_exports: ReportHistoryItem[];
   scheduler: SchedulerState;
@@ -282,7 +285,7 @@ const Reports: React.FC = () => {
   };
 
   return (
-    <div className="w-full min-w-0 min-h-screen bg-[#070a12] text-slate-100 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen bg-[#070a12] text-slate-100 space-y-6`}>
 
       {/* HEADER */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
@@ -321,7 +324,7 @@ const Reports: React.FC = () => {
           { label: 'Exports Today', value: metrics?.exports_today ?? 'N/A', subtitle: 'Successful file downloads today', icon: <Download className="w-4 h-4 text-emerald-400" /> },
           { label: 'Pending Reports', value: metrics?.pending_reports ?? 'N/A', subtitle: 'Active schedules awaiting next run', icon: <Clock className="w-4 h-4 text-amber-400" /> },
           { label: 'Generated Today', value: metrics?.generated_today ?? 'N/A', subtitle: metrics?.last_generated_at ? `Last generated ${formatDateTime(metrics.last_generated_at)}` : 'No reports generated yet', icon: <CheckCircle className="w-4 h-4 text-cyan-400" /> },
-          { label: metrics?.warehouse_capacity.total ? 'Warehouse Capacity' : 'Total Stock Units', value: metrics?.warehouse_capacity.total ? `${metrics.warehouse_capacity.utilization_percentage}%` : (metrics?.total_stock_units ?? 'N/A'), subtitle: metrics?.warehouse_capacity.total ? `${metrics.warehouse_capacity.used.toLocaleString()} / ${metrics.warehouse_capacity.total.toLocaleString()} units` : 'Capacity configuration unavailable', icon: <WarehouseIcon className="w-4 h-4 text-purple-400" /> },
+          { label: 'Warehouse Capacity Allocation', value: metrics?.warehouse_capacity.total ? metrics.warehouse_capacity.allocated_total.toLocaleString() : 'Not configured', subtitle: metrics?.warehouse_capacity.total ? `${metrics.warehouse_capacity.total.toLocaleString()} total budget · usage shown per unit` : 'Allocation setup required', icon: <WarehouseIcon className="w-4 h-4 text-purple-400" /> },
           { label: 'AI Forecast Accuracy', value: metrics?.ai_forecast_accuracy === null || metrics?.ai_forecast_accuracy === undefined ? 'N/A' : `${metrics.ai_forecast_accuracy}%`, subtitle: metrics?.ai_forecast_accuracy == null ? 'No measured forecast results' : 'Measured forecast performance', icon: <TrendingUp className="w-4 h-4 text-rose-400" /> },
         ].map((kpi, idx) => (
           <div key={idx} className="min-h-32 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
@@ -523,19 +526,14 @@ const Reports: React.FC = () => {
             <WarehouseIcon className="w-4 h-4 text-cyan-400" />
             Warehouse Capacity Overview
           </h4>
-          <p className="mb-5 text-xs text-slate-500">Physical stock uses available plus reserved quantities for active warehouses.</p>
+          <p className="mb-5 text-xs text-slate-500">Capacity is allocated by unit. Used quantities include available plus reserved stock in the matching unit.</p>
           <div className="flex-1 space-y-5" aria-live="polite">
             {dashboardLoading && warehouseChartData.length === 0 && <div className="flex h-full items-center justify-center text-xs text-slate-500">Loading warehouse capacity…</div>}
             {!dashboardLoading && warehouseChartData.length === 0 && <div className="flex h-full items-center justify-center text-xs text-slate-500">No active warehouses found.</div>}
             {warehouseChartData.map((item) => (
-              <div key={item.code}>
-                <div className="mb-2 flex items-start justify-between gap-4 text-xs">
-                  <div className="min-w-0"><p className="truncate font-medium text-slate-200">{item.name}</p><p className="flex items-center gap-2 text-slate-500">{item.code}{item.alert_level !== 'NORMAL' && <StatusPill value={item.alert_level} />}</p></div>
-                  <div className="shrink-0 text-right"><p className="font-semibold text-white">{item.utilization_percentage === null ? 'Capacity N/A' : `${item.utilization_percentage}%`}</p><p className="text-slate-500">{item.used.toLocaleString()} used{item.capacity === null ? '' : ` / ${item.capacity.toLocaleString()}`}</p></div>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" role="img" aria-label={`${item.name}: ${item.utilization_percentage === null ? 'capacity not configured' : `${item.utilization_percentage}% utilized`}`}>
-                  <div className={`h-full rounded-full transition-[width] duration-500 ${item.alert_level === 'FULL' ? 'bg-red-500' : item.alert_level === 'WARNING' ? 'bg-amber-500' : 'bg-cyan-500'}`} style={{ width: `${item.utilization_percentage ?? 0}%` }} />
-                </div>
+              <div key={item.code} className="space-y-2">
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-200">{item.name} · {item.code}</p>
+                <CapacitySummary capacity={item} />
               </div>
             ))}
           </div>
