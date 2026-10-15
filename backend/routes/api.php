@@ -112,6 +112,20 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::post('/admin/catalog-mapping/offerings/{offering}/create-product', [AdminCatalogMappingController::class, 'createProduct']);
     Route::get('/plant-manager/dashboard', [PlantManagerDashboardController::class, 'index']);
     Route::get('/plant-manager/warehouse', [PlantManagerWarehouseController::class, 'show']);
+    Route::get('/admin/boms', [\App\Http\Controllers\Api\BomController::class, 'index']);
+    Route::post('/admin/boms', [\App\Http\Controllers\Api\BomController::class, 'store']);
+    Route::put('/admin/boms/{bom}', [\App\Http\Controllers\Api\BomController::class, 'update']);
+    Route::get('/production/options', [\App\Http\Controllers\Api\ProductionController::class, 'options']);
+    Route::get('/production/batches', [\App\Http\Controllers\Api\ProductionController::class, 'index']);
+    Route::post('/production/batches', [\App\Http\Controllers\Api\ProductionController::class, 'store']);
+    Route::get('/production/batches/{productionBatch}', [\App\Http\Controllers\Api\ProductionController::class, 'show']);
+    Route::get('/production/batches/{productionBatch}/pick-list', [\App\Http\Controllers\Api\ProductionController::class, 'pickList']);
+    Route::post('/production/batches/{productionBatch}/issue', [\App\Http\Controllers\Api\ProductionController::class, 'issue']);
+    Route::post('/production/batches/{productionBatch}/output', [\App\Http\Controllers\Api\ProductionController::class, 'output']);
+    Route::post('/production/batches/{productionBatch}/qa', [\App\Http\Controllers\Api\ProductionController::class, 'inspect']);
+    Route::post('/production/batches/{productionBatch}/stock-in', [\App\Http\Controllers\Api\ProductionController::class, 'stockIn']);
+    Route::post('/production/batches/{productionBatch}/cancel', [\App\Http\Controllers\Api\ProductionController::class, 'cancel']);
+    Route::post('/production/batches/{productionBatch}/non-conformance', [\App\Http\Controllers\Api\ProductionController::class, 'disposition']);
     Route::prefix('plant-manager/reports')->group(function () {
         Route::get('/dashboard', [ReportsController::class, 'dashboard']);
         Route::get('/generate', [ReportsController::class, 'generate']);
@@ -148,6 +162,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::delete('/inventory/{id}', [InventoryController::class, 'destroy']);
 
     Route::get('/stock-in/receivings', [StockInController::class, 'index']);
+    Route::get('/stock-in/capacity', [StockInController::class, 'capacity']);
     Route::get('/stock-in/history', [StockInController::class, 'history']);
     Route::get('/stock-in/recently-stocked', [StockInController::class, 'recentStockedIn']);
     Route::get('/stock-in/receivings/{id}', [StockInController::class, 'show']);

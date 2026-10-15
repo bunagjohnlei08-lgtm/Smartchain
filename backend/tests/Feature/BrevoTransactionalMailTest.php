@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Exceptions\BrevoDeliveryException;
 use App\Mail\LoginOtpMail;
 use App\Mail\PasswordResetOtpMail;
+use App\Mail\SupplierApplicationPortalMail;
 use App\Mail\UserInvitationMail;
 use App\Support\BrevoTransactionalMail;
 use Illuminate\Http\Client\ConnectionException;
@@ -109,6 +110,30 @@ class BrevoTransactionalMailTest extends TestCase
             $this->assertSame('SmartChain Password Reset Verification Code', $body['subject']);
             $this->assertStringContainsString(self::OTP, $body['htmlContent']);
             $this->assertStringContainsString('SmartChain password reset', $body['htmlContent']);
+            return true;
+        });
+    }
+
+    public function test_supplier_invitation_keeps_the_direct_destination_in_html_and_plain_text(): void
+    {
+        Http::fake([BrevoTransactionalMail::ENDPOINT => Http::response(['messageId' => '<supplier@brevo>'], 201)]);
+        $url = 'https://portal.smartchain.test/supplier-portal#token='.str_repeat('a', 64);
+        Mail::to('supplier@example.test')->send(new SupplierApplicationPortalMail(
+            subjectLine: 'Supplier Application - Select Your Meeting Schedule',
+            heading: 'Meeting options available',
+            recipientName: 'Supplier Contact',
+            applicationReference: 'SUP-APP-TEST',
+            messageText: 'Please select one of the offered meetings.',
+            actionUrl: $url,
+            meetingOptions: ['October 20, 2026, 2:00 PM - 3:00 PM (Asia/Manila)'],
+        ));
+
+        Http::assertSent(function (Request $request) use ($url) {
+            $body = $request->data();
+            $this->assertTrue(str_contains($body['htmlContent'], 'href="'.$url.'"'), 'The rendered button destination reaches the Brevo API unchanged.');
+            $this->assertTrue(str_contains($body['htmlContent'], '<code>'.$url.'</code>'), 'HTML contains the original copyable destination.');
+            $this->assertTrue(str_contains($body['textContent'], $url), 'The plain-text alternative retains the full destination and fragment.');
+            $this->assertStringNotContainsString('sendibt3.com', $body['htmlContent']);
             return true;
         });
     }

@@ -24,11 +24,12 @@ type OtpErrorResponse = {
   message?: string;
   reason?: string;
   retry_after?: number;
+  resend_available_in?: number;
   errors?: Record<string, string[]>;
 };
 
 // Reasons after which this challenge can never succeed; the user must sign in again.
-const TERMINAL_REASONS = new Set(['attempts_exhausted', 'challenge_invalid', 'already_used', 'resend_limit', 'delivery_failed']);
+const TERMINAL_REASONS = new Set(['attempts_exhausted', 'challenge_invalid', 'already_used', 'resend_limit']);
 
 const maskEmail = (email: string): string => {
   const [local, domain] = email.split('@');
@@ -52,11 +53,15 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
 }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState('Your code was submitted to the email service. Check your inbox and spam folder.');
   const [isTerminal, setIsTerminal] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [deliveryFailed, setDeliveryFailed] = useState(false);
   const [resendIn, setResendIn] = useState(initialResendIn);
+  const [expiresRemaining, setExpiresRemaining] = useState(expiresIn);
+  const resendAt = useRef(Date.now() + initialResendIn * 1000);
+  const expiresAt = useRef(Date.now() + expiresIn * 1000);
   const inFlight = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,10 +70,19 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
   }, []);
 
   useEffect(() => {
-    if (resendIn <= 0) return;
-    const timer = window.setTimeout(() => setResendIn((seconds) => seconds - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [resendIn]);
+    const tick = () => {
+      setResendIn(Math.max(0, Math.ceil((resendAt.current - Date.now()) / 1000)));
+      setExpiresRemaining(Math.max(0, Math.ceil((expiresAt.current - Date.now()) / 1000)));
+    };
+    const timer = window.setInterval(tick, 1000);
+    window.addEventListener('focus', tick);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', tick); };
+  }, []);
+
+  const updateCooldown = (seconds: number) => {
+    resendAt.current = Date.now() + Math.max(0, seconds) * 1000;
+    setResendIn(Math.max(0, seconds));
+  };
 
   const describeError = (err: unknown, fallback: string): string => {
     const axiosError = err as AxiosError<OtpErrorResponse>;
@@ -76,12 +90,15 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
     const data = axiosError.response?.data;
 
     if (data?.reason && TERMINAL_REASONS.has(data.reason)) setIsTerminal(true);
-    if (data?.reason === 'cooldown' && typeof data.retry_after === 'number') setResendIn(data.retry_after);
+    if (typeof data?.resend_available_in === 'number') updateCooldown(data.resend_available_in);
+    else if (typeof data?.retry_after === 'number') updateCooldown(data.retry_after);
 
     switch (data?.reason) {
       case 'invalid_code':
         return 'The verification code is incorrect. Please try again.';
       case 'expired':
+        expiresAt.current = Date.now();
+        setExpiresRemaining(0);
         return 'This code has expired. Request a new code to continue.';
       case 'attempts_exhausted':
         return 'Too many incorrect codes. Please go back and sign in again.';
@@ -92,7 +109,8 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
       case 'resend_limit':
         return 'No more codes can be sent for this sign-in. Please go back and sign in again.';
       case 'delivery_failed':
-        return 'We could not send a new code. Please go back and sign in again.';
+        setDeliveryFailed(true);
+        return "We couldn't send your verification code. Please try Resend code again shortly.";
       case 'cooldown':
         return 'Please wait before requesting another code.';
       default:
@@ -141,13 +159,23 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
 
     inFlight.current = true;
     setIsResending(true);
+    setCode('');
     setError('');
     setNotice('');
     try {
       const response = await api.post('/api/login/resend-otp', { challenge_id: challengeId });
+      if (response.data?.delivery_status !== 'submitted') {
+        setDeliveryFailed(true);
+        setError("We couldn't confirm code submission. Please try again shortly.");
+        return;
+      }
       setCode('');
-      setResendIn(Number(response.data?.resend_available_in) || 60);
-      setNotice('A new code has been sent. Earlier codes no longer work.');
+      setDeliveryFailed(false);
+      updateCooldown(Number(response.data.resend_available_in) || 0);
+      const remaining = Math.max(0, Number(response.data.expires_in) || 0);
+      expiresAt.current = Date.now() + remaining * 1000;
+      setExpiresRemaining(remaining);
+      setNotice('A new code was submitted to the email service. Earlier codes no longer work. Check your inbox and spam folder.');
       inputRef.current?.focus();
     } catch (err) {
       setError(describeError(err, 'Unable to send a new code. Please try again.'));
@@ -170,15 +198,15 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
           Verify your identity
         </h2>
         <p className={`mt-2 text-sm md:text-[15px] xl:text-base ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-          We sent a 6-digit verification code to{' '}
+          Enter the 6-digit verification code for{' '}
           <span className={`font-medium ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{maskEmail(email)}</span>.
         </p>
       </div>
 
       <form onSubmit={handleVerify} className="space-y-[18px]" noValidate>
-        {notice && !error && (
+        {(isResending || (notice && !error)) && (
           <div role="status" aria-live="polite" className={`rounded-xl border p-3 text-sm ${isLight ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'}`}>
-            {notice}
+            {isResending ? 'Sending your verification code...' : notice}
           </div>
         )}
         {error && (
@@ -209,11 +237,11 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
             style={{ backgroundColor: isLight ? '#FFFFFF' : '#050e1b', color: isLight ? '#0F172A' : '#F5F7FA' }}
           />
           <p className={`mt-1.5 text-xs ${isLight ? 'text-slate-600' : 'text-slate-500'}`}>
-            The code expires in {Math.ceil(expiresIn / 60)} minutes. Never share it with anyone.
+            {deliveryFailed ? 'No usable code was sent. Request a new code.' : expiresRemaining > 0 ? `The code expires in ${Math.floor(expiresRemaining / 60)}:${String(expiresRemaining % 60).padStart(2, '0')}.` : 'This code has expired. Request a new code.'} Never share it with anyone.
           </p>
         </div>
 
-        <FormButton type="submit" variant="primary" isLoading={isVerifying} disabled={busy || isTerminal || code.length !== 6}>
+        <FormButton type="submit" variant="primary" isLoading={isVerifying} disabled={busy || isTerminal || deliveryFailed || code.length !== 6}>
           {!isVerifying && <ShieldCheck className="h-5 w-5" />}
           {isVerifying ? 'Verifying...' : 'Verify'}
         </FormButton>
@@ -236,7 +264,7 @@ const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
             className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:text-slate-500 ${isLight ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'}`}
           >
             <RotateCw className={`h-4 w-4 ${isResending ? 'animate-spin' : ''}`} />
-            {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+            {isResending ? 'Sending...' : resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
           </button>
         </div>
       </form>

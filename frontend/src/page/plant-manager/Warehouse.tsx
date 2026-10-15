@@ -1,8 +1,12 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Archive, Boxes, Loader2, MapPin, PackageCheck, RefreshCw, Warehouse as WarehouseIcon } from 'lucide-react';
+import { Loader2, MapPin, RefreshCw, Warehouse as WarehouseIcon } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
-interface WarehouseOverview {
+import CapacitySummary from '../../components/warehouse/CapacitySummary';
+import type { CapacitySnapshot } from '../../lib/warehouseCapacity';
+
+interface WarehouseOverview extends CapacitySnapshot {
   id: number;
   name: string;
   code: string;
@@ -46,11 +50,10 @@ const Warehouse: React.FC = () => {
 
   useEffect(() => { void loadWarehouse(); }, [loadWarehouse]);
 
-  const units = (value: number | null) => value === null ? 'Not configured' : `${value.toLocaleString()} units`;
 
   return (
-    <main className="min-h-screen w-full bg-[#090d16] p-4 text-slate-100 md:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <main className={`${PAGE_CONTENT_CLASS} min-h-screen bg-[#090d16] text-slate-100`}>
+      <div className="min-w-0 space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Warehouse Overview</h1>
@@ -78,28 +81,10 @@ const Warehouse: React.FC = () => {
             </div>
           </section>
 
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Warehouse capacity summary">
-            <MetricCard label="Total Capacity" value={units(warehouse.capacity)} icon={<WarehouseIcon className="h-5 w-5 text-blue-400" />} />
-            <MetricCard label="Utilized" value={units(warehouse.utilized)} icon={<Boxes className="h-5 w-5 text-cyan-400" />} />
-            <MetricCard label="Available" value={units(warehouse.available)} icon={<PackageCheck className="h-5 w-5 text-emerald-400" />} />
-            <MetricCard label="Capacity Utilization" value={warehouse.utilization_percentage === null ? 'Not available' : `${warehouse.utilization_percentage}%`} icon={<Archive className="h-5 w-5 text-amber-400" />} />
-          </section>
-
-          {warehouse.capacity_warning && <CapacityWarning warehouse={warehouse} />}
-
-          <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 md:p-6">
-            <div className="mb-2 flex justify-between text-sm"><span className="font-medium text-slate-300">Capacity utilization</span><span className="text-white">{warehouse.utilization_percentage === null ? 'Not available' : `${warehouse.utilization_percentage}%`}</span></div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label="Warehouse capacity utilization" aria-valuemin={0} aria-valuemax={100} aria-valuenow={warehouse.utilization_percentage ?? 0}><div className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${warehouse.capacity_state === 'full' || warehouse.capacity_state === 'warning' ? 'bg-red-500' : 'bg-cyan-500'}`} style={{ width: `${warehouse.utilization_percentage ?? 0}%` }} /></div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5 md:p-6">
-            <div className="mb-5"><h2 className="text-lg font-semibold text-white">Inventory Utilization</h2><p className="mt-1 text-sm text-slate-400">Live stock totals assigned to {warehouse.name}</p></div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <InventoryValue label="Total inventory units" value={warehouse.inventory.total_units} />
-              <InventoryValue label="Available inventory" value={warehouse.inventory.available_stock} />
-              <InventoryValue label="Reserved inventory" value={warehouse.inventory.reserved_stock} />
-              <InventoryValue label="Backload" value={warehouse.inventory.backload} />
-            </div>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-[#0f172a]/80 md:p-6">
+            <CapacitySummary capacity={warehouse} />
+            <h3 className="mt-5 text-sm font-semibold text-slate-900 dark:text-white">Inventory by unit</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">{(['KG', 'PCS', 'L'] as const).map(unit => <div key={unit} className="rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300"><p className="font-semibold">{unit}</p><p>Available: {warehouse.unit_capacity[unit].available_stock.toLocaleString()} {unit}</p><p>Reserved: {warehouse.unit_capacity[unit].reserved_stock.toLocaleString()} {unit}</p><p>Backload: {warehouse.unit_capacity[unit].backload.toLocaleString()} {unit}</p></div>)}</div>
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-slate-800/90 bg-[#0f172a]/80">
@@ -112,12 +97,5 @@ const Warehouse: React.FC = () => {
   );
 };
 
-const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => <article className="rounded-2xl border border-slate-800/90 bg-[#0f172a]/80 p-5"><div className="flex items-start justify-between gap-3"><div><p className="mobile-kpi-title text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p><p className="mobile-kpi-value mt-2 text-xl font-bold text-white">{value}</p></div><div className="rounded-lg bg-slate-800/50 p-2.5">{icon}</div></div></article>;
-const InventoryValue: React.FC<{ label: string; value: number }> = ({ label, value }) => <div className="rounded-xl bg-slate-800/50 p-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-1 text-lg font-semibold text-white">{value.toLocaleString()} units</p></div>;
 const StatusBadge: React.FC<{ status: WarehouseOverview['status'] }> = ({ status }) => <span className={`plant-manager-badge rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'Active' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-slate-600 bg-slate-700/30 text-slate-400'}`}>{status}</span>;
-const CapacityWarning: React.FC<{ warehouse: WarehouseOverview }> = ({ warehouse }) => {
-  const full = warehouse.capacity_state === 'full';
-  return <section className="flex min-w-0 items-start gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 p-5 text-red-900 dark:text-red-100" role="alert"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" /><div className="min-w-0"><h2 className="font-semibold">{full ? 'Warehouse Full' : 'Critical Capacity Warning'}</h2><p className="mt-1 break-words text-sm leading-5 opacity-90">{warehouse.name} is {warehouse.utilization_percentage}% utilized. {warehouse.available?.toLocaleString() ?? 0} units of capacity remain.</p></div></section>;
-};
-
 export default Warehouse;

@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 // src/page/admin/Logistics.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { apiClient } from '../../lib/api';
@@ -457,7 +458,7 @@ const Logistics: React.FC = () => {
   };
 
  return (
-  <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-transparent text-white min-h-screen">
+  <div className={`${PAGE_CONTENT_CLASS} space-y-6 bg-transparent text-white min-h-screen`}>
    {/* Breadcrumb */}
    <div className="flex items-center gap-2 text-sm text-gray-400">
     <span>Admin</span>

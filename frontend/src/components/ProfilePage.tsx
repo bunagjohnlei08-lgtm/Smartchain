@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from './layout/pageLayout';
 import React, { useEffect, useRef, useState } from 'react';
 import { Building2, Camera, CheckCircle2, GitBranch, IdCard, LoaderCircle, LockKeyhole, Trash2, UserRound, Warehouse } from 'lucide-react';
 import { apiClient } from '../lib/api';
@@ -139,11 +140,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ breadcrumbLabel }) => {
 
   if (loading) return <div className="flex min-h-[50vh] items-center justify-center gap-2 text-slate-500 dark:text-slate-400"><LoaderCircle className="h-5 w-5 animate-spin" /> Loading profile…</div>;
 
-  return <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
+  return <div className={`${PAGE_CONTENT_CLASS} space-y-6`}>
     <header><div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400"><span>{breadcrumbLabel}</span><span>/</span><span className="text-slate-900 dark:text-slate-100">Profile</span></div><h1 className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">Profile</h1><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage your account information.</p></header>
     {profileErrors.form && !profile && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{profileErrors.form}</div>}
     {profile && <>
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+      <div className="grid max-w-6xl grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
         <section aria-labelledby="profile-summary-heading" className="self-start rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
           <div className="relative mx-auto h-20 w-20">
             <UserAvatar name={profile.name} photoUrl={photoPreviewUrl ?? profile.profile_photo_url} className="flex h-20 w-20 items-center justify-center rounded-full border border-cyan-200 bg-cyan-50 text-2xl font-bold text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300" />

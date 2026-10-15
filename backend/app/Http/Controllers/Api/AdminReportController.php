@@ -45,6 +45,7 @@ class AdminReportController extends Controller
                 $snapshot = WarehouseCapacity::snapshot($warehouse);
 
                 return [
+                    ...$snapshot,
                     'name' => $warehouse->name,
                     'code' => $warehouse->code,
                     'used' => $snapshot['utilized'],
@@ -65,7 +66,6 @@ class AdminReportController extends Controller
             ->first();
 
         $configured = $warehouseCapacity->filter(fn (array $warehouse) => $warehouse['capacity'] !== null && $warehouse['capacity'] > 0);
-        $usedCapacity = (int) $configured->sum('used');
         $totalCapacity = (int) $configured->sum('capacity');
         $today = now()->startOfDay();
         $successToday = ReportExport::query()->where('status', ReportExport::STATUS_SUCCESS)->where('generated_at', '>=', $today);
@@ -81,9 +81,10 @@ class AdminReportController extends Controller
                 'last_generated_at' => ReportExport::query()->where('status', ReportExport::STATUS_SUCCESS)
                     ->orderByDesc('generated_at')->first(['generated_at'])?->generated_at?->toIso8601String(),
                 'warehouse_capacity' => [
-                    'used' => $usedCapacity,
+                    'used' => null,
                     'total' => $totalCapacity > 0 ? $totalCapacity : null,
-                    'utilization_percentage' => $totalCapacity > 0 ? round(min(100, $usedCapacity / $totalCapacity * 100), 1) : null,
+                    'allocated_total' => (int) $configured->sum('allocated_total'),
+                    'utilization_percentage' => null,
                 ],
                 'total_stock_units' => (int) (DB::table('inventories')->selectRaw('COALESCE(SUM(available_stock + reserved_stock), 0) as total')->value('total') ?? 0),
                 // No forecast results are persisted anywhere, so accuracy cannot be measured.

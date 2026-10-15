@@ -32,12 +32,16 @@ class AdminWarehouseLocationController extends Controller
             'address' => [Rule::requiredIf($willBePublic), 'nullable', 'string', 'max:2000'],
             'latitude' => [Rule::requiredIf($willBePublic), 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => [Rule::requiredIf($willBePublic), 'nullable', 'numeric', 'between:-180,180'],
-            'capacity' => ['nullable', 'integer', 'min:0'],
+            'capacity' => ['nullable', 'integer', 'min:0', 'max:2147483647'],
+            'capacity_kg' => ['nullable', 'integer', 'min:0', 'max:2147483647'],
+            'capacity_pcs' => ['nullable', 'integer', 'min:0', 'max:2147483647'],
+            'capacity_l' => ['nullable', 'integer', 'min:0', 'max:2147483647'],
             'status' => ['required', Rule::in(['Active', 'Inactive'])],
             'show_on_public_website' => ['sometimes', 'boolean'],
         ]);
         DB::transaction(function () use ($warehouse, $validated): void {
             $locked = Warehouse::query()->lockForUpdate()->findOrFail($warehouse->id);
+            WarehouseCapacity::validateAllocations($locked, $validated);
             $locked->update($validated);
             WarehouseCapacity::recordTransition($locked);
         });

@@ -1,3 +1,6 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import { ClassificationBadge } from '../../components/catalog/ProductFields';
+import type { Classification } from '../../lib/catalog';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   X,
@@ -33,6 +36,8 @@ interface ReplenishmentRequest {
   request_no: string;
   product_id: number | null;
   product_name: string;
+  unit?: string;
+  item_classification?: Classification;
   warehouse_id: number | null;
   warehouse_name: string;
   requested_qty: number;
@@ -303,7 +308,7 @@ const Procurement: React.FC = () => {
   }, [requests, search, statusFilter]);
 
   return (
-    <div className="min-h-screen w-full bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200 p-6 space-y-6">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200 space-y-6`}>
       {/* Breadcrumb & Header Row */}
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -975,6 +980,7 @@ const Procurement: React.FC = () => {
                 <dt className="text-xs text-[var(--text-muted)]">Product</dt>
                 <dd className="text-[var(--text-primary)] font-medium">
                   {selectedRequest.product_name}
+                  {selectedRequest.item_classification && <div className="mt-2"><ClassificationBadge value={selectedRequest.item_classification}/></div>}
                 </dd>
               </div>
               <div>
@@ -986,7 +992,7 @@ const Procurement: React.FC = () => {
               <div>
                 <dt className="text-xs text-[var(--text-muted)]">Requested Qty</dt>
                 <dd className="text-[var(--text-primary)] font-medium">
-                  {selectedRequest.requested_qty.toLocaleString()}
+                  {selectedRequest.requested_qty.toLocaleString()} {selectedRequest.unit}
                 </dd>
               </div>
               <div>

@@ -52,6 +52,8 @@ const navGroups: NavGroup[] = [
         label: 'Smart Warehousing System (SWS)',
         children: [
           { id: 'manage-locations', label: 'Manage Locations', path: '/admin/manage-locations' },
+          { id: 'boms', label: 'BOM / Formulas', path: '/admin/boms' },
+          { id: 'production', label: 'Production Oversight', path: '/admin/production' },
           { id: 'order-management', label: 'Order Management', path: '/admin/order-management' },
         ],
       },

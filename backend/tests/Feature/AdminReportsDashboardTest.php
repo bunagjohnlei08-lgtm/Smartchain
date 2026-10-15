@@ -24,7 +24,7 @@ class AdminReportsDashboardTest extends TestCase
     public function test_admin_reports_dashboard_returns_live_inventory_aggregates(): void
     {
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'MAIN-WH', 'branch_id' => $branch->id, 'capacity' => 100, 'status' => 'Active']);
+        $warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'MAIN-WH', 'branch_id' => $branch->id, 'capacity' => 100, 'capacity_kg' => 0, 'capacity_pcs' => 100, 'capacity_l' => 0, 'status' => 'Active']);
         $available = Product::create(['name' => 'Available Product', 'unit' => 'pcs', 'cost_price' => 10, 'reorder_level' => 5]);
         $low = Product::create(['name' => 'Low Product', 'unit' => 'pcs', 'cost_price' => 20, 'reorder_level' => 5]);
         Inventory::create(['barcode' => 'REPORT-1', 'product_id' => $available->id, 'warehouse_id' => $warehouse->id, 'available_stock' => 10, 'reserved_stock' => 2, 'backload' => 3]);
@@ -37,12 +37,12 @@ class AdminReportsDashboardTest extends TestCase
             ->assertJsonPath('metrics.generated_today', 0)
             ->assertJsonPath('metrics.last_generated_at', null)
             ->assertJsonPath('metrics.ai_forecast_accuracy', null)
-            ->assertJsonPath('metrics.warehouse_capacity.used', 16)
+            ->assertJsonPath('metrics.warehouse_capacity.used', null)
             ->assertJsonPath('metrics.warehouse_capacity.total', 100)
-            ->assertJsonPath('metrics.warehouse_capacity.utilization_percentage', 16)
+            ->assertJsonPath('metrics.warehouse_capacity.allocated_total', 100)
             ->assertJsonPath('metrics.total_stock_units', 16)
             ->assertJsonPath('warehouse_capacity_overview.0.name', 'Main Warehouse')
-            ->assertJsonPath('warehouse_capacity_overview.0.used', 16)
+            ->assertJsonPath('warehouse_capacity_overview.0.unit_capacity.PCS.used', 16)
             ->assertJsonPath('warehouse_capacity_overview.0.capacity', 100)
             ->assertJsonPath('stock_status_overview.0.value', 1)
             ->assertJsonPath('stock_status_overview.1.value', 1)

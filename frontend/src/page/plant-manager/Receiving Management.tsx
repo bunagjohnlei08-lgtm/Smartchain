@@ -1,3 +1,5 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
+import { ClassificationBadge } from '../../components/catalog/ProductFields';
 // src/page/plant-manager/ReceivingManagement.tsx
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { AxiosError } from 'axios';
@@ -773,7 +775,7 @@ const ReceivingManagement: React.FC = () => {
   }, [assignmentTarget, assignmentSaving]);
 
   return (
-    <div className="pm-receiving-page mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#0b1220] p-4 text-slate-100 sm:p-6">
+    <div className={`${PAGE_CONTENT_CLASS} pm-receiving-page min-h-screen space-y-6 bg-[#0b1220] text-slate-100`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -1237,7 +1239,7 @@ const ReceivingManagement: React.FC = () => {
                     <tbody>
                       {selectedReceiving.items.map((item) => (
                         <tr key={item.id} className="border-b border-[#1f2937] hover:bg-slate-800/30">
-                          <td className="px-2 py-2 text-white">{item.product_name}</td>
+                          <td className="px-2 py-2 text-white">{item.product_name}{item.item_classification && <div className="mt-1"><ClassificationBadge value={item.item_classification}/></div>}</td>
                           <td className="px-2 py-2 text-center text-white">{selectedReceiving.replacement?.awaiting_delivery ? `0 / ${item.expected_quantity ?? 0}` : item.delivered_quantity}</td>
                           <td className="px-2 py-2 text-slate-300">{item.unit ?? '—'}</td>
                           <td className="px-2 py-2">

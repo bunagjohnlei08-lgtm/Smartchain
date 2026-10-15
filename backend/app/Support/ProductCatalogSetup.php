@@ -102,6 +102,7 @@ final class ProductCatalogSetup
             'barcode' => self::uniqueBarcode(), 'product_id' => $product->id, 'warehouse_id' => $warehouse->id,
             'available_stock' => 0, 'reserved_stock' => 0, 'backload' => 0,
             'status' => 'Out of Stock', 'pending_receiving' => false,
+            'catalog_setup_at' => now(),
         ]);
         AuditLogger::success('PRODUCT_WAREHOUSE_ASSIGNED', AuditLogger::MODULE_INVENTORY, [
             'actor' => $actor, 'resource' => $inventory, 'resource_label' => $inventory->barcode,

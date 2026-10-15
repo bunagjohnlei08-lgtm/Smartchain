@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowRight, CheckCircle2, ClipboardCheck, Clock3, Hash, MinusCircle, Package, Paperclip, RefreshCcw, Search, UserRound, UsersRound, XCircle } from 'lucide-react';
@@ -112,7 +113,7 @@ const InspectionHistory: React.FC = () => {
   ];
   const controlClass = 'h-9 w-full min-w-0 rounded-lg border border-(--border-color-strong) bg-(--bg-input) px-2.5 text-xs text-(--text-primary) outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 md:h-10 md:text-sm';
 
-  return <div className="w-full max-w-7xl mx-auto min-h-screen space-y-4 bg-(--bg-app) p-4 text-(--text-primary) md:space-y-6 md:p-6">
+  return <div className={`${PAGE_CONTENT_CLASS} min-h-screen space-y-4 bg-(--bg-app) text-(--text-primary) md:space-y-6`}>
     <header><h1 className="text-[15px] font-bold text-(--text-primary) md:text-2xl">Inspection History</h1><p className="mt-1 text-[10px] text-(--text-muted) sm:text-[11px] md:text-sm">Review completed quality inspections and delivery decisions.</p></header>
 
     <section aria-label="Inspection summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4">

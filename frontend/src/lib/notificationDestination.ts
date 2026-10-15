@@ -7,6 +7,9 @@ const destinations: {
   category: string;
   path: string;
 }[] = [
+  { role: 'ADMIN', category: 'Production', path: '/admin/production' },
+  { role: 'PLANT_MANAGER', category: 'Production', path: '/plant-manager/production' },
+  { role: 'QA_SUPERVISOR', category: 'Production', path: '/qa/production' },
   { role: 'ADMIN', category: 'Stock In', path: '/admin/inventory' },
   { role: 'ADMIN', category: 'Warehouse Capacity', path: '/admin/manage-locations' },
   { role: 'ADMIN', category: 'Procurement', path: '/admin/procurement' },

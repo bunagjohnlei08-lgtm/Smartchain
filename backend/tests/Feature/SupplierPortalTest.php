@@ -273,6 +273,73 @@ class SupplierPortalTest extends TestCase
         }
     }
 
+    public function test_meeting_invitation_opens_as_guest_and_preserves_history_and_selected_schedule(): void
+    {
+        Notification::fake();
+        config(['supplier_portal.frontend_url' => 'https://portal.smartchain.test/']);
+        $application = $this->application('invitation-history', SupplierApplication::STATUS_UNDER_REVIEW);
+        $other = $this->application('unrelated-supplier');
+
+        $slotId = $this->actingAs($this->admin)
+            ->postJson("/api/admin/supplier-applications/{$application->id}/meeting-slots", [
+                'slots' => $this->meetingOptions(),
+            ])->assertCreated()->json('data.meeting_slots.0.id');
+        $application->update(['decision_reason' => 'Private administrator note.']);
+        $mail = Mail::sent(SupplierApplicationPortalMail::class)->last();
+        $this->assertSame('https://portal.smartchain.test/supplier-portal', explode('#', $mail->actionUrl)[0]);
+        $this->assertCount(3, $mail->meetingOptions);
+        $html = $mail->render();
+        $this->assertTrue(str_contains($html, 'href="'.$mail->actionUrl.'"'), 'The button retains the original invitation URL.');
+        $this->assertTrue(str_contains($html, '<code>'.$mail->actionUrl.'</code>'), 'The copyable address retains the complete invitation URL.');
+
+        $token = $this->tokenFromLastPortalMail();
+        $this->app['auth']->forgetGuards();
+        $session = $this->postJson('/api/supplier-portal/access', ['access_token' => $token])
+            ->assertOk()->json('session_token');
+        $headers = $this->portalHeaders($session);
+        $before = $this->withHeaders($headers)
+            ->getJson('/api/supplier-portal/application?supplier_application_id='.$other->id)->assertOk()
+            ->assertJsonPath('data.application_number', $application->application_number)
+            ->assertJsonPath('data.status', SupplierApplication::STATUS_QUALIFIED_FOR_MEETING)
+            ->assertJsonCount(3, 'data.available_meeting_slots')
+            ->assertJsonPath('data.confirmed_meeting', null)
+            ->assertJsonFragment(['event_type' => SupplierApplicationEvent::SUBMITTED])
+            ->assertJsonFragment(['event_type' => SupplierApplicationEvent::QUALIFIED_FOR_MEETING])
+            ->assertJsonFragment(['event_type' => SupplierApplicationEvent::SLOTS_AVAILABLE]);
+        $this->assertStringNotContainsString('Private administrator note.', $before->getContent());
+        $this->assertStringNotContainsString($other->application_number, $before->getContent());
+        $this->assertDatabaseCount('suppliers', 0);
+
+        $this->withHeaders($headers)->postJson("/api/supplier-portal/meeting-slots/{$slotId}/select")
+            ->assertOk()->assertJsonPath('data.status', SupplierApplication::STATUS_MEETING_SCHEDULED);
+        // Confirmation rotates the invitation link, but preserves the supplier's session.
+        $this->withHeaders($headers)->getJson('/api/supplier-portal/application')->assertOk()
+            ->assertJsonPath('data.confirmed_meeting.id', $slotId)
+            ->assertJsonPath('data.available_meeting_slots', [])
+            ->assertJsonFragment(['event_type' => SupplierApplicationEvent::MEETING_SELECTED]);
+        $this->assertDatabaseCount('suppliers', 0);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+
+        // Replaying the old link without its established session remains forbidden.
+        $this->postJson('/api/supplier-portal/access', ['access_token' => $token])->assertUnauthorized();
+        $confirmationToken = $this->tokenFromLastPortalMail();
+        $newSession = $this->postJson('/api/supplier-portal/access', ['access_token' => $confirmationToken])
+            ->assertOk()->json('session_token');
+        $this->withHeaders($this->portalHeaders($newSession))->getJson('/api/supplier-portal/application')
+            ->assertOk()->assertJsonPath('data.confirmed_meeting.id', $slotId)
+            ->assertJsonPath('data.status', SupplierApplication::STATUS_MEETING_SCHEDULED);
+    }
+
+    public function test_tampered_invitation_cannot_create_a_session(): void
+    {
+        $application = $this->application('tampered');
+        $link = SupplierPortalAccess::issueLink($application);
+        $tampered = substr($link['token'], 0, -1).(str_ends_with($link['token'], 'a') ? 'b' : 'a');
+        $this->postJson('/api/supplier-portal/access', ['access_token' => $tampered])->assertUnauthorized();
+        $this->assertNull($application->portalAccess()->firstOrFail()->session_token_hash);
+        $this->assertNull($application->portalAccess()->firstOrFail()->link_consumed_at);
+    }
+
     public function test_admin_slots_are_visible_and_only_one_can_be_selected(): void
     {
         Notification::fake();

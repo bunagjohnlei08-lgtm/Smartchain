@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { useSearchParams } from 'react-router-dom';
@@ -933,7 +934,7 @@ const QualityInspection: React.FC = () => {
   */
 
   return (
-    <div className="qa-quality-inspection w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100">
+    <div className={`${PAGE_CONTENT_CLASS} qa-quality-inspection space-y-6 bg-[#090d16] text-slate-100`}>
       {/* Obsolete inline-layout debug panel retained as commented history during the modal migration.
         <aside data-qa-layout-debug-panel className="pointer-events-none fixed bottom-3 right-3 z-[200] max-w-[min(24rem,calc(100vw-1.5rem))] rounded-lg bg-slate-950/95 p-3 font-mono text-[11px] leading-4 text-cyan-100 shadow-2xl" aria-label="Temporary QA layout diagnostics">
           <p className="font-bold text-cyan-300">QA layout diagnostics</p>

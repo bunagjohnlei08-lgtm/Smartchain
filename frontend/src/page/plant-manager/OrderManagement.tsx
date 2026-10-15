@@ -1,3 +1,4 @@
+import { PAGE_CONTENT_CLASS } from '../../components/layout/pageLayout';
 // src/pages/plant-manager/OrderManagement.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../../lib/api';
@@ -477,7 +478,7 @@ const OrderManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full min-w-0 max-w-full space-y-6 overflow-x-hidden bg-[#070a12] p-4 text-slate-100 sm:p-6 lg:p-8">
+    <div className={`${PAGE_CONTENT_CLASS} min-h-screen max-w-full space-y-6 bg-[#070a12] text-slate-100`}>
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

@@ -1,3 +1,4 @@
+import { MAIN_SCROLL_OFFSET_CLASS } from './pageLayout';
 import React from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import {
@@ -166,7 +167,7 @@ const AdminLayout: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-slate-50 pt-14 dark:bg-transparent xl:pt-0">
+        <main className={`flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-slate-50 ${MAIN_SCROLL_OFFSET_CLASS} dark:bg-transparent`}>
           <Outlet />
         </main>
       </div>

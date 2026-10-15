@@ -148,11 +148,24 @@ class ReportRegistry
         $orderStatuses = collect(Order::STATUSES)->mapWithKeys(fn (string $status) => [$status => $status])->all();
         $capacityColumns = [
             'warehouse' => ['Warehouse', 'text'], 'code' => ['Code', 'text'], 'warehouse_status' => ['Active Status', 'status'],
-            'capacity' => ['Capacity', 'number'], 'used' => ['Used Qty', 'number'], 'available_capacity' => ['Available Capacity', 'number'],
+            'capacity' => ['Total Capacity Allocation', 'number'], 'unit' => ['Unit', 'text'], 'allocated' => ['Unit Allocation', 'number'],
+            'used' => ['Used Qty', 'number'], 'available_capacity' => ['Remaining Unit Allocation', 'number'],
             'utilization' => ['Utilization', 'percent'], 'alert_level' => ['Capacity Alert', 'status'],
         ];
 
         return [
+            new ReportDefinition('warehouse.production_batches', 'Production Batch History', 'Internal quantities by batch and stock unit; supplier fulfillment remains separate.', 'warehouse',
+                ['batch_number' => ['Batch', 'text'], 'product' => ['Finished Product', 'text'], 'warehouse' => ['Warehouse', 'text'], 'unit' => ['Stock Unit', 'text'],
+                    'target_quantity' => ['Target', 'number'], 'actual_quantity' => ['Produced', 'number'], 'passed_quantity' => ['QA Passed', 'number'], 'failed_quantity' => ['QA Failed', 'number'],
+                    'status' => ['Status', 'status'], 'disposition' => ['Internal Disposition', 'text'], 'created_at' => ['Created', 'datetime'], 'stocked_in_at' => ['Stocked In', 'datetime']],
+                ['date', 'warehouse', 'product', 'status'], array_combine(\App\Models\ProductionBatch::STATUSES, \App\Models\ProductionBatch::STATUSES), dateLabel: 'Batch created',
+                source: fn (ReportFilters $f) => $this->productionQuery($f)),
+            new ReportDefinition('inventory.raw_materials', 'Raw Material Stock', 'Current raw stock by warehouse and stock unit.', 'inventory',
+                $inventoryColumns, $inventoryFilters, dateLabel: 'Last updated',
+                source: fn (ReportFilters $f) => $this->inventoryItems($f)->where('products.item_classification', \App\Models\Product::RAW_MATERIAL)),
+            new ReportDefinition('inventory.finished_products', 'Finished Product Stock', 'Current finished stock by warehouse and stock unit.', 'inventory',
+                $inventoryColumns, $inventoryFilters, dateLabel: 'Last updated',
+                source: fn (ReportFilters $f) => $this->inventoryItems($f)->where('products.item_classification', \App\Models\Product::FINISHED_PRODUCT)),
             // ---------------- Inventory ----------------
             new ReportDefinition('inventory.summary', 'Inventory Summary Report', 'Current stock per product and warehouse with reorder-based stock status.', 'inventory',
                 $inventoryColumns, [...$inventoryFilters, 'status'], self::STOCK_STATUSES, dateLabel: 'Last updated',
@@ -373,6 +386,19 @@ class ReportRegistry
         if ($status) $query->whereRaw(self::STOCK_STATUS_SQL.' = ?', [$status]);
 
         return $this->dateRange($query, 'inventories.updated_at', $f);
+    }
+
+    private function productionQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('production_batches as pb')->join('warehouses as w', 'w.id', '=', 'pb.warehouse_id')
+            ->leftJoin('production_non_conformances as nc', 'nc.production_batch_id', '=', 'pb.id')
+            ->select(['pb.batch_number', 'pb.product_name as product', 'w.name as warehouse', 'pb.unit', 'pb.target_quantity', 'pb.actual_quantity',
+                'pb.passed_quantity', 'pb.failed_quantity', 'pb.status', 'nc.disposition', 'pb.created_at', 'pb.stocked_in_at'])
+            ->orderByDesc('pb.created_at')->orderByDesc('pb.id');
+        if ($f->warehouseId) $query->where('pb.warehouse_id', $f->warehouseId);
+        if ($f->productId) $query->where('pb.product_id', $f->productId);
+        if ($f->status) $query->where('pb.status', $f->status);
+        return $this->dateRange($query, 'pb.created_at', $f);
     }
 
     private function inventoryByWarehouse(ReportFilters $f): Builder
@@ -680,14 +706,18 @@ class ReportRegistry
             ->when($f->status, fn ($q, string $status) => $q->where('status', $status))
             ->orderBy('name')->orderBy('id')
             ->get()
-            ->map(function (Warehouse $warehouse) {
+            ->flatMap(function (Warehouse $warehouse) {
                 $snapshot = WarehouseCapacity::snapshot($warehouse);
-
-                return (object) [
+                $units = $snapshot['unit_capacity'];
+                foreach ($snapshot['unsupported_unit_usage'] as $usage) {
+                    $units[$usage['unit']] = [...$usage, 'allocated' => null, 'remaining' => null, 'utilization_percentage' => null, 'capacity_state' => 'setup_required'];
+                }
+                return collect($units)->map(fn ($unitCapacity, $unit) => (object) [
                     'warehouse' => $warehouse->name, 'code' => $warehouse->code, 'warehouse_status' => $warehouse->status,
-                    'capacity' => $snapshot['capacity'], 'used' => $snapshot['utilized'], 'available_capacity' => $snapshot['available'],
-                    'utilization' => $snapshot['utilization_percentage'], 'alert_level' => strtoupper($snapshot['capacity_state']),
-                ];
+                    'capacity' => $snapshot['capacity'], 'unit' => $unit, 'allocated' => $unitCapacity['allocated'],
+                    'used' => $unitCapacity['used'], 'available_capacity' => $unitCapacity['remaining'],
+                    'utilization' => $unitCapacity['utilization_percentage'], 'alert_level' => strtoupper($unitCapacity['capacity_state']),
+                ])->values();
             })
             ->values();
     }

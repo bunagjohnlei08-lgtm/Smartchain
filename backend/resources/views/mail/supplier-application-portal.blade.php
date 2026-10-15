@@ -24,6 +24,10 @@ Hello {{ $recipientName }},
 Open Supplier Application Portal
 </x-mail::button>
 
+If the button does not open, copy the entire address below and paste it into your browser's address bar:
+
+<p style="word-break: break-all;"><code>{{ $actionUrl }}</code></p>
+
 This secure link is intended only for the application contact. Do not forward it.
 @endif
 

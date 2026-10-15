@@ -48,7 +48,7 @@ class ProductCatalogTest extends TestCase
     /** New catalog products require an ACTIVE supplier and an active warehouse. */
     private function assignment(): array
     {
-        $this->warehouse->update(['status' => 'Active']);
+        $this->warehouse->update(['status' => 'Active', 'capacity' => 10000, 'capacity_kg' => 4000, 'capacity_pcs' => 3000, 'capacity_l' => 3000]);
         $supplier = Supplier::query()->firstOrCreate(['supplier_code' => 'SUP-CAT'], ['name' => 'Catalog Supplier', 'status' => 'ACTIVE']);
 
         return ['supplier_id' => $supplier->id, 'warehouse_id' => $this->warehouse->id];
@@ -60,8 +60,9 @@ class ProductCatalogTest extends TestCase
         $created = $this->actingAs($this->admin)->postJson('/api/admin/products', [...$payload, ...$this->assignment()])->assertCreated()->assertJsonPath('name', 'Steel Bolt');
         $id = $created->json('id');
         $this->actingAs($this->admin)->putJson("/api/admin/products/{$id}", [...$payload, 'name' => 'Steel Bolts'])->assertOk()->assertJsonPath('name', 'Steel Bolts');
-        // Creation now assigns a warehouse inventory row, which protects the product from deletion.
-        $this->deleteJson("/api/admin/products/{$id}")->assertConflict();
+        // A proven empty catalog setup row is removable with the product.
+        $this->deleteJson("/api/admin/products/{$id}")->assertOk();
+        $this->assertDatabaseMissing('inventories', ['product_id' => $id]);
 
         $unreferenced = Product::create(['name' => 'Unreferenced Bolt']);
         $this->deleteJson("/api/admin/products/{$unreferenced->id}")->assertOk();
@@ -92,10 +93,10 @@ class ProductCatalogTest extends TestCase
             ->mapWithKeys(fn ($table) => [$table => DB::table($table)->count()]);
         $missing = ['cost_price' => null, 'selling_price' => null, 'reorder_level' => null];
 
-        foreach (['Omitted' => [], 'Explicit null' => ['unit' => null, ...$missing]] as $name => $metadata) {
+        foreach (['Omitted' => [], 'Explicit null' => $missing] as $name => $metadata) {
             // The new warehouse inventory row starts at zero: genuinely out of stock.
             $response = $this->actingAs($this->admin)->postJson('/api/admin/products', [
-                'name' => $name, 'category' => 'REFRACTORY PRODUCTS', ...$metadata, ...$assignment,
+                'name' => $name, 'unit' => 'PCS', 'category' => 'REFRACTORY PRODUCTS', ...$metadata, ...$assignment,
             ])->assertCreated()->assertJsonPath('current_stock', 0)->assertJsonPath('status', 'OUT OF STOCK')
                 ->assertJsonPath('unit', 'PCS');
             foreach ($missing as $field => $value) {
@@ -122,13 +123,13 @@ class ProductCatalogTest extends TestCase
         $this->assertDatabaseHas('products', ['id' => $product->id, ...$values]);
 
         $response = $this->putJson("/api/admin/products/{$product->id}", [
-            'name' => 'Renamed metadata', 'unit' => '', 'cost_price' => '', 'selling_price' => '', 'reorder_level' => '',
+            'name' => 'Renamed metadata', 'cost_price' => '', 'selling_price' => '', 'reorder_level' => '',
         ])->assertOk();
         foreach (array_keys(array_diff_key($values, ['unit' => true])) as $field) {
             $response->assertJsonPath($field, null);
             $this->assertNull($product->fresh()->{$field});
         }
-        // Unit is fixed to PCS; clearing it restores the default instead of NULL.
+        // Omitting the required stock unit on edit preserves its existing value.
         $response->assertJsonPath('unit', 'PCS');
         $this->putJson("/api/admin/products/{$product->id}", [
             'name' => 'Renamed metadata', 'unit' => 'pcs', 'cost_price' => 0, 'selling_price' => 0, 'reorder_level' => 0,
@@ -137,7 +138,7 @@ class ProductCatalogTest extends TestCase
 
     public function test_optional_metadata_still_validates_supplied_values(): void
     {
-        foreach ([['unit' => 42], ['unit' => str_repeat('x', 51)], ['unit' => 'kg'], ['cost_price' => -1], ['cost_price' => 'invalid'],
+        foreach ([['unit' => 42], ['unit' => str_repeat('x', 51)], ['unit' => 'BAG'], ['cost_price' => -1], ['cost_price' => 'invalid'],
             ['selling_price' => -1], ['selling_price' => 'invalid'], ['reorder_level' => -1], ['reorder_level' => 1.5]] as $invalid) {
             $this->actingAs($this->admin)->postJson('/api/admin/products', ['name' => 'Invalid metadata', ...$invalid])
                 ->assertUnprocessable()->assertJsonValidationErrors(array_keys($invalid));
@@ -182,20 +183,20 @@ class ProductCatalogTest extends TestCase
     public function test_new_product_requires_active_supplier_and_warehouse_and_is_created_atomically(): void
     {
         $assignment = $this->assignment();
-        $this->actingAs($this->admin)->postJson('/api/admin/products', ['name' => 'smartPhone', 'warehouse_id' => $assignment['warehouse_id']])
+        $this->actingAs($this->admin)->postJson('/api/admin/products', ['name' => 'smartPhone', 'unit' => 'PCS', 'warehouse_id' => $assignment['warehouse_id']])
             ->assertUnprocessable()->assertJsonPath('errors.supplier_id.0', 'Select an assigned supplier.');
-        $this->postJson('/api/admin/products', ['name' => 'smartPhone', 'supplier_id' => $assignment['supplier_id']])
+        $this->postJson('/api/admin/products', ['name' => 'smartPhone', 'unit' => 'PCS', 'supplier_id' => $assignment['supplier_id']])
             ->assertUnprocessable()->assertJsonPath('errors.warehouse_id.0', 'Select a warehouse.');
         foreach (['ON_HOLD', 'INACTIVE', 'PENDING_REMOVAL', 'ARCHIVED'] as $status) {
             $blocked = Supplier::create(['supplier_code' => "SUP-{$status}", 'name' => "Blocked {$status}", 'status' => $status]);
-            $this->postJson('/api/admin/products', ['name' => 'smartPhone', 'supplier_id' => $blocked->id, 'warehouse_id' => $assignment['warehouse_id']])
+            $this->postJson('/api/admin/products', ['name' => 'smartPhone', 'unit' => 'PCS', 'supplier_id' => $blocked->id, 'warehouse_id' => $assignment['warehouse_id']])
                 ->assertUnprocessable()->assertJsonValidationErrors('supplier_id');
         }
         $this->assertDatabaseCount('products', 0);
         $this->assertDatabaseCount('inventories', 0);
 
-        $this->postJson('/api/admin/products', ['name' => 'smartPhone', 'unit' => 'kg', ...$assignment])->assertUnprocessable();
-        $id = $this->postJson('/api/admin/products', ['name' => 'smartPhone', ...$assignment])->assertCreated()
+        $this->postJson('/api/admin/products', ['name' => 'smartPhone', 'unit' => 'BAG', ...$assignment])->assertUnprocessable();
+        $id = $this->postJson('/api/admin/products', ['name' => 'smartPhone', 'unit' => 'PCS', ...$assignment])->assertCreated()
             ->assertJsonPath('unit', 'PCS')->assertJsonPath('supplier', 'Catalog Supplier')->assertJsonPath('status', 'OUT OF STOCK')->json('id');
         $this->assertDatabaseHas('product_supplier', ['product_id' => $id, 'supplier_id' => $assignment['supplier_id'], 'is_primary' => true]);
         $this->assertDatabaseHas('inventories', ['product_id' => $id, 'warehouse_id' => $assignment['warehouse_id'], 'available_stock' => 0]);

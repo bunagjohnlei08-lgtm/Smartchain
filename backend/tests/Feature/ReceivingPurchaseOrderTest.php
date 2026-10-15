@@ -148,7 +148,7 @@ class ReceivingPurchaseOrderTest extends TestCase
         $this->assertFalse($rows->contains('id', $completed->id));
     }
 
-    public function test_receiving_preserves_null_when_no_legitimate_unit_exists(): void
+    public function test_receiving_uses_explicit_legacy_piece_default_when_catalog_unit_was_omitted(): void
     {
         $product = Product::create(['name' => 'TOMAHAWK EC', 'category' => 'WOOD PRESERVATIVE PRODUCTS']);
         $order = PurchaseOrder::create([
@@ -165,7 +165,7 @@ class ReceivingPurchaseOrderTest extends TestCase
             ->assertOk()->json('data');
         $approvedOrder = collect($approved)->firstWhere('id', $order->id);
         $this->assertNotNull($approvedOrder);
-        $this->assertNull($approvedOrder['items'][0]['unit']);
+        $this->assertSame('PCS', $approvedOrder['items'][0]['unit']);
 
         $response = $this->post('/api/receivings', [
             'purchase_order_id' => $order->id, 'reference_no' => 'RTX-12345',
@@ -175,11 +175,11 @@ class ReceivingPurchaseOrderTest extends TestCase
         ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('status', 'Pending QA')
             ->assertJsonPath('items.0.product_name', 'TOMAHAWK EC')
             ->assertJsonPath('items.0.delivered_quantity', 20)
-            ->assertJsonPath('items.0.unit', null);
+            ->assertJsonPath('items.0.unit', 'PCS');
 
         $this->assertDatabaseHas('receiving_items', [
             'receiving_id' => $response->json('id'), 'product_id' => $product->id,
-            'product_name' => 'TOMAHAWK EC', 'unit' => null, 'inspection_status' => 'Pending QA',
+            'product_name' => 'TOMAHAWK EC', 'unit' => 'PCS', 'inspection_status' => 'Pending QA',
         ]);
         $this->assertDatabaseCount('inventories', 0);
         $this->assertDatabaseCount('qa_inspections', 0);

@@ -267,6 +267,7 @@ class StockOutController extends Controller
         $inventory = $query->first();
         if (!$inventory) throw ValidationException::withMessages(['barcode' => 'Barcode not found in inventory.']);
         if ($inventory->warehouse_id !== $warehouseId) throw ValidationException::withMessages(['barcode' => 'This inventory item does not belong to your assigned warehouse.']);
+        if ($inventory->product?->item_classification !== \App\Models\Product::FINISHED_PRODUCT) throw ValidationException::withMessages(['inventory' => 'Raw materials cannot be released for a customer order.']);
         if ($inventory->pending_receiving || $inventory->available_stock <= 0 || $inventory->status === 'Out of Stock') throw ValidationException::withMessages(['inventory' => 'Inventory is not usable or has no available quantity.']);
 
         $productName = trim((string) $inventory->product?->name);

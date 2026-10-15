@@ -7,6 +7,8 @@ use App\Models\Product;
 use App\Models\SupplierApplicationOffering;
 use App\Support\AuditLogger;
 use App\Support\ProductCatalogSetup;
+use App\Support\CatalogProductRules;
+use App\Support\WarehouseCapacity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -94,13 +96,15 @@ class AdminCatalogMappingController extends Controller
             'cost_price' => ['nullable', 'numeric', 'min:0'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
             'warehouse_id' => ['required', 'integer'],
-            'unit' => ['nullable', 'string', Rule::in([Product::DEFAULT_UNIT])],
-        ], ['unit.in' => 'Unit must be '.Product::DEFAULT_UNIT.'.']);
+            'unit' => ['required', 'string', Rule::in(WarehouseCapacity::UNITS)],
+            'item_classification' => ['sometimes', 'required', Rule::in(Product::CLASSIFICATIONS)],
+        ], ['unit.in' => 'Select a supported Stock Unit: KG, L, or PCS.']);
         $validated['name'] = trim($validated['name']);
 
         $product = DB::transaction(function () use ($offering, $validated, $request) {
             [$locked, $supplier] = $this->lockPendingOffering($offering);
             $warehouse = ProductCatalogSetup::lockActiveWarehouse((int) $validated['warehouse_id']);
+            CatalogProductRules::ensureSupported($warehouse, $validated['unit']);
             // Serializes concurrent creations so two offerings cannot both create the same name.
             DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['smartchain_catalog_product_create']);
             $normalized = SupplierApplicationOffering::normalizeName($validated['name']);
@@ -116,7 +120,8 @@ class AdminCatalogMappingController extends Controller
                 'name' => $validated['name'],
                 'category' => filled($validated['category'] ?? null) ? trim($validated['category']) : null,
                 'brand' => filled($validated['brand'] ?? null) ? trim($validated['brand']) : null,
-                'unit' => Product::DEFAULT_UNIT,
+                'unit' => $validated['unit'],
+                'item_classification' => $validated['item_classification'] ?? Product::FINISHED_PRODUCT,
                 'cost_price' => $validated['cost_price'] ?? null,
                 'selling_price' => $validated['selling_price'] ?? null,
             ]);
@@ -135,7 +140,7 @@ class AdminCatalogMappingController extends Controller
 
         return response()->json([
             'message' => 'Product created and assigned to the warehouse.',
-            'data' => ['offering_id' => $offering->id, 'product' => $product->only(['id', 'name', 'category', 'unit'])],
+            'data' => ['offering_id' => $offering->id, 'product' => $product->only(['id', 'name', 'category', 'unit', 'item_classification'])],
         ], 201);
     }
 

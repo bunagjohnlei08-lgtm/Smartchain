@@ -30,6 +30,7 @@ class ReportsController extends Controller
         'low-stock' => 'Low Stock Report',
         'damage-waste' => 'Damage & Waste Report',
         'order-fulfillment' => 'Order Fulfillment Report',
+        'production' => 'Production Batch History',
     ];
 
     /** The date each report's From/To filter applies to; null means a current-state report that ignores dates. */
@@ -44,6 +45,7 @@ class ReportsController extends Controller
         'low-stock' => null,
         'damage-waste' => 'QA completed at',
         'order-fulfillment' => 'Order date',
+        'production' => 'Batch created at',
     ];
 
     /** Event timestamps are stored in the app timezone and shown to users in business time. */
@@ -237,6 +239,7 @@ class ReportsController extends Controller
             'warehouse-utilization' => $this->warehouseReport(),
             'damage-waste' => $this->damageReport($from, $to),
             'order-fulfillment' => $this->orderReport($from, $to),
+            'production' => $this->productionReport($from, $to),
         };
     }
 
@@ -252,6 +255,19 @@ class ReportsController extends Controller
         ])->map(fn ($row) => (array) $row)->all();
 
         return [array_keys($rows[0] ?? ['barcode' => null, 'product' => null, 'category' => null, 'warehouse' => null, 'available_stock' => null, 'reserved_stock' => null, 'backload' => null, 'status' => null]), $rows, ['records' => count($rows), 'available_units' => array_sum(array_column($rows, 'available_stock'))]];
+    }
+
+    private function productionReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
+    {
+        $columns = ['batch_number', 'product', 'warehouse', 'unit', 'target_quantity', 'actual_quantity', 'passed_quantity', 'failed_quantity', 'status', 'disposition', 'created_at', 'stocked_in_at'];
+        $query = DB::table('production_batches as pb')->join('warehouses as w', 'w.id', '=', 'pb.warehouse_id')
+            ->leftJoin('production_non_conformances as nc', 'nc.production_batch_id', '=', 'pb.id')
+            ->where('pb.warehouse_id', request()->user()->warehouse_id)
+            ->select(['pb.batch_number', 'pb.product_name as product', 'w.name as warehouse', 'pb.unit', 'pb.target_quantity', 'pb.actual_quantity',
+                'pb.passed_quantity', 'pb.failed_quantity', 'pb.status', 'nc.disposition', 'pb.created_at', 'pb.stocked_in_at']);
+        $this->applyTimestampRange($query, 'pb.created_at', $from, $to);
+        $rows = $query->orderByDesc('pb.id')->get()->map(fn ($row) => (array) $row)->all();
+        return [$columns, $rows, ['records' => count($rows)]];
     }
 
     private function receivingReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
@@ -377,11 +393,20 @@ class ReportsController extends Controller
             ->where('status', 'Active')
             ->orderBy('name')
             ->get()
-            ->map(function (Warehouse $warehouse) {
+            ->flatMap(function (Warehouse $warehouse) {
                 $snapshot = WarehouseCapacity::snapshot($warehouse);
-                return ['name' => $warehouse->name, 'code' => $warehouse->code, 'status' => $warehouse->status, 'used' => $snapshot['utilized'], 'free' => $snapshot['available'], 'total' => $snapshot['capacity'], 'utilization_percentage' => $snapshot['utilization_percentage']];
+                $units = $snapshot['unit_capacity'];
+                foreach ($snapshot['unsupported_unit_usage'] as $usage) {
+                    $units[$usage['unit']] = [...$usage, 'allocated' => null, 'remaining' => null, 'utilization_percentage' => null];
+                }
+                return collect($units)->map(fn ($capacity, $unit) => [
+                    'name' => $warehouse->name, 'code' => $warehouse->code, 'status' => $warehouse->status,
+                    'unit' => $unit, 'allocated' => $capacity['allocated'], 'used' => $capacity['used'],
+                    'free' => $capacity['remaining'], 'total' => $snapshot['capacity'], 'utilization_percentage' => $capacity['utilization_percentage'],
+                ])->values();
             })->all();
-        return [['name', 'code', 'status', 'used', 'free', 'total', 'utilization_percentage'], $rows, ['warehouses' => count($rows), 'capacity' => array_sum(array_filter(array_column($rows, 'total'), fn ($value) => $value !== null))]];
+        return [['name', 'code', 'status', 'unit', 'allocated', 'used', 'free', 'total', 'utilization_percentage'], $rows,
+            ['warehouses' => count(array_unique(array_column($rows, 'code'))), 'capacity' => collect($rows)->unique('code')->sum('total')]];
     }
 
     private function damageReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
@@ -505,7 +530,8 @@ class ReportsController extends Controller
         $warehouse = ($user->warehouse_id ? Warehouse::query()->find($user->warehouse_id) : null)
             ?? Warehouse::query()->where('code', 'WH-MAIN')->first();
         if (! $warehouse) {
-            return ['used' => 0, 'free' => null, 'total' => null, 'utilization_percentage' => null];
+            return ['used' => null, 'free' => null, 'total' => null, 'utilization_percentage' => null, 'capacity' => null,
+                'allocation_configured' => false, 'allocated_total' => 0, 'unit_capacity' => [], 'unsupported_unit_usage' => []];
         }
         $snapshot = WarehouseCapacity::snapshot($warehouse);
 
@@ -514,6 +540,7 @@ class ReportsController extends Controller
             'free' => $snapshot['available'],
             'total' => $snapshot['capacity'],
             'utilization_percentage' => $snapshot['utilization_percentage'],
+            ...$snapshot,
         ];
     }
 

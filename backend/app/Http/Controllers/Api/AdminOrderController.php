@@ -76,6 +76,7 @@ class AdminOrderController extends Controller
         $this->authorize('viewAny', Order::class);
 
         return response()->json(Product::query()
+            ->where('item_classification', Product::FINISHED_PRODUCT)
             ->orderBy('name')
             ->get(['id', 'name', 'category', 'unit', 'cost_price']));
     }
@@ -99,7 +100,7 @@ class AdminOrderController extends Controller
             'order_date' => ['required', 'date'],
             'required_delivery_date' => ['required', 'date', 'after_or_equal:order_date'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('products', 'id')->where('item_classification', Product::FINISHED_PRODUCT)],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
@@ -110,7 +111,11 @@ class AdminOrderController extends Controller
 
         $order = DB::transaction(function () use ($validated, $request) {
             $items = collect($validated['items'])->map(function (array $item, int $index) {
-                $product = Product::query()->findOrFail($item['product_id']);
+                $product = Product::query()->lockForUpdate()->findOrFail($item['product_id']);
+                if ($product->item_classification !== Product::FINISHED_PRODUCT) throw ValidationException::withMessages(['items' => 'Raw materials cannot be customer order items.']);
+                if (filled($item['unit'] ?? null) && \App\Support\WarehouseCapacity::normalizeUnit($item['unit']) !== \App\Support\WarehouseCapacity::normalizeUnit($product->unit)) {
+                    throw ValidationException::withMessages(["items.{$index}.unit" => 'Order unit must match the selected catalog Stock Unit.']);
+                }
                 $item['product_name'] = $product->name;
                 $item['unit'] = ($item['unit'] ?? null) ?: $product->unit;
                 if (!filled($item['unit'])) {

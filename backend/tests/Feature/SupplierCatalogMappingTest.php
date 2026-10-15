@@ -38,7 +38,7 @@ class SupplierCatalogMappingTest extends TestCase
         $adminRole = Role::create(['name' => 'Admin', 'slug' => 'ADMIN']);
         $managerRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'status' => 'Active']);
+        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'status' => 'Active', 'capacity' => 10000, 'capacity_kg' => 4000, 'capacity_pcs' => 3000, 'capacity_l' => 3000]);
         $this->admin = User::factory()->create(['role_id' => $adminRole->id, 'status' => 'ACTIVE']);
         $this->manager = User::factory()->create(['role_id' => $managerRole->id, 'status' => 'ACTIVE', 'warehouse_id' => $this->warehouse->id]);
     }
@@ -225,18 +225,18 @@ class SupplierCatalogMappingTest extends TestCase
         $offering = $this->approvedOffering('MegaFlow MP');
         Product::create(['name' => 'megaflow  mp']);
         $this->actingAs($this->admin)->postJson("/api/admin/catalog-mapping/offerings/{$offering->id}/create-product", [
-            'name' => 'MegaFlow MP', 'warehouse_id' => $this->warehouse->id,
+            'name' => 'MegaFlow MP', 'unit' => 'PCS', 'warehouse_id' => $this->warehouse->id,
         ])->assertUnprocessable()->assertJsonValidationErrors('name');
 
         $inactive = $this->approvedOffering('Inactive Supplier Product', Supplier::STATUS_ON_HOLD);
         $this->postJson("/api/admin/catalog-mapping/offerings/{$inactive->id}/create-product", [
-            'name' => 'Inactive Supplier Product', 'warehouse_id' => $this->warehouse->id,
+            'name' => 'Inactive Supplier Product', 'unit' => 'PCS', 'warehouse_id' => $this->warehouse->id,
         ])->assertUnprocessable()->assertJsonValidationErrors('offering');
 
         $inactiveWarehouse = Warehouse::create(['name' => 'Old Warehouse', 'code' => 'WH-OLD', 'branch_id' => $this->warehouse->branch_id, 'status' => 'Inactive']);
         $other = $this->approvedOffering('Brand New Product');
         $this->postJson("/api/admin/catalog-mapping/offerings/{$other->id}/create-product", [
-            'name' => 'Brand New Product', 'warehouse_id' => $inactiveWarehouse->id,
+            'name' => 'Brand New Product', 'unit' => 'PCS', 'warehouse_id' => $inactiveWarehouse->id,
         ])->assertUnprocessable()->assertJsonValidationErrors('warehouse_id');
 
         $this->assertDatabaseCount('products', 1);
@@ -246,12 +246,12 @@ class SupplierCatalogMappingTest extends TestCase
     }
 
     // TEST 7
-    public function test_unit_defaults_to_pcs_and_rejects_other_units(): void
+    public function test_stock_unit_is_required_and_rejects_unknown_units(): void
     {
         $supplier = Supplier::create(['supplier_code' => 'SUP-UNIT', 'name' => 'Unit Supplier', 'status' => 'ACTIVE']);
-        $this->actingAs($this->admin)->postJson('/api/admin/products', ['name' => 'Default Unit', 'supplier_id' => $supplier->id, 'warehouse_id' => $this->warehouse->id])
+        $this->actingAs($this->admin)->postJson('/api/admin/products', ['name' => 'Default Unit', 'unit' => 'PCS', 'supplier_id' => $supplier->id, 'warehouse_id' => $this->warehouse->id])
             ->assertCreated()->assertJsonPath('unit', 'PCS');
-        $this->postJson('/api/admin/products', ['name' => 'Kg Unit', 'unit' => 'kg'])
+        $this->postJson('/api/admin/products', ['name' => 'Unknown Unit', 'unit' => 'BAG'])
             ->assertUnprocessable()->assertJsonValidationErrors('unit');
     }
 

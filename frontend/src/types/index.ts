@@ -105,6 +105,7 @@ export interface ApiAuditLog {
 }
 
 export interface ApiInventoryItem {
+  item_classification?: 'RAW_MATERIAL' | 'FINISHED_PRODUCT';
   id: number;
   barcode: string;
   product: string;
@@ -136,6 +137,7 @@ export interface ApiInventoryMovement {
 }
 
 export interface ApiReceivingItem {
+  item_classification?: 'RAW_MATERIAL' | 'FINISHED_PRODUCT' | null;
   id: number;
   product_id: number;
   product_name: string;

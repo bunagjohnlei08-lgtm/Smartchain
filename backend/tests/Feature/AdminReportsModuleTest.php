@@ -51,8 +51,8 @@ class AdminReportsModuleTest extends TestCase
     {
         parent::setUp();
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $this->main = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 100, 'status' => 'Active']);
-        $this->second = Warehouse::create(['name' => 'North Warehouse', 'code' => 'WH-NORTH', 'branch_id' => $branch->id, 'capacity' => 20, 'status' => 'Active']);
+        $this->main = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 100, 'capacity_kg' => 80, 'capacity_pcs' => 0, 'capacity_l' => 20, 'status' => 'Active']);
+        $this->second = Warehouse::create(['name' => 'North Warehouse', 'code' => 'WH-NORTH', 'branch_id' => $branch->id, 'capacity' => 20, 'capacity_kg' => 20, 'capacity_pcs' => 0, 'capacity_l' => 0, 'status' => 'Active']);
         $this->admin = $this->user('ADMIN');
         $this->manager = $this->user('PLANT_MANAGER', ['warehouse_id' => $this->main->id]);
         $this->qa = $this->user('QA_SUPERVISOR');
@@ -535,23 +535,27 @@ class AdminReportsModuleTest extends TestCase
     public function test_warehouse_capacity_report_uses_the_shared_capacity_service(): void
     {
         Inventory::query()->where('barcode', 'INV-OUT')->update(['available_stock' => 19]);
-        $rows = collect($this->rows('warehouse.capacity'))->keyBy('code');
-
+        $rows = collect($this->rows('warehouse.capacity'))->keyBy(fn ($row) => $row['code'].'-'.$row['unit']);
         foreach ([$this->main, $this->second] as $warehouse) {
             $snapshot = WarehouseCapacity::snapshot($warehouse->fresh());
-            $this->assertSame($snapshot['utilized'], $rows[$warehouse->code]['used']);
-            $this->assertSame($snapshot['available'], $rows[$warehouse->code]['available_capacity']);
-            $this->assertEquals($snapshot['utilization_percentage'], $rows[$warehouse->code]['utilization']);
-            $this->assertSame(strtoupper($snapshot['capacity_state']), $rows[$warehouse->code]['alert_level']);
+            foreach (WarehouseCapacity::UNITS as $unit) {
+                $row = $rows[$warehouse->code.'-'.$unit];
+                $this->assertSame($snapshot['unit_capacity'][$unit]['used'], $row['used']);
+                $this->assertSame($snapshot['unit_capacity'][$unit]['remaining'], $row['available_capacity']);
+                $this->assertSame($snapshot['unit_capacity'][$unit]['allocated'], $row['allocated']);
+                $this->assertEquals($snapshot['unit_capacity'][$unit]['utilization_percentage'], $row['utilization']);
+            }
         }
-        $this->assertSame(59, $rows['WH-MAIN']['used']);
-        $this->assertSame('WARNING', $rows['WH-NORTH']['alert_level']);
+        $this->assertSame(55, $rows['WH-MAIN-KG']['used']);
+        $this->assertSame(4, $rows['WH-MAIN-L']['used']);
+        $this->assertSame('WARNING', $rows['WH-NORTH-KG']['alert_level']);
         $this->assertSame(['WH-NORTH'], array_column($this->rows('warehouse.capacity_alerts'), 'code'));
-
         $this->actingAs($this->admin)->getJson('/api/admin/reports/dashboard')->assertOk()
             ->assertJsonPath('warehouse_capacity_overview.0.code', 'WH-MAIN')
-            ->assertJsonPath('warehouse_capacity_overview.0.used', 59)
-            ->assertJsonPath('metrics.warehouse_capacity.used', 78)
+            ->assertJsonPath('warehouse_capacity_overview.0.unit_capacity.KG.used', 55)
+            ->assertJsonPath('warehouse_capacity_overview.0.unit_capacity.L.used', 4)
+            ->assertJsonPath('metrics.warehouse_capacity.used', null)
+            ->assertJsonPath('metrics.warehouse_capacity.allocated_total', 120)
             ->assertJsonPath('metrics.warehouse_capacity.total', 120);
     }
 
