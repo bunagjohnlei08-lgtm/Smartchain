@@ -290,8 +290,6 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
     itemsComplete: false,
   });
 
-  if (!shipment) return null;
-
   // Initialize state when shipment changes
   React.useEffect(() => {
     if (shipment) {
@@ -310,6 +308,8 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
       });
     }
   }, [shipment]);
+
+  if (!shipment) return null;
 
   const checklistComplete = Object.values(checklist).every(v => v === true);
   const boxes = Number(packing.boxes);
