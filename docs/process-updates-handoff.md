@@ -8,17 +8,19 @@ This contribution includes all existing application edits requested by the owner
 
 The existing supplier replenishment/approval/PO/receiving/incoming-QA/stock-in flow remains the procurement path for both product classes. Production does not complete supplier requests. Whole-unit inventory and existing barcodes remain authoritative; fractional material demand blocks issuance rather than rounding. Internal HOLD/REWORK/DISPOSAL is separate from supplier Backload.
 
-## Validation during contribution preparation
+## Validation during contribution preparation and PR readiness review
 
-- 176 focused process tests passed, 2,120 assertions, on isolated PostgreSQL `smartchain_test_db` at port 55432.
-- Full backend suite: 714 tests, 712 passed, 6,313 assertions. Two exceptions match existing baseline logs: `AuditLogTest::test_user_update_role_change_and_status_changes_are_audited` uses a password fixture without a required symbol; `InventoryQualityAuditTest::test_admin_can_change_configured_months` uses unsupported PostgreSQL JSON equality.
+- The readiness review recovered the dedicated PostgreSQL `smartchain_test_db` on local port 5432 and verified `current_database()` before every destructive test migration. The development database remained `smartchain_db` and was not migrated or reset.
+- A broader focused run of all 22 changed feature-test files passed: 272 tests, 3,054 assertions, at revision `f0b0462a99e0c8d0ed7e60819012a6d0d07bd2e5`.
+- Equivalent full-suite comparison used PHP 8.5.9, direct PHPUnit, a 512 MB test-process memory limit, and forced array mail/cache plus the same PostgreSQL test database. Base `993905329186fb5477a8d6b272bf3fc198d95401`: 645 tests, 643 passed, 5,320 assertions. Contribution `f0b0462a99e0c8d0ed7e60819012a6d0d07bd2e5`: 714 tests, 712 passed, 6,313 assertions.
+- Both revisions have exactly the same two exceptions: `AuditLogTest::test_user_update_role_change_and_status_changes_are_audited` uses a password fixture without a required symbol; `InventoryQualityAuditTest::test_admin_can_change_configured_months` asks PostgreSQL to compare a `json` column with an uncast value. The contribution does not introduce or alter either test file.
 - Frontend TypeScript/Vite production build passed; large-chunk warning remains.
-- Global frontend lint fails at `plant-manager/Shipment.tsx:296` because a hook is conditional; four existing warnings remain. The Shipment diff only changes page spacing/imports.
+- Global frontend lint now passes after separate commit `f0b0462` moved the existing Shipment modal null return below its guarded effect, preserving behavior while keeping hook order stable. Four existing warnings remain.
 - PHP syntax passed for all 66 staged PHP files. Composer production platform requirements passed.
 - Eleven production routes were listed successfully; all four new migrations are recorded as applied in the local application database. No application migration was executed during contribution preparation.
 - Applied the repository-local Open Code Review checklist and focused staged-diff review, including authorization, transactions, snapshots, stock/QA arithmetic, provider submission semantics and shared layout changes. External OCR CLI is unavailable.
 - Staged whitespace check and credential/path scan passed. No dependency manifest or lockfile changes were required. No secrets, databases, private uploads, or generated Python caches are included.
-- No browser flow or live email was rerun for this contribution. Earlier fixture browser evidence is described in the implementation reports; it is not a new production verification.
+- No controllable browser was connected during the readiness review, so browser UI smoke remains unresolved. Local HTTP smoke against the merge candidate used only `smartchain_test_db` and a localhost SMTP catcher: a fresh OTP was submitted locally in 1.443 seconds and successfully verified in 2.140 seconds, within the unchanged five-minute expiry. This proves the local application submission/verification path only; it is not live-provider delivery evidence.
 
 ## Developer setup
 
@@ -31,8 +33,8 @@ The existing supplier replenishment/approval/PO/receiving/incoming-QA/stock-in f
 
 ## Remaining deployment verification
 
-Timely live OTP delivery remains unresolved: the existing report records eventual receipt after approximately 46 minutes, beyond the five-minute OTP lifetime. The Brevo account owner must investigate and verify a fresh login before expiry. Supplier invitation tracking redirects also require account/network verification; the template provides a direct copy/paste fallback. No provider setting or support message was changed/sent during this contribution.
+Timely live OTP delivery remains unresolved: the existing report records eventual receipt after approximately 46 minutes, beyond the five-minute OTP lifetime. The Brevo account owner must use an explicitly approved test inbox, compare application submission, provider acceptance/delivery events and mailbox arrival timestamps, and verify a fresh login before expiry. Supplier invitation tracking redirects also require account/network verification against the configured deployment URLs; the template provides a direct copy/paste fallback. No external provider setting or support message was changed/sent during this contribution or readiness review.
 
-Use a draft PR until the lint/test exceptions are assessed and required live validation is completed. Existing detailed implementation reports contain historical local counts and links into ignored `.codex` artifacts; those artifacts are local evidence and are not part of the Git contribution.
+Keep the PR draft until browser smoke, timely live-provider OTP delivery, and supplier tracking redirects are verified. The two backend exceptions are confirmed baseline issues, and the Shipment lint blocker is resolved. Existing detailed implementation reports contain historical local counts and links into ignored `.codex` artifacts; those artifacts are local evidence and are not part of the Git contribution.
 
 Local environment files, real database records, provider credentials, private attachments, dependencies/build output, ignored `.codex` verification artifacts, and two modified tracked `.claude` Python cache files remain only on the original device.
