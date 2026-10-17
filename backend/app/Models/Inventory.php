@@ -17,8 +17,10 @@ class Inventory extends Model
         'available_stock',
         'reserved_stock',
         'backload',
+        'returned_stock',
         'status',
         'pending_receiving',
+        'catalog_setup_at',
     ];
 
     protected function casts(): array
@@ -27,7 +29,10 @@ class Inventory extends Model
             'available_stock' => 'integer',
             'reserved_stock' => 'integer',
             'backload' => 'integer',
+            'returned_stock' => 'integer',
             'pending_receiving' => 'boolean',
+            'catalog_setup_at' => 'datetime',
+            'has_stock_history' => 'boolean',
         ];
     }
 

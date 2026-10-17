@@ -10,6 +10,7 @@ use App\Models\ReceivingItem;
 use App\Models\StockOutTransaction;
 use App\Models\Supplier;
 use App\Models\Warehouse;
+use App\Support\WarehouseCapacity;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -100,17 +101,13 @@ class DashboardController extends Controller
 
         $warehouse = Warehouse::query()->where('code', 'WH-MAIN')->first()
             ?? Warehouse::query()->orderBy('id')->first();
-        $warehouseUtilized = $warehouse === null ? null : (int) $warehouse->inventories()
-            ->selectRaw('COALESCE(SUM(available_stock + reserved_stock), 0) AS aggregate')
-            ->value('aggregate');
-        $warehouseUtilization = $warehouse?->capacity && $warehouse->capacity > 0
-            ? round(min(100, $warehouseUtilized / $warehouse->capacity * 100), 1)
-            : null;
+        $warehouseCapacity = $warehouse ? WarehouseCapacity::snapshot($warehouse) : null;
 
         return response()->json([
             'data' => [
                 'metrics' => [
-                    'warehouse_utilization' => $warehouseUtilization,
+                    'warehouse_utilization' => null,
+                    'warehouse_capacity' => $warehouseCapacity,
                     'warehouse_name' => $warehouse?->name,
                     'open_purchase_orders' => PurchaseOrder::query()->whereNotIn('status', ['Completed', 'Cancelled'])->count(),
                     'shipments_in_transit' => Order::query()->where('status', 'IN_TRANSIT')->count(),

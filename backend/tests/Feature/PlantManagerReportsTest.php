@@ -44,7 +44,7 @@ class PlantManagerReportsTest extends TestCase
         // 2026-09-26 10:00 in Manila.
         $this->travelTo(Carbon::parse('2026-09-26 02:00:00', 'UTC'));
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $this->main = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 1000, 'status' => 'Active']);
+        $this->main = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 1000, 'capacity_kg' => 1000, 'capacity_pcs' => 0, 'capacity_l' => 0, 'status' => 'Active']);
         $this->admin = $this->user('ADMIN');
         $this->manager = $this->user('PLANT_MANAGER', ['warehouse_id' => $this->main->id]);
         $this->product = Product::create(['name' => 'Resin', 'unit' => 'kg', 'cost_price' => 10, 'reorder_level' => 5]);
@@ -232,7 +232,8 @@ class PlantManagerReportsTest extends TestCase
         $warehouse = $this->actingAs($this->manager)->getJson('/api/plant-manager/warehouse')->assertOk();
         $report = $this->dashboard()->assertOk();
 
-        $this->assertSame(35, $warehouse->json('utilization_percentage'));
+        $this->assertSame(35, $warehouse->json('unit_capacity.KG.utilization_percentage'));
+        $this->assertNull($warehouse->json('utilization_percentage'));
         $report->assertJsonPath('kpis.warehouse_utilization.value', $warehouse->json('utilization_percentage'))
             ->assertJsonPath('warehouse_capacity.used', $warehouse->json('utilized'))
             ->assertJsonPath('warehouse_capacity.free', $warehouse->json('available'))
@@ -241,8 +242,8 @@ class PlantManagerReportsTest extends TestCase
 
         // Date filters never alter current capacity.
         $this->dashboard(['from' => '2026-01-01', 'to' => '2026-01-31'])->assertOk()
-            ->assertJsonPath('warehouse_capacity.used', 350)
-            ->assertJsonPath('kpis.warehouse_utilization.value', 35);
+            ->assertJsonPath('warehouse_capacity.unit_capacity.KG.used', 350)
+            ->assertJsonPath('warehouse_capacity.unit_capacity.KG.utilization_percentage', 35);
     }
 
     public function test_inventory_status_uses_current_stock_buckets_and_ignores_dates(): void

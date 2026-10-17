@@ -129,7 +129,7 @@ class PlantManagerOrderController extends Controller
             }
             if ($to === 'READY_FOR_STOCK_OUT') {
                 $record->load('items.product');
-                $invalidItem = $record->items->first(fn ($item) => !$item->product_id || !$item->product);
+                $invalidItem = $record->items->first(fn ($item) => !$item->product_id || !$item->product || $item->product->item_classification !== \App\Models\Product::FINISHED_PRODUCT);
                 if ($invalidItem) {
                     throw ValidationException::withMessages([
                         'items' => "Order item {$invalidItem->id} does not have a valid product reference.",

@@ -29,6 +29,11 @@ import AdminProfile from '../page/admin/Profile';
 import AdminNotifications from '../page/admin/Notifications';
 import AdminRejectedItems from '../page/admin/RejectedItems';
 import AdminInventoryAuditApprovals from '../page/admin/InventoryAuditApprovals';
+import AdminBoms from '../page/admin/FormulaTablePage';
+import ProductionRolePage from '../page/production/ProductionRolePage';
+import PlantManagerProductionList from '../page/production/PlantManagerProductionList';
+import PlantManagerProductionCreate from '../page/production/PlantManagerProductionCreate';
+import PlantManagerProductionDetail from '../page/production/PlantManagerProductionDetail';
 
 import PlantManagerDashboard from '../page/plant-manager/Dashboard';
 import PlantManagerProcurement from '../page/plant-manager/Procurement';
@@ -77,6 +82,8 @@ const router = createBrowserRouter([
       { path: 'inventory', element: <AdminInventory /> },
       { path: 'inventory-audit-approvals', element: <AdminInventoryAuditApprovals /> },
       { path: 'manage-locations', element: <AdminManageLocations /> },
+      { path: 'boms', element: <AdminBoms /> },
+      { path: 'production', element: <ProductionRolePage role="admin" /> },
       { path: 'procurement', element: <AdminProcurement /> },
       { path: 'barcode-center', element: <AdminBarcodeCenter /> },
       { path: 'purchase-orders', element: <AdminPurchaseOrders /> },
@@ -100,6 +107,9 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <PlantManagerDashboard /> },
       { path: 'procurement', element: <PlantManagerProcurement /> },
       { path: 'warehouse', element: <PlantManagerWarehouse /> },
+      { path: 'production', element: <PlantManagerProductionList /> },
+      { path: 'production/create', element: <PlantManagerProductionCreate /> },
+      { path: 'production/:batchId', element: <PlantManagerProductionDetail /> },
       { path: 'inventory', element: <PlantManagerInventory /> },
       { path: 'stock-in', element: <PlantManagerStockIn /> },
       { path: 'stock-out', element: <PlantManagerStockOut /> },
@@ -120,6 +130,7 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/qa/dashboard" replace /> },
       { path: 'dashboard', element: <QADashboard /> },
       { path: 'inspection', element: <QAInspection /> },
+      { path: 'production', element: <ProductionRolePage role="qa" /> },
       { path: 'rejected-items', element: <QARejectedItems /> },
       { path: 'history', element: <QAInspectionHistory /> },
       { path: 'inventory-audit', element: <QAInventoryQualityAudit /> },

@@ -1,10 +1,12 @@
+import { ClassificationSelect, StockUnitSelect } from '../../components/catalog/ProductFields';
+import { unitForWarehouseChange } from '../../lib/catalog';
+import type { Classification, CatalogWarehouse } from '../../lib/catalog';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link2, PackagePlus, Search, X } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 
 type Supplier = { id: number; code: string; name: string; status: string; is_active: boolean };
 type Offering = { id: number; name: string; category: string | null; description: string | null; application_number: string | null; supplier: Supplier | null; suggested_product: { id: number; name: string; category: string | null } | null };
-type Option = { id: number; name: string };
 type ProductMatch = { id: number; name: string; category: string | null };
 type Action = { kind: 'link' | 'create'; offering: Offering };
 
@@ -16,7 +18,7 @@ const inputClass = 'h-11 w-full rounded-xl border border-slate-300 bg-white px-3
 const readOnlyClass = 'flex h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300';
 
 /** Admin review of approved suppliers' product offerings awaiting Product Catalog mapping. */
-export default function CatalogMappingPanel({ warehouses, onMapped }: { warehouses: Option[]; onMapped: () => void }) {
+export default function CatalogMappingPanel({ warehouses, onMapped }: { warehouses: CatalogWarehouse[]; onMapped: () => void }) {
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [error, setError] = useState('');
   const [action, setAction] = useState<Action | null>(null);
@@ -55,7 +57,7 @@ export default function CatalogMappingPanel({ warehouses, onMapped }: { warehous
   </section>;
 }
 
-function MappingDialog({ action, warehouses, onClose, onDone }: { action: Action; warehouses: Option[]; onClose: () => void; onDone: () => void }) {
+function MappingDialog({ action, warehouses, onClose, onDone }: { action: Action; warehouses: CatalogWarehouse[]; onClose: () => void; onDone: () => void }) {
   const { offering } = action;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -63,7 +65,9 @@ function MappingDialog({ action, warehouses, onClose, onDone }: { action: Action
   const [matches, setMatches] = useState<ProductMatch[]>([]);
   const [productId, setProductId] = useState<number | null>(offering.suggested_product?.id ?? null);
   const [makePrimary, setMakePrimary] = useState(false);
-  const [form, setForm] = useState({ name: offering.name, category: offering.category ?? '', brand: '', warehouse_id: warehouses.length === 1 ? String(warehouses[0].id) : '' });
+  const [form, setForm] = useState({ name: offering.name, category: offering.category ?? '', brand: '', warehouse_id: warehouses.length === 1 ? String(warehouses[0].id) : '', unit: warehouses.length === 1 && warehouses[0].supported_units.includes('PCS') ? 'PCS' : '', item_classification: 'FINISHED_PRODUCT' as Classification });
+  const selectedWarehouse = warehouses.find(warehouse => String(warehouse.id) === form.warehouse_id);
+  const changeWarehouse = (id: string) => { const next = warehouses.find(warehouse => String(warehouse.id) === id); setForm(old => ({...old, warehouse_id: id, unit: unitForWarehouseChange(old.unit, old.warehouse_id, next)})); };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
@@ -89,7 +93,7 @@ function MappingDialog({ action, warehouses, onClose, onDone }: { action: Action
       if (action.kind === 'link') {
         await apiClient.post(`/admin/catalog-mapping/offerings/${offering.id}/link`, { product_id: productId, make_primary: makePrimary });
       } else {
-        await apiClient.post(`/admin/catalog-mapping/offerings/${offering.id}/create-product`, { ...form, warehouse_id: Number(form.warehouse_id), unit: 'PCS' });
+        await apiClient.post(`/admin/catalog-mapping/offerings/${offering.id}/create-product`, { ...form, warehouse_id: Number(form.warehouse_id) });
       }
       onDone();
     } catch (cause) {
@@ -115,12 +119,12 @@ function MappingDialog({ action, warehouses, onClose, onDone }: { action: Action
             <label className="block text-sm"><span className="mb-1.5 block text-slate-600 dark:text-slate-400">Category</span><input maxLength={255} value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} className={inputClass} /></label>
             <label className="block text-sm"><span className="mb-1.5 block text-slate-600 dark:text-slate-400">Brand</span><input maxLength={255} value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} className={inputClass} /></label>
             <div className="text-sm"><span className="mb-1.5 block text-slate-600 dark:text-slate-400">Primary Supplier</span><span className={readOnlyClass}>{offering.supplier?.name}</span></div>
-            <div className="text-sm"><span className="mb-1.5 block text-slate-600 dark:text-slate-400">Unit</span><span className={readOnlyClass}>PCS</span></div>
-            <label className="block text-sm sm:col-span-2"><span className="mb-1.5 block text-slate-600 dark:text-slate-400">Warehouse *</span><select required value={form.warehouse_id} onChange={(event) => setForm({ ...form, warehouse_id: event.target.value })} className={inputClass}><option value="">Select warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select></label>
-            <p className="text-xs text-slate-600 dark:text-slate-400 sm:col-span-2">An empty inventory record (0 PCS) is created, so the product appears in Plant Manager Replenishment Planning as Critical. No replenishment request is created automatically.</p>
+            <ClassificationSelect value={form.item_classification} onChange={value => setForm({...form, item_classification: value as Classification})}/><StockUnitSelect value={form.unit} units={selectedWarehouse?.supported_units ?? []} onChange={unit => setForm({...form, unit})}/>
+            <label className="block text-sm sm:col-span-2"><span className="mb-1.5 block text-slate-600 dark:text-slate-400">Warehouse *</span><select required value={form.warehouse_id} onChange={(event) => changeWarehouse(event.target.value)} className={inputClass}><option value="">Select warehouse</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select></label>
+            <p className="text-xs text-slate-600 dark:text-slate-400 sm:col-span-2">An empty inventory record (0 {form.unit || "selected units"}) is created, so the product appears in Plant Manager Replenishment Planning as Critical. No replenishment request is created automatically.</p>
           </div>}
         </div>
-        <div className="mt-4 flex shrink-0 justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-800"><button type="button" onClick={onClose} className="h-11 cursor-pointer rounded-xl px-4 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</button><button disabled={saving || (action.kind === 'link' && productId === null)} className="h-11 cursor-pointer rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400">{saving ? 'Saving…' : action.kind === 'link' ? 'Link Product' : 'Create Product'}</button></div>
+        <div className="mt-4 flex shrink-0 justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-800"><button type="button" onClick={onClose} className="h-11 cursor-pointer rounded-xl px-4 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</button><button disabled={saving || (action.kind === 'link' && productId === null) || (action.kind === 'create' && !form.unit)} className="h-11 cursor-pointer rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400">{saving ? 'Saving…' : action.kind === 'link' ? 'Link Product' : 'Create Product'}</button></div>
       </form>
     </div>
   </div>;

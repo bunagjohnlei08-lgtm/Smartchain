@@ -144,6 +144,8 @@ class StockInController extends Controller
                     'stockable_quantity' => $this->resolveStockableQuantity($item),
                     'stocked_quantity' => $item->stocked_in_at ? $this->resolveStockedQuantity($item) : 0,
                     'unit' => $item->unit,
+                    'capacity_unit' => WarehouseCapacity::normalizeUnit($item->product?->unit),
+                    'item_classification' => $item->product?->item_classification,
                     'inspection_status' => $item->inspection_status,
                     'warehouse' => $item->warehouse?->name,
                     'stocked_in_at' => $item->stocked_in_at,
@@ -159,6 +161,14 @@ class StockInController extends Controller
             'created_at' => $receiving->created_at,
             'updated_at' => $receiving->updated_at,
         ];
+    }
+
+    public function capacity(Request $request)
+    {
+        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+        $warehouse = $this->resolveDefaultWarehouse();
+        abort_unless($warehouse, 404, 'No warehouse is configured to receive stock.');
+        return response()->json(['name' => $warehouse->name, ...WarehouseCapacity::snapshot($warehouse)]);
     }
 
     public function index(Request $request)
@@ -215,7 +225,7 @@ class StockInController extends Controller
         try {
             $receiving = DB::transaction(function () use ($id, $request) {
                 $receiving = Receiving::query()
-                    ->with(['items.qaInspectionItem.inspection'])
+                    ->with(['items.qaInspectionItem.inspection', 'items.product'])
                     ->lockForUpdate()
                     ->findOrFail($id);
 
@@ -235,23 +245,12 @@ class StockInController extends Controller
                 // including the case where the product row does not exist yet.
                 $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($warehouse->id);
 
-                $incomingQuantity = (int) $eligibleItems->sum(
-                    fn (ReceivingItem $item) => $this->resolveStockableQuantity($item)
-                );
-                $utilizedCapacity = (int) Inventory::query()
-                    ->where('warehouse_id', $warehouse->id)
-                    ->sum(DB::raw('available_stock + reserved_stock'));
-                $availableCapacity = $warehouse->capacity === null
-                    ? null
-                    : max(0, (int) $warehouse->capacity - $utilizedCapacity);
-
-                if ($availableCapacity !== null && $incomingQuantity > $availableCapacity) {
-                    throw new HttpResponseException(response()->json([
-                        'message' => 'Cannot stock in: Quantity exceeds maximum warehouse capacity.',
-                        'available_capacity' => $availableCapacity,
-                        'requested_quantity' => $incomingQuantity,
-                    ], 422));
+                $additions = [];
+                foreach ($eligibleItems as $item) {
+                    $unit = WarehouseCapacity::normalizeUnit($item->product?->unit);
+                    $additions[$unit] = ($additions[$unit] ?? 0) + $this->resolveStockableQuantity($item);
                 }
+                WarehouseCapacity::ensureAdditionsFit($warehouse, $additions);
 
                 foreach ($eligibleItems as $item) {
                     $stockQuantity = $this->resolveStockableQuantity($item);

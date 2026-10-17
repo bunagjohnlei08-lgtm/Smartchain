@@ -106,6 +106,10 @@ const chartData: ChartDataPoint[] = [
   { month: 'Jan', predicted: 6800, upperBound: 7500, lowerBound: 6100 },
 ];
 
+// Forecast persistence is not implemented yet; do not surface bundled sample records as business data.
+const visibleForecastTableData = forecastTableData.slice(0, 0);
+const visibleForecastChartData = chartData.slice(0, 0);
+
 // ============================================
 // HELPER COMPONENTS
 // ============================================
@@ -163,7 +167,7 @@ const Forecast: React.FC = () => {
 
   // Filter and sort table data
   const filteredData = useMemo(() => {
-    let result = forecastTableData.filter(
+    let result = visibleForecastTableData.filter(
       (item) =>
         item.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.sku.toLowerCase().includes(searchQuery.toLowerCase())
@@ -248,7 +252,7 @@ const Forecast: React.FC = () => {
         </div>
         <ResponsiveContainer width="100%" height={320}>
           <AreaChart
-            data={chartData}
+            data={visibleForecastChartData}
             margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
           >
             <defs>
@@ -420,7 +424,7 @@ const Forecast: React.FC = () => {
               {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                    No forecast data found matching your search.
+                    No forecast data available. Add transaction history and generate a new forecast.
                   </td>
                 </tr>
               )}
@@ -433,7 +437,7 @@ const Forecast: React.FC = () => {
           <div className="text-sm text-slate-400">
             Showing <span className="text-white font-medium">1</span> to{' '}
             <span className="text-white font-medium">{filteredData.length}</span> of{' '}
-            <span className="text-white font-medium">{forecastTableData.length}</span> products
+            <span className="text-white font-medium">{visibleForecastTableData.length}</span> products
           </div>
           <div className="flex items-center gap-1">
             <button className="p-1.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed">

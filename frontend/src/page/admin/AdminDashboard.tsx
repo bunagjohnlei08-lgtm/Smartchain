@@ -1,3 +1,4 @@
+import type { CapacitySnapshot } from '../../lib/warehouseCapacity';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
@@ -30,7 +31,7 @@ import {
 } from 'recharts';
 
 interface DashboardData {
-  metrics: { warehouse_utilization: number | null; warehouse_name: string | null; open_purchase_orders: number; shipments_in_transit: number; low_stock_items: number; low_stock_threshold: number; stock_in: number; stock_out: number; orders: number; active_suppliers: number };
+  metrics: { warehouse_capacity: CapacitySnapshot | null; warehouse_utilization: number | null; warehouse_name: string | null; open_purchase_orders: number; shipments_in_transit: number; low_stock_items: number; low_stock_threshold: number; stock_in: number; stock_out: number; orders: number; active_suppliers: number };
   recent_purchase_orders: Array<{ id: number; po_number: string; supplier_name: string; total_amount: number; status: string }>;
   inventory_status: Array<{ id: number; product: string; category: string; stock: number; status: string }>;
   inventory_movement: Array<{ date: string; day: string; stock_in: number; stock_out: number }>;
@@ -38,7 +39,7 @@ interface DashboardData {
 }
 
 const emptyDashboard: DashboardData = {
-  metrics: { warehouse_utilization: null, warehouse_name: null, open_purchase_orders: 0, shipments_in_transit: 0, low_stock_items: 0, low_stock_threshold: 20, stock_in: 0, stock_out: 0, orders: 0, active_suppliers: 0 },
+  metrics: { warehouse_capacity: null, warehouse_utilization: null, warehouse_name: null, open_purchase_orders: 0, shipments_in_transit: 0, low_stock_items: 0, low_stock_threshold: 20, stock_in: 0, stock_out: 0, orders: 0, active_suppliers: 0 },
   recent_purchase_orders: [], inventory_status: [], inventory_movement: [], ai_forecast: [],
 };
 
@@ -108,8 +109,20 @@ export default function AdminDashboard() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   }).format(new Date()), []);
 
+  const warehouseCapacity = dashboard.metrics.warehouse_capacity;
+  const capacityConfigured = !!warehouseCapacity?.allocation_configured && warehouseCapacity.capacity !== null && warehouseCapacity.capacity > 0;
+  const occupancyLabel = warehouseCapacity?.occupancy_percentage === null || warehouseCapacity?.occupancy_percentage === undefined
+    ? 'Occupancy unavailable'
+    : `${warehouseCapacity.occupancy_percentage.toLocaleString(undefined, { maximumFractionDigits: 2 })}% occupied`;
+  const capacityValue = loading ? '—' : error ? 'Unavailable' : capacityConfigured
+    ? `${warehouseCapacity.used_capacity.toLocaleString()} / ${warehouseCapacity.capacity!.toLocaleString()}`
+    : 'Capacity not configured';
+  const capacitySubtitle = loading ? 'Loading warehouse capacity' : error ? 'Unable to load warehouse capacity' : capacityConfigured
+    ? `${occupancyLabel} · ${warehouseCapacity.over_capacity ? `${Math.abs(warehouseCapacity.remaining_capacity!).toLocaleString()} over capacity` : `${warehouseCapacity.remaining_capacity!.toLocaleString()} available`} · ${dashboard.metrics.warehouse_name ?? 'Main Warehouse'}`
+    : `${dashboard.metrics.warehouse_name ?? 'Main Warehouse'} · storage-area setup required`;
+
   const topStats = [
-    { title: 'Warehouse Utilization', value: loading ? '—' : dashboard.metrics.warehouse_utilization === null ? 'N/A' : `${dashboard.metrics.warehouse_utilization}%`, subtitle: dashboard.metrics.warehouse_name ? `${dashboard.metrics.warehouse_name} capacity utilization` : loading ? 'Loading warehouse capacity' : 'Warehouse capacity not configured', subtitleColor: 'text-slate-500 dark:text-slate-400', icon: <Warehouse className="w-5 h-5 text-blue-600 dark:text-blue-400"/>, iconBg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { title: 'Warehouse Capacity Used', value: capacityValue, subtitle: capacitySubtitle, subtitleColor: warehouseCapacity?.over_capacity ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400', progress: capacityConfigured && warehouseCapacity.occupancy_percentage !== null ? Math.min(100, Math.max(0, warehouseCapacity.occupancy_percentage)) : null, icon: <Warehouse className="w-5 h-5 text-blue-600 dark:text-blue-400"/>, iconBg: 'bg-blue-50 dark:bg-blue-500/10' },
     { title: 'Open Purchase Orders', value: loading ? '—' : dashboard.metrics.open_purchase_orders.toLocaleString(), subtitle: 'Excludes completed/cancelled', subtitleColor: 'text-amber-600 dark:text-amber-400', icon: <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400"/>, iconBg: 'bg-amber-50 dark:bg-amber-500/10' },
     { title: 'Shipments In Transit', value: loading ? '—' : dashboard.metrics.shipments_in_transit.toLocaleString(), subtitle: 'Orders currently in transit', subtitleColor: 'text-emerald-600 dark:text-emerald-400', icon: <Truck className="w-5 h-5 text-emerald-600 dark:text-emerald-400"/>, iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' },
     { title: 'Low Stock Items', value: loading ? '—' : dashboard.metrics.low_stock_items.toLocaleString(), subtitle: `At or below ${dashboard.metrics.low_stock_threshold} units`, subtitleColor: 'text-rose-600 dark:text-rose-400', icon: <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400"/>, iconBg: 'bg-rose-50 dark:bg-rose-500/10' },
@@ -177,6 +190,7 @@ export default function AdminDashboard() {
               <div className={`admin-kpi-helper text-xs mt-1.5 font-medium ${stat.subtitleColor}`}>
                 {stat.subtitle}
               </div>
+              {stat.progress !== undefined && stat.progress !== null && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" role="progressbar" aria-label="Warehouse capacity occupied" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stat.progress}><div className={`h-full rounded-full ${warehouseCapacity?.over_capacity ? 'bg-rose-500' : 'bg-blue-500 dark:bg-blue-400'}`} style={{ width: `${stat.progress}%` }} /></div>}
             </div>
           </div>
         ))}

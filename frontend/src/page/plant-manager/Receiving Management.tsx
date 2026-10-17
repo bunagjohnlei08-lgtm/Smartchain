@@ -1,3 +1,4 @@
+import { ClassificationBadge } from '../../components/catalog/ProductFields';
 // src/page/plant-manager/ReceivingManagement.tsx
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { AxiosError } from 'axios';
@@ -1237,7 +1238,7 @@ const ReceivingManagement: React.FC = () => {
                     <tbody>
                       {selectedReceiving.items.map((item) => (
                         <tr key={item.id} className="border-b border-[#1f2937] hover:bg-slate-800/30">
-                          <td className="px-2 py-2 text-white">{item.product_name}</td>
+                          <td className="px-2 py-2 text-white">{item.product_name}{item.item_classification && <div className="mt-1"><ClassificationBadge value={item.item_classification}/></div>}</td>
                           <td className="px-2 py-2 text-center text-white">{selectedReceiving.replacement?.awaiting_delivery ? `0 / ${item.expected_quantity ?? 0}` : item.delivered_quantity}</td>
                           <td className="px-2 py-2 text-slate-300">{item.unit ?? '—'}</td>
                           <td className="px-2 py-2">

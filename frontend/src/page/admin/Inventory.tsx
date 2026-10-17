@@ -1,3 +1,5 @@
+import { ClassificationBadge, ClassificationSelect } from '../../components/catalog/ProductFields';
+import type { Classification } from '../../lib/catalog';
 // src/page/admin/Inventory.tsx
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
@@ -841,7 +843,7 @@ const InventoryGrid: React.FC<{
                 <Package className="w-7 h-7" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-white font-semibold text-base truncate">{item.product}</h3>
+                <h3 className="text-white font-semibold text-base truncate">{item.product} <ClassificationBadge value={item.item_classification ?? 'FINISHED_PRODUCT'}/></h3>
               </div>
             </div>
             <div className="mb-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#0b0f19]">
@@ -858,15 +860,15 @@ const InventoryGrid: React.FC<{
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
               <div className="bg-slate-800/30 rounded-xl p-2">
                 <p className="admin-inventory-grid-stock-label text-emerald-400 text-xs font-medium">Available</p>
-                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.available_stock}</p>
+                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.available_stock} {item.unit}</p>
               </div>
               <div className="bg-slate-800/30 rounded-xl p-2">
                 <p className="admin-inventory-grid-stock-label text-blue-400 text-xs font-medium">Reserved</p>
-                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.reserved_stock}</p>
+                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.reserved_stock} {item.unit}</p>
               </div>
               <div className="bg-slate-800/30 rounded-xl p-2">
                 <p className="admin-inventory-grid-stock-label text-red-400 text-xs font-medium">Backload</p>
-                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.backload}</p>
+                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.backload} {item.unit}</p>
               </div>
             </div>
 
@@ -994,6 +996,7 @@ export const InventoryList: React.FC = () => {
   // Filter/view state
   const [search, setSearch] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState('All Warehouses');
+  const [classification, setClassification] = useState<Classification | ''>('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [brandFilter, setBrandFilter] = useState('All Brands');
@@ -1156,6 +1159,7 @@ export const InventoryList: React.FC = () => {
   // Filter and sort
   const filteredItems = useMemo(() => {
     const list = items.filter(item => {
+      if (classification && (item.item_classification ?? 'FINISHED_PRODUCT') !== classification) return false;
       const searchLower = search.toLowerCase();
       const matchSearch =
         item.product.toLowerCase().includes(searchLower) ||
@@ -1196,7 +1200,7 @@ export const InventoryList: React.FC = () => {
         break;
     }
     return list;
-  }, [items, search, warehouseFilter, statusFilter, categoryFilter, brandFilter, sortBy]);
+  }, [items, search, warehouseFilter, statusFilter, categoryFilter, brandFilter, sortBy, classification]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const paginatedItems = filteredItems.slice(
@@ -1235,6 +1239,7 @@ export const InventoryList: React.FC = () => {
         </div>
       )}
 
+        <div className="max-w-sm"><ClassificationSelect value={classification} onChange={value => {setClassification(value); setCurrentPage(1);}} label="Inventory Classification"/></div>
       {/* Header with actions on the right */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -1427,11 +1432,12 @@ export const InventoryList: React.FC = () => {
         // Table View
         <div className="min-w-0 bg-[#0d1322] border border-slate-800 rounded-2xl">
           <div className="admin-table-scroll w-full min-w-0 max-w-full overflow-x-auto custom-scrollbar">
-            <table className="admin-responsive-table admin-inventory-table admin-cols-9 admin-sticky-1 w-full">
+            <table className="admin-responsive-table admin-inventory-table admin-cols-10 admin-sticky-1 w-full">
               <thead className="bg-[#0b0f19]/50 border-b border-slate-800 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Barcode</th>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Product</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Classification</th>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Warehouse</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Available</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Reserved</th>
@@ -1455,10 +1461,13 @@ export const InventoryList: React.FC = () => {
                         <span className="text-white text-xs sm:text-sm font-medium truncate" title={item.product}>{item.product}</span>
                       </div>
                     </td>
+                    <td className="px-2 py-2 whitespace-nowrap sm:px-4 sm:py-3.5">
+                      <ClassificationBadge value={item.item_classification ?? 'FINISHED_PRODUCT'}/>
+                    </td>
                     <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.warehouse}</td>
-                    <td className="px-2 py-2 text-center text-xs text-white font-medium sm:px-4 sm:py-3.5 sm:text-sm">{item.available_stock}</td>
-                    <td className="px-2 py-2 text-center text-xs text-slate-900 dark:text-blue-400 sm:px-4 sm:py-3.5 sm:text-sm">{item.reserved_stock}</td>
-                    <td className={`px-2 py-2 text-center text-xs sm:px-4 sm:py-3.5 sm:text-sm ${item.backload > 0 ? 'text-slate-900 dark:text-red-400' : 'text-slate-900 dark:text-slate-500'}`}>{item.backload}</td>
+                    <td className="px-2 py-2 text-center text-xs text-white font-medium sm:px-4 sm:py-3.5 sm:text-sm">{item.available_stock} {item.unit}</td>
+                    <td className="px-2 py-2 text-center text-xs text-slate-900 dark:text-blue-400 sm:px-4 sm:py-3.5 sm:text-sm">{item.reserved_stock} {item.unit}</td>
+                    <td className={`px-2 py-2 text-center text-xs sm:px-4 sm:py-3.5 sm:text-sm ${item.backload > 0 ? 'text-slate-900 dark:text-red-400' : 'text-slate-900 dark:text-slate-500'}`}>{item.backload} {item.unit}</td>
                     <td className="px-2 py-2 sm:px-4 sm:py-3.5"><StatusBadge status={item.status} /></td>
                     <td className="px-2 py-2 text-xs text-slate-400 sm:px-4 sm:py-3.5 sm:text-sm">{formatLastUpdated(item.updated_at)}</td>
                     <td className="px-2 py-2 sm:px-4 sm:py-3.5">
@@ -1490,7 +1499,7 @@ export const InventoryList: React.FC = () => {
                 ))}
                 {paginatedItems.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={10} className="px-4 py-8 text-center text-slate-400">
                       No inventory records found matching your criteria.
                     </td>
                   </tr>

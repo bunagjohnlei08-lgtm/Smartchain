@@ -8,11 +8,14 @@ use App\Models\Supplier;
 use App\Support\AuditLogger;
 use App\Support\ProductCatalogSetup;
 use App\Support\StockLevel;
+use App\Support\WarehouseCapacity;
+use App\Support\CatalogProductRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -27,6 +30,7 @@ class ProductController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:255'],
             'brand' => ['nullable', 'string', 'max:255'],
+            'item_classification' => ['nullable', Rule::in(Product::CLASSIFICATIONS)],
             'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'status' => ['nullable', Rule::in(self::STATUSES)],
             'sort_by' => ['nullable', Rule::in(['name', 'category', 'brand', 'cost_price', 'selling_price', 'reorder_level', 'current_stock', 'created_at'])],
@@ -41,7 +45,7 @@ class ProductController extends Controller
                 ->orWhere('category', 'like', "%{$search}%")
                 ->orWhere('brand', 'like', "%{$search}%"));
         }
-        foreach (['category', 'brand'] as $field) {
+        foreach (['category', 'brand', 'item_classification'] as $field) {
             if (! empty($validated[$field])) {
                 $query->where($field, $validated[$field]);
             }
@@ -92,10 +96,11 @@ class ProductController extends Controller
                 'suppliers' => $allProducts->pluck('suppliers')->flatten()->pluck('name')->unique()->sort()->values(),
                 'warehouses' => DB::table('warehouses')->orderBy('name')->get(['id', 'name']),
                 'statuses' => self::STATUSES,
+                'classifications' => Product::CLASSIFICATIONS,
             ],
             'assignment_options' => [
                 'suppliers' => Supplier::query()->where('status', Supplier::STATUS_ACTIVE)->orderBy('name')->get(['id', 'name']),
-                'warehouses' => DB::table('warehouses')->where('status', ProductCatalogSetup::WAREHOUSE_ACTIVE)->orderBy('name')->get(['id', 'name']),
+                'warehouses' => CatalogProductRules::warehouseOptions(),
                 'unit' => Product::DEFAULT_UNIT,
                 'replenishment_threshold' => 30,
             ],
@@ -111,13 +116,13 @@ class ProductController extends Controller
         );
 
         $perPage = min(max($request->integer('per_page', 100), 1), 100);
-        return response()->json(Product::query()->orderBy('name')->paginate($perPage, ['id', 'name', 'category']));
+        return response()->json(Product::query()->orderBy('name')->paginate($perPage, ['id', 'name', 'category', 'unit', 'item_classification']));
     }
 
     public function show(Request $request, Product $product): JsonResponse
     {
         $this->authorizeAdmin($request);
-        return response()->json($this->present($product->load(['inventories.warehouse', 'suppliers:id,name,status'])));
+        return response()->json($this->present($product->load(['inventories.warehouse', 'suppliers:id,name,status']), true));
     }
 
     public function store(Request $request): JsonResponse
@@ -135,7 +140,7 @@ class ProductController extends Controller
         $attributes = array_diff_key($validated, $assignment);
 
         $product = DB::transaction(function () use ($attributes, $assignment, $request) {
-            $product = Product::create([...$attributes, 'unit' => Product::DEFAULT_UNIT]);
+            $product = Product::create($attributes);
             AuditLogger::success('PRODUCT_CREATED', AuditLogger::MODULE_INVENTORY, [
                 'resource' => $product, 'resource_label' => $product->name,
                 'details' => "Created catalog product {$product->name}.",
@@ -156,7 +161,21 @@ class ProductController extends Controller
         $assignment = array_intersect_key($validated, ['supplier_id' => true]);
         $attributes = array_diff_key($validated, $assignment);
         DB::transaction(function () use ($product, $attributes, $assignment, $request) {
+            // Match stock-changing lock order, then protect catalog identity/history.
+            $warehouseIds = $product->inventories()->pluck('warehouse_id');
+            $warehouses = \App\Models\Warehouse::query()->whereIn('id', $warehouseIds)->orderBy('id')->lockForUpdate()->get();
+            $product = Product::query()->lockForUpdate()->findOrFail($product->id);
+            abort_if($product->inventories()->whereNotIn('warehouse_id', $warehouseIds)->exists(), 409, 'Warehouse assignments changed. Refresh and retry.');
+            if (isset($attributes['unit']) && WarehouseCapacity::normalizeUnit($attributes['unit']) !== WarehouseCapacity::normalizeUnit($product->unit)) {
+                if ($reason = CatalogProductRules::unitChangeReason($product)) throw ValidationException::withMessages(['unit' => $reason]);
+                if ($warehouses->isEmpty()) throw ValidationException::withMessages(['unit' => 'Assign a warehouse before selecting a different Stock Unit.']);
+                foreach ($warehouses as $warehouse) CatalogProductRules::ensureSupported($warehouse, $attributes['unit']);
+            }
+            CatalogProductRules::ensureClassificationChange($product, $attributes['item_classification'] ?? $product->item_classification);
+            $changes = AuditLogger::diff($product->getAttributes(), $attributes, ['name' => 'name', 'unit' => 'Stock Unit', 'item_classification' => 'Classification']);
             $product->update($attributes);
+            if ($changes !== []) AuditLogger::success('PRODUCT_UPDATED', AuditLogger::MODULE_INVENTORY, ['resource' => $product,
+                'resource_label' => $product->name, 'details' => AuditLogger::describeChanges($changes), 'metadata' => ['changes' => $changes]]);
             if (! empty($assignment['supplier_id'])) {
                 $this->applyAssignment($product, (int) $assignment['supplier_id'], null, $request);
             }
@@ -219,6 +238,8 @@ class ProductController extends Controller
             return;
         }
 
+        CatalogProductRules::ensureSupported($warehouse, $product->unit);
+
         [$inventory, $created] = ProductCatalogSetup::ensureInventory($product, $warehouse, $request->user());
         $supplier ??= $product->load('suppliers:id,name,status')->activePrimarySupplier();
         if ($created && $supplier) {
@@ -229,25 +250,32 @@ class ProductController extends Controller
     public function destroy(Request $request, Product $product): JsonResponse
     {
         $this->authorizeAdmin($request);
-        $references = collect([
-            'inventories' => 'product_id',
-            'order_items' => 'product_id',
-            'receiving_items' => 'product_id',
-            'replenishment_requests' => 'product_id',
-            'stock_out_transactions' => 'product_id',
-        ])->filter(fn (string $column, string $table) => Schema::hasTable($table)
-            && Schema::hasColumn($table, $column)
-            && DB::table($table)->where($column, $product->id)->exists())->keys()->values();
-
-        if ($references->isNotEmpty()) {
-            return response()->json([
-                'message' => 'This product is referenced by existing inventory or transactions and cannot be deleted.',
+        return DB::transaction(function () use ($product, $request) {
+            // Mapped offerings lock before catalog identity, as in the existing mapping workflow.
+            $offerings = \App\Models\SupplierApplicationOffering::query()->where('mapped_product_id', $product->id)->orderBy('id')->lockForUpdate()->get();
+            $warehouseIds = $product->inventories()->pluck('warehouse_id');
+            \App\Models\Warehouse::query()->whereIn('id', $warehouseIds)->orderBy('id')->lockForUpdate()->get();
+            $locked = Product::query()->lockForUpdate()->findOrFail($product->id);
+            $inventories = $locked->inventories()->lockForUpdate()->get();
+            abort_if($inventories->contains(fn ($inventory) => ! $warehouseIds->contains($inventory->warehouse_id)), 409, 'Warehouse assignments changed. Refresh and retry.');
+            $references = CatalogProductRules::historyReferences($locked);
+            if ($references !== []) return response()->json([
+                'message' => 'Product cannot be deleted because it has transaction history or BOM/production dependencies: '.implode(', ', $references).'.',
                 'references' => $references,
             ], 409);
-        }
-
-        $product->delete();
-        return response()->json(['message' => 'Product deleted.']);
+            if ($inventories->contains(fn ($inventory) => ! CatalogProductRules::isDisposableSetup($inventory))) {
+                return response()->json(['message' => 'Product cannot be deleted: inventory contains stock, reservations, backload, pending receiving, or is not proven disposable catalog setup.', 'references' => ['inventories']], 409);
+            }
+            foreach ($inventories as $inventory) $inventory->delete();
+            foreach ($offerings as $offering) $offering->update(['mapped_product_id' => null, 'mapped_at' => null, 'mapped_by_id' => null]);
+            $locked->suppliers()->detach();
+            AuditLogger::success('PRODUCT_DELETED', AuditLogger::MODULE_INVENTORY, [
+                'actor' => $request->user(), 'resource' => $locked, 'resource_label' => $locked->name,
+                'details' => 'Removed an unused catalog product and proven empty setup records. Transaction history was checked under a product lock.',
+            ]);
+            $locked->delete();
+            return response()->json(['message' => 'Unused product and empty catalog setup removed.']);
+        });
     }
 
     private function validatedProduct(Request $request, ?Product $product = null, array $extraRules = [], array $extraMessages = []): array
@@ -259,21 +287,18 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255', Rule::unique('products', 'name')->ignore($product?->id)],
             'category' => ['nullable', 'string', 'max:255'],
             'brand' => ['nullable', 'string', 'max:255'],
-            // Stock is tracked in pieces; the column stays for future units.
-            'unit' => ['nullable', 'string', 'max:50', Rule::in([Product::DEFAULT_UNIT])],
+            'unit' => [$product ? 'sometimes' : 'required', 'string', 'max:50', Rule::in(array_unique([...WarehouseCapacity::UNITS, ...($product?->unit ? [WarehouseCapacity::normalizeUnit($product->unit)] : [])]))],
+            'item_classification' => ['sometimes', 'required', Rule::in(Product::CLASSIFICATIONS)],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
             'reorder_level' => ['nullable', 'integer', 'min:0'],
             ...$extraRules,
-        ], ['unit.in' => 'Unit must be '.Product::DEFAULT_UNIT.'.', ...$extraMessages]);
-        if (array_key_exists('unit', $validated)) {
-            $validated['unit'] = Product::DEFAULT_UNIT;
-        }
+        ], ['unit.in' => 'Select a supported Stock Unit: PCS, SACK, or DRUM. Legacy KG/L values remain read-only.', ...$extraMessages]);
 
         return $validated;
     }
 
-    private function present(Product $product): array
+    private function present(Product $product, bool $editing = false): array
     {
         $stock = (int) $product->inventories->sum('available_stock');
         $reorderLevel = $product->reorder_level;
@@ -308,6 +333,13 @@ class ProductController extends Controller
             'warehouse_ids' => $product->inventories->pluck('warehouse_id')->unique()->values(),
             'current_stock' => $stock,
             'unit' => $product->unit,
+            'item_classification' => $product->item_classification,
+            'unit_change_reason' => $editing ? CatalogProductRules::unitChangeReason($product) : null,
+            'supported_units' => ! $editing || $product->inventories->isEmpty() ? [] : array_values(array_reduce(
+                $product->inventories->pluck('warehouse_id')->unique()->all(),
+                fn ($units, $id) => array_intersect($units, CatalogProductRules::supportedUnits(\App\Models\Warehouse::findOrFail($id))),
+                WarehouseCapacity::UNITS,
+            )),
             'cost_price' => $costPrice,
             'selling_price' => $product->selling_price === null ? null : (float) $product->selling_price,
             'reorder_level' => $reorderLevel,

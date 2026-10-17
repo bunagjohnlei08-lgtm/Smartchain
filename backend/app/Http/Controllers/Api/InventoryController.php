@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Support\AuditLogger;
 use App\Support\WarehouseCapacity;
+use App\Support\CatalogProductRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class InventoryController extends Controller
             'category' => $inventory->product->category,
             'brand' => $inventory->product->brand,
             'unit' => $inventory->product->unit,
+            'item_classification' => $inventory->product->item_classification,
             'warehouse' => $inventory->warehouse->name,
             'warehouse_id' => $inventory->warehouse_id,
             'available_stock' => $inventory->available_stock,
@@ -38,6 +40,7 @@ class InventoryController extends Controller
         if ($user->isPlantManager() || $user->isAdmin()) {
             $data['reserved_stock'] = $inventory->reserved_stock;
             $data['backload'] = $inventory->backload;
+            $data['returned_stock'] = $inventory->returned_stock;
         }
 
         if ($user->isAdmin()) {
@@ -54,6 +57,8 @@ class InventoryController extends Controller
         $this->authorize('viewAny', Inventory::class);
         $user = $request->user();
         $query = $this->readableInventoryQuery($user)->with(['product', 'warehouse']);
+        $request->validate(['item_classification' => ['nullable', Rule::in(Product::CLASSIFICATIONS)]]);
+        if ($request->filled('item_classification')) $query->whereHas('product', fn ($products) => $products->where('item_classification', $request->input('item_classification')));
 
         if ($request->filled('warehouse_id')) {
             $query->where('warehouse_id', $request->warehouse_id);
@@ -142,7 +147,11 @@ class InventoryController extends Controller
         $inventory = DB::transaction(function () use ($validated) {
             $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($validated['warehouse_id']);
             $product = $this->resolveProduct($validated);
+            CatalogProductRules::ensureSupported($warehouse, $product->unit);
             $this->ensureNoDuplicateInventory($product->id, $warehouse->id);
+            WarehouseCapacity::ensureAdditionsFit($warehouse, [
+                WarehouseCapacity::normalizeUnit($product->unit) => (int) $validated['available_stock'] + (int) $validated['reserved_stock'],
+            ]);
             $inventory = Inventory::create([
                 'barcode' => $validated['barcode'], 'product_id' => $product->id,
                 'warehouse_id' => $warehouse->id, 'available_stock' => $validated['available_stock'],
@@ -181,11 +190,22 @@ class InventoryController extends Controller
             $warehouseIds = collect([$inventory->warehouse_id, $validated['warehouse_id'] ?? $inventory->warehouse_id])->unique()->sort()->values();
             $warehouses = Warehouse::query()->whereIn('id', $warehouseIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $inventory = Inventory::query()->lockForUpdate()->findOrFail($inventory->id);
+            abort_unless($warehouses->has($inventory->warehouse_id), 409, 'Inventory warehouse changed during this update. Refresh and try again.');
+            $oldWarehouseId = $inventory->warehouse_id;
+            $oldUnit = WarehouseCapacity::normalizeUnit($inventory->product->unit);
+            $oldQuantity = $inventory->available_stock + $inventory->reserved_stock;
             if (array_key_exists('product', $validated)) {
                 $inventory->product_id = $this->resolveProduct($validated)->id;
+                $inventory->unsetRelation('product');
             }
             $this->ensureNoDuplicateInventory($inventory->product_id, (int) ($validated['warehouse_id'] ?? $inventory->warehouse_id), $inventory->id);
-            $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray())->save();
+            $inventory->fill(collect($validated)->except(['product', 'category', 'brand', 'unit', 'cost_price'])->toArray());
+            $unit = WarehouseCapacity::normalizeUnit($inventory->product->unit);
+            if ((int) $oldWarehouseId !== (int) $inventory->warehouse_id) CatalogProductRules::ensureSupported($warehouses[$inventory->warehouse_id], $inventory->product->unit);
+            $quantity = $inventory->available_stock + $inventory->reserved_stock;
+            $addition = $quantity - ((int) $oldWarehouseId === (int) $inventory->warehouse_id && $oldUnit === $unit ? $oldQuantity : 0);
+            WarehouseCapacity::ensureAdditionsFit($warehouses[$inventory->warehouse_id], [$unit => $addition]);
+            $inventory->save();
             foreach ($warehouses as $warehouse) WarehouseCapacity::recordTransition($warehouse);
             return $inventory;
         });
@@ -216,7 +236,11 @@ class InventoryController extends Controller
         $inventory = DB::transaction(function () use ($id) {
             $current = Inventory::findOrFail($id);
             $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($current->warehouse_id);
+            $product = Product::query()->lockForUpdate()->findOrFail($current->product_id);
             $inventory = Inventory::query()->lockForUpdate()->findOrFail($id);
+            abort_if((int) $inventory->warehouse_id !== (int) $warehouse->id || (int) $inventory->product_id !== (int) $product->id, 409, 'Inventory assignments changed. Refresh and retry deletion.');
+            abort_if(! CatalogProductRules::isDisposableSetup($inventory), 409, 'Inventory cannot be deleted: stock or stock history exists, or this is not proven unused catalog setup.');
+            abort_if(CatalogProductRules::historyReferences($product) !== [], 409, 'Inventory cannot be deleted because its product has transaction history or BOM/production dependencies.');
             $inventory->delete();
             WarehouseCapacity::recordTransition($warehouse);
             return $inventory;
@@ -230,6 +254,73 @@ class InventoryController extends Controller
         ]);
 
         return response()->json(['message' => 'Inventory record deleted.']);
+    }
+
+    public function moveToReturned(Request $request, Inventory $inventory)
+    {
+        $this->authorizeAdmin($request);
+        $validated = $request->validate([
+            'quantity' => ['required', 'integer', 'min:1'],
+            'source_bucket' => ['required', Rule::in(['available_stock', 'reserved_stock'])],
+            'source_type' => ['required', 'string', 'max:80'],
+            'source_reference' => ['required', 'string', 'max:255'],
+            'idempotency_key' => ['nullable', 'string', 'max:120'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $movement = DB::transaction(function () use ($inventory, $validated, $request) {
+            $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($inventory->warehouse_id);
+            $inventory = Inventory::query()->with('product')->lockForUpdate()->findOrFail($inventory->id);
+            abort_unless((int) $inventory->warehouse_id === (int) $warehouse->id, 409, 'Inventory warehouse changed. Refresh and retry the return movement.');
+            if (! empty($validated['idempotency_key'])) {
+                $existing = DB::table('inventory_return_movements')->where('idempotency_key', $validated['idempotency_key'])->first();
+                if ($existing) return $existing;
+            }
+            $bucket = $validated['source_bucket']; $quantity = (int) $validated['quantity'];
+            if ($inventory->{$bucket} < $quantity) throw ValidationException::withMessages([$bucket => 'The requested returned quantity exceeds the physically stored source quantity.']);
+            WarehouseCapacity::ensureReturnedAdditionFits($warehouse, $quantity);
+            $inventory->{$bucket} -= $quantity; $inventory->returned_stock += $quantity; $inventory->save();
+            $id = DB::table('inventory_return_movements')->insertGetId([
+                'inventory_id' => $inventory->id, 'warehouse_id' => $warehouse->id, 'performed_by' => $request->user()->id,
+                'direction' => 'TO_RETURNED', 'source_bucket' => $bucket, 'unit' => WarehouseCapacity::normalizeUnit($inventory->product->unit),
+                'quantity' => $quantity, 'source_type' => $validated['source_type'], 'source_reference' => $validated['source_reference'],
+                'idempotency_key' => $validated['idempotency_key'] ?? null, 'notes' => $validated['notes'] ?? null,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            WarehouseCapacity::recordTransition($warehouse);
+            return DB::table('inventory_return_movements')->find($id);
+        });
+        return response()->json(['message' => 'Stock moved to Returned Products Area.', 'movement' => $movement]);
+    }
+
+    public function receiveReturned(Request $request, Inventory $inventory)
+    {
+        $this->authorizeAdmin($request);
+        $validated = $request->validate([
+            'quantity' => ['required', 'integer', 'min:1'],
+            'source_type' => ['required', Rule::in(['CUSTOMER_RETURN', 'AUTHORIZED_EXTERNAL_RETURN'])],
+            'source_reference' => ['required', 'string', 'max:255'],
+            'idempotency_key' => ['required', 'string', 'max:120'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $movement = DB::transaction(function () use ($inventory, $validated, $request) {
+            $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($inventory->warehouse_id);
+            $inventory = Inventory::query()->with('product')->lockForUpdate()->findOrFail($inventory->id);
+            abort_unless((int) $inventory->warehouse_id === (int) $warehouse->id, 409, 'Inventory warehouse changed. Refresh and retry the return receipt.');
+            $existing = DB::table('inventory_return_movements')->where('idempotency_key', $validated['idempotency_key'])->first();
+            if ($existing) return $existing;
+            $quantity = (int) $validated['quantity'];
+            WarehouseCapacity::ensureReturnedAdditionFits($warehouse, $quantity);
+            $inventory->returned_stock += $quantity; $inventory->save();
+            $id = DB::table('inventory_return_movements')->insertGetId([
+                'inventory_id' => $inventory->id, 'warehouse_id' => $warehouse->id, 'performed_by' => $request->user()->id,
+                'direction' => 'EXTERNAL_RECEIPT', 'source_bucket' => 'external', 'unit' => WarehouseCapacity::normalizeUnit($inventory->product->unit),
+                'quantity' => $quantity, 'source_type' => $validated['source_type'], 'source_reference' => $validated['source_reference'],
+                'idempotency_key' => $validated['idempotency_key'], 'notes' => $validated['notes'] ?? null, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            WarehouseCapacity::recordTransition($warehouse);
+            return DB::table('inventory_return_movements')->find($id);
+        });
+        return response()->json(['message' => 'External return physically received into Returned Products Area.', 'movement' => $movement]);
     }
 
     private function authorizeAdmin(Request $request): void

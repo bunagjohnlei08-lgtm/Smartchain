@@ -242,7 +242,7 @@ const StatusBadge: React.FC<{ status: unknown }> = ({ status }) => {
   const label = normalizedStatus ?? formatStatusLabel(status);
 
   return (
-    <span className={`qa-badge ${normalizedStatus === 'Partial' ? 'qa-badge-attention' : ''} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeConfig.color} ${badgeConfig.bg}`}>
+    <span className={`qa-badge ${normalizedStatus === 'Partial' ? 'qa-badge-attention' : ''} inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-4 sm:text-xs ${badgeConfig.color} ${badgeConfig.bg}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${badgeConfig.dotColor}`} />
       {label}
     </span>
@@ -1145,7 +1145,7 @@ const QualityInspection: React.FC = () => {
 
       {isInspectionModalOpen && selectedReceivingId !== null && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-0 backdrop-blur-sm sm:p-4"
+          className="fixed inset-0 z-40 flex items-start justify-center overflow-hidden bg-slate-950/80 p-0 backdrop-blur-sm sm:items-center sm:p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !isSaving) setIsInspectionModalOpen(false);
           }}
@@ -1155,28 +1155,28 @@ const QualityInspection: React.FC = () => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="inspection-dialog-title"
-            className="max-h-[100dvh] w-full overflow-y-auto overscroll-contain border border-gray-800/50 bg-[#0d1322] shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:w-[94vw] sm:max-w-7xl sm:rounded-2xl"
+            className="h-[100dvh] w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-contain border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-[#0d1322] dark:text-slate-100 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[94vw] sm:max-w-7xl sm:rounded-2xl"
           >
-              <div className="p-5 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h2 id="inspection-dialog-title" className="text-lg font-semibold text-white">Inspection Details</h2>
-                    {selectedReceiving && <p className="mt-0.5 text-sm text-slate-400">{selectedReceiving.receivingNo} · {selectedReceiving.poNumber} · {selectedReceiving.supplier}</p>}
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:items-center sm:px-5 sm:py-4">
+                <div className="flex min-w-0 max-w-full items-center gap-2.5">
+                  <div className="min-w-0">
+                    <h2 id="inspection-dialog-title" className="text-xl font-semibold leading-6 text-slate-950 dark:text-white sm:text-[22px]">Inspection Details</h2>
+                    {selectedReceiving && <p className="mt-0.5 truncate text-[13px] leading-5 text-slate-600 dark:text-slate-400" title={`${selectedReceiving.receivingNo} · ${selectedReceiving.poNumber} · ${selectedReceiving.supplier}`}>{selectedReceiving.receivingNo} · {selectedReceiving.poNumber} · {selectedReceiving.supplier}</p>}
                   </div>
                   {selectedReceiving && <StatusBadge status={selectedReceiving.inspectionStatus} />}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
                   <button
                     disabled={isSaving || isLoadingDetail || !selectedReceiving || inspectionIsFinal}
                     onClick={() => saveInspection(false)}
-                    className="px-3 py-1.5 border border-gray-700 hover:bg-gray-800 text-slate-300 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-transparent dark:text-slate-200 dark:hover:bg-slate-800 sm:min-h-11 sm:text-[13px]"
                   >
                     <Save className="w-4 h-4 inline mr-1.5" /> Save Draft
                   </button>
                   <button
                     disabled={isSaving || isLoadingDetail || !selectedReceiving || inspectionIsFinal}
                     onClick={() => saveInspection(true)}
-                    className="px-3 py-1.5 bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 dark:focus-visible:outline-cyan-400 sm:min-h-11 sm:text-[13px]"
                   >
                     <Send className="w-4 h-4" /> Submit Inspection
                   </button>
@@ -1186,7 +1186,7 @@ const QualityInspection: React.FC = () => {
                     disabled={isSaving}
                     onClick={() => setIsInspectionModalOpen(false)}
                     aria-label="Close inspection details"
-                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="ml-auto flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white sm:ml-0 sm:h-11 sm:w-11"
                   >
                     <X className="h-5 w-5" aria-hidden="true" />
                   </button>
@@ -1212,29 +1212,29 @@ const QualityInspection: React.FC = () => {
                 <div className="p-5 text-sm text-slate-400">Loading inspection details...</div>
               ) : selectedReceiving ? (
                 <>
-                  <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 px-4 py-3 text-[13px] sm:grid-cols-3 sm:gap-x-5 sm:gap-y-3 sm:px-5 sm:py-4">
                     <div>
-                      <p className="text-slate-400">Receiving No.</p>
-                      <p className="text-white font-medium">{selectedReceiving.receivingNo}</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Receiving No.</p>
+                      <p className="truncate font-medium text-slate-950 dark:text-white" title={selectedReceiving.receivingNo}>{selectedReceiving.receivingNo}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400">PO Number</p>
-                      <p className="text-white font-medium">{selectedReceiving.poNumber}</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">PO Number</p>
+                      <p className="truncate font-medium text-slate-950 dark:text-white" title={selectedReceiving.poNumber}>{selectedReceiving.poNumber}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400">Supplier</p>
-                      <p className="text-white font-medium">{selectedReceiving.supplier}</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Supplier</p>
+                      <p className="truncate font-medium text-slate-950 dark:text-white" title={selectedReceiving.supplier}>{selectedReceiving.supplier}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400">Delivery Date</p>
-                      <p className="text-white font-medium">{selectedReceiving.deliveryDate}</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Delivery Date</p>
+                      <p className="font-medium text-slate-950 dark:text-white">{selectedReceiving.deliveryDate}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400">Reference No.</p>
-                      <p className="text-white font-medium">{selectedReceiving.referenceNo}</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Reference No.</p>
+                      <p className="truncate font-medium text-slate-950 dark:text-white" title={selectedReceiving.referenceNo}>{selectedReceiving.referenceNo}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400">Supplier Receipt</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Supplier Receipt</p>
                       {selectedReceiving.receivingReceipts.length > 0 ? (
                         <button
                           ref={receiptTriggerRef}
@@ -1242,7 +1242,7 @@ const QualityInspection: React.FC = () => {
                           onClick={() => setIsReceiptModalOpen(true)}
                           aria-haspopup="dialog"
                           aria-label={`View supplier delivery receipts (${selectedReceiving.receivingReceipts.length})`}
-                          className="mt-0.5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium text-cyan-300 transition-colors hover:bg-cyan-500/10 hover:text-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+                          className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg pr-2 text-[13px] font-medium text-cyan-700 transition-colors hover:bg-cyan-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500 dark:text-cyan-300 dark:hover:text-cyan-200"
                         >
                           <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
                           {selectedReceiving.receivingReceipts.length === 1
@@ -1254,18 +1254,18 @@ const QualityInspection: React.FC = () => {
                       )}
                     </div>
                     <div>
-                      <p className="text-slate-400">Prepared By</p>
-                      <p className="text-white font-medium">{selectedReceiving.preparedBy}</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Prepared By</p>
+                      <p className="truncate font-medium text-slate-950 dark:text-white" title={selectedReceiving.preparedBy}>{selectedReceiving.preparedBy}</p>
                     </div>
                   </div>
 
-                  <div className="border-b border-gray-800">
-                    <div className="flex px-5 overflow-x-auto">
+                  <div className="border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex max-w-full snap-x overflow-x-auto overscroll-x-contain px-2 sm:px-4">
                       {['products', 'summary', 'notes', 'attachments', 'timeline'].map((tab) => (
                         <button
                           key={tab}
-                          onClick={() => setActiveTab(tab as typeof activeTab)}
-                          className={`flex-none whitespace-nowrap border-b-2 bg-transparent px-4 py-3 text-sm font-medium transition-all ${activeTab === tab ? 'border-cyan-500 text-slate-900 dark:text-white' : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+                          onClick={(event) => { setActiveTab(tab as typeof activeTab); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }}
+                          className={`flex-none snap-center whitespace-nowrap border-b-2 bg-transparent px-3 py-2.5 text-xs font-semibold transition-colors sm:px-4 sm:text-[13px] ${activeTab === tab ? 'border-cyan-500 text-slate-950 dark:text-white' : 'border-transparent text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'}`}
                         >
                           {tab.charAt(0).toUpperCase() + tab.slice(1)}
                           {tab === 'products' && ` (${selectedReceiving.products.length})`}
@@ -1274,11 +1274,13 @@ const QualityInspection: React.FC = () => {
                     </div>
                   </div>
 
-                  <div data-qa-layout-debug="activeTabContent" className="p-5">
+                  <div data-qa-layout-debug="activeTabContent" className="min-w-0 px-4 py-3 sm:p-5">
                     {activeTab === 'products' && (
-                      <div className="qa-table-scroll">
-                        <table className="qa-responsive-table qa-cols-7 qa-sticky-1 w-full min-w-[688px] text-sm">
-                          <thead className="border-b border-gray-800">
+                      <div className="min-w-0">
+                        <div className="qa-table-scroll rounded-lg border border-slate-200 dark:border-slate-800">
+                        <table className="qa-responsive-table qa-sticky-1 w-full min-w-[720px] text-xs sm:min-w-[800px] sm:text-[13px]">
+                          <colgroup><col className="w-44 sm:w-56" /><col className="w-24" /><col className="w-24" /><col className="w-28" /><col className="w-28" /><col className="w-20" /><col className="w-32" /></colgroup>
+                          <thead className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-[#090d16] dark:text-slate-400 sm:text-[11px]">
                             <tr className="text-left text-slate-400">
                               <th className="px-2 py-2 font-medium">Product</th>
                               <th className="px-2 py-2 font-medium text-center">PO Ordered Qty</th>
@@ -1303,17 +1305,17 @@ const QualityInspection: React.FC = () => {
                               };
 
                               return (
-                                <tr key={product.id} className="border-b border-gray-800 hover:bg-gray-800/30">
-                                  <td className="px-2 py-2 text-white">
-                                    <span className="block">{product.product}</span>
+                                <tr key={product.id} className="border-b border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-[#0d1322] dark:hover:bg-slate-800/30">
+                                  <td className="min-w-0 px-3 py-2.5 text-slate-950 dark:text-white">
+                                    <span className="block truncate text-[13px] font-semibold" title={product.product}>{product.product}</span>
                                     {(product.brand || product.category) && (
-                                      <span className="mt-1 block text-xs text-slate-400">
+                                      <span className="mt-0.5 block truncate text-[10px] text-slate-600 dark:text-slate-400 sm:text-[11px]" title={[product.brand, product.category].filter(Boolean).join(' / ')}>
                                         {[product.brand, product.category].filter(Boolean).join(' / ')}
                                       </span>
                                     )}
                                   </td>
-                                  <td className="px-2 py-2 text-center text-white">{product.orderedQty}</td>
-                                  <td className="px-2 py-2 text-center text-white">{product.deliveredQty}</td>
+                                  <td className="px-3 py-2.5 text-center text-slate-900 dark:text-white">{product.orderedQty}</td>
+                                  <td className="px-3 py-2.5 text-center text-slate-900 dark:text-white">{product.deliveredQty}</td>
                                   <td className="px-2 py-2 text-center">
                                     <input
                                       type="text"
@@ -1325,7 +1327,7 @@ const QualityInspection: React.FC = () => {
                                       placeholder="0"
                                       aria-invalid={Boolean(acceptedError || quantityError)}
                                       onChange={(event) => updateQuantityInput(product, 'acceptedQty', event.currentTarget.value)}
-                                      className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${acceptedError || quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
+                                      className={`h-10 w-20 rounded-lg border bg-white px-2 text-center text-[13px] text-slate-950 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:bg-[#090d16] dark:text-slate-200 ${acceptedError || quantityError ? 'border-rose-500/60' : 'border-slate-300 dark:border-slate-700'} disabled:opacity-60`}
                                     />
                                     {acceptedError && <p className="mt-1 text-[10px] leading-3 text-rose-400">{acceptedError}</p>}
                                   </td>
@@ -1340,11 +1342,11 @@ const QualityInspection: React.FC = () => {
                                       placeholder="0"
                                       aria-invalid={Boolean(rejectedError || quantityError)}
                                       onChange={(event) => updateQuantityInput(product, 'rejectedQty', event.currentTarget.value)}
-                                      className={`w-20 bg-[#090d16] border rounded px-2 py-1 text-center text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${rejectedError || quantityError ? 'border-rose-500/60' : 'border-gray-700'} disabled:opacity-60`}
+                                      className={`h-10 w-20 rounded-lg border bg-white px-2 text-center text-[13px] text-slate-950 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:bg-[#090d16] dark:text-slate-200 ${rejectedError || quantityError ? 'border-rose-500/60' : 'border-slate-300 dark:border-slate-700'} disabled:opacity-60`}
                                     />
                                     {rejectedError && <p className="mt-1 text-[10px] leading-3 text-rose-400">{rejectedError}</p>}
                                   </td>
-                                  <td className="px-2 py-2 text-slate-300">{product.unit}</td>
+                                  <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300">{product.unit}</td>
                                   <td className="px-2 py-2">
                                     <StatusBadge status={product.inspectionResult} />
                                   </td>
@@ -1352,14 +1354,14 @@ const QualityInspection: React.FC = () => {
                               );
                             })}
                           </tbody>
-                        </table>
+                        </table></div>
 
-                        <div className="mt-4 p-3 bg-[#090d16] border border-gray-800 rounded-lg flex flex-wrap items-center justify-between text-sm gap-3">
-                          <span className="text-slate-400">Total Items: <span className="text-white font-medium">{selectedReceiving.products.length}</span></span>
-                          <div className="flex flex-wrap gap-4">
-                            <span className="text-slate-400">PO Ordered: <span className="text-white font-medium">{selectedReceiving.totalOrdered}</span></span>
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-800 dark:bg-[#090d16]">
+                          <span className="text-slate-600 dark:text-slate-400">Total Items: <span className="font-semibold text-slate-950 dark:text-white">{selectedReceiving.products.length}</span></span>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                            <span className="text-slate-600 dark:text-slate-400">PO Ordered: <span className="font-semibold text-slate-950 dark:text-white">{selectedReceiving.totalOrdered}</span></span>
                             <span className="text-slate-400">Short: <span className="text-amber-400 font-medium">{Math.max(0, selectedReceiving.totalOrdered - selectedReceiving.totalDelivered)}</span></span>
-                            <span className="text-slate-400">Delivered: <span className="text-white font-medium">{selectedReceiving.totalDelivered}</span></span>
+                            <span className="text-slate-600 dark:text-slate-400">Delivered: <span className="font-semibold text-slate-950 dark:text-white">{selectedReceiving.totalDelivered}</span></span>
                             <span className="text-slate-400">Accepted: <span className="text-emerald-400 font-medium">{selectedReceiving.totalAccepted}</span></span>
                             <span className="text-slate-400">Rejected: <span className="text-red-400 font-medium">{selectedReceiving.totalRejected}</span></span>
                           </div>
@@ -1368,43 +1370,43 @@ const QualityInspection: React.FC = () => {
                     )}
 
                     {activeTab === 'summary' && (
-                      <div className="space-y-4 text-sm">
-                        <div className="grid grid-cols-2 gap-4">
+                      <div className="text-[13px]">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                           <div>
-                            <p className="text-slate-400">QA Inspector</p>
-                            <p className="text-white">{selectedReceiving.inspectedBy}</p>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">QA Inspector</p>
+                            <p className="font-medium text-slate-950 dark:text-white">{selectedReceiving.inspectedBy}</p>
                           </div>
                           <div>
-                            <p className="text-slate-400">Inspection Date</p>
-                            <p className="text-white">{selectedReceiving.inspectionDate}</p>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Inspection Date</p>
+                            <p className="font-medium text-slate-950 dark:text-white">{selectedReceiving.inspectionDate}</p>
                           </div>
                           <div>
-                            <p className="text-slate-400">Overall Decision</p>
+                            <p className="mb-1 text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Overall Decision</p>
                             <StatusBadge status={selectedReceiving.inspectionStatus} />
                           </div>
                           <div>
-                            <p className="text-slate-400">Remarks</p>
-                            <p className="text-white">{selectedReceiving.summaryRemarks}</p>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">Remarks</p>
+                            <p className="font-medium text-slate-950 dark:text-white">{selectedReceiving.summaryRemarks}</p>
                           </div>
                         </div>
                       </div>
                     )}
 
                     {activeTab === 'notes' && (
-                      <div className="space-y-3 text-sm">
-                        <div className="space-y-2">
-                          <p className="text-slate-400">QA Notes</p>
+                      <div className="space-y-3 text-[13px]">
+                        <div className="space-y-3">
+                          <p className="text-sm font-semibold text-slate-950 dark:text-white">QA Notes</p>
                           {selectedReceiving.products.map((product) => (
-                            <div key={product.id}>
-                              <label className="mb-1 block text-xs text-slate-500">{product.product}</label>
+                            <div key={product.id} className="min-w-0">
+                              <label className="mb-1 block truncate text-xs font-medium text-slate-600 dark:text-slate-400" title={product.product}>{product.product}</label>
                               <textarea
                                 value={product.remarks}
                                 onChange={(event) => updateProductField(product.id, { remarks: event.target.value })}
                                 disabled={inspectionIsFinal}
                                 maxLength={1000}
-                                rows={3}
+                                rows={2}
                                 placeholder="Enter QA inspection findings"
-                                className="w-full rounded-lg border border-gray-800 !bg-white p-3 !text-slate-900 placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none disabled:opacity-60 dark:!bg-slate-800 dark:!text-white"
+                                className="min-h-20 w-full resize-y rounded-lg border border-slate-300 bg-white p-2.5 text-[13px] text-slate-950 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                               />
                             </div>
                           ))}
@@ -1413,29 +1415,29 @@ const QualityInspection: React.FC = () => {
                     )}
 
                     {activeTab === 'attachments' && (
-                      <div className="text-sm text-(--text-primary)">
-                        <section data-qa-layout-debug="evidenceCard" aria-labelledby="qa-evidence-heading" className="space-y-3 rounded-xl border border-(--border-color-strong) bg-(--bg-surface-alt) p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"><ShieldCheck className="h-5 w-5" /></div>
-                            <div className="min-w-0"><h3 id="qa-evidence-heading" className="font-semibold text-(--text-primary)">QA Inspection Evidence</h3><p className="text-(--text-secondary)">Upload photos or documents supporting rejected, damaged, incorrect, or non-conforming items.</p></div>
+                      <div className="text-[13px] text-(--text-primary)">
+                        <section data-qa-layout-debug="evidenceCard" aria-labelledby="qa-evidence-heading" className="space-y-2.5 rounded-xl border border-(--border-color-strong) bg-(--bg-surface-alt) p-3 sm:p-4">
+                          <div className="flex items-start gap-2.5">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"><ShieldCheck className="h-4.5 w-4.5" /></div>
+                            <div className="min-w-0"><h3 id="qa-evidence-heading" className="text-sm font-semibold text-(--text-primary)">QA Inspection Evidence</h3><p className="text-xs leading-5 text-(--text-secondary)">Upload photos or documents supporting rejected, damaged, incorrect, or non-conforming items.</p></div>
                           </div>
-                          <EvidenceGallery attachments={selectedReceiving.attachments} receivingId={selectedReceiving.id} title="Inspection evidence files" editable={!inspectionIsFinal} selectedFiles={selectedAttachments} removedIds={removedAttachmentIds} onSelectedFilesChange={(files) => { setSelectedAttachments(files); setAttachmentError(null); }} onRemovedIdsChange={(ids) => { setRemovedAttachmentIds(ids); setAttachmentError(null); }} error={attachmentError} disabled={isSaving} />
-                          <p data-qa-layout-debug="lastRealContent" className="text-(--text-secondary)">{selectedReceiving.totalRejected > 0 ? 'At least one QA inspection evidence file is required before submission.' : 'QA evidence is optional when no quantity is rejected.'}</p>
+                          <EvidenceGallery compact attachments={selectedReceiving.attachments} receivingId={selectedReceiving.id} title="Inspection evidence files" editable={!inspectionIsFinal} selectedFiles={selectedAttachments} removedIds={removedAttachmentIds} onSelectedFilesChange={(files) => { setSelectedAttachments(files); setAttachmentError(null); }} onRemovedIdsChange={(ids) => { setRemovedAttachmentIds(ids); setAttachmentError(null); }} error={attachmentError} disabled={isSaving} />
+                          <p data-qa-layout-debug="lastRealContent" className="text-xs leading-5 text-(--text-secondary)">{selectedReceiving.totalRejected > 0 ? 'At least one QA inspection evidence file is required before submission.' : 'QA evidence is optional when no quantity is rejected.'}</p>
                         </section>
                       </div>
                     )}
 
                     {activeTab === 'timeline' && (
-                      <div className="space-y-4 relative">
+                      <div className="relative space-y-2.5">
                         {selectedReceiving.timeline.map((item, index) => (
-                          <div key={`${item.status}-${index}`} className="flex items-start gap-3 relative">
-                            {index < selectedReceiving.timeline.length - 1 && <div className="absolute left-2.5 top-5 bottom-0 w-0.5 bg-slate-700" />}
-                            <div className="w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                              <div className="w-2 h-2 rounded-full bg-cyan-500" />
+                          <div key={`${item.status}-${index}`} className="relative flex items-start gap-2.5">
+                            {index < selectedReceiving.timeline.length - 1 && <div className="absolute bottom-0 left-[7px] top-4 w-px bg-slate-300 dark:bg-slate-700" />}
+                            <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-cyan-500/50 bg-cyan-500/20">
+                              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
                             </div>
-                            <div className="flex-1 pb-4">
-                              <p className="text-white font-medium">{item.status}</p>
-                              <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <div className="min-w-0 flex-1 pb-2.5">
+                              <p className="text-[13px] font-medium text-slate-950 dark:text-white sm:text-sm">{item.status}</p>
+                              <div className="flex flex-wrap items-center gap-x-1.5 text-[11px] leading-4 text-slate-600 dark:text-slate-400 sm:text-xs">
                                 <span>{item.date}</span>
                                 <span>|</span>
                                 <span>{item.time}</span>

@@ -348,11 +348,17 @@ const AIDemandForecast: React.FC = () => {
   boxShadow: isDark ? 'none' : '0 4px 12px rgb(15 23 42 / 0.08)',
  };
 
+ // Forecast persistence is not implemented yet; do not surface bundled sample records as business data.
+ const forecastProducts = mockForecastProducts.filter(() => false);
+ const forecastHistory = mockForecastHistory.filter(() => false);
+ const aiInsights = mockAIInsights.filter(() => false);
+ const forecastChartData = mockChartData.filter(() => false);
+
  const timeFilters = ['7 Days', '30 Days', '90 Days', '6 Months', '1 Year'];
  const warehouses = ['All Warehouses', 'Central Depot', 'Northgate', 'Eastside', 'Southpark'];
  const statuses = ['All Status', 'Critical', 'High', 'Medium', 'Low'];
 
- const filteredProducts = mockForecastProducts.filter(p => {
+ const filteredProducts = forecastProducts.filter(p => {
   const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
             p.sku.toLowerCase().includes(search.toLowerCase());
   const matchWarehouse = warehouseFilter === 'All Warehouses' || p.warehouse === warehouseFilter;
@@ -367,21 +373,21 @@ const AIDemandForecast: React.FC = () => {
  );
 
  // KPI Calculations
- const totalPredictedDemand = mockForecastProducts.reduce((sum, p) => sum + p.predictedDemand, 0);
- const totalReorder = mockForecastProducts.reduce((sum, p) => sum + p.suggestedReorder, 0);
- const avgConfidence = Math.round(mockForecastProducts.reduce((sum, p) => sum + p.confidence, 0) / mockForecastProducts.length);
- const criticalItems = mockForecastProducts.filter(p => p.status === 'Critical').length;
+ const totalPredictedDemand = forecastProducts.reduce((sum, p) => sum + p.predictedDemand, 0);
+ const totalReorder = forecastProducts.reduce((sum, p) => sum + p.suggestedReorder, 0);
+ const avgConfidence = forecastProducts.length ? Math.round(forecastProducts.reduce((sum, p) => sum + p.confidence, 0) / forecastProducts.length) : 0;
+ const criticalItems = forecastProducts.filter(p => p.status === 'Critical').length;
 
  // Top products
- const lastActualIndex = mockChartData.reduce((acc, entry, index) => entry.actual !== null ? index : acc, -1);
- const _forecastChartData = mockChartData.map((entry, index) => {
+ const lastActualIndex = forecastChartData.reduce((acc, entry, index) => entry.actual !== null ? index : acc, -1);
+ const _forecastChartData = forecastChartData.map((entry, index) => {
   if (lastActualIndex < 0) return { ...entry, forecastFromLastActual: entry.forecast };
   if (index < lastActualIndex) return { ...entry, forecastFromLastActual: null };
   if (index === lastActualIndex) return { ...entry, forecastFromLastActual: entry.actual as number };
   return { ...entry, forecastFromLastActual: entry.forecast };
  });
 
- const topProducts = [...mockForecastProducts].sort((a, b) => b.predictedDemand - a.predictedDemand).slice(0, 3);
+ const topProducts = [...forecastProducts].sort((a, b) => b.predictedDemand - a.predictedDemand).slice(0, 3);
 
  const handleViewProduct = (product: ForecastProduct) => {
   setSelectedProduct(product);
@@ -397,6 +403,11 @@ const AIDemandForecast: React.FC = () => {
      <p className="text-gray-400 text-sm mt-1">
       Predict future inventory demand using Machine Learning.
      </p>
+    </div>
+
+    <div role="status" className="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-4 text-sm text-slate-300">
+     <p className="font-semibold text-white">No forecast data available.</p>
+     <p className="mt-1 text-slate-400">Add transaction history and generate a new forecast.</p>
     </div>
 
     {/* ============================================ */}
@@ -661,7 +672,7 @@ const AIDemandForecast: React.FC = () => {
         <Sparkles className="w-4 h-4 text-blue-400" /> AI Insights
        </h3>
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {mockAIInsights.map((insight) => (
+         {aiInsights.map((insight) => (
          <div
           key={insight.id}
            className="bg-[#0d1322] border border-slate-800/80 rounded-xl p-4 transition-all duration-200"
@@ -678,7 +689,8 @@ const AIDemandForecast: React.FC = () => {
            )}
           </div>
          </div>
-        ))}
+         ))}
+         {aiInsights.length === 0 && <p className="md:col-span-2 py-6 text-center text-sm text-slate-400">No generated insights are available.</p>}
        </div>
       </div>
      </div>
@@ -716,7 +728,8 @@ const AIDemandForecast: React.FC = () => {
            </div>
           </div>
          </div>
-        ))}
+         ))}
+         {topProducts.length === 0 && <p className="py-6 text-center text-sm text-slate-400">No forecast ranking is available.</p>}
        </div>
       </div>
      </div>
@@ -737,7 +750,7 @@ const AIDemandForecast: React.FC = () => {
         </tr>
        </thead>
        <tbody>
-         {mockForecastHistory.map((history) => (
+          {forecastHistory.map((history) => (
           <tr key={history.id} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
           <td className="px-4 py-2.5 text-white text-sm">{history.generatedDate}</td>
           <td className="px-4 py-2.5 text-gray-400 text-sm">{history.generatedBy}</td>
@@ -745,7 +758,8 @@ const AIDemandForecast: React.FC = () => {
           <td className="px-4 py-2.5 text-right text-white text-sm font-medium">{history.accuracy}%</td>
           <td className="px-4 py-2.5 text-gray-400 text-sm">{history.forecastPeriod}</td>
          </tr>
-        ))}
+         ))}
+         {forecastHistory.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">No generated forecast history is available.</td></tr>}
        </tbody>
       </table>
      </div>

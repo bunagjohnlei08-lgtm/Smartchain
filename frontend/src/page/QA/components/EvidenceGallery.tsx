@@ -31,6 +31,7 @@ interface EvidenceGalleryProps {
   readOnlyLabel?: string;
   showDownload?: boolean;
   showMetadata?: boolean;
+  compact?: boolean;
 }
 
 const MAX_FILES = 5;
@@ -65,7 +66,7 @@ const SavedImage: React.FC<{ attachment: QaAttachment; onOpen: (url: string, nam
   </button>;
 };
 
-export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ attachments, editable = false, selectedFiles = [], removedIds = [], onSelectedFilesChange, onRemovedIdsChange, error, disabled, title = 'Evidence', description = 'JPG, PNG, or PDF · Max 5 MB each · Up to 5 files', emptyMessage = 'No evidence attached.', maxFiles = MAX_FILES, readOnlyLabel, showDownload = false, showMetadata = false }) => {
+export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ attachments, editable = false, selectedFiles = [], removedIds = [], onSelectedFilesChange, onRemovedIdsChange, error, disabled, title = 'Evidence', description = 'JPG, PNG, or PDF · Max 5 MB each · Up to 5 files', emptyMessage = 'No evidence attached.', maxFiles = MAX_FILES, readOnlyLabel, showDownload = false, showMetadata = false, compact = false }) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -134,12 +135,12 @@ export const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ attachments, e
     }
   };
 
-  return <div className="space-y-4">
+  return <div className={compact ? 'space-y-2.5' : 'space-y-4'}>
     <div className="flex flex-wrap items-start justify-between gap-2">
-      <div><h4 className="font-semibold text-(--text-primary)">{title}</h4><p className="text-sm text-(--text-secondary)">{description}</p></div>
-      <div className="flex flex-wrap items-center gap-2">{readOnlyLabel && <span className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">{readOnlyLabel}</span>}<span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300">{total} / {maxFiles} files</span></div>
+      <div><h4 className={`${compact ? 'text-[13px]' : ''} font-semibold text-(--text-primary)`}>{title}</h4><p className={`${compact ? 'text-[11px] leading-4' : 'text-sm'} text-(--text-secondary)`}>{description}</p></div>
+      <div className="flex flex-wrap items-center gap-2">{readOnlyLabel && <span className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">{readOnlyLabel}</span>}<span className={`rounded-full bg-cyan-500/10 font-semibold text-cyan-700 dark:text-cyan-300 ${compact ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'}`}>{total} / {maxFiles} files</span></div>
     </div>
-    {total === 0 && <p className="rounded-lg border border-dashed border-(--border-color-strong) p-4 text-center text-sm text-(--text-secondary)">{emptyMessage}</p>}
+    {total === 0 && <p className={`rounded-lg border border-dashed border-(--border-color-strong) text-center text-(--text-secondary) ${compact ? 'p-3 text-xs' : 'p-4 text-sm'}`}>{emptyMessage}</p>}
     <div data-qa-layout-debug="evidenceGrid" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {visibleSaved.map((attachment) => <article key={attachment.id} className="min-w-0 rounded-xl border border-(--border-color-strong) bg-(--bg-surface-alt) p-3">
         {attachment.mime_type.startsWith('image/') ? <SavedImage attachment={attachment} onOpen={(url, name) => setPreview({ url, name, owned: false })} /> : <div className="flex aspect-video items-center justify-center rounded-lg bg-red-500/10"><FileText className="h-10 w-10 text-red-500" /></div>}

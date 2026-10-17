@@ -1,3 +1,5 @@
+import { ClassificationBadge } from '../../components/catalog/ProductFields';
+import type { Classification } from '../../lib/catalog';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   X,
@@ -33,6 +35,8 @@ interface ReplenishmentRequest {
   request_no: string;
   product_id: number | null;
   product_name: string;
+  unit?: string;
+  item_classification?: Classification;
   warehouse_id: number | null;
   warehouse_name: string;
   requested_qty: number;
@@ -975,6 +979,7 @@ const Procurement: React.FC = () => {
                 <dt className="text-xs text-[var(--text-muted)]">Product</dt>
                 <dd className="text-[var(--text-primary)] font-medium">
                   {selectedRequest.product_name}
+                  {selectedRequest.item_classification && <div className="mt-2"><ClassificationBadge value={selectedRequest.item_classification}/></div>}
                 </dd>
               </div>
               <div>
@@ -986,7 +991,7 @@ const Procurement: React.FC = () => {
               <div>
                 <dt className="text-xs text-[var(--text-muted)]">Requested Qty</dt>
                 <dd className="text-[var(--text-primary)] font-medium">
-                  {selectedRequest.requested_qty.toLocaleString()}
+                  {selectedRequest.requested_qty.toLocaleString()} {selectedRequest.unit}
                 </dd>
               </div>
               <div>

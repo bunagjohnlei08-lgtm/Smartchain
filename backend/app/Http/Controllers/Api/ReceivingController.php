@@ -30,7 +30,7 @@ class ReceivingController extends Controller
 {
     private function present(Receiving $receiving): array
     {
-        $receiving->loadMissing(['items', 'receiptAttachments', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
+        $receiving->loadMissing(['items.purchaseOrderItem', 'items.product:id,item_classification', 'receiptAttachments', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
 
         $items = $receiving->items;
         $productSummary = match (true) {
@@ -73,6 +73,7 @@ class ReceivingController extends Controller
                 'id' => $item->id,
                 'product_id' => $item->product_id,
                 'product_name' => $item->product_name,
+                'item_classification' => $item->purchaseOrderItem?->item_classification ?? $item->product?->item_classification,
                 'ordered_quantity' => $item->ordered_quantity,
                 'delivered_quantity' => $item->delivered_quantity,
                 'unit' => $item->unit,
@@ -372,16 +373,16 @@ class ReceivingController extends Controller
                     if ((int) $itemData['delivered_quantity'] === 0) {
                         continue;
                     }
-                    $product = Product::query()->where('name', $poItem->product_name)->firstOrFail();
+                    $product = $poItem->product_id ? Product::findOrFail($poItem->product_id) : Product::query()->where('name', $poItem->product_name)->firstOrFail();
 
                     ReceivingItem::create([
                         'receiving_id' => $receiving->id,
                         'purchase_order_item_id' => $poItem->id,
                         'product_id' => $product->id,
-                        'product_name' => $product->name,
+                        'product_name' => $poItem->product_name,
                         'ordered_quantity' => $poItem->ordered_quantity,
                         'delivered_quantity' => $itemData['delivered_quantity'],
-                        'unit' => $product->unit,
+                        'unit' => $poItem->unit ?? $product->unit,
                         'inspection_status' => 'Pending QA',
                     ]);
                 }

@@ -34,8 +34,8 @@ class WarehouseCapacityWarningTest extends TestCase
             $slug => Role::create(['name' => $slug, 'slug' => $slug]),
         ]);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 1000, 'status' => 'Active']);
-        $other = Warehouse::create(['name' => 'Other Warehouse', 'code' => 'WH-OTHER', 'branch_id' => $branch->id, 'capacity' => 1000, 'status' => 'Active']);
+        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 1000, 'capacity_kg' => 0, 'capacity_pcs' => 1000, 'capacity_l' => 0, 'status' => 'Active']);
+        $other = Warehouse::create(['name' => 'Other Warehouse', 'code' => 'WH-OTHER', 'branch_id' => $branch->id, 'capacity' => 1000, 'capacity_kg' => 0, 'capacity_pcs' => 1000, 'capacity_l' => 0, 'status' => 'Active']);
         $this->admin = User::factory()->create(['role_id' => $roles['ADMIN']->id, 'status' => 'ACTIVE']);
         $this->manager = User::factory()->create(['role_id' => $roles['PLANT_MANAGER']->id, 'warehouse_id' => $this->warehouse->id, 'status' => 'ACTIVE']);
         $this->otherManager = User::factory()->create(['role_id' => $roles['PLANT_MANAGER']->id, 'warehouse_id' => $other->id, 'status' => 'ACTIVE']);
@@ -64,7 +64,7 @@ class WarehouseCapacityWarningTest extends TestCase
             $notification->title === 'Warehouse Near Capacity'
             && str_contains($notification->message, 'Main Warehouse')
             && str_contains($notification->message, '95.0%')
-            && str_contains($notification->message, '50 units')
+            && str_contains($notification->message, '50 remaining')
         );
         Notification::assertNotSentTo([$this->otherManager, $this->qa], WorkflowNotification::class);
 
@@ -96,8 +96,8 @@ class WarehouseCapacityWarningTest extends TestCase
         $this->actingAs($this->manager)->getJson('/api/plant-manager/warehouse')
             ->assertOk()->assertJsonPath('capacity_state', 'full')
             ->assertJsonPath('capacity_warning', true)
-            ->assertJsonPath('utilization_percentage', 100)
-            ->assertJsonPath('available', 0);
+            ->assertJsonPath('unit_capacity.PCS.utilization_percentage', 100)
+            ->assertJsonPath('unit_capacity.PCS.remaining', 0);
     }
 
     public function test_rolled_back_change_does_not_persist_state_or_send_warning(): void
@@ -116,5 +116,21 @@ class WarehouseCapacityWarningTest extends TestCase
         Notification::assertNothingSent();
         $this->assertSame(940, $this->inventory->fresh()->available_stock);
         $this->assertSame('NORMAL', $this->warehouse->fresh()->capacity_alert_level);
+    }
+
+    public function test_one_units_alert_does_not_suppress_another_units_warning(): void
+    {
+        Notification::fake();
+        $this->warehouse->update(['capacity' => 2000, 'capacity_kg' => 1000, 'capacity_pcs' => 1000, 'capacity_l' => 0]);
+        $this->setUtilized(1000);
+        Notification::fake();
+        $kg = Product::create(['name' => 'KG Alert Material', 'unit' => 'KG']);
+        DB::transaction(function () use ($kg): void {
+            $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($this->warehouse->id);
+            Inventory::create(['barcode' => 'KG-WARN', 'product_id' => $kg->id, 'warehouse_id' => $warehouse->id, 'available_stock' => 950]);
+            WarehouseCapacity::recordTransition($warehouse);
+        });
+        Notification::assertSentToTimes($this->admin, WorkflowNotification::class, 1);
+        Notification::assertSentTo($this->admin, WorkflowNotification::class, fn ($notification) => str_contains($notification->message, 'KG allocation:') && ! str_contains($notification->message, 'PCS allocation:'));
     }
 }

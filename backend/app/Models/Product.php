@@ -8,11 +8,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
-    /** Stock quantities are tracked in pieces. */
+    public const RAW_MATERIAL = 'RAW_MATERIAL';
+    public const FINISHED_PRODUCT = 'FINISHED_PRODUCT';
+    public const CLASSIFICATIONS = [self::RAW_MATERIAL, self::FINISHED_PRODUCT];
+    /** Existing quantity columns count whole units of the chosen stock unit. */
     public const DEFAULT_UNIT = 'PCS';
+    public const PACKAGE_UNITS = ['PCS', 'SACK', 'DRUM'];
+
+    protected $attributes = ['item_classification' => self::FINISHED_PRODUCT, 'unit' => self::DEFAULT_UNIT];
 
     protected $fillable = [
-        'name', 'category', 'brand', 'unit', 'cost_price', 'selling_price', 'reorder_level',
+        'name', 'category', 'brand', 'unit', 'cost_price', 'selling_price', 'reorder_level', 'item_classification',
     ];
 
     protected function casts(): array

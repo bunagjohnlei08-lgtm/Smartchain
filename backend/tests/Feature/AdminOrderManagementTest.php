@@ -80,7 +80,7 @@ class AdminOrderManagementTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
-    public function test_admin_can_create_a_new_order_for_a_real_product_without_catalog_unit_or_inventory(): void
+    public function test_admin_can_create_a_new_order_with_the_catalog_default_unit_without_inventory(): void
     {
         $admin = $this->userWithRole('ADMIN');
         $product = Product::create(['name' => 'TOMAHAWK EC', 'category' => 'WOOD PRESERVATIVE PRODUCTS']);
@@ -93,7 +93,7 @@ class AdminOrderManagementTest extends TestCase
             'items' => [[
                 'product_id' => $product->id,
                 'quantity' => 3,
-                'unit' => 'drum',
+                'unit' => 'PCS',
                 'unit_price' => 125.50,
             ]],
         ])->assertCreated()
@@ -101,7 +101,7 @@ class AdminOrderManagementTest extends TestCase
             ->assertJsonPath('assigned_to', null)
             ->assertJsonPath('items.0.product_id', $product->id)
             ->assertJsonPath('items.0.product_name', 'TOMAHAWK EC')
-            ->assertJsonPath('items.0.unit', 'drum')
+            ->assertJsonPath('items.0.unit', 'PCS')
             ->assertJsonPath('items.0.subtotal', '376.50')
             ->assertJsonPath('total_amount', '376.50');
 
@@ -110,7 +110,7 @@ class AdminOrderManagementTest extends TestCase
         ]);
         $this->assertDatabaseHas('order_items', [
             'order_id' => $response->json('id'), 'product_id' => $product->id,
-            'product_name' => 'TOMAHAWK EC', 'quantity' => 3, 'unit' => 'drum',
+            'product_name' => 'TOMAHAWK EC', 'quantity' => 3, 'unit' => 'PCS',
             'unit_price' => 125.50, 'subtotal' => 376.50,
         ]);
 
