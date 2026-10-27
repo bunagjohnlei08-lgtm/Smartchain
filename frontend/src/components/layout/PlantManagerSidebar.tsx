@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
+import { AI_FORECAST_ENABLED } from '../../config/features';
 
 const navGroups = [
   {
@@ -49,7 +50,7 @@ const navGroups = [
     title: 'INSIGHTS',
     items: [
       { id: 'reports', icon: BarChart3, label: 'Reports', path: '/plant-manager/reports' },
-      { id: 'forecast', icon: Sparkles, label: 'AI Forecast', path: '/plant-manager/forecast' },
+      ...(AI_FORECAST_ENABLED ? [{ id: 'forecast', icon: Sparkles, label: 'AI Forecast', path: '/plant-manager/forecast' }] : []),
     ],
   },
   {

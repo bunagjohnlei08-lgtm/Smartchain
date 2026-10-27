@@ -191,7 +191,7 @@ const Suppliers: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 bg-[#0b0f19] p-4 text-slate-100 sm:p-6">
+    <div className="w-full min-w-0 space-y-6 bg-[#0b0f19] p-4 text-slate-100 sm:p-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Plant Manager</span>

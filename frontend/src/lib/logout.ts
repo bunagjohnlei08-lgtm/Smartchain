@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { clearAuthStorage } from './authSession';
+import { broadcastSessionEnd, clearAuthStorage, currentSessionKey } from './authSession';
 
 export { clearAuthStorage } from './authSession';
 
@@ -11,11 +11,13 @@ export { clearAuthStorage } from './authSession';
  * so the local state is cleared either way.
  */
 export const logout = async (): Promise<void> => {
+  const sessionKey = currentSessionKey();
   try {
     await apiClient.post('/logout');
   } catch {
     // Ignored on purpose - see above.
   } finally {
+    broadcastSessionEnd('logout', sessionKey);
     clearAuthStorage();
   }
 };

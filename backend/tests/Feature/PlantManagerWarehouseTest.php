@@ -28,7 +28,7 @@ class PlantManagerWarehouseTest extends TestCase
         $warehouse = Warehouse::create([
             'name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id,
             'address' => 'G/F, Brgy. New Marikina Subd., 29 Flamingo, Marikina, 1800 Metro Manila', 'latitude' => 14.6305374,
-            'longitude' => 121.1010625, 'capacity' => 1000, 'capacity_kg' => 0, 'capacity_pcs' => 1000, 'capacity_l' => 0, 'status' => 'Active',
+            'longitude' => 121.1010625, 'capacity' => 1000, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 1000, 'capacity_returned' => 0, 'status' => 'Active',
         ]);
         $product = Product::create(['name' => 'Warehouse Product', 'unit' => 'pcs', 'cost_price' => 10]);
         Inventory::create([
@@ -62,7 +62,7 @@ class PlantManagerWarehouseTest extends TestCase
         $warehouse = Warehouse::create([
             'name' => 'Main Warehouse', 'code' => 'WH-PAMP', 'branch_id' => $branch->id,
             'address' => 'G/F, Brgy, New Marikina Subd, 29 Flamingo, Marikina, 1800 Metro Manila', 'latitude' => 14.6305374,
-            'longitude' => 121.1010625, 'capacity' => 1000, 'capacity_kg' => 0, 'capacity_pcs' => 1000, 'capacity_l' => 0, 'status' => 'Active',
+            'longitude' => 121.1010625, 'capacity' => 1000, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 1000, 'capacity_returned' => 0, 'status' => 'Active',
         ]);
 
         $this->actingAs($this->user('PLANT_MANAGER', ['warehouse_id' => $warehouse->id]))->getJson('/api/plant-manager/warehouse')

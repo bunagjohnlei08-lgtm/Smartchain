@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Middleware\AuthenticateSupplierPortal;
+use App\Http\Middleware\EnsureSupplierAccount;
+use App\Http\Middleware\AuthenticateLogisticsCallback;
 use App\Http\Middleware\EnforceIdleSessionTimeout;
 use App\Http\Middleware\EnsureAccountIsActive;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -30,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureAccountIsActive::class,
             'idle' => EnforceIdleSessionTimeout::class,
             'supplier.portal' => AuthenticateSupplierPortal::class,
+            'supplier.account' => EnsureSupplierAccount::class,
+            'logistics.callback' => AuthenticateLogisticsCallback::class,
         ]);
 
         // API authentication failures must reach the exception handler instead of
@@ -47,6 +52,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+
+            return null;
+        });
+
+        // Login can touch the database before credentials are checked (for the
+        // database-backed rate limiter). Never return SQL, connection details,
+        // or a debug trace to this public endpoint when that dependency fails.
+        $exceptions->render(function (QueryException $e, Request $request) {
+            if ($request->is('api/login')) {
+                return response()->json([
+                    'message' => 'Unable to connect to the server right now. Please try again later.',
+                ], 503);
             }
 
             return null;

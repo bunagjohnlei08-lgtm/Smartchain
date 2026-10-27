@@ -317,6 +317,7 @@ class ProductController extends Controller
 
         return [
             'id' => $product->id,
+            'image_url' => $product->image_path ? route('public.products.image', $product) : null,
             'name' => $product->name,
             'category' => $product->category,
             'brand' => $product->brand,

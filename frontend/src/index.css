@@ -872,27 +872,6 @@
   max-width: 100%;
 }
 
-/* Admin Inventory (tablet/desktop): every column has an explicit width, so no
-   single column absorbs the spare space. Their sum is the table's min-width;
-   wider content areas stretch all columns proportionally, narrower ones scroll
-   inside the wrapper. Mobile geometry lives in the max-width: 639px block. */
-/* Product names wrap to two lines (rows are already barcode-height); only
-   longer names are clipped with an ellipsis. The full name is in the title. */
-/* Classification is separate from names; keep the existing compact badge
-   and reserve label width without shrinking the surrounding table text. */
-.admin-product-catalog .product-catalog-table :is(th, td):nth-child(2) {
-  min-width: 220px;
-  max-width: 320px;
-}
-.admin-product-catalog .product-catalog-table td:nth-child(2) {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.admin-product-catalog .product-catalog-table :is(th, td):nth-child(3) {
-  min-width: 152px;
-  white-space: nowrap;
-}
-
 .admin-main .admin-inventory-table td:nth-child(2) > div > span {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -5701,3 +5680,53 @@ body {
     }
   }
 }
+/* Product Catalog: one deterministic column map shared by headers and cells.
+   The table is intentionally wider than its card, so only its wrapper scrolls. */
+.admin-product-catalog .custom-scrollbar {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.admin-product-catalog .product-catalog-table {
+  width: 1934px;
+  min-width: 1934px;
+  table-layout: fixed;
+}
+.admin-product-catalog .product-catalog-table :is(th, td) { min-width: 0; max-width: none; overflow: hidden; vertical-align: middle; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(1) { width: 48px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(2) { width: 72px; padding-inline: 8px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(3) { width: 240px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(4) { width: 176px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(5) { width: 176px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(6) { width: 140px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(7) { width: 190px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(8) { width: 180px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(9) { width: 112px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(10) { width: 72px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(11),
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(12),
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(13) { width: 128px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(14) { width: 144px; }
+.admin-product-catalog .product-catalog-table th { white-space: normal; }
+.admin-product-catalog .product-catalog-table td:nth-child(3) {
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-product-catalog .product-catalog-table td:is(:nth-child(5), :nth-child(6), :nth-child(7), :nth-child(8)) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rfq-records-table th:nth-child(1) { width: 180px; }
+.rfq-records-table th:nth-child(2) { width: 260px; }
+.rfq-records-table th:nth-child(3) { width: 72px; }
+.rfq-records-table th:nth-child(4) { width: 170px; }
+.rfq-records-table th:nth-child(5), .rfq-records-table th:nth-child(6) { width: 180px; }
+.rfq-records-table th:nth-child(7) { width: 320px; }
+.rfq-records-table th, .rfq-records-table td { padding-inline: 12px; vertical-align: middle; }

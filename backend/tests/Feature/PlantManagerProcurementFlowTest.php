@@ -12,6 +12,7 @@ use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class PlantManagerProcurementFlowTest extends TestCase
@@ -194,6 +195,39 @@ class PlantManagerProcurementFlowTest extends TestCase
             'requested_qty' => 100,
             'priority' => 'Low',
         ])->assertCreated()->assertJsonPath('priority', 'Critical');
+    }
+
+    public function test_manual_request_works_without_phase_two_forecast_columns(): void
+    {
+        $this->removeForecastContextColumns();
+        Inventory::create([
+            'barcode' => 'INV-PHASE1-SCHEMA', 'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id, 'available_stock' => 3,
+        ]);
+
+        $response = $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'requested_qty' => 25,
+        ])->assertCreated()->assertJsonPath('source', 'MANUAL')
+            ->assertJsonPath('recommendation_snapshot', null);
+
+        $this->assertDatabaseHas('replenishment_requests', [
+            'id' => $response->json('id'),
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'requested_qty' => 25,
+            'status' => ReplenishmentRequest::STATUS_PENDING,
+        ]);
+    }
+
+    private function removeForecastContextColumns(): void
+    {
+        foreach (['source', 'recommendation_snapshot'] as $column) {
+            if (Schema::hasColumn('replenishment_requests', $column)) {
+                Schema::table('replenishment_requests', fn ($table) => $table->dropColumn($column));
+            }
+        }
     }
 
     public function test_submitting_a_draft_recalculates_priority_from_latest_stock(): void

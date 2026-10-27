@@ -8,9 +8,12 @@ use App\Models\SupplierAlias;
 use App\Models\SupplierApplication;
 use App\Models\SupplierApplicationAttachment;
 use App\Models\SupplierApplicationEvent;
+use App\Models\Role;
+use App\Models\User;
 use App\Support\AuditLogger;
 use App\Support\SupplierName;
 use App\Support\SupplierPortalNotifications;
+use App\Support\UserInvitations;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -195,12 +198,24 @@ class AdminSupplierApplicationController extends Controller
             abort_if($application->status === SupplierApplication::STATUS_REJECTED, 422, 'A rejected application cannot be approved.');
             abort_if($application->status === SupplierApplication::STATUS_APPROVED, 409, 'The approved application no longer has its linked supplier. Resolve the official record before retrying.');
             abort_unless($application->status === SupplierApplication::STATUS_MEETING_COMPLETED, 422, 'Final supplier approval requires a completed meeting.');
+            $eligibility = $this->approvalEligibility($application);
+            if (! $eligibility['eligible']) {
+                throw ValidationException::withMessages([
+                    'application' => [$eligibility['message']],
+                ]);
+            }
 
             // Different applications have different row locks. This stable
             // transaction-scoped PostgreSQL lock serializes the duplicate check
             // and official Supplier insert without retaining an application lock.
             DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['smartchain_supplier_approval']);
             $this->guardAgainstDuplicateSupplier($application);
+
+            $accreditationExpiresOn = $application->attachments()->where('is_current', true)
+                ->where('verification_status', SupplierApplicationAttachment::STATUS_VERIFIED)
+                ->whereIn('attachment_type', [SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE, SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT])
+                ->whereNotNull('expires_on')->min('expires_on');
+            abort_unless($accreditationExpiresOn, 422, 'Verified required documents must have validity dates before supplier approval.');
 
             $supplier = new Supplier([
                 'name' => $application->company_name,
@@ -212,6 +227,9 @@ class AdminSupplierApplicationController extends Controller
                 'supply_category' => $application->supply_category,
                 'products_services' => $application->products_services,
                 'status' => 'ACTIVE',
+                'accreditation_status' => 'ACTIVE',
+                'accredited_at' => now(),
+                'accreditation_expires_on' => $accreditationExpiresOn,
                 'notes' => "Approved from {$application->application_number}.",
             ]);
             $supplier->forceFill(['supplier_code' => 'TMP-'.Str::uuid()])->save();
@@ -242,9 +260,28 @@ class AdminSupplierApplicationController extends Controller
                 'metadata' => ['supplier_id' => $supplier->id],
             ]);
 
-            return [$application->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']), true];
+            $supplierRole = Role::query()->where('slug', 'SUPPLIER')->lockForUpdate()->firstOrFail();
+            $supplierUser = User::query()->where('email', $application->normalized_email)->lockForUpdate()->first();
+            abort_if($supplierUser && $supplierUser->supplier_id && $supplierUser->supplier_id !== $supplier->id, 409, 'The authorized contact email is already linked to another supplier account.');
+            abort_if($supplierUser && ! $supplierUser->isSupplier(), 409, 'The authorized contact email belongs to an internal user account. Resolve the account before approval.');
+            $supplierUser ??= new User();
+            $supplierUser->forceFill([
+                'name' => $application->contact_person,
+                'email' => $application->normalized_email,
+                'password' => Str::random(64),
+                'role_id' => $supplierRole->id,
+                'supplier_id' => $supplier->id,
+                'status' => 'PENDING',
+                'employee_id' => null,
+            ])->save();
+            $interestRows = $application->biddingInterests()->pluck('rfq_lines.id')->map(fn ($lineId) => ['supplier_id'=>$supplier->id,'rfq_line_id'=>$lineId,'selected_by_user_id'=>$supplierUser->id,'created_at'=>now(),'updated_at'=>now()])->all();
+            if ($interestRows !== []) DB::table('supplier_bidding_interests')->insertOrIgnore($interestRows);
+            [$invitation, $token] = UserInvitations::issue($supplierUser, $request->user());
+
+            return [$application->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']), true, $supplierUser, $invitation, $token];
         });
 
+        $invitationAccepted = null;
         if ($result[1]) {
             SupplierPortalNotifications::sendStatus(
                 $result[0],
@@ -252,12 +289,83 @@ class AdminSupplierApplicationController extends Controller
                 'Application approved',
                 'Your supplier application completed the evaluation process and was approved. Your company is now registered as an official supplier.',
             );
+            $invitationAccepted = UserInvitations::send($result[2], $result[3], $result[4]);
+            AuditLogger::log('SUPPLIER_ACCOUNT_INVITATION_SENT', AuditLogger::MODULE_SUPPLIERS, [
+                'status' => $invitationAccepted ? 'SUCCESS' : 'FAILURE',
+                'actor' => $request->user(), 'resource' => $result[2], 'resource_label' => $result[2]->email,
+                'details' => $invitationAccepted ? 'Supplier activation invitation accepted by mail transport.' : 'Supplier activation invitation could not be sent.',
+                'metadata' => ['supplier_id' => $result[2]->supplier_id],
+            ]);
         }
 
         return response()->json([
-            'message' => $result[1] ? 'Application approved and active supplier created.' : 'Application was already approved; no duplicate supplier was created.',
+            'message' => $result[1]
+                ? ($invitationAccepted ? 'Application approved; the activation invitation was accepted by the mail service.' : 'Application approved, but the activation invitation could not be sent. Use Resend Invitation.')
+                : 'Application was already approved; no duplicate supplier was created.',
+            'account_invitation_status' => $result[1] ? ($invitationAccepted ? 'INVITATION_PENDING' : 'DELIVERY_FAILED') : null,
             'data' => $this->applicationData($result[0]),
         ]);
+    }
+
+    public function verifyAttachment(Request $request, SupplierApplication $supplierApplication, SupplierApplicationAttachment $attachment): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($attachment->supplier_application_id === $supplierApplication->id && $attachment->is_current, 404);
+        $validated = $request->validate([
+            'verification_status' => ['required', Rule::in(SupplierApplicationAttachment::VERIFICATION_STATUSES)],
+            'valid_from' => ['nullable', 'date'],
+            'expires_on' => ['nullable', 'date', 'after_or_equal:valid_from'],
+            'reason' => ['nullable', 'string', 'max:2000', Rule::requiredIf(fn () => in_array($request->input('verification_status'), [SupplierApplicationAttachment::STATUS_CORRECTION_REQUIRED, SupplierApplicationAttachment::STATUS_REJECTED], true))],
+            'document_updated_at' => ['nullable', 'date'],
+            'document_verification_status' => ['nullable', Rule::in(SupplierApplicationAttachment::VERIFICATION_STATUSES)],
+        ]);
+        [$application, $reviewedAttachment, $status] = DB::transaction(function () use ($request, $supplierApplication, $attachment, $validated) {
+            $application = SupplierApplication::query()->lockForUpdate()->findOrFail($supplierApplication->id);
+            abort_if(in_array($application->status, [SupplierApplication::STATUS_APPROVED, SupplierApplication::STATUS_REJECTED], true), 409, 'Finalized applications are read-only. Use an authorized amendment process for later corrections.');
+            $reviewedAttachment = SupplierApplicationAttachment::query()->lockForUpdate()->findOrFail($attachment->id);
+            abort_unless($reviewedAttachment->supplier_application_id === $application->id && $reviewedAttachment->is_current, 404);
+            if ((isset($validated['document_updated_at']) && ! $reviewedAttachment->updated_at->equalTo($validated['document_updated_at']))
+                || (isset($validated['document_verification_status']) && $reviewedAttachment->verification_status !== $validated['document_verification_status'])) {
+                abort(409, 'This document review changed in another session. Refresh the application before saving.');
+            }
+            $status = $validated['verification_status'];
+            if (($validated['expires_on'] ?? null) && now()->startOfDay()->gt($validated['expires_on'])) {
+                $status = SupplierApplicationAttachment::STATUS_EXPIRED;
+            }
+            $reviewedAttachment->update([
+                'verification_status' => $status,
+                'verified_by_id' => $request->user()->id,
+                'verified_at' => now(),
+                'valid_from' => $validated['valid_from'] ?? null,
+                'expires_on' => $validated['expires_on'] ?? null,
+                'verification_reason' => $validated['reason'] ?? null,
+            ]);
+
+            return [$application, $reviewedAttachment->fresh(), $status];
+        });
+        AuditLogger::success('SUPPLIER_DOCUMENT_REVIEWED', AuditLogger::MODULE_SUPPLIERS, [
+            'actor' => $request->user(), 'resource' => $reviewedAttachment, 'resource_label' => $reviewedAttachment->original_name,
+            'details' => "Supplier document marked {$status}.", 'metadata' => ['application_id' => $application->id],
+        ]);
+        return response()->json(['data' => $this->applicationData($application->fresh())]);
+    }
+
+    public function resendAccountInvitation(Request $request, SupplierApplication $supplierApplication): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        [$user, $invitation, $token] = DB::transaction(function () use ($request, $supplierApplication) {
+            $application = SupplierApplication::query()->lockForUpdate()->findOrFail($supplierApplication->id);
+            abort_unless($application->status === SupplierApplication::STATUS_APPROVED && $application->approved_supplier_id, 422, 'Only an approved supplier can receive an account invitation.');
+            $user = User::query()->where('supplier_id', $application->approved_supplier_id)->lockForUpdate()->firstOrFail();
+            abort_unless($user->status === 'PENDING', 422, 'This supplier account is already active or disabled.');
+            [$invitation, $token] = UserInvitations::issue($user, $request->user());
+            return [$user, $invitation, $token];
+        });
+        $accepted = UserInvitations::send($user, $invitation, $token);
+        return response()->json([
+            'message' => $accepted ? 'A new activation invitation was accepted by the mail service.' : 'The activation invitation could not be sent. Please try again.',
+            'account_invitation_status' => $accepted ? 'INVITATION_PENDING' : 'DELIVERY_FAILED',
+        ], $accepted ? 200 : 502);
     }
 
     public function reject(Request $request, SupplierApplication $supplierApplication): JsonResponse
@@ -393,9 +501,75 @@ class AdminSupplierApplicationController extends Controller
             'preview_url' => "/admin/supplier-applications/{$application->id}/attachments/{$attachment->id}/preview",
             'download_url' => "/admin/supplier-applications/{$application->id}/attachments/{$attachment->id}/download",
             'created_at' => $attachment->created_at,
+            'verification_status' => $attachment->verification_status,
+            'verified_at' => $attachment->verified_at,
+            'valid_from' => $attachment->valid_from?->toDateString(),
+            'expires_on' => $attachment->expires_on?->toDateString(),
+            'verification_reason' => $attachment->verification_reason,
+            'updated_at' => $attachment->updated_at,
         ])->values()->all();
+        $data['attachment_history'] = $application->attachments->sortByDesc('created_at')->map(fn (SupplierApplicationAttachment $attachment) => [
+            'id' => $attachment->id,
+            'attachment_type' => $attachment->attachment_type,
+            'original_name' => $attachment->original_name,
+            'verification_status' => $attachment->verification_status,
+            'is_current' => $attachment->is_current,
+            'replaces_attachment_id' => $attachment->replaces_attachment_id,
+            'verified_at' => $attachment->verified_at,
+            'expires_on' => $attachment->expires_on?->toDateString(),
+            'verification_reason' => $attachment->verification_reason,
+            'created_at' => $attachment->created_at,
+        ])->values()->all();
+        $data['approval_eligibility'] = $this->approvalEligibility($application);
 
         return $data;
+    }
+
+    /**
+     * Return the server-authoritative approval blockers without changing state.
+     * A document remains valid throughout its expires_on calendar date.
+     *
+     * @return array{eligible: bool, message: string, documents: array<int, array{type: string, label: string, status: string}>}
+     */
+    private function approvalEligibility(SupplierApplication $application): array
+    {
+        $documents = $application->relationLoaded('attachments')
+            ? $application->attachments->where('is_current', true)
+            : $application->attachments()->where('is_current', true)->get();
+        $requirements = [
+            SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE => 'Business Certificate',
+            SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT => 'Business Permit',
+        ];
+        $results = [];
+
+        foreach ($requirements as $type => $label) {
+            $candidates = $documents->where('attachment_type', $type);
+            $verified = $candidates->first(fn (SupplierApplicationAttachment $document) =>
+                $document->verification_status === SupplierApplicationAttachment::STATUS_VERIFIED
+                && (! $document->expires_on || ! $document->expires_on->lt(today()))
+            );
+            if ($verified) {
+                $status = SupplierApplicationAttachment::STATUS_VERIFIED;
+            } elseif ($candidates->isEmpty()) {
+                $status = 'MISSING';
+            } else {
+                $document = $candidates->sortByDesc('created_at')->first();
+                $status = $document->expires_on && $document->expires_on->lt(today())
+                    ? SupplierApplicationAttachment::STATUS_EXPIRED
+                    : $document->verification_status;
+            }
+            $results[] = ['type' => $type, 'label' => $label, 'status' => $status];
+        }
+
+        $blocked = collect($results)->where('status', '!=', SupplierApplicationAttachment::STATUS_VERIFIED)->values();
+        $eligible = $application->status === SupplierApplication::STATUS_MEETING_COMPLETED && $blocked->isEmpty();
+        $message = $blocked->isNotEmpty()
+            ? 'Approval unavailable: '.$blocked->map(fn (array $document) => "{$document['label']} is ".strtolower(str_replace('_', ' ', $document['status'])))->join('; ').'.'
+            : ($application->status === SupplierApplication::STATUS_MEETING_COMPLETED
+                ? 'All required business documents are verified and valid.'
+                : 'Final supplier approval requires a completed meeting.');
+
+        return ['eligible' => $eligible, 'message' => $message, 'documents' => $results];
     }
 
     private function guardAgainstDuplicateSupplier(SupplierApplication $application): void

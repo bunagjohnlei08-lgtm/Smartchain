@@ -135,6 +135,23 @@ class PurchaseOrderSendTest extends TestCase
             && ! $mail->hasTo('attacker@evil.test') && count($mail->to) === 1);
     }
 
+    public function test_repeated_send_is_idempotent(): void
+    {
+        Mail::fake();
+
+        $this->send()->assertOk();
+        $sentAt = $this->order->fresh()->sent_at;
+
+        $this->send()
+            ->assertOk()
+            ->assertJsonPath('status', PurchaseOrder::STATUS_SENT_TO_SUPPLIER)
+            ->assertJsonPath('message', 'Purchase order was already sent to the supplier.');
+
+        Mail::assertSentCount(1);
+        $this->assertSame($sentAt?->toISOString(), $this->order->fresh()->sent_at?->toISOString());
+        $this->assertSame(1, AuditLog::query()->where('action', 'PO_SENT_TO_SUPPLIER')->count());
+    }
+
     public function test_new_purchase_order_stores_authoritative_supplier_id_and_name_snapshot(): void
     {
         $response = $this->actingAs($this->admin)->postJson('/api/purchase-orders', [

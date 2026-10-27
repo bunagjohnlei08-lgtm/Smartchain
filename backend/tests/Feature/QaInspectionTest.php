@@ -256,7 +256,7 @@ class QaInspectionTest extends TestCase
         ]);
         $plantManager = User::factory()->create(['role_id' => $plantManagerRole->id]);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'BR-MAIN']);
-        Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 10000, 'capacity_kg' => 0, 'capacity_pcs' => 10000, 'capacity_l' => 0]);
+        Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 10000, 'capacity_kg' => 0, 'capacity_pcs' => 10000, 'capacity_l' => 0, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 10000, 'capacity_returned' => 0]);
         $receiving = $this->makeReceiving([
             ['product' => 'Partial Widget', 'qty' => 5],
         ]);
@@ -283,8 +283,9 @@ class QaInspectionTest extends TestCase
             ->assertJsonPath('data.0.stock_in_status', 'Ready for Stock In')
             ->assertJsonPath('data.0.eligible_quantity', 3);
 
-        $this->actingAs($plantManager)
-            ->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")
+        $stockIn = $this->actingAs($plantManager)
+            ->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in");
+        $stockIn
             ->assertOk()
             ->assertJsonPath('qa_status', 'Partial')
             ->assertJsonPath('stock_in_status', 'Completed');

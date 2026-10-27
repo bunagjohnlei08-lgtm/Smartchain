@@ -13,3 +13,4 @@ Artisan::command('inspire', function () {
 Schedule::command('reports:run-scheduled')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('inventory-audits:process-schedule')->dailyAt('08:00')->timezone('Asia/Manila')->withoutOverlapping();
 Schedule::command('suppliers:archive-expired-removals')->dailyAt('00:15')->timezone('Asia/Manila')->withoutOverlapping();
+Schedule::command('rfqs:close-expired')->everyMinute()->withoutOverlapping();

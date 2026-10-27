@@ -15,6 +15,7 @@ use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -281,8 +282,10 @@ class PlantManagerProcurementController extends Controller
         int $requestedBy,
         string $status,
         int $currentStock,
+        string $source = 'MANUAL',
+        ?array $recommendationSnapshot = null,
     ): ReplenishmentRequest {
-        return ReplenishmentRequest::create([
+        $attributes = [
             'product_id' => $productId,
             'warehouse_id' => $warehouseId,
             'requested_qty' => $requestedQty,
@@ -291,7 +294,18 @@ class PlantManagerProcurementController extends Controller
             'requested_by' => $requestedBy,
             'status' => $status,
             'submitted_at' => $status === self::STATUS_PENDING ? now() : null,
-        ]);
+        ];
+        if ($this->supportsForecastContext()) {
+            $attributes['source'] = $source;
+            $attributes['recommendation_snapshot'] = $recommendationSnapshot;
+        }
+
+        return ReplenishmentRequest::create($attributes);
+    }
+
+    private function supportsForecastContext(): bool
+    {
+        return Schema::hasColumns('replenishment_requests', ['source', 'recommendation_snapshot']);
     }
 
     private function afterRequestCreated(ReplenishmentRequest $replenishmentRequest, bool $submitted): void

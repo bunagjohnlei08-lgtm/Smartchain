@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\SupplierApplicationPortalMail;
+use App\Mail\UserInvitationMail;
 use App\Models\Role;
 use App\Models\Supplier;
 use App\Models\SupplierApplication;
@@ -100,6 +101,18 @@ class SupplierApplicationWorkflowTest extends TestCase
             ->assertCreated();
 
         return SupplierApplication::where('application_number', $response->json('data.application_number'))->firstOrFail();
+    }
+
+    private function verifyMandatoryDocuments(SupplierApplication $application): void
+    {
+        $application->attachments()->whereIn('attachment_type', ['BUSINESS_CERTIFICATE', 'BUSINESS_PERMIT'])->get()
+            ->each(function (SupplierApplicationAttachment $attachment) use ($application): void {
+                $this->actingAs($this->admin)->patchJson("/api/admin/supplier-applications/{$application->id}/attachments/{$attachment->id}/verification", [
+                    'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED,
+                    'valid_from' => now()->toDateString(),
+                    'expires_on' => now()->addYear()->toDateString(),
+                ])->assertOk();
+            });
     }
 
     public function test_guest_can_submit_application_without_creating_supplier_or_user(): void
@@ -439,6 +452,7 @@ class SupplierApplicationWorkflowTest extends TestCase
         $rejectedPath = $rejected->attachments()->firstOrFail()->stored_path;
         $approved->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
         $rejected->update(['status' => SupplierApplication::STATUS_UNDER_REVIEW]);
+        $this->verifyMandatoryDocuments($approved);
 
         $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$approved->id}/approve")
             ->assertOk()->assertJsonCount(3, 'data.attachments');
@@ -674,6 +688,7 @@ class SupplierApplicationWorkflowTest extends TestCase
     {
         $application = $this->submit();
         $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $this->verifyMandatoryDocuments($application);
         $first = $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
             ->assertOk()->assertJsonPath('data.status', SupplierApplication::STATUS_APPROVED);
         $second = $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
@@ -686,7 +701,9 @@ class SupplierApplicationWorkflowTest extends TestCase
             'products_services' => 'Industrial materials, safety equipment, and local delivery services.', 'status' => 'ACTIVE',
         ]);
         $this->assertDatabaseMissing('suppliers', ['supplier_code' => null]);
-        $this->assertSame(0, User::where('email', 'sales@atlas.test')->count());
+        $this->assertDatabaseHas('users', ['email' => 'sales@atlas.test', 'supplier_id' => $first->json('data.approved_supplier.id'), 'status' => 'PENDING']);
+        Mail::assertSent(UserInvitationMail::class, fn (UserInvitationMail $mail) => $mail->hasTo('sales@atlas.test'));
+        $this->assertDatabaseCount('user_invitations', 1);
         $this->assertDatabaseHas('audit_logs', ['action' => 'SUPPLIER_APPLICATION_APPROVED', 'resource_label' => $application->application_number]);
         $this->assertDatabaseHas('supplier_application_events', ['supplier_application_id' => $application->id, 'event_type' => 'APPROVED']);
     }
@@ -695,6 +712,7 @@ class SupplierApplicationWorkflowTest extends TestCase
     {
         $application = $this->submit();
         $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $this->verifyMandatoryDocuments($application);
         $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/reject", [])->assertUnprocessable()->assertJsonValidationErrors('reason_codes');
         $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/reject", [
             'reason_codes' => ['CAPABILITY_NOT_MET'],
@@ -721,6 +739,7 @@ class SupplierApplicationWorkflowTest extends TestCase
         Supplier::create(['supplier_code' => 'SUP-EXISTING', 'name' => 'Atlas Industrial Supply', 'email' => 'other@atlas.test', 'status' => 'ACTIVE']);
         $application = $this->submit();
         $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $this->verifyMandatoryDocuments($application);
 
         $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
             ->assertUnprocessable()->assertJsonValidationErrors('application');
@@ -762,5 +781,104 @@ class SupplierApplicationWorkflowTest extends TestCase
             ->postJson("/api/admin/supplier-applications/{$application->id}/approve")
             ->assertUnprocessable();
         $this->assertDatabaseCount('suppliers', 0);
+    }
+
+    public function test_approval_requires_each_mandatory_document_type_and_reports_the_blocker(): void
+    {
+        $application = $this->submit();
+        $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $certificate = $application->attachments()->where('attachment_type', SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE)->firstOrFail();
+        $permit = $application->attachments()->where('attachment_type', SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT)->firstOrFail();
+        $certificate->update(['verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED, 'expires_on' => today()->addYear()]);
+        $permit->update(['attachment_type' => SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE, 'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED, 'expires_on' => today()->addYear()]);
+
+        $this->actingAs($this->admin)->getJson("/api/admin/supplier-applications/{$application->id}")
+            ->assertOk()
+            ->assertJsonPath('data.approval_eligibility.eligible', false)
+            ->assertJsonPath('data.approval_eligibility.documents.1.status', 'MISSING');
+        $this->postJson("/api/admin/supplier-applications/{$application->id}/approve")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('application');
+        $this->assertDatabaseCount('suppliers', 0);
+    }
+
+    public function test_document_expiring_today_remains_valid_for_approval(): void
+    {
+        $application = $this->submit();
+        $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $application->attachments()->whereIn('attachment_type', [
+            SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE,
+            SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT,
+        ])->update(['verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED, 'expires_on' => today()]);
+
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', SupplierApplication::STATUS_APPROVED);
+        $this->assertDatabaseCount('suppliers', 1);
+    }
+
+    public function test_rejection_does_not_require_verified_or_unexpired_documents(): void
+    {
+        $application = $this->submit();
+        $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $application->attachments()->where('attachment_type', SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT)
+            ->update(['verification_status' => SupplierApplicationAttachment::STATUS_EXPIRED, 'expires_on' => today()->subDay()]);
+
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/reject", [
+            'reason_codes' => ['DOCUMENTS_CANNOT_BE_VALIDATED'],
+            'supplier_message' => 'The required business documents could not be validated.',
+        ])->assertUnprocessable()->assertJsonValidationErrors('reason_codes');
+
+        $this->postJson("/api/admin/supplier-applications/{$application->id}/reject", [
+            'reason_codes' => ['COMPLIANCE_NOT_SATISFIED'],
+            'supplier_message' => 'The required business documents could not be validated.',
+        ])->assertOk()->assertJsonPath('data.status', SupplierApplication::STATUS_REJECTED);
+        $this->assertDatabaseCount('suppliers', 0);
+    }
+
+    public function test_document_review_after_meeting_completion_preserves_workflow_status(): void
+    {
+        $application = $this->submit();
+        $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $document = $application->attachments()->where('attachment_type', SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE)->firstOrFail();
+
+        $this->actingAs($this->admin)->patchJson("/api/admin/supplier-applications/{$application->id}/attachments/{$document->id}/verification", [
+            'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED,
+            'expires_on' => today()->addYear()->toDateString(),
+            'document_updated_at' => $document->updated_at->toISOString(),
+        ])->assertOk()->assertJsonPath('data.status', SupplierApplication::STATUS_MEETING_COMPLETED);
+
+        $this->assertSame(SupplierApplication::STATUS_MEETING_COMPLETED, $application->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'SUPPLIER_DOCUMENT_REVIEWED', 'resource_id' => (string) $document->id]);
+    }
+
+    public function test_finalized_application_document_review_is_read_only(): void
+    {
+        $application = $this->submit();
+        $application->update(['status' => SupplierApplication::STATUS_REJECTED]);
+        $document = $application->attachments()->firstOrFail();
+
+        $this->actingAs($this->admin)->patchJson("/api/admin/supplier-applications/{$application->id}/attachments/{$document->id}/verification", [
+            'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED,
+        ])->assertConflict();
+
+        $this->assertSame(SupplierApplicationAttachment::STATUS_PENDING, $document->fresh()->verification_status);
+    }
+
+    public function test_stale_document_review_cannot_overwrite_a_newer_admin_decision(): void
+    {
+        $application = $this->submit();
+        $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
+        $document = $application->attachments()->firstOrFail();
+        $staleTimestamp = $document->updated_at->toISOString();
+        $document->update(['verification_status' => SupplierApplicationAttachment::STATUS_CORRECTION_REQUIRED, 'verification_reason' => 'Newer review']);
+
+        $this->actingAs($this->admin)->patchJson("/api/admin/supplier-applications/{$application->id}/attachments/{$document->id}/verification", [
+            'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED,
+            'document_updated_at' => $staleTimestamp,
+            'document_verification_status' => SupplierApplicationAttachment::STATUS_PENDING,
+        ])->assertConflict();
+
+        $this->assertSame(SupplierApplicationAttachment::STATUS_CORRECTION_REQUIRED, $document->fresh()->verification_status);
     }
 }

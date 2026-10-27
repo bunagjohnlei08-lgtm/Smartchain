@@ -34,8 +34,8 @@ class WarehouseCapacityWarningTest extends TestCase
             $slug => Role::create(['name' => $slug, 'slug' => $slug]),
         ]);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 1000, 'capacity_kg' => 0, 'capacity_pcs' => 1000, 'capacity_l' => 0, 'status' => 'Active']);
-        $other = Warehouse::create(['name' => 'Other Warehouse', 'code' => 'WH-OTHER', 'branch_id' => $branch->id, 'capacity' => 1000, 'capacity_kg' => 0, 'capacity_pcs' => 1000, 'capacity_l' => 0, 'status' => 'Active']);
+        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 1000, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 1000, 'capacity_returned' => 0, 'status' => 'Active']);
+        $other = Warehouse::create(['name' => 'Other Warehouse', 'code' => 'WH-OTHER', 'branch_id' => $branch->id, 'capacity' => 1000, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 1000, 'capacity_returned' => 0, 'status' => 'Active']);
         $this->admin = User::factory()->create(['role_id' => $roles['ADMIN']->id, 'status' => 'ACTIVE']);
         $this->manager = User::factory()->create(['role_id' => $roles['PLANT_MANAGER']->id, 'warehouse_id' => $this->warehouse->id, 'status' => 'ACTIVE']);
         $this->otherManager = User::factory()->create(['role_id' => $roles['PLANT_MANAGER']->id, 'warehouse_id' => $other->id, 'status' => 'ACTIVE']);
@@ -121,16 +121,16 @@ class WarehouseCapacityWarningTest extends TestCase
     public function test_one_units_alert_does_not_suppress_another_units_warning(): void
     {
         Notification::fake();
-        $this->warehouse->update(['capacity' => 2000, 'capacity_kg' => 1000, 'capacity_pcs' => 1000, 'capacity_l' => 0]);
+        $this->warehouse->update(['capacity' => 2000, 'capacity_powder' => 1000, 'capacity_liquid' => 0, 'capacity_solid' => 1000, 'capacity_returned' => 0]);
         $this->setUtilized(1000);
         Notification::fake();
-        $kg = Product::create(['name' => 'KG Alert Material', 'unit' => 'KG']);
-        DB::transaction(function () use ($kg): void {
+        $sack = Product::create(['name' => 'Sack Alert Material', 'unit' => 'SACK']);
+        DB::transaction(function () use ($sack): void {
             $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($this->warehouse->id);
-            Inventory::create(['barcode' => 'KG-WARN', 'product_id' => $kg->id, 'warehouse_id' => $warehouse->id, 'available_stock' => 950]);
+            Inventory::create(['barcode' => 'SACK-WARN', 'product_id' => $sack->id, 'warehouse_id' => $warehouse->id, 'available_stock' => 950]);
             WarehouseCapacity::recordTransition($warehouse);
         });
         Notification::assertSentToTimes($this->admin, WorkflowNotification::class, 1);
-        Notification::assertSentTo($this->admin, WorkflowNotification::class, fn ($notification) => str_contains($notification->message, 'KG allocation:') && ! str_contains($notification->message, 'PCS allocation:'));
+        Notification::assertSentTo($this->admin, WorkflowNotification::class, fn ($notification) => str_contains($notification->message, 'Powder Products Area:') && ! str_contains($notification->message, 'Solid Products Area:'));
     }
 }

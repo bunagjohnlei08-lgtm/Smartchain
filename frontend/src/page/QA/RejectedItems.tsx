@@ -255,7 +255,7 @@ const RejectedItems: React.FC = () => {
   };
 
   return (
-    <div className="qa-rejected-items w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
+    <div className="qa-rejected-items w-full min-w-0 p-4 md:p-6 space-y-6 bg-[#090d16] text-slate-100 min-h-screen">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-white">Rejected Items</h1>

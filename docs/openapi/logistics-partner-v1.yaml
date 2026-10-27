@@ -1,0 +1,200 @@
+openapi: 3.1.0
+info:
+  title: SmartChain Logistics Partner Callback API
+  version: 1.0.0
+  description: Phase-one whole-order exchange contract. The callback path is implemented by SmartChain; the outbound partner endpoint remains subject to partner agreement.
+servers:
+  - url: https://tapering-sulfite-knapsack.ngrok-free.dev/api/integrations/logistics/v1
+    description: User-provided test backend tunnel; public reachability remains unverified.
+paths:
+  /status-events:
+    post:
+      operationId: receiveLogisticsStatusEvent
+      summary: Report In Transit or Delivered
+      security:
+        - PartnerHmac: []
+      parameters:
+        - $ref: '#/components/parameters/PartnerHeader'
+        - $ref: '#/components/parameters/TimestampHeader'
+        - $ref: '#/components/parameters/SignatureHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusEvent'
+      responses:
+        '200':
+          description: Event applied, duplicate, or safely ignored as out of order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Acknowledgment' }
+        '401': { $ref: '#/components/responses/AuthenticationError' }
+        '403': { $ref: '#/components/responses/PartnerError' }
+        '404': { $ref: '#/components/responses/ReferenceError' }
+        '409': { $ref: '#/components/responses/ConflictError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429':
+          description: Rate limit exceeded.
+components:
+  securitySchemes:
+    PartnerHmac:
+      type: apiKey
+      in: header
+      name: X-SmartChain-Signature
+      description: Lowercase hexadecimal HMAC-SHA256 of `{timestamp}.{raw_request_body}` using the partner-specific callback secret.
+  parameters:
+    PartnerHeader:
+      name: X-SmartChain-Partner
+      in: header
+      required: true
+      schema: { type: string, pattern: '^[A-Z0-9_-]{2,50}$' }
+    TimestampHeader:
+      name: X-SmartChain-Timestamp
+      in: header
+      required: true
+      schema: { type: string, pattern: '^\d{10}$' }
+      description: Current Unix time in seconds; default accepted skew is plus or minus 300 seconds.
+    SignatureHeader:
+      name: X-SmartChain-Signature
+      in: header
+      required: true
+      schema: { type: string, pattern: '^[a-f0-9]{64}$' }
+  schemas:
+    DeliveryRequest:
+      type: object
+      additionalProperties: false
+      required: [schema_version, source_system, delivery_request_id, order_reference, shipment_reference, partner_code, pickup, recipient, required_delivery_at, items, callback]
+      properties:
+        schema_version: { type: string, const: '1.0' }
+        source_system: { type: string, const: SMARTCHAIN }
+        delivery_request_id: { type: string, format: uuid }
+        order_reference: { type: string }
+        shipment_reference: { type: string }
+        upstream_order_reference: { type: string }
+        partner_code: { type: string }
+        pickup:
+          type: object
+          additionalProperties: false
+          required: [location_code, name, address]
+          properties:
+            location_code: { type: string }
+            name: { type: string }
+            address: { type: string }
+        recipient:
+          type: object
+          additionalProperties: false
+          required: [name, address]
+          properties:
+            name: { type: string }
+            address: { type: string }
+            contact: { type: string }
+        required_delivery_at: { type: string, format: date-time }
+        packages:
+          type: object
+          additionalProperties: false
+          required: [count, estimated_weight_kg, fragile]
+          properties:
+            count: { type: integer, minimum: 1 }
+            estimated_weight_kg: { type: number, exclusiveMinimum: 0 }
+            fragile: { type: boolean }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/DeliveryItem' }
+        callback:
+          type: object
+          additionalProperties: false
+          required: [url]
+          properties:
+            url: { type: string, format: uri, pattern: '^https://' }
+      example:
+        schema_version: '1.0'
+        source_system: SMARTCHAIN
+        delivery_request_id: 6d891fc0-acde-4b21-9df4-cc4b617f61d9
+        order_reference: SO-TEST-0001
+        shipment_reference: PKG-TEST-0001
+        partner_code: PARTNER_TEST
+        pickup: { location_code: WH-TEST, name: Synthetic Test Warehouse, address: '100 Test Avenue, Test City' }
+        recipient: { name: Synthetic Customer, address: '200 Example Street, Test City' }
+        required_delivery_at: '2026-10-21T17:00:00+08:00'
+        items: [{ product_id: '123', product_name: Synthetic Finished Product, quantity: 10, unit: PCS }]
+        callback: { url: 'https://tapering-sulfite-knapsack.ngrok-free.dev/api/integrations/logistics/v1/status-events' }
+    DeliveryItem:
+      type: object
+      additionalProperties: false
+      required: [product_id, product_name, quantity, unit]
+      properties:
+        product_id:
+          type: string
+          pattern: '^\d+$'
+          description: Existing SmartChain products.id in the SMARTCHAIN namespace; this is the default product reference.
+        product_name: { type: string, minLength: 1, description: Human-readable product name or description. }
+        partner_item_reference: { type: string, minLength: 1, maxLength: 100, description: Optional and sent only when an explicitly verified partner contract requires/provides a mapping. }
+        quantity: { type: number, exclusiveMinimum: 0, description: Actual fully released stock-out quantity for this order line. }
+        unit: { type: string, minLength: 1, maxLength: 50, description: Existing stored order-item unit; SmartChain performs no conversion. }
+    DeliveryAcceptance:
+      type: object
+      additionalProperties: true
+      required: [accepted, delivery_request_id, partner_delivery_request_id, status]
+      properties:
+        accepted: { type: boolean, const: true }
+        delivery_request_id: { type: string, format: uuid }
+        partner_delivery_request_id: { type: string, minLength: 1, maxLength: 100 }
+        status: { type: string, const: ACCEPTED }
+        accepted_at: { type: string, format: date-time }
+    StatusEvent:
+      type: object
+      additionalProperties: false
+      required: [schema_version, event_id, delivery_request_id, partner_delivery_request_id, status, occurred_at]
+      properties:
+        schema_version: { type: string, const: '1.0' }
+        event_id: { type: string, minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9._:-]+$' }
+        delivery_request_id: { type: string, format: uuid }
+        partner_delivery_request_id: { type: string, minLength: 1, maxLength: 100 }
+        status: { type: string, enum: [IN_TRANSIT, DELIVERED] }
+        occurred_at:
+          type: string
+          format: date-time
+          description: RFC 3339 timestamp containing Z or an explicit numeric offset.
+        note: { type: [string, 'null'], maxLength: 1000 }
+        proof_reference: { type: [string, 'null'], maxLength: 255 }
+    Acknowledgment:
+      type: object
+      additionalProperties: false
+      required: [acknowledged, event_id, result, smartchain_status]
+      properties:
+        acknowledged: { type: boolean, const: true }
+        event_id: { type: string }
+        result: { type: string, enum: [APPLIED, DUPLICATE, IGNORED_OUT_OF_ORDER] }
+        smartchain_status: { type: string, enum: [IN_TRANSIT, DELIVERED] }
+    Error:
+      type: object
+      additionalProperties: false
+      required: [acknowledged, error]
+      properties:
+        acknowledged: { type: boolean, const: false }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, maxLength: 80 }
+            message: { type: string, maxLength: 500 }
+            fields: { type: array, maxItems: 20, items: { type: string } }
+          additionalProperties: false
+  responses:
+    AuthenticationError:
+      description: Missing, stale, or invalid authentication.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    PartnerError:
+      description: Authenticated partner does not own this request.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ReferenceError:
+      description: Unknown delivery request.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ConflictError:
+      description: Event ID conflict, partner reference mismatch, or invalid state.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ValidationError:
+      description: Schema or field validation failed.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

@@ -7,6 +7,7 @@ use App\Models\Supplier;
 use App\Models\SupplierApplication;
 use App\Models\SupplierApplicationAttachment;
 use App\Models\SupplierApplicationEvent;
+use App\Models\RfqLine;
 use App\Models\User;
 use App\Notifications\WorkflowNotification;
 use App\Support\AuditLogger;
@@ -58,6 +59,8 @@ class SupplierApplicationController extends Controller
             'business_type' => ['required', 'string', 'min:2', 'max:100'],
             'supply_category' => ['required', 'string', 'min:2', 'max:150'],
             'products_services' => ['nullable', 'string', 'max:5000'],
+            'rfq_line_ids' => ['nullable', 'array', 'max:50'],
+            'rfq_line_ids.*' => ['integer', 'distinct', 'exists:rfq_lines,id'],
             ...SupplierApplicationOfferings::rules(),
             'business_certificate' => ['required', 'array', 'min:1', 'max:2'],
             'business_certificate.*' => [
@@ -137,6 +140,13 @@ class SupplierApplicationController extends Controller
                 ]);
 
                 $application->offerings()->createMany($offerings);
+                if (! empty($validated['rfq_line_ids'])) {
+                    $availableLineIds = RfqLine::query()->whereIn('id', $validated['rfq_line_ids'])
+                        ->whereHas('rfq', fn ($query) => $query->whereNotNull('published_at')->whereIn('status', ['SCHEDULED', 'OPEN'])->where('closes_at', '>', now()))
+                        ->pluck('id');
+                    abort_unless($availableLineIds->count() === count($validated['rfq_line_ids']), 422, 'One or more selected supply requirements are no longer available.');
+                    $application->biddingInterests()->attach($availableLineIds);
+                }
                 $this->storeAttachments($application, $request, $attachmentHashes, $storedPaths);
                 $application->events()->create([
                     'event_type' => SupplierApplicationEvent::SUBMITTED,

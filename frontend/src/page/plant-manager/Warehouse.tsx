@@ -52,7 +52,7 @@ const Warehouse: React.FC = () => {
 
   return (
     <main className="min-h-screen w-full bg-[#090d16] p-4 text-slate-100 md:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Warehouse Overview</h1>

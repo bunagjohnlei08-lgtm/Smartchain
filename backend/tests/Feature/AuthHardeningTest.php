@@ -7,7 +7,10 @@ use App\Models\Branch;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
+use PDOException;
 use Tests\Concerns\CompletesOtpLogin;
 use Tests\TestCase;
 
@@ -117,6 +120,30 @@ class AuthHardeningTest extends TestCase
             'email' => 'nobody@example.com',
             'password' => 'wrong',
         ])->assertUnauthorized();
+    }
+
+    public function test_login_database_failure_does_not_expose_query_details(): void
+    {
+        RateLimiter::shouldReceive('tooManyAttempts')
+            ->once()
+            ->andThrow(new QueryException(
+                'pgsql',
+                'select * from "cache" where "key" = ?',
+                ['secret-cache-key'],
+                new PDOException('could not find driver for host=internal-db'),
+            ));
+
+        $response = $this->postJson('/api/login', [
+            'email' => 'probe@example.invalid',
+            'password' => 'not-a-real-password',
+        ]);
+
+        $response->assertServiceUnavailable()->assertExactJson([
+            'message' => 'Unable to connect to the server right now. Please try again later.',
+        ]);
+        $this->assertStringNotContainsString('cache', $response->getContent());
+        $this->assertStringNotContainsString('internal-db', $response->getContent());
+        $this->assertStringNotContainsString('driver', $response->getContent());
     }
 
     public function test_token_stops_working_and_is_revoked_once_account_is_not_active(): void

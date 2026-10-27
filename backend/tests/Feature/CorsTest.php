@@ -54,6 +54,23 @@ class CorsTest extends TestCase
         $response->assertHeader('Access-Control-Allow-Origin', self::PRODUCTION_ORIGIN);
     }
 
+    public function test_session_status_preflight_accepts_the_headers_the_spa_actually_sends(): void
+    {
+        $response = $this->call('OPTIONS', '/api/session/status', [], [], [], [
+            'HTTP_ORIGIN' => 'http://localhost:5173',
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'GET',
+            'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'authorization,x-requested-with',
+        ]);
+
+        $response->assertNoContent();
+        $response->assertHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+
+        $allowedHeaders = strtolower((string) $response->headers->get('Access-Control-Allow-Headers'));
+        $this->assertStringContainsString('authorization', $allowedHeaders);
+        $this->assertStringContainsString('x-requested-with', $allowedHeaders);
+        $this->assertStringNotContainsString('cache-control', $allowedHeaders);
+    }
+
     public function test_an_unknown_origin_is_not_allowed(): void
     {
         $response = $this->postJson('/api/login', [], ['Origin' => 'https://evil.example.com']);

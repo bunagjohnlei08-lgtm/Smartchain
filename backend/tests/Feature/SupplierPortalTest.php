@@ -6,6 +6,7 @@ use App\Mail\SupplierApplicationPortalMail;
 use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\SupplierApplication;
+use App\Models\SupplierApplicationAttachment;
 use App\Models\SupplierApplicationEvent;
 use App\Models\SupplierApplicationMeetingSlot;
 use App\Models\User;
@@ -65,6 +66,19 @@ class SupplierPortalTest extends TestCase
 
         return $this->postJson('/api/supplier-portal/access', ['access_token' => $link['token']])
             ->assertOk()->json('session_token');
+    }
+
+    private function addVerifiedMandatoryDocuments(SupplierApplication $application): void
+    {
+        foreach ([SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE, SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT] as $type) {
+            $application->attachments()->create([
+                'attachment_type' => $type, 'original_name' => strtolower($type).'.pdf',
+                'stored_path' => "tests/{$application->id}/{$type}.pdf", 'mime_type' => 'application/pdf',
+                'file_size' => 100, 'is_current' => true,
+                'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED,
+                'verified_at' => now(), 'expires_on' => now()->addYear(),
+            ]);
+        }
     }
 
     private function portalHeaders(string $session): array
@@ -187,6 +201,7 @@ class SupplierPortalTest extends TestCase
             ->assertOk()
             ->json('session_token');
 
+        $this->addVerifiedMandatoryDocuments($approved);
         $this->actingAs($this->admin)
             ->postJson("/api/admin/supplier-applications/{$approved->id}/approve")
             ->assertOk();

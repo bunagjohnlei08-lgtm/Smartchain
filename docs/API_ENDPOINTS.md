@@ -310,7 +310,7 @@ The endpoints are grouped by business domain. The number beside each heading is 
 
 ### Production
 
-**11 endpoints**
+**15 endpoints**
 
 | Method | Full endpoint | Access | Controller method | Expected request | Expected response | Purpose |
 |---|---|---|---|---|---|---|
@@ -335,6 +335,10 @@ The endpoints are grouped by business domain. The number beside each heading is 
 | Method | Full endpoint | Access | Controller method | Expected request | Expected response | Purpose |
 |---|---|---|---|---|---|---|
 | GET | `/api/admin/logistics/shipments` | Authenticated | `AdminLogisticsController::index` | `search` (nullable); `status` (nullable); `per_page` (nullable) | JSON collection/paginated result with records and pagination metadata. | List admin logistics shipments. |
+| GET | `/api/admin/logistics/partners` | Admin | `AdminLogisticsIntegrationController::partners` | None. | Enabled partner identifiers and configuration readiness; credentials are never serialized. | List selectable logistics partners. |
+| POST | `/api/admin/logistics/shipments/{order}/preview` | Admin | `AdminLogisticsIntegrationController::preview` | `logistics_partner_id` (required) | Validated proposed-v1 payload preview with a clearly synthetic request ID. | Review authoritative delivery data before persistence. |
+| POST | `/api/admin/logistics/shipments/{order}/send` | Admin | `AdminLogisticsIntegrationController::send` | `logistics_partner_id` (required) | 202 for a newly queued request; 200 with the existing request for a duplicate click. | Persist and queue one delivery request per order. |
+| POST | `/api/integrations/logistics/v1/status-events` | Partner HMAC | `LogisticsStatusCallbackController::store` | Strict v1 status-event JSON and `X-SmartChain-*` signature headers. | Authenticated acknowledgment, duplicate/out-of-order result, or documented safe error. | Receive In Transit and Delivered events. |
 | GET | `/api/stock-out/summary` | Authenticated | `StockOutController::summary` | None. | 200: { `orders_ready` } | Return summary data for stock-out summary. |
 | GET | `/api/stock-out/orders` | Authenticated | `StockOutController::index` | `search` (nullable); `status` (nullable); `priority` (nullable); `warehouse_id` (nullable); `date_from` (nullable); `date_to` (nullable); `sort_by` (nullable); `sort_direction` (nullable); `per_page` (nullable) | JSON collection/paginated result with records and pagination metadata. | List stock-out orders. |
 | GET | `/api/stock-out/orders/{order}` | Authenticated | `StockOutController::show` | None. | 200: JSON serialized stock-out orders data (model fields and any loaded relationships); validation/auth failures use Laravel error JSON. | Retrieve stock-out orders record. |
@@ -348,7 +352,16 @@ The endpoints are grouped by business domain. The number beside each heading is 
 
 ## Coverage notes
 
-- Documented endpoints: **197**.
+- Documented endpoints: **201**.
 - Source scope: `backend/routes/api.php` and controllers in `backend/app/Http/Controllers/Api`.
 - This is implementation-derived documentation, not a formal OpenAPI contract. Dynamic Eloquent attributes, authorization policies, middleware-specific error bodies, and database-dependent nested relations may add fields at runtime.
+
+## Phase 5 supplier procurement
+
+- `POST /api/admin/supplier-awards/{award}/purchase-orders` — idempotently converts an approved competitive award into supplier-specific Purchase Orders. Server-side `PROCUREMENT_AWARD_TO_PO_ENABLED` must be enabled; it is disabled by default pending Phase 6.
+- `GET /api/supplier-account/purchase-orders` — supplier-scoped PO list with award, RFQ, acknowledgment, receiving, and QA quantities.
+- `GET /api/supplier-account/purchase-orders/{purchaseOrder}` — supplier-scoped PO detail; cross-supplier records return 404.
+- `POST /api/supplier-account/purchase-orders/{purchaseOrder}/acknowledgments` — idempotent supplier response (`RECEIVED`, `ACCEPTED`, `CLARIFICATION_REQUESTED`, or `DECLINED`).
+- `GET /api/supplier-account/performance` — verified operational performance and approved snapshot history for the authenticated supplier.
+- `POST /api/admin/supplier-performance/{supplier}/snapshots` — persists an authorized policy-versioned snapshot only while the performance policy is active.
 

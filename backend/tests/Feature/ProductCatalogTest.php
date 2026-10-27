@@ -10,8 +10,10 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProductCatalogTest extends TestCase
@@ -28,6 +30,35 @@ class ProductCatalogTest extends TestCase
         $this->admin = User::factory()->create(['role_id' => $role->id, 'status' => 'ACTIVE']);
         $branch = Branch::create(['name' => 'Main', 'code' => 'MAIN']);
         $this->warehouse = Warehouse::create(['name' => 'Central Warehouse', 'code' => 'CENTRAL', 'branch_id' => $branch->id]);
+    }
+
+    public function test_admin_can_securely_upload_replace_and_remove_a_catalog_image(): void
+    {
+        Storage::fake('local');
+        $product = Product::create(['name' => 'Catalog Image Product']);
+        $role = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
+        $nonAdmin = User::factory()->create(['role_id' => $role->id, 'status' => 'ACTIVE']);
+        $url = "/api/admin/products/{$product->id}/image";
+
+        $this->actingAs($nonAdmin)->postJson($url, ['image' => UploadedFile::fake()->image('blocked.jpg')])->assertForbidden();
+        $this->actingAs($this->admin)->postJson($url, ['image' => UploadedFile::fake()->create('script.jpg', 10, 'text/plain')])->assertUnprocessable();
+        $this->postJson($url, ['image' => UploadedFile::fake()->create('large.png', 5121, 'image/png')])->assertUnprocessable();
+        $this->postJson($url, ['image' => UploadedFile::fake()->image('first.jpg', 600, 400)])->assertOk();
+        $first = $product->fresh()->image_path;
+        $this->assertNotNull($first);
+        Storage::disk('local')->assertExists($first);
+        $this->get("/api/public/products/{$product->id}/image")->assertOk()->assertHeader('x-content-type-options', 'nosniff');
+
+        $this->postJson($url, ['image' => UploadedFile::fake()->image('replacement.png', 600, 400)])->assertOk();
+        $second = $product->fresh()->image_path;
+        $this->assertNotSame($first, $second);
+        Storage::disk('local')->assertMissing($first);
+        Storage::disk('local')->assertExists($second);
+
+        $this->deleteJson($url)->assertOk();
+        $this->assertNull($product->fresh()->image_path);
+        Storage::disk('local')->assertMissing($second);
+        $this->get("/api/public/products/{$product->id}/image")->assertNotFound();
     }
 
     public function test_catalog_uses_product_names_and_aggregates_inventory_and_summary(): void
@@ -48,7 +79,11 @@ class ProductCatalogTest extends TestCase
     /** New catalog products require an ACTIVE supplier and an active warehouse. */
     private function assignment(): array
     {
-        $this->warehouse->update(['status' => 'Active', 'capacity' => 10000, 'capacity_kg' => 4000, 'capacity_pcs' => 3000, 'capacity_l' => 3000]);
+        $this->warehouse->update([
+            'status' => 'Active', 'capacity' => 10000,
+            'capacity_powder' => 4000, 'capacity_liquid' => 3000,
+            'capacity_solid' => 3000, 'capacity_returned' => 0,
+        ]);
         $supplier = Supplier::query()->firstOrCreate(['supplier_code' => 'SUP-CAT'], ['name' => 'Catalog Supplier', 'status' => 'ACTIVE']);
 
         return ['supplier_id' => $supplier->id, 'warehouse_id' => $this->warehouse->id];
@@ -67,6 +102,17 @@ class ProductCatalogTest extends TestCase
         $unreferenced = Product::create(['name' => 'Unreferenced Bolt']);
         $this->deleteJson("/api/admin/products/{$unreferenced->id}")->assertOk();
         $this->assertDatabaseMissing('products', ['id' => $unreferenced->id]);
+    }
+
+    public function test_unreferenced_product_can_be_deleted_without_phase_two_display_table(): void
+    {
+        Schema::dropIfExists('product_displays');
+        $product = Product::create(['name' => 'Phase 1 catalog product']);
+
+        $this->actingAs($this->admin)->deleteJson("/api/admin/products/{$product->id}")
+            ->assertOk();
+
+        $this->assertDatabaseMissing('products', ['id' => $product->id]);
     }
 
     public function test_referenced_product_cannot_be_deleted(): void

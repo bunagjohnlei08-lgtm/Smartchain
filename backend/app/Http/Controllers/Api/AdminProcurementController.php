@@ -214,11 +214,13 @@ class AdminProcurementController extends Controller
                 ? $replenishmentRequest->reviewed_at?->toDateString()
                 : null,
             'admin_decision' => $replenishmentRequest->admin_decision,
+            'sourcing_method' => $replenishmentRequest->sourcing_method,
+            'sourcing_selected_at' => $replenishmentRequest->sourcing_selected_at,
             'available_for_purchase_order' => in_array(
                 $replenishmentRequest->status,
                 ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES,
                 true,
-            ) && ! $replenishmentRequest->purchaseOrder,
+            ) && ! $replenishmentRequest->purchaseOrder && $replenishmentRequest->sourcing_method !== ReplenishmentRequest::SOURCING_COMPETITIVE,
             'linked_purchase_order' => $replenishmentRequest->purchaseOrder ? [
                 'number' => $replenishmentRequest->purchaseOrder->po_number,
                 'status' => $replenishmentRequest->purchaseOrder->status,

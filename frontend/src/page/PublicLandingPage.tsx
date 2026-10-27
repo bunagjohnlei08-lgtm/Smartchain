@@ -8,6 +8,7 @@ import {
 import logo from '../assets/logo.png';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../lib/api';
+import OpenSupplyNeeds from '../components/OpenSupplyNeeds';
 
 const platformFlow = [
   { label: 'Procurement', icon: ShoppingCart },
@@ -160,6 +161,8 @@ const PublicLandingPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <OpenSupplyNeeds />
 
       <section className="bg-slate-50 py-12 dark:bg-[#06101d] sm:py-16 lg:py-20" aria-labelledby="access-heading">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">

@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ReplenishmentRequest extends Model
 {
+    public const SOURCING_DIRECT = 'DIRECT_PURCHASE';
+    public const SOURCING_COMPETITIVE = 'COMPETITIVE_BIDDING';
+    public const SOURCING_METHODS = [self::SOURCING_DIRECT, self::SOURCING_COMPETITIVE];
     /** Replenishment request lifecycle: Plant Manager -> Admin Procurement -> Purchase Order. */
     public const STATUS_DRAFT = 'draft';
     public const STATUS_PENDING = 'pending';
@@ -66,6 +69,7 @@ class ReplenishmentRequest extends Model
         'request_no', 'requested_by', 'warehouse_id', 'product_id', 'requested_qty',
         'priority', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at',
         'admin_decision',
+        'sourcing_method', 'sourcing_selected_by', 'sourcing_selected_at',
     ];
 
     protected function casts(): array
@@ -74,6 +78,7 @@ class ReplenishmentRequest extends Model
             'submitted_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'requested_qty' => 'integer',
+            'sourcing_selected_at' => 'datetime',
         ];
     }
 
@@ -82,6 +87,7 @@ class ReplenishmentRequest extends Model
     public function requester(): BelongsTo { return $this->belongsTo(User::class, 'requested_by'); }
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
     public function purchaseOrder(): HasOne { return $this->hasOne(PurchaseOrder::class); }
+    public function rfqLine(): HasOne { return $this->hasOne(RfqLine::class); }
 
     public function scopeActive(Builder $query): Builder
     {

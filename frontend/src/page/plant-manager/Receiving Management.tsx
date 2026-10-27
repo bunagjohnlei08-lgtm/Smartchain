@@ -774,7 +774,7 @@ const ReceivingManagement: React.FC = () => {
   }, [assignmentTarget, assignmentSaving]);
 
   return (
-    <div className="pm-receiving-page mx-auto min-h-screen w-full max-w-7xl space-y-6 bg-[#0b1220] p-4 text-slate-100 sm:p-6">
+    <div className="pm-receiving-page min-h-screen w-full min-w-0 space-y-6 bg-[#0b1220] p-4 text-slate-100 sm:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

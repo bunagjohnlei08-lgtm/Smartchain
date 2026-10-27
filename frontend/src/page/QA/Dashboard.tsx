@@ -91,7 +91,7 @@ const QADashboard: React.FC = () => {
   ];
 
   return (
-    <div className="w-full min-w-0 max-w-7xl mx-auto p-4 md:p-6 space-y-6 overflow-x-hidden bg-[#090d16] text-slate-100 min-h-screen">
+    <div className="w-full min-w-0 p-4 md:p-6 space-y-6 overflow-x-hidden bg-[#090d16] text-slate-100 min-h-screen">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div><h1 className="text-2xl font-bold text-white">{greeting}</h1><p className="text-sm text-slate-400">{dateLabel} — receiving inspection summary.</p></div>
         <button onClick={() => navigate('/qa/inspection')} className="w-fit sm:w-auto px-4 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-slate-950 font-semibold"><ClipboardCheck className="w-4 h-4" /> Start Inspection</button>

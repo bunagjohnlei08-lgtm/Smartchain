@@ -18,7 +18,7 @@ class Product extends Model
     protected $attributes = ['item_classification' => self::FINISHED_PRODUCT, 'unit' => self::DEFAULT_UNIT];
 
     protected $fillable = [
-        'name', 'category', 'brand', 'unit', 'cost_price', 'selling_price', 'reorder_level', 'item_classification',
+        'name', 'category', 'brand', 'unit', 'cost_price', 'selling_price', 'reorder_level', 'item_classification', 'image_path',
     ];
 
     protected function casts(): array
@@ -38,6 +38,11 @@ class Product extends Model
     public function suppliers(): BelongsToMany
     {
         return $this->belongsToMany(Supplier::class)->withPivot('is_primary')->withTimestamps();
+    }
+
+    public function replenishmentRequests(): HasMany
+    {
+        return $this->hasMany(ReplenishmentRequest::class);
     }
 
     /** The mapped primary supplier, only while it is ACTIVE. Requires `suppliers` loaded. */

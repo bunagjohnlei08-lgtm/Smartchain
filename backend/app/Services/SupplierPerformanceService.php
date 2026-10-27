@@ -9,6 +9,18 @@ use Illuminate\Support\Collection;
 
 class SupplierPerformanceService
 {
+    /** @return array<string, mixed> */
+    public function summarizeSupplier(Supplier $supplier): array
+    {
+        $supplier->loadMissing([
+            'purchaseOrders.items',
+            'purchaseOrders.receivings.items',
+            'purchaseOrders.receivings.discrepancy',
+            'purchaseOrders.receivings.qaInspection.items.supplierRejectionCase',
+        ]);
+
+        return $this->supplierSummary($supplier);
+    }
     /** @return array<int, array<string, mixed>> */
     public function summarize(Collection $suppliers): array
     {
@@ -107,6 +119,9 @@ class SupplierPerformanceService
     /** @return array{string, ?float, string} */
     private function score(array $metrics, int $eligibleDeliveries): array
     {
+        if (config('supplier_performance.policy_active') !== true) {
+            return ['SCORING_NOT_CONFIGURED', null, 'Performance policy is an inactive draft. Individual verified operational metrics remain available.'];
+        }
         $minimum = config('supplier_performance.minimum_eligible_deliveries');
         $weights = config('supplier_performance.weights', []);
         $required = ['on_time_delivery', 'fulfillment', 'qa_acceptance', 'discrepancy_free'];

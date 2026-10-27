@@ -12,6 +12,8 @@ use App\Support\AuditLogger;
 use App\Support\PurchaseOrderPdf;
 use App\Support\PurchaseOrderSupplier;
 use App\Support\ReplenishmentLifecycle;
+use App\Notifications\WorkflowNotification;
+use App\Support\WorkflowNotificationSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +37,7 @@ class PurchaseOrderController extends Controller
         $query = PurchaseOrder::query()
             ->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)
             ->with([
-            'items', 'approver:id,name', 'receivings.items',
+            'items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'receivings.items',
             'discrepancies.reportedBy:id,name', 'discrepancies.contactedBy:id,name',
             'discrepancies.respondedBy:id,name', 'discrepancies.resolvedBy:id,name',
             'discrepancies.resolvedByReceiving:id,receiving_no,delivery_date',
@@ -99,6 +101,10 @@ class PurchaseOrderController extends Controller
             if (!empty($validated['replenishment_request_id'])) {
                 $replenishmentRequest = ReplenishmentRequest::query()->lockForUpdate()->findOrFail($validated['replenishment_request_id']);
                 abort_unless($replenishmentRequest->isAvailableForPurchaseOrder(), 422, 'Only approved replenishment requests can generate a Purchase Order.');
+                abort_if($replenishmentRequest->sourcing_method === ReplenishmentRequest::SOURCING_COMPETITIVE, 422, 'Competitive-bidding requirements cannot generate a Purchase Order before an approved award.');
+                if ($replenishmentRequest->sourcing_method === null) {
+                    $replenishmentRequest->forceFill(['sourcing_method' => ReplenishmentRequest::SOURCING_DIRECT, 'sourcing_selected_by' => $request->user()->id, 'sourcing_selected_at' => now()])->save();
+                }
             }
             $items = collect($validated['items'])->map(function (array $item) {
                 $product = Product::query()->where('name', $item['product_name'])->lockForUpdate()->firstOrFail();
@@ -173,6 +179,42 @@ class PurchaseOrderController extends Controller
         return response()->json(['data' => $orders->map(fn (PurchaseOrder $order) => $this->present($order))]);
     }
 
+    public function approve(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $order = DB::transaction(function () use ($request, $purchaseOrder) {
+            $locked = PurchaseOrder::query()->lockForUpdate()->findOrFail($purchaseOrder->id);
+
+            if ($locked->status === PurchaseOrder::STATUS_APPROVED) {
+                return $locked;
+            }
+
+            abort_unless(
+                $locked->status === PurchaseOrder::STATUS_PENDING_APPROVAL,
+                422,
+                'Only a pending Purchase Order can be approved.',
+            );
+
+            $locked->update([
+                'status' => PurchaseOrder::STATUS_APPROVED,
+                'approved_by' => $request->user()->id,
+            ]);
+
+            AuditLogger::success('PURCHASE_ORDER_APPROVED', AuditLogger::MODULE_PURCHASE_ORDERS, [
+                'actor' => $request->user(),
+                'resource' => $locked,
+                'resource_label' => $locked->po_number,
+            ]);
+
+            return $locked;
+        });
+
+        $order->load(['items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'receivings.items']);
+
+        return response()->json($this->present($order));
+    }
+
     /** The same document the supplier receives by email. */
     public function pdf(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf): Response
     {
@@ -196,7 +238,16 @@ class PurchaseOrderController extends Controller
     public function send(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderPdf $pdf, PurchaseOrderSupplier $supplierResolver): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        abort_if(in_array($purchaseOrder->status, ['Completed', 'Closed with Shortage', 'Cancelled'], true), 422, 'Completed or closed Purchase Orders cannot be sent.');
+
+        $purchaseOrder->refresh();
+        if (in_array($purchaseOrder->status, [PurchaseOrder::STATUS_SENT_TO_SUPPLIER, PurchaseOrder::STATUS_PARTIALLY_RECEIVED], true)) {
+            return response()->json(array_merge(
+                $this->present($purchaseOrder->load(['items', 'approver:id,name'])),
+                ['message' => 'Purchase order was already sent to the supplier.'],
+            ));
+        }
+
+        abort_unless($purchaseOrder->status === PurchaseOrder::STATUS_APPROVED, 422, 'Only an approved active Purchase Order can be sent.');
 
         $supplier = $supplierResolver->resolve($purchaseOrder);
         abort_if(! $supplier, 422, 'This Purchase Order is not linked to a registered supplier.');
@@ -245,6 +296,7 @@ class PurchaseOrderController extends Controller
                 'supplier_email' => $email,
             ],
         ]);
+        WorkflowNotificationSender::send($supplier->authorizedUsers, new WorkflowNotification('Purchase Order Issued', "{$purchaseOrder->po_number} is available for review and acknowledgment.", 'info', $purchaseOrder->po_number, 'Purchase Orders', ['purchase_order_id'=>$purchaseOrder->id]));
 
         return response()->json(array_merge(
             $this->present($purchaseOrder->load(['items', 'approver:id,name'])),
@@ -268,10 +320,20 @@ class PurchaseOrderController extends Controller
             'supplier_name' => $order->supplier_name,
             'supplier_id' => $order->supplier_id,
             'replenishment_request_id' => $order->replenishment_request_id,
+            'supplier_award_id' => $order->supplier_award_id,
+            'award_reference' => $order->award?->award_number,
+            'rfq_reference' => $order->award?->rfq?->rfq_number,
             'delivery_details' => $order->delivery_details,
             'expected_delivery_date' => $order->expected_delivery_date?->toDateString(),
             'total_amount' => (float) $order->total_amount,
             'status' => $order->status,
+            'currency' => $order->currency ?? 'PHP',
+            'acknowledgment' => $order->relationLoaded('acknowledgments') && $order->acknowledgments->isNotEmpty() ? [
+                'action'=>$order->acknowledgments->first()->action,
+                'remarks'=>$order->acknowledgments->first()->remarks,
+                'acted_at'=>$order->acknowledgments->first()->acted_at?->toIso8601String(),
+                'acted_by'=>$order->acknowledgments->first()->actor?->name,
+            ] : null,
             'sent_at' => $order->sent_at?->toIso8601String(),
             'approved_by' => $order->approver?->name,
             'signature_data' => $order->signature_data,

@@ -11,3 +11,14 @@ public/hot
 public/storage
 storage/logs/*.log
 vendor
+tests
+scripts
+database/factories
+database/seeders
+phpunit.xml
+.phpunit.cache
+.phpunit.result.cache
+coverage
+*.log
+**/__pycache__
+**/*.pyc

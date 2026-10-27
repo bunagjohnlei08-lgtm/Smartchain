@@ -1647,7 +1647,7 @@ const WarehouseModule: React.FC = () => {
  return (
   <div className="flex-1 flex flex-col overflow-hidden bg-transparent">
    <main className="flex-1 overflow-y-auto py-4 sm:py-6">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+    <div className="w-full min-w-0 px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
      {/* Breadcrumb */}
      <div className="flex items-center gap-2 text-gray-400 text-sm">
       <span>Dashboard</span>

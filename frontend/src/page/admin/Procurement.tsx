@@ -16,6 +16,7 @@ import {
 import { apiClient } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
+import ProcurementWorkflowNav from '../../components/procurement/ProcurementWorkflowNav';
 
 // ============================================
 // TYPES
@@ -48,6 +49,7 @@ interface ReplenishmentRequest {
   approved_date: string | null;
   admin_decision: string | null;
   primary_supplier?: { id: number; name: string } | null;
+  sourcing_method?: 'DIRECT_PURCHASE' | 'COMPETITIVE_BIDDING' | null;
 }
 
 interface ProcurementSummary {
@@ -274,6 +276,18 @@ const Procurement: React.FC = () => {
     });
   };
 
+  const selectSourcing = async (request: ReplenishmentRequest, sourcing_method: 'DIRECT_PURCHASE' | 'COMPETITIVE_BIDDING') => {
+    setDecidingId(request.id);
+    setActionError('');
+    try {
+      await apiClient.post(`/admin/procurement/requests/${request.id}/sourcing-decision`, { sourcing_method });
+      await loadProcurement();
+      if (sourcing_method === 'COMPETITIVE_BIDDING') navigate('/admin/procurement/sourcing');
+    } catch (error: any) {
+      setActionError(error?.response?.data?.message || (Object.values(error?.response?.data?.errors || {}).flat()[0] as string) || 'The sourcing decision could not be saved.');
+    } finally { setDecidingId(null); }
+  };
+
   const pendingRequests = useMemo(
     () => requests.filter((request) => request.status === 'pending'),
     [requests]
@@ -332,6 +346,7 @@ const Procurement: React.FC = () => {
           </div>
         </div>
       </div>
+      <ProcurementWorkflowNav active="replenishment" />
 
       {(loadError || actionError) && (
         <p
@@ -463,9 +478,9 @@ const Procurement: React.FC = () => {
                           <button onClick={() => void handleDecision(request, 'approve')} disabled={decidingId === request.id} className="min-h-9 rounded-lg bg-[#00a3c4] px-3 text-xs font-semibold text-white hover:bg-[#008ca8] disabled:cursor-not-allowed disabled:opacity-50 transition-colors">Approve</button>
                         </>
                       )}
-                      {(request.status === 'approved' || request.status === 'for_purchase_order') && (
-                        <button onClick={() => handleGeneratePo(request)} className="min-h-9 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors">Generate PO</button>
-                      )}
+                      {(request.status === 'approved' || request.status === 'for_purchase_order') && !request.sourcing_method && <><button disabled={decidingId===request.id} onClick={() => void selectSourcing(request,'DIRECT_PURCHASE')} className="min-h-9 rounded-lg border border-[var(--border-color)] px-3 text-xs font-semibold hover:bg-[var(--bg-hover)] disabled:opacity-50">Direct purchase</button><button disabled={decidingId===request.id} onClick={() => void selectSourcing(request,'COMPETITIVE_BIDDING')} className="min-h-9 rounded-lg bg-cyan-700 px-3 text-xs font-semibold text-white hover:bg-cyan-800 disabled:opacity-50">Competitive bidding</button></>}
+                      {(request.status === 'approved' || request.status === 'for_purchase_order') && request.sourcing_method === 'DIRECT_PURCHASE' && <button onClick={() => handleGeneratePo(request)} className="min-h-9 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors">Generate PO</button>}
+                      {request.sourcing_method === 'COMPETITIVE_BIDDING' && <button onClick={() => navigate('/admin/procurement/sourcing')} className="min-h-9 rounded-lg bg-cyan-700 px-3 text-xs font-semibold text-white">Create RFQ</button>}
                     </div>
                   </td>
                 </tr>
@@ -882,10 +897,10 @@ const Procurement: React.FC = () => {
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleGeneratePo(request)}
+                        onClick={() => request.sourcing_method==='COMPETITIVE_BIDDING'?navigate('/admin/procurement/sourcing'):request.sourcing_method==='DIRECT_PURCHASE'?handleGeneratePo(request):void selectSourcing(request,'DIRECT_PURCHASE')}
                         className="admin-procurement-generate-po rounded-lg font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors sm:px-3 sm:py-1.5 sm:text-xs"
                       >
-                        Generate PO
+                        {request.sourcing_method==='COMPETITIVE_BIDDING'?'Open RFQs':request.sourcing_method==='DIRECT_PURCHASE'?'Generate PO':'Choose direct purchase'}
                       </button>
                     </div>
                   </td>

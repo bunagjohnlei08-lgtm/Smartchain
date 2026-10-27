@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
+use Illuminate\Notifications\Messages\MailMessage;
 
 class WorkflowNotification extends Notification
 {
@@ -16,11 +17,17 @@ class WorkflowNotification extends Notification
         public readonly string $referenceId,
         public readonly ?string $category = null,
         public readonly array $metadata = [],
+        public readonly ?array $deliveryChannels = null,
     ) {}
 
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return $this->deliveryChannels ?? ($this->category === 'Supplier Bidding' ? ['database', 'mail'] : ['database']);
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        return (new MailMessage)->subject($this->title)->line($this->message)->line('Reference: '.$this->referenceId);
     }
 
     public function toDatabase(object $notifiable): array

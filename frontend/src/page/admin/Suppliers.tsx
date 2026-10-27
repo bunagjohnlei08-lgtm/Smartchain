@@ -23,7 +23,9 @@ import {
   Trash2,
   RotateCcw,
   AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
+import AdminAccreditationReview from '../../components/supplier/AdminAccreditationReview';
 
 // ============================================
 // TYPES
@@ -104,12 +106,13 @@ const Suppliers: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [accreditationSupplierId, setAccreditationSupplierId] = useState<string | null>(null);
   const [actionSupplier, setActionSupplier] = useState<Supplier | null>(null);
   const [lifecycleAction, setLifecycleAction] = useState<'remove' | 'restore' | null>(null);
   const actionDialogRef = useRef<HTMLDivElement>(null);
   const cancelActionRef = useRef<HTMLButtonElement>(null);
   const actionTriggerRef = useRef<HTMLElement | null>(null);
-  useAdminDetailOverlay((showEditModal && selectedSupplier !== null) || actionSupplier !== null);
+  useAdminDetailOverlay((showEditModal && selectedSupplier !== null) || actionSupplier !== null || accreditationSupplierId !== null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -300,7 +303,7 @@ const Suppliers: React.FC = () => {
 
   {/* FIX: Dark mode canvas adaptation */}
   return (
-    <div className="admin-suppliers w-full max-w-7xl mx-auto p-6 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200">
+    <div className="admin-suppliers w-full min-w-0 p-6 space-y-6 bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
         <span>Admin</span>
@@ -771,6 +774,8 @@ const Suppliers: React.FC = () => {
               </button>
             </div>
 
+            <button type="button" onClick={() => { setShowEditModal(false); setAccreditationSupplierId(selectedSupplier.id); }} className="mb-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-cyan-600 px-4 text-sm font-semibold text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-300"><ShieldCheck className="h-4 w-4"/>Accreditation Review</button>
+
             <form className="space-y-4" onSubmit={handleUpdate}>
               <div>
                 <label htmlFor="edit-supplier-code" className="block text-sm font-medium mb-1.5 text-[var(--text-secondary)]">Supplier Code</label>
@@ -894,6 +899,7 @@ const Suppliers: React.FC = () => {
           </div>
         </div>
       )}
+      {accreditationSupplierId && <AdminAccreditationReview supplierId={accreditationSupplierId} onClose={() => setAccreditationSupplierId(null)} />}
 
       {actionSupplier && lifecycleAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) closeLifecycleDialog(); }}>

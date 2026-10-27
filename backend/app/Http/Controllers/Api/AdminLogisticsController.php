@@ -22,7 +22,7 @@ class AdminLogisticsController extends Controller
      * Strictly orders the Plant Manager has forwarded. Orders still in FOR_PACKING,
      * PACKING or READY_FOR_SHIPMENT belong to Plant Manager Shipment and must not appear here.
      */
-    private const LOGISTICS_STATUSES = [Order::LOGISTICS_STATUS];
+    private const LOGISTICS_STATUSES = [Order::LOGISTICS_STATUS, 'IN_TRANSIT', 'DELIVERED'];
 
     public function index(Request $request): JsonResponse
     {
@@ -43,6 +43,9 @@ class AdminLogisticsController extends Controller
                 'assignee.warehouse:id,name,code',
                 'histories' => fn ($histories) => $histories->oldest(),
                 'shipmentPacking.packedBy:id,name,employee_id',
+                'deliveryRequest.partner:id,code,name',
+                'deliveryRequest.attempts',
+                'deliveryRequest.statusEvents',
             ])
             ->withCount('items');
 
@@ -80,8 +83,30 @@ class AdminLogisticsController extends Controller
             'warehouse' => $order->assignee?->warehouse?->name,
             'prepared_by' => $order->assignee?->name,
             'prepared_date' => $order->assigned_at,
-            // No logistics assignment column exists on orders yet.
-            'assigned_logistics' => null,
+            'assigned_logistics' => $order->deliveryRequest?->partner?->name,
+            'integration_state' => $order->deliveryRequest?->state ?? 'READY',
+            'delivery_request' => $order->deliveryRequest ? [
+                'delivery_request_id' => $order->deliveryRequest->request_uuid,
+                'state' => $order->deliveryRequest->state,
+                'partner' => $order->deliveryRequest->partner?->only(['id', 'code', 'name']),
+                'partner_delivery_request_id' => $order->deliveryRequest->partner_request_id,
+                'retry_count' => $order->deliveryRequest->retry_count,
+                'next_attempt_at' => $order->deliveryRequest->next_attempt_at,
+                'submitted_at' => $order->deliveryRequest->submitted_at,
+                'accepted_at' => $order->deliveryRequest->accepted_at,
+                'latest_event_at' => $order->deliveryRequest->latest_event_at,
+                'last_error' => $order->deliveryRequest->last_error_code ? [
+                    'code' => $order->deliveryRequest->last_error_code,
+                    'message' => $order->deliveryRequest->last_error_message,
+                ] : null,
+                'payload' => $order->deliveryRequest->payload_snapshot,
+                'attempts' => $order->deliveryRequest->attempts->sortByDesc('attempt_number')->values()->map->only([
+                    'attempt_number', 'correlation_id', 'result', 'http_status', 'error_code', 'safe_message', 'started_at', 'completed_at',
+                ]),
+                'events' => $order->deliveryRequest->statusEvents->sortByDesc('occurred_at')->values()->map->only([
+                    'event_id', 'partner_status', 'occurred_at', 'processing_result', 'note', 'proof_reference', 'received_at',
+                ]),
+            ] : null,
             'status' => $order->status,
             'required_delivery_date' => $order->required_delivery_date,
             'items_count' => $order->items_count,

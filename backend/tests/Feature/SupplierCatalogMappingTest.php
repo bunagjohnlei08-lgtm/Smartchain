@@ -9,6 +9,7 @@ use App\Models\ReplenishmentRequest;
 use App\Models\Role;
 use App\Models\Supplier;
 use App\Models\SupplierApplication;
+use App\Models\SupplierApplicationAttachment;
 use App\Models\SupplierApplicationOffering;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -38,7 +39,7 @@ class SupplierCatalogMappingTest extends TestCase
         $adminRole = Role::create(['name' => 'Admin', 'slug' => 'ADMIN']);
         $managerRole = Role::create(['name' => 'Plant Manager', 'slug' => 'PLANT_MANAGER']);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'status' => 'Active', 'capacity' => 10000, 'capacity_kg' => 4000, 'capacity_pcs' => 3000, 'capacity_l' => 3000]);
+        $this->warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'status' => 'Active', 'capacity' => 10000, 'capacity_powder' => 4000, 'capacity_liquid' => 3000, 'capacity_solid' => 3000, 'capacity_returned' => 0]);
         $this->admin = User::factory()->create(['role_id' => $adminRole->id, 'status' => 'ACTIVE']);
         $this->manager = User::factory()->create(['role_id' => $managerRole->id, 'status' => 'ACTIVE', 'warehouse_id' => $this->warehouse->id]);
     }
@@ -70,6 +71,19 @@ class SupplierCatalogMappingTest extends TestCase
         $supplier = Supplier::create(['supplier_code' => 'SUP-'.random_int(100, 999), 'name' => 'Novaplaza', 'status' => $supplierStatus]);
 
         return $this->application(SupplierApplication::STATUS_APPROVED, [['name' => $name]], $supplier)->offerings()->sole();
+    }
+
+    private function addVerifiedMandatoryDocuments(SupplierApplication $application): void
+    {
+        foreach ([SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE, SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT] as $type) {
+            $application->attachments()->create([
+                'attachment_type' => $type, 'original_name' => strtolower($type).'.pdf',
+                'stored_path' => "tests/{$application->id}/{$type}.pdf", 'mime_type' => 'application/pdf',
+                'file_size' => 100, 'is_current' => true,
+                'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED,
+                'verified_at' => now(), 'expires_on' => now()->addYear(),
+            ]);
+        }
     }
 
     private function publicPayload(array $offerings): array
@@ -143,6 +157,7 @@ class SupplierCatalogMappingTest extends TestCase
     public function test_final_approval_creates_one_supplier_and_no_catalog_records(): void
     {
         $application = $this->application(SupplierApplication::STATUS_MEETING_COMPLETED, [['name' => 'MegaAdd P4 (Powder)'], ['name' => 'MegaFlow MP']]);
+        $this->addVerifiedMandatoryDocuments($application);
 
         $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")->assertOk();
         $this->postJson("/api/admin/supplier-applications/{$application->id}/approve")->assertOk();

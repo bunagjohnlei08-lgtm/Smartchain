@@ -33,6 +33,7 @@ class SupplierPerformanceTest extends TestCase
     public function test_metrics_use_only_eligible_operational_records_and_configured_scoring(): void
     {
         config([
+            'supplier_performance.policy_active' => true,
             'supplier_performance.minimum_eligible_deliveries' => 2,
             'supplier_performance.weights' => ['on_time_delivery' => 25, 'fulfillment' => 25, 'qa_acceptance' => 25, 'discrepancy_free' => 25],
             'supplier_performance.recognition_tiers' => [['label' => 'Preferred', 'min_score' => 70]],
@@ -66,7 +67,7 @@ class SupplierPerformanceTest extends TestCase
 
     public function test_no_history_returns_null_metrics_and_no_misleading_score(): void
     {
-        config(['supplier_performance.minimum_eligible_deliveries' => 3, 'supplier_performance.weights' => ['on_time_delivery' => 25, 'fulfillment' => 25, 'qa_acceptance' => 25, 'discrepancy_free' => 25]]);
+        config(['supplier_performance.policy_active' => true, 'supplier_performance.minimum_eligible_deliveries' => 3, 'supplier_performance.weights' => ['on_time_delivery' => 25, 'fulfillment' => 25, 'qa_acceptance' => 25, 'discrepancy_free' => 25]]);
 
         $response = $this->actingAs($this->admin)->getJson('/api/admin/supplier-performance')->assertOk();
         $row = $response->json('data.0');
@@ -78,7 +79,7 @@ class SupplierPerformanceTest extends TestCase
 
     public function test_unconfigured_rules_show_metrics_but_not_score_or_recognition(): void
     {
-        config(['supplier_performance.minimum_eligible_deliveries' => null, 'supplier_performance.weights' => ['on_time_delivery' => null, 'fulfillment' => null, 'qa_acceptance' => null, 'discrepancy_free' => null], 'supplier_performance.recognition_tiers' => []]);
+        config(['supplier_performance.policy_active' => true, 'supplier_performance.minimum_eligible_deliveries' => null, 'supplier_performance.weights' => ['on_time_delivery' => null, 'fulfillment' => null, 'qa_acceptance' => null, 'discrepancy_free' => null], 'supplier_performance.recognition_tiers' => []]);
         $response = $this->actingAs($this->admin)->getJson('/api/admin/supplier-performance')->assertOk();
         $response->assertJsonPath('data.0.eligibility_status', 'SCORING_NOT_CONFIGURED')
             ->assertJsonPath('data.0.overall_score', null)

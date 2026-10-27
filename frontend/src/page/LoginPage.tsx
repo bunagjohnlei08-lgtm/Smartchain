@@ -85,13 +85,15 @@ const LoginPage: React.FC = () => {
           const data = axiosError.response.data as Record<string, unknown>;
           if (status === 401) {
             apiErrors.password = 'Incorrect email or password.';
-          } else if ((status === 429 || status === 503) && typeof data.message === 'string') {
+          } else if (status === 429 && typeof data.message === 'string') {
             apiErrors.form = data.message;
-          } else if (data.errors && typeof data.errors === 'object') {
+          } else if (status === 503) {
+            apiErrors.form = 'Unable to connect to the server right now. Please try again later.';
+          } else if (status === 422 && data.errors && typeof data.errors === 'object') {
             Object.entries(data.errors as Record<string, unknown>).forEach(([key, messages]) => {
               apiErrors[key] = Array.isArray(messages) ? String(messages[0]) : String(messages);
             });
-          } else if (typeof data.message === 'string') {
+          } else if ((status === 403 || status === 422) && typeof data.message === 'string') {
             apiErrors.form = data.message;
           }
         }
@@ -121,12 +123,16 @@ const LoginPage: React.FC = () => {
     setChallenge(null);
 
     const role = user.role?.slug;
+    const selectedRfqLines = new URLSearchParams(location.search).get('rfq_lines')?.split(',').filter((value) => /^\d+$/.test(value)).slice(0, 50) ?? [];
     if (role === 'ADMIN') {
       navigate('/admin/dashboard');
     } else if (role === 'QA_SUPERVISOR') {
       navigate('/qa/dashboard');
     } else if (role === 'PLANT_MANAGER') {
       navigate('/plant-manager/dashboard');
+    } else if (role === 'SUPPLIER') {
+      if (selectedRfqLines.length) sessionStorage.setItem('smartchain:supplier-rfq-interests', JSON.stringify(selectedRfqLines.map(Number)));
+      navigate('/supplier-account');
     } else {
       navigate('/login');
     }

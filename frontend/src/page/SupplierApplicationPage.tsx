@@ -17,6 +17,7 @@ type PreviewState = { file: File; url: string };
 // Offerings are products only; the backend stores type = PRODUCT.
 type Offering = { key: number; name: string; category: string; description: string };
 type OfferingField = 'name' | 'category' | 'description';
+type RfqInterest = { id: number; product_name: string; required_quantity: number; unit: string; public_specification: string; rfq_number: string; closes_at: string };
 
 const emptyForm: FormState = { company_name: '', owner_name: '', address: '', contact_person: '', email: '', phone: '', business_type: '', supply_category: '', website: '' };
 const emptyFiles = (): FileState => ({ business_certificate: [], business_permit: [], product_service_image: [] });
@@ -65,12 +66,22 @@ const SupplierApplicationPage: React.FC = () => {
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [processingFiles, setProcessingFiles] = useState(false);
+  const [rfqInterests, setRfqInterests] = useState<RfqInterest[]>([]);
   const fileInputs = useRef<Partial<Record<FileField, HTMLInputElement | null>>>({});
   const fingerprints = useRef(new Set<string>());
   const processingFilesRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const dialogCloseRef = useRef<HTMLButtonElement | null>(null);
   const previewTriggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const ids = new URLSearchParams(window.location.search).get('rfq_lines')?.split(',').filter((value) => /^\d+$/.test(value)) ?? [];
+    if (!ids.length) return;
+    apiClient.get('/public/rfqs').then(({ data }) => {
+      const selected = new Set(ids.map(Number));
+      setRfqInterests((data.data || []).flatMap((rfq: any) => (rfq.lines || []).filter((line: any) => selected.has(line.id)).map((line: any) => ({ ...line, rfq_number: rfq.rfq_number, closes_at: rfq.closes_at }))));
+    }).catch(() => setErrors((current) => ({ ...current, form: 'Your selected supply requirements could not be loaded. You may still submit a general supplier application.' })));
+  }, []);
 
   const update = (field: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -302,6 +313,8 @@ const SupplierApplicationPage: React.FC = () => {
     setSubmitting(true); setErrors({});
     try {
       const payload = new FormData();
+      const selectedRfqLines = new URLSearchParams(window.location.search).get('rfq_lines')?.split(',').filter((value) => /^\d+$/.test(value)) ?? [];
+      selectedRfqLines.forEach((id, index) => payload.append(`rfq_line_ids[${index}]`, id));
       Object.entries(form).forEach(([key, value]) => payload.append(key, value));
       offerings.forEach((offering, index) => {
         payload.append(`offerings[${index}][name]`, offering.name.trim());
@@ -374,6 +387,7 @@ const SupplierApplicationPage: React.FC = () => {
     <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[0.78fr_1.22fr] lg:py-12">
       <section aria-labelledby="application-heading" className="lg:sticky lg:top-8 lg:self-start"><p className="text-sm font-bold uppercase tracking-[0.18em] text-sky-800 dark:text-sky-400">Partner with us</p><h1 id="application-heading" className="mt-3 max-w-xl text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Apply to become a SmartChain supplier</h1><p className="mt-4 max-w-[65ch] text-base leading-7 text-slate-700 dark:text-slate-300">Submit your company details for review. An application is not an active supplier account, and approval does not create login access.</p><div className="mt-7 space-y-4">{[[ClipboardCheck, 'Admin review', 'Your submission is reviewed by authorized procurement staff.'], [ShieldCheck, 'Controlled onboarding', 'Only an approved application creates an active supplier business record.'], [LockKeyhole, 'No account required', 'This portal only accepts applications and never issues login credentials.']].map(([Icon, title, text]) => <div key={String(title)} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0a1524]"><Icon className="mt-0.5 h-5 w-5 shrink-0 text-sky-700 dark:text-sky-400" /><div><h2 className="font-semibold text-slate-900 dark:text-slate-100">{String(title)}</h2><p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{String(text)}</p></div></div>)}</div></section>
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/5 dark:border-white/10 dark:bg-[#081322] dark:shadow-black/30 sm:p-8">
+        {rfqInterests.length>0&&<aside aria-labelledby="selected-needs-heading" className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-400/20 dark:bg-sky-400/10"><h2 id="selected-needs-heading" className="font-bold">Selected supply requirements</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">These interests will be linked to your application for procurement review.</p><ul className="mt-3 space-y-2">{rfqInterests.map(item=><li key={item.id} className="rounded-xl bg-white p-3 text-sm dark:bg-slate-900/60"><strong>{item.product_name}</strong><span className="ml-2 text-slate-600 dark:text-slate-300">{item.required_quantity.toLocaleString()} {item.unit} · {item.rfq_number}</span><p className="mt-1 text-slate-600 dark:text-slate-300">{item.public_specification}</p></li>)}</ul></aside>}
         {reference ? <div role="status" aria-live="polite" className="py-10 text-center"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-700" /><h2 className="mt-5 text-2xl font-bold">Supplier application submitted successfully.</h2><p className="mx-auto mt-3 max-w-lg leading-7 text-slate-600 dark:text-slate-300">Your application is pending Admin review. Save this reference number and check your email for the secure temporary link used to track your application.</p><div className="mx-auto mt-6 max-w-md rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/30 dark:bg-emerald-400/10"><p className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Application reference</p><p className="mt-1 break-all font-mono text-lg font-bold text-emerald-950 dark:text-emerald-100">{reference}</p></div><p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Estimated review time: 1–3 business days.</p><button type="button" onClick={() => setReference('')} className="mt-7 min-h-11 cursor-pointer rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-400/40">Submit another application</button></div> : <form id="supplier-application-form" onSubmit={submit} noValidate>
           <div className="border-b border-slate-200 pb-6 dark:border-slate-700">
             <div className="flex items-center justify-between gap-4"><p className="text-sm font-bold text-sky-800 dark:text-sky-300">Step {step} of 4</p><p className="text-sm font-semibold tabular-nums text-slate-600 dark:text-slate-300">{progress}% complete</p></div>

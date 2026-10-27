@@ -365,6 +365,7 @@ class AuthController extends Controller
                 'name' => $user->warehouse->name,
                 'code' => $user->warehouse->code,
             ] : null,
+            'supplier_id' => $user->supplier_id,
         ];
     }
 

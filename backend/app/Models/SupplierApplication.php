@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class SupplierApplication extends Model
 {
@@ -114,5 +115,10 @@ class SupplierApplication extends Model
     public function meetingSlots(): HasMany
     {
         return $this->hasMany(SupplierApplicationMeetingSlot::class)->orderBy('starts_at')->orderBy('scheduled_at');
+    }
+
+    public function biddingInterests(): BelongsToMany
+    {
+        return $this->belongsToMany(RfqLine::class, 'supplier_application_bidding_interests')->withTimestamps();
     }
 }

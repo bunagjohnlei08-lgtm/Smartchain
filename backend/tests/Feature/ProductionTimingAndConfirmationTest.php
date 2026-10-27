@@ -129,7 +129,7 @@ class ProductionTimingAndConfirmationTest extends ProductionFixture
     {
         [$raw, $output, $inventory, $bom, $batch] = $this->prepared('1');
         $before = [$inventory->available_stock, ProductionBatch::find($batch)->status, DB::table('production_batch_events')->count()];
-        $this->actingAs($this->manager)->get("/api/production/batches/{$batch}/pick-list?format=html")->assertOk()->assertSee('Archon Nell Incorporated')->assertSee('PLANNED')->assertSee($inventory->barcode)->assertSee('Remaining to Pick')->assertSee('KG');
+        $this->actingAs($this->manager)->get("/api/production/batches/{$batch}/pick-list?format=html")->assertOk()->assertSee('Archon Nell Incorporated')->assertSee('PLANNED')->assertSee($inventory->barcode)->assertSee('Remaining to Pick')->assertSee('SACK');
         $pdf = $this->get("/api/production/batches/{$batch}/pick-list?format=pdf")->assertOk()->assertHeader('Content-Type', 'application/pdf'); $this->assertStringStartsWith('%PDF-', $pdf->getContent());
         $this->assertSame($before, [$inventory->fresh()->available_stock, ProductionBatch::find($batch)->status, DB::table('production_batch_events')->count()]);
         $this->issue($batch); $this->get("/api/production/batches/{$batch}/pick-list?format=html")->assertOk()->assertSee('ISSUED')->assertSee('reprint / recorded quantities');
@@ -137,12 +137,12 @@ class ProductionTimingAndConfirmationTest extends ProductionFixture
         $this->actingAs($this->qa)->get("/api/production/batches/{$batch}/pick-list")->assertForbidden();
         $this->actingAs($this->admin)->get("/api/production/batches/{$batch}/pick-list")->assertForbidden();
     }
-    public function test_multi_page_pick_list_preserves_kg_l_pcs_without_fabricated_bins_or_mutations(): void
+    public function test_multi_page_pick_list_preserves_package_units_without_fabricated_bins_or_mutations(): void
     {
         $output = $this->product(); $materials = [];
-        for ($index = 0; $index < 45; $index++) { $raw = $this->product(Product::RAW_MATERIAL, ['KG','L','PCS'][$index % 3]); $materials[] = ['product_id' => $raw->id, 'required_quantity' => '1']; }
+        for ($index = 0; $index < 45; $index++) { $raw = $this->product(Product::RAW_MATERIAL, ['SACK','DRUM','PCS'][$index % 3]); $materials[] = ['product_id' => $raw->id, 'required_quantity' => '1']; }
         $this->bom($output, $materials); $batch = $this->planned($output);
-        $html = $this->actingAs($this->manager)->get("/api/production/batches/{$batch}/pick-list?format=html")->assertOk()->assertSee('Not recorded')->assertSee('KG')->assertSee('L')->assertSee('PCS');
+        $html = $this->actingAs($this->manager)->get("/api/production/batches/{$batch}/pick-list?format=html")->assertOk()->assertSee('Not recorded')->assertSee('SACK')->assertSee('DRUM')->assertSee('PCS');
         $pdf = $this->get("/api/production/batches/{$batch}/pick-list")->assertOk();
         preg_match_all('/\/Type\s*\/Page\b/', $pdf->getContent(), $pages); $this->assertGreaterThan(1, count($pages[0]));
         $this->assertDatabaseCount('production_material_issues', 0); $this->assertNull(ProductionBatch::find($batch)->issued_at);

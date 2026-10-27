@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Branch;
 use App\Models\Inventory;
 use App\Models\InventoryAuditItem;
+use App\Models\InventoryAuditSetting;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
@@ -198,7 +199,8 @@ class InventoryQualityAuditTest extends TestCase
     {
         $this->actingAs($this->admin)->putJson('/api/admin/inventory-audits/schedule/months', ['months' => [1, 5, 10]])
             ->assertOk()->assertExactJson(['months' => [1, 5, 10]]);
-        $this->assertDatabaseHas('inventory_audit_settings', ['id' => 1, 'audit_months' => json_encode([1, 5, 10])]);
+        $setting = InventoryAuditSetting::query()->findOrFail(1);
+        $this->assertSame([1, 5, 10], $setting->audit_months);
     }
 
     public function test_new_scheduled_month_creates_a_new_cycle_without_deleting_history(): void

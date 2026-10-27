@@ -44,6 +44,6 @@ class SessionController extends Controller
             'expires_at' => IdleSession::expiresAt($user, $token)->toIso8601String(),
             // Lets the client measure expires_at against the server clock instead of its own.
             'server_time' => now()->toIso8601String(),
-        ]);
+        ])->header('Cache-Control', 'private, no-store');
     }
 }

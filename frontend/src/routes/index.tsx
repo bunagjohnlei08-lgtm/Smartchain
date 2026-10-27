@@ -4,7 +4,9 @@ import LoginPage from '../page/LoginPage';
 import ActivateAccountPage from '../page/ActivateAccountPage';
 import ForgotPasswordPage from '../page/ForgotPasswordPage';
 import SupplierApplicationPage from '../page/SupplierApplicationPage';
+import SupplierAccessPage from '../page/SupplierAccessPage';
 import SupplierPortalPage from '../page/SupplierPortalPage';
+import SupplierAccountPage from '../page/SupplierAccountPage';
 import PublicLandingPage from '../page/PublicLandingPage';
 
 import AdminLayout from '../components/layout/AdminLayout';
@@ -15,6 +17,10 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import AdminDashboard from '../page/admin/AdminDashboard';
 import AdminProductCatalog from '../page/admin/ProductCatalog';
 import AdminProcurement from '../page/admin/Procurement';
+import AdminRfqManagement from '../page/admin/RfqManagement';
+import AdminRfqEvaluation from '../page/admin/RfqEvaluation';
+import AdminRfqBidMonitor from '../page/admin/RfqBidMonitor';
+import ProcurementWorkflowIndex from '../page/admin/ProcurementWorkflowIndex';
 import AdminPurchaseOrders from '../page/admin/PurchaseOrders';
 import AdminSupplierManagement from '../page/admin/SupplierManagement';
 import AdminLogistics from '../page/admin/logistics';
@@ -58,6 +64,7 @@ import QAQualityReports from '../page/QA/QualityReports';
 import QAProfile from '../page/QA/Profile';
 import QANotifications from '../page/QA/Notifications';
 import QAInventoryQualityAudit from '../page/QA/InventoryQualityAudit';
+import { AI_FORECAST_ENABLED } from '../config/features';
 
 const router = createBrowserRouter([
   { path: '/', element: <PublicLandingPage /> },
@@ -65,9 +72,11 @@ const router = createBrowserRouter([
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/activate-account', element: <ActivateAccountPage /> },
   { path: '/supplier-application', element: <SupplierApplicationPage /> },
+  { path: '/supplier-access', element: <SupplierAccessPage /> },
   { path: '/supplier-portal', element: <SupplierPortalPage /> },
   { path: '/supplier-application/access', element: <SupplierPortalPage /> },
   { path: '/supplier-application/portal', element: <SupplierPortalPage /> },
+  { path: '/supplier-account', element: <ProtectedRoute allowedRoles={['SUPPLIER']}><SupplierAccountPage /></ProtectedRoute> },
   {
     path: '/dashboard',
     element: <ProtectedRoute allowedRoles={['ADMIN']}><Navigate to="/admin/dashboard" replace /></ProtectedRoute>,
@@ -85,12 +94,18 @@ const router = createBrowserRouter([
       { path: 'boms', element: <AdminBoms /> },
       { path: 'production', element: <ProductionRolePage role="admin" /> },
       { path: 'procurement', element: <AdminProcurement /> },
+      { path: 'procurement/sourcing', element: <AdminRfqManagement section="products" /> },
+      { path: 'procurement/rfqs', element: <AdminRfqManagement section="rfqs" /> },
+      { path: 'procurement/bidding', element: <ProcurementWorkflowIndex section="bidding" /> },
+      { path: 'procurement/evaluations', element: <ProcurementWorkflowIndex section="evaluation" /> },
+      { path: 'procurement/rfqs/:id/evaluation', element: <AdminRfqEvaluation /> },
+      { path: 'procurement/rfqs/:id/bids', element: <AdminRfqBidMonitor /> },
       { path: 'barcode-center', element: <AdminBarcodeCenter /> },
       { path: 'purchase-orders', element: <AdminPurchaseOrders /> },
       { path: 'rejected-items', element: <AdminRejectedItems /> },
       { path: 'suppliers', element: <AdminSupplierManagement /> },
       { path: 'logistics', element: <AdminLogistics /> },
-      { path: 'ai-demand-forecasting', element: <AdminAIDemandForecasting /> },
+      { path: 'ai-demand-forecasting', element: AI_FORECAST_ENABLED ? <AdminAIDemandForecasting /> : <Navigate to="/admin/dashboard" replace /> },
       { path: 'reports', element: <AdminReports /> },
       { path: 'users', element: <AdminUserManagement /> },
       { path: 'order-management', element: <AdminOrderManagement /> },
@@ -116,7 +131,7 @@ const router = createBrowserRouter([
       { path: 'shipment', element: <PlantManagerShipment /> },
       { path: 'receiving', element: <PlantManagerReceiving /> },
       { path: 'reports', element: <PlantManagerReports /> },
-      { path: 'forecast', element: <PlantManagerForecast /> },
+      { path: 'forecast', element: AI_FORECAST_ENABLED ? <PlantManagerForecast /> : <Navigate to="/plant-manager/dashboard" replace /> },
       { path: 'notifications', element: <PlantManagerNotifications /> },
       { path: 'profile', element: <PlantManagerProfile /> },
       { path: 'suppliers', element: <PlantManagerSuppliers /> },

@@ -12,8 +12,8 @@ class SharedClassifiedSupplyTest extends ProductionFixture
 {
     public function test_raw_and_production_capable_finished_products_share_the_supplier_lifecycle(): void
     {
-        $raw = $this->product(Product::RAW_MATERIAL, 'L');
-        $finished = $this->product(Product::FINISHED_PRODUCT, 'KG');
+        $raw = $this->product(Product::RAW_MATERIAL, 'DRUM');
+        $finished = $this->product(Product::FINISHED_PRODUCT, 'SACK');
         $this->bom($finished, [['product_id' => $raw->id, 'required_quantity' => '1']]);
         foreach ([$raw, $finished] as $product) {
             $requestId = $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [

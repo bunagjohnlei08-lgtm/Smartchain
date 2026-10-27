@@ -94,7 +94,7 @@ class StockInTest extends TestCase
             'name' => 'Main Warehouse',
             'code' => 'WH-MAIN',
             'branch_id' => $branch->id,
-            'capacity' => $capacity, 'capacity_kg' => 0, 'capacity_pcs' => $capacity, 'capacity_l' => 0,
+            'capacity' => $capacity, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => $capacity, 'capacity_returned' => 0,
             'status' => 'Active',
         ]);
 
@@ -138,7 +138,7 @@ class StockInTest extends TestCase
         $admin = User::factory()->create(['role_id' => $adminRole->id, 'status' => 'ACTIVE']);
         $qa = User::factory()->create(['role_id' => $qaRole->id, 'status' => 'ACTIVE']);
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'BR-MAIN']);
-        Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 10000, 'capacity_kg' => 0, 'capacity_pcs' => 10000, 'capacity_l' => 0]);
+        Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 10000, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 10000, 'capacity_returned' => 0]);
 
         $receiving = $this->makeReceiving([
             ['product' => 'Widget A', 'qty' => 10, 'inspection_status' => 'Passed'],
@@ -202,7 +202,7 @@ class StockInTest extends TestCase
     {
         $user = $this->plantManager();
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'BR-MAIN']);
-        $warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 10000, 'capacity_kg' => 0, 'capacity_pcs' => 10000, 'capacity_l' => 0]);
+        $warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'capacity' => 10000, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 10000, 'capacity_returned' => 0]);
         $receiving = $this->makeReceiving([['product' => 'Valve', 'qty' => 5, 'inspection_status' => 'Passed']]);
         $item = $receiving->items()->firstOrFail();
         Inventory::create([
@@ -250,8 +250,9 @@ class StockInTest extends TestCase
         $this->actingAs($user)->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Cannot add stock: PCS quantity exceeds its remaining warehouse allocation (500 PCS).',
+                'message' => 'Cannot add stock: PCS quantity exceeds the remaining Solid Products Area capacity (500 slots).',
                 'capacity_unit' => 'PCS',
+                'capacity_area' => 'SOLID',
                 'available_capacity' => 500,
                 'requested_quantity' => 501,
             ]);
@@ -317,43 +318,43 @@ class StockInTest extends TestCase
     {
         Notification::fake();
         $warehouse = $this->warehouseWithUtilization(10000, 0);
-        $warehouse->update(['capacity_kg' => 4000, 'capacity_pcs' => 3000, 'capacity_l' => 3000]);
-        $product = Product::create(['name' => 'Stored KG Material', 'unit' => 'KG']);
-        Inventory::create(['barcode' => 'EXISTING-KG', 'product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'available_stock' => 3990]);
+        $warehouse->update(['capacity_powder' => 4000, 'capacity_liquid' => 3000, 'capacity_solid' => 3000, 'capacity_returned' => 0]);
+        $product = Product::create(['name' => 'Stored Sack Material', 'unit' => 'SACK']);
+        Inventory::create(['barcode' => 'EXISTING-SACK', 'product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'available_stock' => 3990]);
         $receiving = $this->makeReceiving([
-            ['product' => 'Incoming KG A', 'unit' => 'KG', 'qty' => 6, 'inspection_status' => 'Passed'],
-            ['product' => 'Incoming KG B', 'unit' => 'kg', 'qty' => 5, 'inspection_status' => 'Passed'],
-            ['product' => 'Incoming L', 'unit' => 'L', 'qty' => 100, 'inspection_status' => 'Passed'],
+            ['product' => 'Incoming Sack A', 'unit' => 'SACK', 'qty' => 6, 'inspection_status' => 'Passed'],
+            ['product' => 'Incoming Sack B', 'unit' => 'sack', 'qty' => 5, 'inspection_status' => 'Passed'],
+            ['product' => 'Incoming Drum', 'unit' => 'DRUM', 'qty' => 100, 'inspection_status' => 'Passed'],
         ]);
-        $liquid = $receiving->items()->where('unit', 'L')->firstOrFail();
-        Inventory::create(['barcode' => 'PLACEHOLDER-L', 'product_id' => $liquid->product_id, 'warehouse_id' => $warehouse->id, 'available_stock' => 0]);
+        $liquid = $receiving->items()->where('unit', 'DRUM')->firstOrFail();
+        Inventory::create(['barcode' => 'PLACEHOLDER-DRUM', 'product_id' => $liquid->product_id, 'warehouse_id' => $warehouse->id, 'available_stock' => 0]);
         $endpoint = "/api/stock-in/receivings/{$receiving->id}/stock-in";
         $this->actingAs($this->plantManager())->postJson($endpoint)->assertUnprocessable()
-            ->assertJsonPath('capacity_unit', 'KG')->assertJsonPath('requested_quantity', 11)->assertJsonPath('available_capacity', 10);
+            ->assertJsonPath('capacity_unit', 'SACK')->assertJsonPath('requested_quantity', 11)->assertJsonPath('available_capacity', 10);
         $this->assertSame(0, $receiving->items()->whereNotNull('stocked_in_at')->count());
-        $this->assertSame(0, Inventory::where('barcode', 'PLACEHOLDER-L')->value('available_stock'));
-        $item = $receiving->items()->where('product_name', 'Incoming KG B')->firstOrFail();
+        $this->assertSame(0, Inventory::where('barcode', 'PLACEHOLDER-DRUM')->value('available_stock'));
+        $item = $receiving->items()->where('product_name', 'Incoming Sack B')->firstOrFail();
         $item->qaInspectionItem->update(['accepted_quantity' => 4, 'rejected_quantity' => 1, 'inspection_result' => 'Partial']);
         $item->update(['inspection_status' => 'Partial']);
         $this->postJson($endpoint)->assertOk();
         $snapshot = \App\Support\WarehouseCapacity::snapshot($warehouse);
-        $this->assertSame(4000, $snapshot['unit_capacity']['KG']['used']);
-        $this->assertSame(100, $snapshot['unit_capacity']['L']['used']);
+        $this->assertSame(4000, $snapshot['unit_capacity']['SACK']['used']);
+        $this->assertSame(100, $snapshot['unit_capacity']['DRUM']['used']);
         $this->assertSame(0, $snapshot['unit_capacity']['PCS']['used']);
-        $this->assertSame('PLACEHOLDER-L', Inventory::where('product_id', $liquid->product_id)->value('barcode'));
+        $this->assertSame('PLACEHOLDER-DRUM', Inventory::where('product_id', $liquid->product_id)->value('barcode'));
         $this->postJson($endpoint)->assertUnprocessable();
-        $this->assertSame(100, Inventory::where('barcode', 'PLACEHOLDER-L')->value('available_stock'));
+        $this->assertSame(100, Inventory::where('barcode', 'PLACEHOLDER-DRUM')->value('available_stock'));
     }
 
     public function test_legacy_warehouse_with_no_split_cannot_stock_in_or_invent_allocations(): void
     {
         $warehouse = $this->warehouseWithUtilization(10000, 0);
-        $warehouse->update(['capacity_kg' => null, 'capacity_pcs' => null, 'capacity_l' => null]);
+        $warehouse->update(['capacity_powder' => null, 'capacity_liquid' => null, 'capacity_solid' => null, 'capacity_returned' => null]);
         $receiving = $this->makeReceiving([['product' => 'Legacy Receiving', 'qty' => 1, 'inspection_status' => 'Passed']]);
         $this->actingAs($this->plantManager())->postJson("/api/stock-in/receivings/{$receiving->id}/stock-in")->assertUnprocessable()
             ->assertJsonPath('available_capacity', null);
         $this->assertDatabaseCount('inventories', 0);
-        $this->assertNull($warehouse->fresh()->capacity_pcs);
+        $this->assertNull($warehouse->fresh()->capacity_solid);
         $this->assertNull($receiving->items()->firstOrFail()->stocked_in_at);
     }
 

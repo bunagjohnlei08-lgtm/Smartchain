@@ -1,4 +1,7 @@
 *.log
+*.pyc
+*.pyo
+__pycache__/
 .DS_Store
 .env
 .env.testing
@@ -28,6 +31,12 @@ Homestead.yaml
 Thumbs.db
 
 /backend/vendor/
+
+/.review-worktrees/
+/.tmp-checkpoints/
+/.tmp-psysh/
+/graphify-out/
+/temp-security-audit/
 
 /.agents/
 /backend/public/storage

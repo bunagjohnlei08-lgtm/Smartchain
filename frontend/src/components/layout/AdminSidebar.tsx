@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
+import { AI_FORECAST_ENABLED } from '../../config/features';
 
 interface NavChild {
   id: string;
@@ -79,7 +80,9 @@ const navGroups: NavGroup[] = [
         id: 'suppliers',
         icon: Users,
         label: 'Supplier / Vendor Management',
-        path: '/admin/suppliers',
+        children: [
+          { id: 'supplier-management', label: 'Suppliers', path: '/admin/suppliers' },
+        ],
       },
       {
         id: 'purchase-orders',
@@ -98,7 +101,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'ANALYTICS & INSIGHTS',
     items: [
-      { id: 'ai-demand-forecast', icon: Brain, label: 'AI Demand Forecasting', path: '/admin/ai-demand-forecasting' },
+      ...(AI_FORECAST_ENABLED ? [{ id: 'ai-demand-forecast', icon: Brain, label: 'AI Demand Forecasting', path: '/admin/ai-demand-forecasting' }] : []),
       { id: 'reports', icon: BarChart3, label: 'Reports', path: '/admin/reports' },
     ],
   },

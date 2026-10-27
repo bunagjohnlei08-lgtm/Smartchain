@@ -3,12 +3,19 @@
 use App\Http\Controllers\Api\AdminCatalogMappingController;
 use App\Http\Controllers\Api\AdminInventoryAuditController;
 use App\Http\Controllers\Api\AdminLogisticsController;
+use App\Http\Controllers\Api\AdminLogisticsIntegrationController;
 use App\Http\Controllers\Api\AdminOrderController;
 use App\Http\Controllers\Api\AdminProcurementController;
+use App\Http\Controllers\Api\AdminRfqController;
+use App\Http\Controllers\Api\AdminRfqEditingController;
+use App\Http\Controllers\Api\AdminRfqImageController;
+use App\Http\Controllers\Api\AdminBidEvaluationController;
 use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AdminSupplierApplicationController;
 use App\Http\Controllers\Api\AdminSupplierApplicationMeetingController;
 use App\Http\Controllers\Api\AdminSupplierPerformanceController;
+use App\Http\Controllers\Api\AdminSupplierAccreditationController;
+use App\Http\Controllers\Api\AwardPurchaseOrderController;
 use App\Http\Controllers\Api\AdminSupplierRejectionController;
 use App\Http\Controllers\Api\AdminWarehouseLocationController;
 use App\Http\Controllers\Api\AuditLogController;
@@ -16,6 +23,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\InventoryAuditEvidenceController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\LogisticsStatusCallbackController;
 use App\Http\Controllers\Api\InventoryHistoryController;
 use App\Http\Controllers\Api\InvitationController;
 use App\Http\Controllers\Api\NotificationController;
@@ -27,7 +35,10 @@ use App\Http\Controllers\Api\PlantManagerReceivingNoteController;
 use App\Http\Controllers\Api\PlantManagerShipmentController;
 use App\Http\Controllers\Api\PlantManagerWarehouseController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductImageController;
+use App\Http\Controllers\Api\SupplierBidController;
 use App\Http\Controllers\Api\PublicCompanyLocationController;
+use App\Http\Controllers\Api\PublicRfqController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\QaDashboardController;
@@ -43,14 +54,23 @@ use App\Http\Controllers\Api\SessionController;
 use App\Http\Controllers\Api\StockInController;
 use App\Http\Controllers\Api\StockOutController;
 use App\Http\Controllers\Api\SupplierApplicationController;
+use App\Http\Controllers\Api\SupplierAccountController;
+use App\Http\Controllers\Api\SupplierAccreditationController;
+use App\Http\Controllers\Api\SupplierRfqController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SupplierPortalController;
+use App\Http\Controllers\Api\SupplierPurchaseOrderController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/supplier-applications', [SupplierApplicationController::class, 'store'])->middleware('throttle:supplier-applications');
 Route::get('/public/company-location', [PublicCompanyLocationController::class, 'show'])->middleware('throttle:60,1');
+Route::get('/public/rfqs', [PublicRfqController::class, 'index'])->middleware('throttle:60,1');
+Route::get('/public/rfqs/{rfq}', [PublicRfqController::class, 'show'])->whereNumber('rfq')->middleware('throttle:60,1');
+Route::get('/accreditation-documents/{document}', [SupplierAccreditationController::class, 'signedDocument'])->whereNumber('document')->middleware(['signed','throttle:60,1'])->name('accreditation-documents.download');
+Route::get('/public/rfq-lines/{rfqLine}/image', [AdminRfqImageController::class, 'publicShow'])->whereNumber('rfqLine')->name('public.rfq-lines.image')->middleware('throttle:120,1');
+Route::get('/rfq-lines/{rfqLine}/image-preview', [AdminRfqImageController::class, 'signedPreview'])->whereNumber('rfqLine')->name('rfq-lines.image.preview')->middleware(['signed', 'throttle:120,1']);
 Route::post('/supplier-portal/access', [SupplierPortalController::class, 'exchange'])->middleware('throttle:supplier-portal-access');
 Route::middleware(['supplier.portal', 'throttle:supplier-portal'])->prefix('supplier-portal')->group(function () {
     Route::get('/application', [SupplierPortalController::class, 'show']);
@@ -70,6 +90,9 @@ Route::post('/forgot-password/resend', [PasswordResetController::class, 'resend'
 Route::post('/forgot-password/verify', [PasswordResetController::class, 'verify'])->middleware('throttle:password-reset-verify');
 Route::post('/forgot-password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:password-reset-complete');
 
+Route::post('/integrations/logistics/v1/status-events', [LogisticsStatusCallbackController::class, 'store'])
+    ->middleware(['throttle:logistics-callback', 'logistics.callback']);
+
 // Public activation-link endpoints. No token is issued by either.
 Route::middleware('throttle:invitations')->group(function () {
     Route::post('/invitations/validate', [InvitationController::class, 'check']);
@@ -77,6 +100,24 @@ Route::middleware('throttle:invitations')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
+    Route::middleware('supplier.account')->prefix('supplier-account')->group(function () {
+        Route::get('/profile', [SupplierAccountController::class, 'show']);
+        Route::get('/accreditation-requests', [SupplierAccreditationController::class, 'index']);
+        Route::post('/accreditation-requests', [SupplierAccreditationController::class, 'store'])->middleware('throttle:10,1');
+        Route::post('/accreditation-requests/{accreditationRequest}/resubmit', [SupplierAccreditationController::class, 'resubmit'])->whereNumber('accreditationRequest')->middleware('throttle:10,1');
+        Route::get('/accreditation-documents/{document}', [SupplierAccreditationController::class, 'document'])->whereNumber('document');
+        Route::get('/rfqs', [SupplierRfqController::class, 'index']);
+        Route::get('/bidding-interests', [SupplierRfqController::class, 'myInterests']);
+        Route::get('/rfqs/{rfq}', [SupplierRfqController::class, 'show']);
+        Route::post('/bidding-interests', [SupplierRfqController::class, 'interests']);
+        Route::get('/quotations', [SupplierBidController::class, 'index']);
+        Route::post('/quotations', [SupplierBidController::class, 'store'])->middleware('throttle:30,1');
+        Route::post('/bid-lines/{bidLine}/revisions', [SupplierBidController::class, 'revise'])->middleware('throttle:30,1');
+        Route::get('/purchase-orders', [SupplierPurchaseOrderController::class, 'index']);
+        Route::get('/purchase-orders/{purchaseOrder}', [SupplierPurchaseOrderController::class, 'show'])->whereNumber('purchaseOrder');
+        Route::post('/purchase-orders/{purchaseOrder}/acknowledgments', [SupplierPurchaseOrderController::class, 'acknowledge'])->whereNumber('purchaseOrder')->middleware('throttle:20,1');
+        Route::get('/performance', [SupplierPurchaseOrderController::class, 'performance']);
+    });
     Route::get('/session/status', [SessionController::class, 'status'])->middleware('throttle:session-status');
     Route::post('/session/activity', [SessionController::class, 'activity'])->middleware('throttle:session-activity');
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -105,6 +146,8 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::get('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'show']);
     Route::put('/admin/warehouse/location', [AdminWarehouseLocationController::class, 'update']);
     Route::post('/admin/products/bulk-supplier', [ProductController::class, 'bulkAssignSupplier']);
+    Route::post('/admin/products/{product}/image', [ProductImageController::class, 'store']);
+    Route::delete('/admin/products/{product}/image', [ProductImageController::class, 'destroy']);
     Route::post('/admin/products/{product}/warehouse', [ProductController::class, 'assignWarehouse']);
     Route::apiResource('/admin/products', ProductController::class);
     Route::get('/admin/catalog-mapping/offerings', [AdminCatalogMappingController::class, 'index']);
@@ -222,6 +265,24 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
         Route::get('/requests/{replenishmentRequest}', [AdminProcurementController::class, 'show']);
         Route::post('/requests/{replenishmentRequest}/approve', [AdminProcurementController::class, 'approve']);
         Route::post('/requests/{replenishmentRequest}/decline', [AdminProcurementController::class, 'decline']);
+        Route::post('/requests/{replenishmentRequest}/sourcing-decision', [AdminRfqController::class, 'sourcingDecision']);
+        Route::get('/rfqs', [AdminRfqController::class, 'index']);
+        Route::get('/rfq-requirements', [AdminRfqEditingController::class, 'eligibleRequirements']);
+        Route::get('/sourcing-products', [AdminRfqEditingController::class, 'sourcingProducts']);
+        Route::post('/rfqs', [AdminRfqController::class, 'store']);
+        Route::get('/rfqs/{rfq}', [AdminRfqEditingController::class, 'show']);
+        Route::put('/rfqs/{rfq}', [AdminRfqEditingController::class, 'update']);
+        Route::post('/rfqs/{rfq}/amend', [AdminRfqEditingController::class, 'amend']);
+        Route::post('/rfqs/{rfq}/submit', [AdminRfqController::class, 'submit']);
+        Route::post('/rfqs/{rfq}/approve', [AdminRfqController::class, 'approve']);
+        Route::post('/rfqs/{rfq}/publish', [AdminRfqController::class, 'publish']);
+        Route::post('/rfqs/{rfq}/cancel', [AdminRfqController::class, 'cancel']);
+        Route::post('/rfq-lines/{rfqLine}/image', [AdminRfqImageController::class, 'store'])->whereNumber('rfqLine');
+        Route::get('/rfq-lines/{rfqLine}/image', [AdminRfqImageController::class, 'show'])->whereNumber('rfqLine')->name('admin.rfq-lines.image');
+        Route::delete('/rfq-lines/{rfqLine}/image', [AdminRfqImageController::class, 'destroy'])->whereNumber('rfqLine');
+        Route::get('/rfqs/{rfq}/bids', [AdminBidEvaluationController::class, 'show']);
+        Route::put('/bid-lines/{bidLine}/evaluation', [AdminBidEvaluationController::class, 'evaluate']);
+        Route::post('/rfqs/{rfq}/award', [AdminBidEvaluationController::class, 'award']);
     });
 
     Route::prefix('admin/rejected-items')->group(function () {
@@ -242,6 +303,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::get('/purchase-orders/approved', [PurchaseOrderController::class, 'approved']);
     Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
     Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+    Route::patch('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve']);
     Route::get('/purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf']);
     Route::patch('/purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send']);
     Route::get('/admin/receiving-discrepancies', [ReceivingDiscrepancyController::class, 'index']);
@@ -250,9 +312,15 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::get('/suppliers', [SupplierController::class, 'index']);
     Route::post('/suppliers', [SupplierController::class, 'store']);
     Route::get('/suppliers/{supplier}', [SupplierController::class, 'show']);
+    Route::get('/suppliers/{supplier}/accreditation', [AdminSupplierAccreditationController::class, 'supplier']);
+    Route::post('/suppliers/{supplier}/accreditation/legacy-correction', [AdminSupplierAccreditationController::class, 'correctLegacy'])->middleware('throttle:10,1');
     Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
     Route::patch('/suppliers/{supplier}/status', [SupplierController::class, 'updateStatus']);
     Route::post('/suppliers/{supplier}/restore', [SupplierController::class, 'restore']);
+    Route::get('/admin/accreditation-requests', [AdminSupplierAccreditationController::class, 'index']);
+    Route::get('/admin/accreditation-documents/{document}/download', [SupplierAccreditationController::class, 'document'])->whereNumber('document');
+    Route::patch('/admin/accreditation-documents/{document}/verification', [AdminSupplierAccreditationController::class, 'verifyDocument'])->whereNumber('document');
+    Route::post('/admin/accreditation-requests/{accreditationRequest}/decision', [AdminSupplierAccreditationController::class, 'decide'])->whereNumber('accreditationRequest');
     Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
     Route::get('/admin/supplier-applications', [AdminSupplierApplicationController::class, 'index']);
     Route::get('/admin/supplier-applications/{supplierApplication}', [AdminSupplierApplicationController::class, 'show']);
@@ -262,13 +330,21 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::post('/admin/supplier-applications/{supplierApplication}/qualify', [AdminSupplierApplicationController::class, 'qualify']);
     Route::post('/admin/supplier-applications/{supplierApplication}/revision', [AdminSupplierApplicationController::class, 'requestRevision']);
     Route::post('/admin/supplier-applications/{supplierApplication}/approve', [AdminSupplierApplicationController::class, 'approve']);
+    Route::post('/admin/supplier-applications/{supplierApplication}/account-invitation/resend', [AdminSupplierApplicationController::class, 'resendAccountInvitation'])->middleware('throttle:invitation-resend');
+    Route::patch('/admin/supplier-applications/{supplierApplication}/attachments/{attachment}/verification', [AdminSupplierApplicationController::class, 'verifyAttachment']);
     Route::post('/admin/supplier-applications/{supplierApplication}/reject', [AdminSupplierApplicationController::class, 'reject']);
     Route::post('/admin/supplier-applications/{supplierApplication}/meeting-slots', [AdminSupplierApplicationMeetingController::class, 'store']);
     Route::delete('/admin/supplier-applications/{supplierApplication}/meeting-slots/{meetingSlot}', [AdminSupplierApplicationMeetingController::class, 'destroy']);
     Route::post('/admin/supplier-applications/{supplierApplication}/meeting-slots/{meetingSlot}/complete', [AdminSupplierApplicationMeetingController::class, 'complete']);
     Route::get('/admin/supplier-performance', [AdminSupplierPerformanceController::class, 'index']);
+    Route::post('/admin/supplier-performance/{supplier}/snapshots', [AdminSupplierPerformanceController::class, 'snapshot'])->whereNumber('supplier');
+    Route::post('/admin/supplier-awards/{supplierAward}/purchase-orders', [AwardPurchaseOrderController::class, 'store'])->whereNumber('supplierAward')->middleware('throttle:10,1');
 
     Route::get('/admin/logistics/shipments', [AdminLogisticsController::class, 'index']);
+    Route::get('/admin/logistics/partners', [AdminLogisticsIntegrationController::class, 'partners']);
+    Route::post('/admin/logistics/shipments/{order}/preview', [AdminLogisticsIntegrationController::class, 'preview']);
+    Route::post('/admin/logistics/shipments/{order}/send', [AdminLogisticsIntegrationController::class, 'send'])
+        ->middleware('throttle:logistics-send');
 
     Route::prefix('plant-manager/orders')->group(function () {
         Route::get('/', [PlantManagerOrderController::class, 'index']);
@@ -294,3 +370,5 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
         Route::post('/{order}/forward-to-logistics', [PlantManagerShipmentController::class, 'forwardToLogistics']);
     });
 });
+
+Route::get('/public/products/{product}/image', [ProductImageController::class, 'show'])->middleware('throttle:120,1')->name('public.products.image');

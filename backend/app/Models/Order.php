@@ -53,6 +53,7 @@ class Order extends Model
     public function histories(): HasMany { return $this->hasMany(OrderStatusHistory::class); }
     public function stockOutTransactions(): HasMany { return $this->hasMany(StockOutTransaction::class); }
     public function shipmentPacking(): HasOne { return $this->hasOne(ShipmentPacking::class); }
+    public function deliveryRequest(): HasOne { return $this->hasOne(DeliveryRequest::class); }
     public function assignee(): BelongsTo { return $this->belongsTo(User::class, 'assigned_to'); }
     public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
 }

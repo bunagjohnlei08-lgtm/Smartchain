@@ -24,7 +24,7 @@ class AdminReportsDashboardTest extends TestCase
     public function test_admin_reports_dashboard_returns_live_inventory_aggregates(): void
     {
         $branch = Branch::create(['name' => 'Main Branch', 'code' => 'MAIN']);
-        $warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'MAIN-WH', 'branch_id' => $branch->id, 'capacity' => 100, 'capacity_kg' => 0, 'capacity_pcs' => 100, 'capacity_l' => 0, 'status' => 'Active']);
+        $warehouse = Warehouse::create(['name' => 'Main Warehouse', 'code' => 'MAIN-WH', 'branch_id' => $branch->id, 'capacity' => 100, 'capacity_powder' => 0, 'capacity_liquid' => 0, 'capacity_solid' => 100, 'capacity_returned' => 0, 'status' => 'Active']);
         $available = Product::create(['name' => 'Available Product', 'unit' => 'pcs', 'cost_price' => 10, 'reorder_level' => 5]);
         $low = Product::create(['name' => 'Low Product', 'unit' => 'pcs', 'cost_price' => 20, 'reorder_level' => 5]);
         Inventory::create(['barcode' => 'REPORT-1', 'product_id' => $available->id, 'warehouse_id' => $warehouse->id, 'available_stock' => 10, 'reserved_stock' => 2, 'backload' => 3]);

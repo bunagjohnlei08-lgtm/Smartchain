@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 class Supplier extends Model
@@ -22,7 +23,8 @@ class Supplier extends Model
         'supplier_code', 'name', 'contact_person', 'email', 'phone',
         'address', 'business_type', 'supply_category', 'products_services',
         'status', 'payment_terms', 'notes', 'removal_requested_at',
-        'removal_requested_by_id', 'archived_at',
+        'removal_requested_by_id', 'archived_at', 'accreditation_status',
+        'accredited_at', 'accreditation_expires_on',
     ];
 
     protected function casts(): array
@@ -30,12 +32,19 @@ class Supplier extends Model
         return [
             'removal_requested_at' => 'datetime',
             'archived_at' => 'datetime',
+            'accredited_at' => 'datetime',
+            'accreditation_expires_on' => 'date',
         ];
     }
 
     public function aliases(): HasMany
     {
         return $this->hasMany(SupplierAlias::class)->orderBy('alias');
+    }
+
+    public function accreditationRequests(): HasMany
+    {
+        return $this->hasMany(SupplierAccreditationRequest::class);
     }
 
     public function products(): BelongsToMany
@@ -47,6 +56,11 @@ class Supplier extends Model
     {
         return $this->hasMany(PurchaseOrder::class);
     }
+
+    public function authorizedUsers(): HasMany { return $this->hasMany(User::class); }
+    public function quotations(): HasMany { return $this->hasMany(SupplierQuotation::class); }
+    public function approvedApplication(): HasOne { return $this->hasOne(SupplierApplication::class, 'approved_supplier_id')->where('status', SupplierApplication::STATUS_APPROVED); }
+    public function performanceSnapshots(): HasMany { return $this->hasMany(SupplierPerformanceSnapshot::class)->orderByDesc('calculated_at'); }
 
     public function removalRequestedBy(): BelongsTo
     {

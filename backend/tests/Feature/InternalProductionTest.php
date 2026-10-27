@@ -13,7 +13,7 @@ class InternalProductionTest extends ProductionFixture
     {
         [$raw, $output, $inventory, $bom, $batch] = $this->prepared();
         $this->actingAs($this->admin)->getJson('/api/admin/reports/preview?report_key=inventory.raw_materials')->assertOk()
-            ->assertJsonFragment(['product' => $raw->name, 'unit' => 'KG'])->assertJsonMissing(['product' => $output->name]);
+            ->assertJsonFragment(['product' => $raw->name, 'unit' => 'SACK'])->assertJsonMissing(['product' => $output->name]);
         $this->getJson('/api/admin/reports/preview?report_key=inventory.finished_products')->assertOk()->assertJsonFragment(['product' => $output->name]);
         $this->getJson('/api/admin/reports/preview?report_key=warehouse.production_batches')->assertOk()->assertJsonFragment(['product' => $output->name, 'unit' => 'PCS']);
         $this->actingAs($this->manager)->getJson('/api/plant-manager/reports/generate?type=production&format=preview')->assertOk()->assertJsonCount(1, 'report.rows');
@@ -69,7 +69,7 @@ class InternalProductionTest extends ProductionFixture
 
     public function test_shortage_in_one_component_rolls_back_all_materials_and_does_not_create_requests(): void
     {
-        $rawA = $this->product(Product::RAW_MATERIAL, 'KG'); $rawB = $this->product(Product::RAW_MATERIAL, 'L'); $output = $this->product();
+        $rawA = $this->product(Product::RAW_MATERIAL, 'SACK'); $rawB = $this->product(Product::RAW_MATERIAL, 'DRUM'); $output = $this->product();
         $a = $this->stock($rawA, 10); $b = $this->stock($rawB, 1);
         $this->bom($output, [['product_id' => $rawA->id, 'required_quantity' => '1'], ['product_id' => $rawB->id, 'required_quantity' => '1']]);
         $batch = $this->planned($output, 2);
@@ -94,7 +94,7 @@ class InternalProductionTest extends ProductionFixture
 
     public function test_missing_bom_wrong_output_classification_and_unauthorized_warehouses_are_blocked(): void
     {
-        $finished = $this->product(); $raw = $this->product(Product::RAW_MATERIAL, 'KG');
+        $finished = $this->product(); $raw = $this->product(Product::RAW_MATERIAL, 'SACK');
         $this->actingAs($this->manager)->postJson('/api/production/batches', ['product_id' => $finished->id, 'warehouse_id' => $this->warehouse->id, 'target_quantity' => 1])->assertUnprocessable()->assertJsonValidationErrors('bom');
         $this->postJson('/api/production/batches', ['product_id' => $raw->id, 'warehouse_id' => $this->warehouse->id, 'target_quantity' => 1])->assertUnprocessable();
         $this->postJson('/api/production/batches', ['product_id' => $finished->id, 'warehouse_id' => $this->otherWarehouse->id, 'target_quantity' => 1])->assertForbidden();
@@ -104,7 +104,7 @@ class InternalProductionTest extends ProductionFixture
 
     public function test_bom_rejects_non_raw_ingredients_and_excess_decimal_precision_and_is_admin_only(): void
     {
-        $output = $this->product(); $raw = $this->product(Product::RAW_MATERIAL, 'KG');
+        $output = $this->product(); $raw = $this->product(Product::RAW_MATERIAL, 'SACK');
         $base = ['product_id' => $output->id, 'output_quantity' => 1];
         $this->actingAs($this->manager)->postJson('/api/admin/boms', $base)->assertForbidden();
         $this->actingAs($this->qa)->getJson('/api/admin/boms')->assertForbidden();

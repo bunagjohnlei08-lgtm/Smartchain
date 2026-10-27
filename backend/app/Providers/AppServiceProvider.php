@@ -114,5 +114,14 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(10)->by('supplier-portal-selection-ip:'.$request->ip()),
             Limit::perMinute(5)->by('supplier-portal-selection-session:'.hash('sha256', (string) $request->header('X-Supplier-Portal-Session'))),
         ]);
+
+        RateLimiter::for('logistics-send', fn (Request $request) => Limit::perMinute(10)->by(
+            'logistics-send:'.($request->user()?->id ?: $request->ip())
+        ));
+
+        RateLimiter::for('logistics-callback', fn (Request $request) => [
+            Limit::perMinute(120)->by('logistics-callback-ip:'.$request->ip()),
+            Limit::perMinute(120)->by('logistics-callback-partner:'.hash('sha256', (string) $request->header('X-SmartChain-Partner'))),
+        ]);
     }
 }

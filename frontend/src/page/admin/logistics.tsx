@@ -13,7 +13,6 @@ import {
   Eye,
   Send,
   X,
-  Check,
   AlertCircle,
   RefreshCw,
   LayoutGrid,
@@ -25,6 +24,12 @@ import {
 // ============================================
 
 type ShipmentStatus =
+ | 'Ready'
+ | 'Sending'
+ | 'Accepted'
+ | 'Retry Pending'
+ | 'Review Required'
+ | 'Failed'
  | 'Pending Approval'
  | 'Approved'
  | 'Assigned'
@@ -60,7 +65,11 @@ interface Shipment {
   checklist: { label: string; complete: boolean }[];
  };
  expectedDelivery?: string;
+ integrationState: string;
+ deliveryRequest: any | null;
 }
+
+interface LogisticsPartner { id: number; code: string; name: string; configured: boolean }
 
 // ============================================
 // ORDER/SHIPMENT MAPPING (existing Plant Manager Shipment data)
@@ -75,6 +84,12 @@ const orderStatusToShipmentStatus: Record<string, ShipmentStatus> = {
   IN_TRANSIT: 'In Transit',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
+};
+
+const integrationStateToStatus: Record<string, ShipmentStatus> = {
+  READY: 'Ready', QUEUED: 'Sending', SENDING: 'Sending', ACCEPTED: 'Accepted',
+  RETRY_PENDING: 'Retry Pending', RECONCILIATION_REQUIRED: 'Review Required',
+  REJECTED: 'Failed', AUTH_FAILED: 'Failed', IN_TRANSIT: 'In Transit', DELIVERED: 'Delivered',
 };
 
 const formatDate = (value?: string | null) =>
@@ -96,7 +111,7 @@ const mapShipment = (record: any): Shipment => ({
   destination: record.destination || '—',
   preparedDate: formatDate(record.prepared_date),
   assignedLogistics: record.assigned_logistics ?? null,
-  status: orderStatusToShipmentStatus[record.status] ?? 'Pending Approval',
+  status: integrationStateToStatus[record.integration_state] ?? orderStatusToShipmentStatus[record.status] ?? 'Ready',
   items: (record.items || []).map((item: any) => ({
     name: item.product_name,
     qty: Number(item.quantity) || 0,
@@ -127,6 +142,8 @@ const mapShipment = (record: any): Shipment => ({
     ].map(([label, complete]) => ({ label: String(label), complete: Boolean(complete) })),
   } : null,
   expectedDelivery: formatDate(record.required_delivery_date),
+  integrationState: record.integration_state ?? 'READY',
+  deliveryRequest: record.delivery_request ?? null,
 });
 
 // ============================================
@@ -135,6 +152,12 @@ const mapShipment = (record: any): Shipment => ({
 
 const statusOptions = [
  'All Status',
+ 'Ready',
+ 'Sending',
+ 'Accepted',
+ 'Retry Pending',
+ 'Review Required',
+ 'Failed',
  'Pending Approval',
  'Approved',
  'Assigned',
@@ -145,7 +168,6 @@ const statusOptions = [
 ];
 
 const warehouseOptions = ['All Warehouses', 'Central Depot', 'Northgate', 'Southpark', 'Eastside'];
-const logisticsOptions = ['All Logistics', 'Integrated Logistics System', 'External Delivery Group', 'Internal Fleet', 'Courier Partner'];
 
 // ============================================
 // HELPER COMPONENTS
@@ -156,6 +178,12 @@ const StatusBadge: React.FC<{ status: ShipmentStatus; abbreviatePendingApproval?
  abbreviatePendingApproval = false,
 }) => {
  const config: Record<ShipmentStatus, { color: string; bg: string; dotColor: string }> = {
+  Ready: { color: 'text-amber-400 not-dark:text-amber-700', bg: 'bg-amber-500/10 border-amber-500/20', dotColor: 'bg-amber-500' },
+  Sending: { color: 'text-cyan-400 not-dark:text-cyan-700', bg: 'bg-cyan-500/10 border-cyan-500/20', dotColor: 'bg-cyan-500' },
+  Accepted: { color: 'text-blue-400 not-dark:text-blue-700', bg: 'bg-blue-500/10 border-blue-500/20', dotColor: 'bg-blue-500' },
+  'Retry Pending': { color: 'text-orange-400 not-dark:text-orange-700', bg: 'bg-orange-500/10 border-orange-500/20', dotColor: 'bg-orange-500' },
+  'Review Required': { color: 'text-red-400 not-dark:text-red-700', bg: 'bg-red-500/10 border-red-500/20', dotColor: 'bg-red-500' },
+  Failed: { color: 'text-red-400 not-dark:text-red-700', bg: 'bg-red-500/10 border-red-500/20', dotColor: 'bg-red-500' },
   'Pending Approval': {
    color: 'text-amber-400 not-dark:text-amber-600',
    bg: 'not-dark:bg-transparent bg-amber-500/10 border-amber-500/20',
@@ -346,6 +374,8 @@ const Logistics: React.FC = () => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [partners, setPartners] = useState<LogisticsPartner[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -354,9 +384,15 @@ const Logistics: React.FC = () => {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const response = await apiClient.get('/admin/logistics/shipments', { params: { per_page: 100 } });
+        const [response, partnerResponse] = await Promise.all([
+          apiClient.get('/admin/logistics/shipments', { params: { per_page: 100 } }),
+          apiClient.get('/admin/logistics/partners'),
+        ]);
         const records = response.data?.data ?? [];
-        if (!cancelled) setShipments(records.map(mapShipment));
+        if (!cancelled) {
+          setShipments(records.map(mapShipment));
+          setPartners(partnerResponse.data ?? []);
+        }
       } catch (error: any) {
         if (!cancelled) {
           setLoadError(error?.response?.data?.message ?? 'Unable to load shipments from Plant Manager Shipment.');
@@ -370,7 +406,7 @@ const Logistics: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   // Modal states
   const [showViewModal, setShowViewModal] = useState(false);
@@ -379,10 +415,10 @@ const Logistics: React.FC = () => {
   useAdminDetailOverlay(showViewModal && selectedShipment !== null);
  const [assignForm, setAssignForm] = useState({
   logisticsPartner: '',
-  pickupDate: '',
-  pickupTime: '',
-  notes: '',
  });
+ const [payloadPreview, setPayloadPreview] = useState<any | null>(null);
+ const [actionError, setActionError] = useState<string | null>(null);
+ const [isSubmitting, setIsSubmitting] = useState(false);
  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
  // Filtered shipments
@@ -411,12 +447,12 @@ const Logistics: React.FC = () => {
  );
 
  // KPI counts
- const pendingApproval = shipments.filter((s) => s.status === 'Pending Approval').length;
- const approved = shipments.filter((s) => s.status === 'Approved').length;
- const assigned = shipments.filter((s) => s.status === 'Assigned').length;
+ const ready = shipments.filter((s) => s.status === 'Ready').length;
+ const sending = shipments.filter((s) => s.status === 'Sending' || s.status === 'Retry Pending').length;
+ const accepted = shipments.filter((s) => s.status === 'Accepted').length;
  const inTransit = shipments.filter((s) => s.status === 'In Transit' || s.status === 'Picked Up').length;
  const delivered = shipments.filter((s) => s.status === 'Delivered').length;
- const cancelled = shipments.filter((s) => s.status === 'Cancelled').length;
+ const needsReview = shipments.filter((s) => s.status === 'Review Required' || s.status === 'Failed').length;
 
  // Handlers
  const handleView = (shipment: Shipment) => {
@@ -428,36 +464,40 @@ const Logistics: React.FC = () => {
   setSelectedShipment(shipment);
   setAssignForm({
    logisticsPartner: '',
-   pickupDate: '',
-   pickupTime: '',
-   notes: '',
   });
+  setPayloadPreview(null);
+  setActionError(null);
   setShowAssignModal(true);
  };
 
- const handleAssignSubmit = () => {
-  if (!selectedShipment) return;
-  // In real app, we would update the shipment status to 'Assigned' and save logistics partner.
-  // For mock, we show toast and close modal.
-  setToast({
-   message: `Shipment ${selectedShipment.shipmentNo} assigned to ${assignForm.logisticsPartner} and notified.`,
-   type: 'success',
-  });
-  setShowAssignModal(false);
-  setTimeout(() => setToast(null), 5000);
+ const handlePreview = async () => {
+  if (!selectedShipment || !assignForm.logisticsPartner) return;
+  setIsSubmitting(true); setActionError(null);
+  try {
+   const response = await apiClient.post(`/admin/logistics/shipments/${selectedShipment.id}/preview`, { logistics_partner_id: Number(assignForm.logisticsPartner) });
+   setPayloadPreview(response.data.payload);
+  } catch (error: any) {
+   const errors = error?.response?.data?.errors;
+   setActionError(errors ? Object.values(errors).flat().join(' ') : (error?.response?.data?.message ?? 'Unable to prepare this delivery request.'));
+  } finally { setIsSubmitting(false); }
  };
 
-  const handleApprove = (shipment: Shipment) => {
-   // Mock approve: show toast and update status in mock
-   setToast({
-    message: `Shipment ${shipment.shipmentNo} approved successfully.`,
-    type: 'success',
-   });
+ const handleAssignSubmit = async () => {
+  if (!selectedShipment || !assignForm.logisticsPartner || !payloadPreview) return;
+  setIsSubmitting(true); setActionError(null);
+  try {
+   const response = await apiClient.post(`/admin/logistics/shipments/${selectedShipment.id}/send`, { logistics_partner_id: Number(assignForm.logisticsPartner) });
+   setToast({ message: `Delivery request ${response.data.delivery_request_id} is ${String(response.data.state).toLowerCase().replaceAll('_', ' ')}.`, type: 'success' });
+   setShowAssignModal(false); setReloadKey((value) => value + 1);
    setTimeout(() => setToast(null), 5000);
-  };
+  } catch (error: any) {
+   const errors = error?.response?.data?.errors;
+   setActionError(errors ? Object.values(errors).flat().join(' ') : (error?.response?.data?.message ?? 'Unable to send the delivery request.'));
+  } finally { setIsSubmitting(false); }
+ };
 
  return (
-  <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 bg-transparent text-white min-h-screen">
+  <div className="w-full min-w-0 p-4 md:p-6 space-y-6 bg-transparent text-white min-h-screen">
    {/* Breadcrumb */}
    <div className="flex items-center gap-2 text-sm text-gray-400">
     <span>Admin</span>
@@ -469,18 +509,18 @@ const Logistics: React.FC = () => {
    <div>
      <h1 className="text-2xl font-bold text-white">Logistics & Tracking (DTRS)</h1>
      <p className="text-sm text-gray-400">
-      Manage delivery routes, fleet status, and shipment tracking across warehouses and branches.
+      Send prepared orders to configured logistics partners and track authenticated delivery updates.
      </p>
    </div>
 
    {/* KPI Cards */}
    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-    <KPICard label="Waiting Approval" value={pendingApproval} icon={<Clock className="w-5 h-5 text-amber-400 not-dark:text-amber-600" />} />
-    <KPICard label="Approved" value={approved} icon={<CheckCircle className="w-5 h-5 text-blue-400 not-dark:text-blue-600" />} />
-    <KPICard label="Assigned" value={assigned} icon={<Truck className="w-5 h-5 text-purple-400 not-dark:text-purple-600" />} />
+    <KPICard label="Ready" value={ready} icon={<Clock className="w-5 h-5 text-amber-400 not-dark:text-amber-600" />} />
+    <KPICard label="Sending" value={sending} icon={<Truck className="w-5 h-5 text-cyan-400 not-dark:text-cyan-600" />} />
+    <KPICard label="Accepted" value={accepted} icon={<CheckCircle className="w-5 h-5 text-blue-400 not-dark:text-blue-600" />} />
     <KPICard label="In Transit" value={inTransit} icon={<Package className="w-5 h-5 text-sky-400 not-dark:text-sky-600" />} />
     <KPICard label="Delivered" value={delivered} icon={<CheckCircle className="w-5 h-5 text-emerald-400 not-dark:text-emerald-600" />} />
-    <KPICard label="Cancelled" value={cancelled} icon={<AlertCircle className="w-5 h-5 text-gray-400 not-dark:text-gray-600" />} />
+    <KPICard label="Needs Review" value={needsReview} icon={<AlertCircle className="w-5 h-5 text-red-400 not-dark:text-red-600" />} />
    </div>
 
    {/* Filter Bar */}
@@ -488,13 +528,13 @@ const Logistics: React.FC = () => {
     <SearchInput value={search} onChange={setSearch} placeholder="Search shipment #, PO #, customer..." />
     <FilterSelect value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
     <FilterSelect value={warehouseFilter} onChange={setWarehouseFilter} options={warehouseOptions} />
-    <FilterSelect value={logisticsFilter} onChange={setLogisticsFilter} options={[...logisticsOptions, 'Not Assigned']} />
+    <FilterSelect value={logisticsFilter} onChange={setLogisticsFilter} options={['All Logistics', ...partners.map((partner) => partner.name), 'Not Assigned']} />
     <div className="admin-dtrs-actions ml-auto flex items-center gap-3">
      <div className="admin-dtrs-view flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/50 p-1" aria-label="Shipment view">
       <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title="List view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'list' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutList className="h-4 w-4" /></button>
       <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'} title="Grid view" className={`rounded-md p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-slate-200 text-slate-900 dark:bg-[#092635] dark:text-white' : 'text-gray-400 hover:text-white'}`}><LayoutGrid className="h-4 w-4" /></button>
      </div>
-     <button className="admin-dtrs-refresh p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all">
+     <button onClick={() => setReloadKey((value) => value + 1)} aria-label="Refresh logistics data" className="admin-dtrs-refresh min-h-11 min-w-11 cursor-pointer p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800/50 hover:bg-gray-800 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500">
       <RefreshCw className="w-4 h-4" />
      </button>
     </div>
@@ -538,29 +578,12 @@ const Logistics: React.FC = () => {
            >
             <Eye className="w-4 h-4" />
            </button>
-           {shipment.status === 'Pending Approval' && (
-            <>
-             <button
-              onClick={() => handleApprove(shipment)}
-              className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-400 not-dark:text-green-600 hover:text-emerald-300 not-dark:hover:text-green-700 transition-all"
-              title="Approve"
-             >
-              <Check className="w-4 h-4" />
-             </button>
-             <button
-              onClick={() => handleAssign(shipment)}
-              className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 not-dark:text-blue-600 hover:text-blue-300 not-dark:hover:text-blue-700 transition-all"
-              title="Assign Logistics"
-             >
-              <Send className="w-4 h-4" />
-             </button>
-            </>
-           )}
-           {shipment.status === 'Approved' && (
+           {shipment.status === 'Ready' && (
             <button
              onClick={() => handleAssign(shipment)}
-             className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400 not-dark:text-blue-600 hover:text-blue-300 not-dark:hover:text-blue-700 transition-all"
-             title="Assign Logistics"
+             className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-blue-400 transition-colors hover:bg-blue-500/20 focus:outline-none focus:ring-2 focus:ring-cyan-500 not-dark:text-blue-600"
+             title="Review and send to logistics partner"
+             aria-label={`Review and send ${shipment.shipmentNo}`}
             >
              <Send className="w-4 h-4" />
             </button>
@@ -587,7 +610,7 @@ const Logistics: React.FC = () => {
        <article key={shipment.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white">{shipment.shipmentNo}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{shipment.poNumber} · {shipment.customer}</p></div><StatusBadge status={shipment.status} /></div>
         <dl className="mt-4 space-y-2 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Assigned Logistics</dt><dd className="text-slate-900 dark:text-white">{shipment.assignedLogistics || '—'}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Destination</dt><dd className="text-slate-900 dark:text-white">{shipment.destination}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Warehouse</dt><dd className="text-slate-900 dark:text-white">{shipment.warehouse}</dd></div></dl>
-        <div className="mt-4 flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => handleView(shipment)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button>{shipment.status === 'Pending Approval' && <button onClick={() => handleApprove(shipment)} className="p-2 text-emerald-600 dark:text-emerald-400" title="Approve"><Check className="h-4 w-4" /></button>}{(shipment.status === 'Pending Approval' || shipment.status === 'Approved') && <button onClick={() => handleAssign(shipment)} className="p-2 text-blue-600 dark:text-blue-400" title="Assign Logistics"><Send className="h-4 w-4" /></button>}</div>
+        <div className="mt-4 flex justify-end gap-1 border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={() => handleView(shipment)} className="min-h-11 min-w-11 cursor-pointer p-2 text-slate-500 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:text-slate-400 dark:hover:text-white" title="View Details"><Eye className="h-4 w-4" /></button>{shipment.status === 'Ready' && <button onClick={() => handleAssign(shipment)} className="min-h-11 min-w-11 cursor-pointer p-2 text-blue-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:text-blue-400" title="Review and send to logistics partner" aria-label={`Review and send ${shipment.shipmentNo}`}><Send className="h-4 w-4" /></button>}</div>
        </article>
       ))}
      </div>
@@ -710,6 +733,18 @@ const Logistics: React.FC = () => {
         </div>
        </div>
 
+       {selectedShipment.deliveryRequest && <div className="mb-4 rounded-xl border border-cyan-800/40 bg-cyan-950/20 p-4">
+        <h4 className="mb-3 text-sm font-medium text-cyan-200">External delivery request</h4>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+         <div><dt className="text-xs text-gray-400">SmartChain request ID</dt><dd className="break-all text-white">{selectedShipment.deliveryRequest.delivery_request_id}</dd></div>
+         <div><dt className="text-xs text-gray-400">Partner reference</dt><dd className="break-all text-white">{selectedShipment.deliveryRequest.partner_delivery_request_id || 'Not accepted yet'}</dd></div>
+         <div><dt className="text-xs text-gray-400">Partner</dt><dd className="text-white">{selectedShipment.deliveryRequest.partner?.name}</dd></div>
+         <div><dt className="text-xs text-gray-400">Attempts</dt><dd className="text-white">{selectedShipment.deliveryRequest.attempts?.length ?? 0}</dd></div>
+        </dl>
+        {selectedShipment.deliveryRequest.last_error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-300">{selectedShipment.deliveryRequest.last_error.message}</p>}
+        <div className="mt-3 space-y-2">{(selectedShipment.deliveryRequest.attempts ?? []).map((attempt: any) => <div key={attempt.correlation_id} className="flex justify-between gap-3 text-xs"><span className="text-gray-300">Attempt {attempt.attempt_number}: {humanize(attempt.result)}</span><span className="text-gray-500">{formatTimestamp(attempt.completed_at ?? attempt.started_at)}</span></div>)}</div>
+       </div>}
+
        <div className="admin-logistics-details-timeline">
         <h4 className="text-sm font-medium text-gray-300 mb-2">Progress Timeline</h4>
        <div className="space-y-2">
@@ -750,7 +785,7 @@ const Logistics: React.FC = () => {
       onClick={(e) => e.stopPropagation()}
      >
       <div className="flex items-center justify-between mb-6">
-       <h2 className="text-xl font-bold text-white">Assign Logistics</h2>
+       <h2 className="text-xl font-bold text-white">Review &amp; Send Delivery Request</h2>
        <button
         onClick={() => setShowAssignModal(false)}
         className="p-1.5 rounded-lg hover:bg-gray-800/50 hover:bg-gray-800/50 text-gray-400 hover:text-white transition-all"
@@ -769,50 +804,29 @@ const Logistics: React.FC = () => {
         <label className="block text-sm font-medium mb-1.5 text-gray-300">Logistics Partner *</label>
         <select
          value={assignForm.logisticsPartner}
-         onChange={(e) => setAssignForm({ ...assignForm, logisticsPartner: e.target.value })}
+         onChange={(e) => { setAssignForm({ logisticsPartner: e.target.value }); setPayloadPreview(null); setActionError(null); }}
          className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
          required
         >
          <option value="">Select Logistics Partner</option>
-         {logisticsOptions.filter(o => o !== 'All Logistics').map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
+         {partners.map((partner) => (
+          <option key={partner.id} value={partner.id} disabled={!partner.configured}>{partner.name}{partner.configured ? '' : ' — configuration required'}</option>
          ))}
         </select>
        </div>
 
-       <div className="grid grid-cols-2 gap-4">
-        <div>
-         <label className="block text-sm font-medium mb-1.5 text-gray-300">Pickup Date</label>
-         <input
-          type="date"
-          value={assignForm.pickupDate}
-          onChange={(e) => setAssignForm({ ...assignForm, pickupDate: e.target.value })}
-          className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-         />
-        </div>
-        <div>
-         <label className="block text-sm font-medium mb-1.5 text-gray-300">Pickup Time</label>
-         <input
-          type="time"
-          value={assignForm.pickupTime}
-          onChange={(e) => setAssignForm({ ...assignForm, pickupTime: e.target.value })}
-          className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-         />
-        </div>
-       </div>
-
-       <div>
-        <label className="block text-sm font-medium mb-1.5 text-gray-300">Notes</label>
-         <textarea
-          rows={3}
-          value={assignForm.notes}
-          onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value })}
-          className="w-full bg-gray-800/50 border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-400 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-          placeholder="Any special instructions..."
-         />
-       </div>
+       {actionError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{actionError}</div>}
+       {payloadPreview && <div><p className="mb-2 text-sm font-medium text-gray-300">Prepared payload preview</p><pre className="max-h-64 overflow-auto rounded-xl border border-gray-700 bg-black/30 p-3 text-xs text-gray-200">{JSON.stringify(payloadPreview, null, 2)}</pre><p className="mt-2 text-xs text-gray-400">The stable request ID is assigned when sent. Acceptance is not In Transit or Delivered.</p></div>}
 
        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800 border-gray-800/50">
+        <button
+         type="button"
+         onClick={handlePreview}
+         disabled={!assignForm.logisticsPartner || isSubmitting}
+         className="min-h-11 cursor-pointer rounded-xl border border-cyan-700 px-5 py-2.5 text-cyan-300 transition-colors hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+         {isSubmitting && !payloadPreview ? 'Preparing…' : 'Review Payload'}
+        </button>
         <button
          type="button"
          onClick={() => setShowAssignModal(false)}
@@ -823,9 +837,10 @@ const Logistics: React.FC = () => {
         <button
          type="submit"
          onClick={handleAssignSubmit}
-         className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950"
+         disabled={!payloadPreview || isSubmitting}
+         className="min-h-11 cursor-pointer px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
         >
-         <Send className="w-4 h-4" /> Assign & Notify
+         <Send className="w-4 h-4" /> {isSubmitting ? 'Sending…' : 'Send Request'}
         </button>
        </div>
       </form>

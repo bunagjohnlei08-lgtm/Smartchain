@@ -31,8 +31,8 @@ abstract class ProductionFixture extends TestCase
         parent::setUp();
         Notification::fake(); Mail::fake(); Storage::fake('local');
         $branch = Branch::create(['name' => 'Test Branch', 'code' => 'PROD-TEST']);
-        $this->warehouse = Warehouse::create(['name' => 'Test Main', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'status' => 'Active', 'capacity' => 10000, 'capacity_kg' => 4000, 'capacity_pcs' => 3000, 'capacity_l' => 3000]);
-        $this->otherWarehouse = Warehouse::create(['name' => 'Other', 'code' => 'WH-OTHER', 'branch_id' => $branch->id, 'status' => 'Active', 'capacity' => 10000, 'capacity_kg' => 4000, 'capacity_pcs' => 3000, 'capacity_l' => 3000]);
+        $this->warehouse = Warehouse::create(['name' => 'Test Main', 'code' => 'WH-MAIN', 'branch_id' => $branch->id, 'status' => 'Active', 'capacity' => 10000, 'capacity_powder' => 4000, 'capacity_liquid' => 3000, 'capacity_solid' => 3000, 'capacity_returned' => 0]);
+        $this->otherWarehouse = Warehouse::create(['name' => 'Other', 'code' => 'WH-OTHER', 'branch_id' => $branch->id, 'status' => 'Active', 'capacity' => 10000, 'capacity_powder' => 4000, 'capacity_liquid' => 3000, 'capacity_solid' => 3000, 'capacity_returned' => 0]);
         foreach (['ADMIN', 'PLANT_MANAGER', 'QA_SUPERVISOR'] as $slug) Role::create(['slug' => $slug, 'name' => $slug]);
         $this->admin = $this->actor('ADMIN');
         $this->manager = $this->actor('PLANT_MANAGER', $this->warehouse);
@@ -71,7 +71,7 @@ abstract class ProductionFixture extends TestCase
     }
     protected function prepared(string $coefficient = '0.5'): array
     {
-        $raw = $this->product(Product::RAW_MATERIAL, 'KG');
+        $raw = $this->product(Product::RAW_MATERIAL, 'SACK');
         $output = $this->product(Product::FINISHED_PRODUCT, 'PCS');
         $inventory = $this->stock($raw, 10);
         $bom = $this->bom($output, [['product_id' => $raw->id, 'required_quantity' => $coefficient]]);

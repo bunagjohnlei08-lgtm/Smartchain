@@ -9,6 +9,8 @@ $nullableNumber = static function (string $key): ?float {
 $tiers = json_decode((string) env('SUPPLIER_PERFORMANCE_RECOGNITION_TIERS', '[]'), true);
 
 return [
+    'policy_active' => filter_var(env('SUPPLIER_PERFORMANCE_POLICY_ACTIVE', false), FILTER_VALIDATE_BOOL),
+    'policy_version' => env('SUPPLIER_PERFORMANCE_POLICY_VERSION', 'draft-v1'),
     // Intentionally unconfigured by default. Governance owners must approve and
     // set the minimum history, weights, and optional tiers before scores appear.
     'minimum_eligible_deliveries' => $nullableNumber('SUPPLIER_PERFORMANCE_MIN_DELIVERIES'),

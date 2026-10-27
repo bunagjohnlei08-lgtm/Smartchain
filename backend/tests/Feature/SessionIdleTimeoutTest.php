@@ -304,6 +304,10 @@ class SessionIdleTimeoutTest extends TestCase
         $token = PersonalAccessToken::query()->sole();
 
         $this->assertNotNull($token->last_activity_at);
+        $this->withToken($plainTextToken)->getJson('/api/session/status')
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertJsonStructure(['timeout_minutes', 'warning_minutes', 'last_activity_at', 'expires_at', 'server_time']);
         $this->withToken($plainTextToken)->postJson('/api/logout')->assertOk();
         $this->assertDatabaseMissing('personal_access_tokens', ['id' => $token->id]);
     }

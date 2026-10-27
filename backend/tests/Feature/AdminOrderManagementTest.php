@@ -169,6 +169,51 @@ class AdminOrderManagementTest extends TestCase
             ->assertJsonPath('data.0.products.1', 'Welding Rod');
     }
 
+    public function test_sixteen_entry_order_keeps_one_order_row_complete_and_hidden_products_searchable(): void
+    {
+        $admin = $this->userWithRole('ADMIN');
+        $products = collect([$this->product]);
+        foreach (range(2, 16) as $number) {
+            $products->push(Product::create([
+                'name' => $number === 16 ? 'Hidden Search Product' : "Synthetic Product {$number}",
+                'unit' => 'pcs',
+                'cost_price' => $number,
+            ]));
+        }
+
+        $items = $products->values()->map(fn (Product $product, int $index) => [
+            'product_id' => $product->id,
+            'quantity' => $index + 1,
+            'unit_price' => $index + 0.50,
+        ])->all();
+        $created = $this->actingAs($admin)->postJson('/api/admin/orders', $this->payload(['items' => $items]))
+            ->assertCreated()
+            ->assertJsonCount(16, 'items');
+
+        $orderId = $created->json('id');
+        $list = $this->actingAs($admin)->getJson('/api/admin/orders?per_page=100')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $orderId)
+            ->assertJsonPath('data.0.items_count', 16)
+            ->assertJsonCount(16, 'data.0.products');
+        $this->assertSame('Hidden Search Product', $list->json('data.0.products.15'));
+
+        $this->actingAs($admin)->getJson('/api/admin/orders?search=Hidden%20Search%20Product')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $orderId);
+        $this->actingAs($admin)->getJson("/api/admin/orders/{$orderId}")
+            ->assertOk()
+            ->assertJsonCount(16, 'items')
+            ->assertJsonPath('items.15.product_name', 'Hidden Search Product');
+        $this->actingAs($admin)->getJson('/api/admin/orders/summary')
+            ->assertOk()
+            ->assertJsonPath('NEW', 1);
+    }
+
     public function test_existing_invalid_item_is_flagged_and_cannot_be_edited_through_admin_api(): void
     {
         $admin = $this->userWithRole('ADMIN');

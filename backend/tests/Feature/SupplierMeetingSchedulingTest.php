@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\SupplierApplicationPortalMail;
 use App\Models\Role;
 use App\Models\SupplierApplication;
+use App\Models\SupplierApplicationAttachment;
 use App\Models\SupplierApplicationEvent;
 use App\Models\SupplierApplicationMeetingSlot;
 use App\Models\User;
@@ -58,6 +59,19 @@ class SupplierMeetingSchedulingTest extends TestCase
         $token = $this->postJson('/api/supplier-portal/access', ['access_token' => $link['token']])->assertOk()->json('session_token');
 
         return ['X-Supplier-Portal-Session' => $token];
+    }
+
+    private function addVerifiedMandatoryDocuments(SupplierApplication $application): void
+    {
+        foreach ([SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE, SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT] as $type) {
+            $application->attachments()->create([
+                'attachment_type' => $type, 'original_name' => strtolower($type).'.pdf',
+                'stored_path' => "tests/{$application->id}/{$type}.pdf", 'mime_type' => 'application/pdf',
+                'file_size' => 100, 'is_current' => true,
+                'verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED,
+                'verified_at' => now(), 'expires_on' => now()->addYear(),
+            ]);
+        }
     }
 
     private function slots(array $dates, string $start = '15:00', string $end = '16:00'): array
@@ -229,6 +243,7 @@ class SupplierMeetingSchedulingTest extends TestCase
         $this->assertSame(SupplierApplication::STATUS_MEETING_COMPLETED, $application->fresh()->status);
         $this->assertDatabaseCount('suppliers', 0);
 
+        $this->addVerifiedMandatoryDocuments($application);
         $this->postJson("/api/admin/supplier-applications/{$application->id}/approve")->assertOk();
         $this->postJson("/api/admin/supplier-applications/{$application->id}/approve")->assertOk();
         $this->assertDatabaseCount('suppliers', 1);

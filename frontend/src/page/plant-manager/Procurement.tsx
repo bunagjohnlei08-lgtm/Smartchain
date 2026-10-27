@@ -79,7 +79,7 @@ interface Warehouse {
 }
 
 const PAGE_SIZE = 10;
-const MAX_REQUESTED_QTY = 100000;
+const MAX_REQUESTED_QTY = 1000000;
 
 const statusLabels: Record<RequestStatus, string> = {
   not_submitted: 'Not Submitted',
@@ -353,7 +353,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const selectedCandidates = candidates.filter((candidate) => selectedIds.includes(candidate.id));
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1400px] space-y-6 p-4 pb-10 sm:p-6 sm:pb-10 lg:p-8 lg:pb-10">
+    <div className="w-full min-w-0 space-y-6 p-4 pb-10 sm:p-6 sm:pb-10 lg:p-8 lg:pb-10">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 dark:text-cyan-400">

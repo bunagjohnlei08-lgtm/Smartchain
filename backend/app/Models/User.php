@@ -23,6 +23,7 @@ use Laravel\Sanctum\HasApiTokens;
     'branch_id',
     'warehouse_id',
     'status',
+    'supplier_id',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
@@ -65,6 +66,10 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Warehouse::class);
     }
+
+    public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
+
+    public function isSupplier(): bool { return $this->role && $this->role->slug === 'SUPPLIER'; }
 
     public function permissions(): BelongsToMany
     {

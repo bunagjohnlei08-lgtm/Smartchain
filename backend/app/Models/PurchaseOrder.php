@@ -40,20 +40,24 @@ class PurchaseOrder extends Model
     ];
 
     protected $fillable = [
-        'po_number', 'replenishment_request_id', 'supplier_id', 'supplier_name', 'delivery_details',
+        'po_number', 'replenishment_request_id', 'supplier_award_id', 'conversion_key', 'supplier_id', 'supplier_name', 'delivery_details',
         'expected_delivery_date', 'total_amount',
-        'status', 'approved_by', 'signature_data', 'sent_at',
+        'currency', 'tax_included', 'freight_included', 'commercial_terms', 'agreement_reference',
+        'status', 'created_by', 'approved_by', 'signature_data', 'sent_at',
     ];
 
     protected function casts(): array
     {
-        return ['total_amount' => 'decimal:2', 'expected_delivery_date' => 'date', 'sent_at' => 'datetime'];
+        return ['total_amount' => 'decimal:2', 'expected_delivery_date' => 'date', 'sent_at' => 'datetime', 'tax_included'=>'boolean', 'freight_included'=>'boolean'];
     }
 
     public function items(): HasMany { return $this->hasMany(PurchaseOrderItem::class); }
     public function approver(): BelongsTo { return $this->belongsTo(User::class, 'approved_by'); }
+    public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function replenishmentRequest(): BelongsTo { return $this->belongsTo(ReplenishmentRequest::class); }
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
+    public function award(): BelongsTo { return $this->belongsTo(SupplierAward::class, 'supplier_award_id'); }
+    public function acknowledgments(): HasMany { return $this->hasMany(PurchaseOrderAcknowledgment::class)->orderByDesc('acted_at'); }
     public function receivings(): HasMany { return $this->hasMany(Receiving::class); }
     public function discrepancies(): HasMany { return $this->hasMany(ReceivingDiscrepancy::class); }
 }

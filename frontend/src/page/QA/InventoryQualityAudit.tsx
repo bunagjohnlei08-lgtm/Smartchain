@@ -124,7 +124,7 @@ export default function InventoryQualityAudit() {
   };
 
   const monthNames = (payload?.schedule.months ?? []).map((month) => new Date(2026, month - 1).toLocaleString('en-US', { month: 'long' })).join(', ');
-  return <div className="mx-auto max-w-[1400px] space-y-6 p-4 text-slate-900 dark:text-slate-100 sm:p-6">
+  return <div className="w-full min-w-0 space-y-6 p-4 text-slate-900 dark:text-slate-100 sm:p-6">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-sm font-medium text-slate-700 dark:text-cyan-400">QUALITY ASSURANCE</p><h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Inventory Quality Audit</h1><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Inspect stock already stored in the warehouse. Schedule: {monthNames || 'Not configured'}.</p></div>
       {payload?.cycle && <span className="w-fit rounded-full border border-blue-700 bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-300">{payload.cycle.name} · Active</span>}

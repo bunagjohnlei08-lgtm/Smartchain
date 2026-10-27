@@ -255,7 +255,7 @@ const Shipments: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6 bg-[#0b0f19] text-slate-100">
+    <div className="w-full min-w-0 p-6 space-y-6 bg-[#0b0f19] text-slate-100">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-400">
         <span>Admin</span>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SupplierApplication;
 use App\Models\SupplierApplicationAccess;
+use App\Models\SupplierApplicationAttachment;
 use App\Models\SupplierApplicationEvent;
 use App\Models\SupplierApplicationMeetingSlot;
 use App\Models\User;
@@ -311,6 +312,7 @@ class SupplierPortalController extends Controller
 
                 foreach ($replacementFields as $field) {
                     [, $type] = $attachmentMap[$field];
+                    $replacedAttachmentId = $locked->attachments()->where('attachment_type', $type)->where('is_current', true)->latest('id')->value('id');
                     $locked->attachments()->where('attachment_type', $type)->where('is_current', true)
                         ->update(['is_current' => false, 'replaced_at' => now()->toIso8601String()]);
                     foreach ($uploads[$field] as [$upload, $hash]) {
@@ -327,6 +329,8 @@ class SupplierPortalController extends Controller
                             'file_size' => $upload->getSize(),
                             'file_sha256' => $hash,
                             'is_current' => true,
+                            'verification_status' => SupplierApplicationAttachment::STATUS_PENDING,
+                            'replaces_attachment_id' => $replacedAttachmentId,
                         ]);
                     }
                 }

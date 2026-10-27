@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseOrderItem extends Model
 {
-    protected $fillable = ['product_id', 'product_name', 'unit', 'item_classification', 'ordered_quantity', 'unit_price', 'total_price'];
+    protected $fillable = ['product_id', 'product_name', 'unit', 'item_classification', 'ordered_quantity', 'unit_price', 'total_price', 'supplier_award_line_id', 'replenishment_request_id'];
 
     public function product(): BelongsTo { return $this->belongsTo(Product::class); }
 
@@ -17,4 +17,6 @@ class PurchaseOrderItem extends Model
     }
 
     public function purchaseOrder(): BelongsTo { return $this->belongsTo(PurchaseOrder::class); }
+    public function awardLine(): BelongsTo { return $this->belongsTo(SupplierAwardLine::class, 'supplier_award_line_id'); }
+    public function replenishmentRequest(): BelongsTo { return $this->belongsTo(ReplenishmentRequest::class); }
 }

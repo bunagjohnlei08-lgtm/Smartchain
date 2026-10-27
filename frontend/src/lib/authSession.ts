@@ -22,6 +22,7 @@ export const clearAuthStorage = (): void => {
   sessionStorage.removeItem('token');
   sessionStorage.removeItem('user');
   sessionStorage.removeItem(FIRST_LOGIN_STORAGE_KEY);
+  sessionStorage.removeItem('smartchain:supplier-rfq-interests');
 };
 
 export const redirectToPublicLanding = (): void => {

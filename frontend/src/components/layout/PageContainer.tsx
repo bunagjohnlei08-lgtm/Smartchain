@@ -8,7 +8,7 @@ const PageContainer: React.FC<PageContainerProps> = ({ children }) => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100">
       <main className="flex-1 overflow-y-auto py-6">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full min-w-0 px-4 sm:px-6 lg:px-8">
           {children}
         </div>
       </main>
