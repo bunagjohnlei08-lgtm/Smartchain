@@ -130,6 +130,7 @@ const AIDemandForecast: React.FC = () => {
  const [forecastProducts, setForecastProducts] = useState<ForecastProduct[]>([]);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState<string | null>(null);
+ const [loadNotice, setLoadNotice] = useState<string | null>(null);
  const [loadProgress, setLoadProgress] = useState({ completed: 0, total: 0 });
  const requestController = useRef<AbortController | null>(null);
  const [selectedProduct, setSelectedProduct] = useState<ForecastProduct | null>(null);
@@ -155,6 +156,7 @@ const AIDemandForecast: React.FC = () => {
   requestController.current = controller;
   setLoading(true);
   setError(null);
+  setLoadNotice(null);
   setForecastProducts([]);
   setLoadProgress({ completed: 0, total: 0 });
   try {
@@ -165,6 +167,8 @@ const AIDemandForecast: React.FC = () => {
    const productsById = new Map(products.map((product) => [product.id, product]));
    setLoadProgress({ completed: 0, total: products.length });
    const forecasts: ForecastProduct[] = [];
+   let unsupportedCount = 0;
+   let failedCount = 0;
 
    for (const [index, product] of products.entries()) {
     if (controller.signal.aborted) return;
@@ -183,7 +187,14 @@ const AIDemandForecast: React.FC = () => {
        setError(forecastError.response.data?.message || 'AI forecasting service is unavailable. Please try again later.');
        return;
       }
-      if (forecastError.response?.status !== 429) break;
+      if (forecastError.response?.status === 404) {
+       unsupportedCount += 1;
+       break;
+      }
+      if (forecastError.response?.status !== 429) {
+       failedCount += 1;
+       break;
+      }
       const retryAfter = Number(forecastError.response.headers['retry-after']);
       await wait(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 60_000);
      }
@@ -212,9 +223,14 @@ const AIDemandForecast: React.FC = () => {
    }
 
    if (!controller.signal.aborted && !forecasts.length) {
-    setError('No trained product forecasts are available.');
+    setError(failedCount > 0
+     ? `${failedCount} forecast request${failedCount === 1 ? '' : 's'} failed; no validated forecasts could be displayed.`
+     : `No catalog products are supported by the trained model (${unsupportedCount} checked).`);
    } else if (!controller.signal.aborted) {
-     setForecastProducts(forecasts);
+    setForecastProducts(forecasts);
+    if (unsupportedCount > 0 || failedCount > 0) {
+     setLoadNotice(`${forecasts.length} supported · ${unsupportedCount} unsupported · ${failedCount} failed`);
+    }
     saveAdminForecastSnapshot(forecasts);
    }
   } catch (caught) {
@@ -312,6 +328,7 @@ const AIDemandForecast: React.FC = () => {
       ? `Requesting forecasts sequentially${loadProgress.total ? ` (${loadProgress.completed}/${loadProgress.total})` : ''}.`
       : error}</p>
     </div>}
+    {!loading && !error && loadNotice && <div role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">Partial forecast coverage: {loadNotice}.</div>}
 
     {/* ============================================ */}
     {/* SECTION 1 (TOP): Predict Dashboard Stats / Metrics Cards */}

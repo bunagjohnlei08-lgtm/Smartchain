@@ -71,9 +71,9 @@ class PlantManagerForecastRecommendationTest extends TestCase
         $drum = $this->inventory('Forecast Drum', 'DRUM', 0);
         $sack = $this->inventory('Forecast Sack', 'SACK', 0);
         $pcs = $this->inventory('Forecast Piece', 'PCS', 200);
-        Http::fake(fn ($request) => Http::response($this->forecast((int) $request['product_id'], match ((int) $request['product_id']) {
-            $drum->product_id => [49.4, 49.4, 49.4, 49.4],
-            $sack->product_id => [0.025, 0.025, 0.025, 0.025],
+        Http::fake(fn ($request) => Http::response($this->forecast((string) $request['product_name'], match ((string) $request['product_name']) {
+            'Forecast Drum' => [49.4, 49.4, 49.4, 49.4],
+            'Forecast Sack' => [0.025, 0.025, 0.025, 0.025],
             default => [49.25, 49.25, 49.25, 49.25],
         })));
 
@@ -101,7 +101,7 @@ class PlantManagerForecastRecommendationTest extends TestCase
     public function test_forecast_request_above_manual_threshold_uses_existing_lifecycle_once(): void
     {
         $inventory = $this->inventory('High Stock Forecast Product', 'DRUM', 50);
-        Http::fake(['*' => Http::response($this->forecast($inventory->product_id, [30.0, 30.0, 30.0, 30.0]))]);
+        Http::fake(['*' => Http::response($this->forecast('High Stock Forecast Product', [30.0, 30.0, 30.0, 30.0]))]);
         $payload = ['product_id' => $inventory->product_id, 'requested_qty' => 65, 'recommendation_generated_at' => now()->toIso8601String(), 'raw_demand' => 120, 'available_stock' => 50, 'recommended_reorder' => 70];
 
         $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/forecast-requests', $payload)
@@ -142,9 +142,9 @@ class PlantManagerForecastRecommendationTest extends TestCase
         }
     }
 
-    private function forecast(int $productId, array $weeks): array
+    private function forecast(string $productName, array $weeks): array
     {
-        return ['product_id' => $productId, 'product_name' => 'Synthetic', 'horizon_weeks' => 4,
+        return ['product_id' => 999, 'product_name' => $productName, 'horizon_weeks' => 4,
             'generated_at' => now()->toIso8601String(), 'model_version' => 'test-v1', 'training_weeks' => 52,
             'model_quality' => ['mae' => 1.234], 'decision_support_only' => true,
             'forecast' => collect($weeks)->map(fn ($quantity, $index) => ['week_start' => now()->addWeeks($index + 1)->toDateString(), 'expected_quantity' => $quantity])->all()];

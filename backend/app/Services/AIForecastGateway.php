@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Product;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -11,7 +12,12 @@ final class AIForecastGateway
     /** @return array<string, mixed> */
     public function forecast(int $productId): array
     {
-        return $this->request(['product_id' => $productId], $productId);
+        $product = Product::query()->find($productId, ['id', 'name']);
+        if ($product === null) {
+            throw new HttpException(404, 'Product was not found.');
+        }
+
+        return $this->request(['product_name' => $product->name], $productId, $product->name);
     }
 
     /** @return array<string, mixed> */
@@ -21,7 +27,7 @@ final class AIForecastGateway
     }
 
     /** @param array<string, int|string> $identifier @return array<string, mixed> */
-    private function request(array $identifier, ?int $expectedProductId = null): array
+    private function request(array $identifier, ?int $catalogProductId = null, ?string $catalogProductName = null): array
     {
         if (config('services.ai_forecast.enabled') !== true) {
             throw new HttpException(503, 'AI forecasting is not enabled.');
@@ -45,8 +51,9 @@ final class AIForecastGateway
 
         $payload = $response->json();
         if (! is_array($payload)
-            || ($expectedProductId !== null && (int) ($payload['product_id'] ?? 0) !== $expectedProductId)
             || (int) ($payload['product_id'] ?? 0) < 1
+            || ! is_string($payload['product_name'] ?? null)
+            || ($catalogProductName !== null && $this->normalizeProductName($payload['product_name']) !== $this->normalizeProductName($catalogProductName))
             || ! is_array($payload['forecast'] ?? null)
             || ! is_int($payload['horizon_weeks'] ?? null)
             || $payload['horizon_weeks'] < 1
@@ -69,6 +76,22 @@ final class AIForecastGateway
             }
         }
 
+        if ($catalogProductId !== null && $catalogProductName !== null) {
+            $payload['model_product_id'] = (int) $payload['product_id'];
+            $payload['product_id'] = $catalogProductId;
+            $payload['product_name'] = $catalogProductName;
+        }
+
         return $payload;
+    }
+
+    private function normalizeProductName(string $value): string
+    {
+        $value = mb_strtolower(trim($value));
+        $value = str_replace(['‐', '‑', '‒', '–', '—', '―', '−'], '-', $value);
+        $value = str_replace(['‘', '’', '´', '`'], "'", $value);
+        $value = str_replace('superplasticiser', 'superplasticizer', $value);
+
+        return preg_replace('/\s+/u', ' ', $value) ?? $value;
     }
 }

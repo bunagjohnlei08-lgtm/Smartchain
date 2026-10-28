@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import unicodedata
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,6 +51,15 @@ def load_artifact() -> dict[str, Any] | None:
     return artifact
 
 
+def normalize_product_name(value: str) -> str:
+    """Normalize catalog-safe spelling and punctuation without fuzzy matching."""
+    value = unicodedata.normalize("NFKC", value).casefold()
+    value = re.sub(r"[‐‑‒–—―−]", "-", value)
+    value = re.sub(r"[‘’´`]", "'", value)
+    value = value.replace("superplasticiser", "superplasticizer")
+    return " ".join(value.split())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -82,10 +93,15 @@ def resolve_product_id(artifact: dict[str, Any], payload: ForecastRequest) -> in
     if payload.product_id is not None:
         product_id = payload.product_id
     else:
-        wanted = payload.product_name.strip().casefold()
-        matches = [int(key) for key, value in artifact["product_names"].items() if value.casefold() == wanted]
+        wanted = normalize_product_name(payload.product_name)
+        matches = [
+            int(key) for key, value in artifact["product_names"].items()
+            if normalize_product_name(value) == wanted
+        ]
         if not matches:
             raise HTTPException(status_code=404, detail="Product is not available in the trained model.")
+        if len(matches) != 1:
+            raise HTTPException(status_code=409, detail="Product name is ambiguous in the trained model.")
         product_id = matches[0]
     if product_id not in artifact["product_codes"]:
         raise HTTPException(status_code=404, detail="Product is not available in the trained model.")

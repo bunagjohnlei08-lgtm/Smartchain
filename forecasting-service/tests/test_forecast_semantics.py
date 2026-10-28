@@ -8,7 +8,7 @@ import joblib
 
 from fastapi import HTTPException
 
-from app.main import ForecastRequest, forecast, forecast_week_starts
+from app.main import ForecastRequest, forecast, forecast_week_starts, resolve_product_id
 
 
 class ForecastSemanticsTest(unittest.TestCase):
@@ -55,6 +55,42 @@ class ForecastSemanticsTest(unittest.TestCase):
 
         self.assertEqual(raised.exception.status_code, 503)
         self.assertNotIn("internal model detail", raised.exception.detail)
+
+    def test_catalog_name_normalization_maps_only_the_intended_model_product(self) -> None:
+        artifact = {
+            "product_names": {198: "MegaFlow SP404 – High performance superplasticizer"},
+            "product_codes": {198: 0},
+        }
+        payload = ForecastRequest(product_name="MegaFlow SP404 - High performance superplasticiser")
+
+        self.assertEqual(resolve_product_id(artifact, payload), 198)
+
+    def test_railway_catalog_names_map_to_all_sixteen_trained_series(self) -> None:
+        railway_catalog = {
+            183: "Thermal Ceramics Tri-Mor Coolcast",
+            184: "Thermal Ceramics Tri-Mor Extra HS Castable",
+            185: "Thermal Ceramics Tri-Mor Insulite",
+            186: "Thermal Ceramics Tri-Mor LC140",
+            187: "MegaFlow P4 – Water reducing and set retarding admixture",
+            188: "MegaFlow P – Water reducing concrete admixture",
+            189: "MegaFlow P401 – Water reducing and set retarding admixture",
+            190: "MegaFlow SP404 – High performance superplasticiser",
+            191: "TOMAHAWK EC",
+            192: "SPIK ‘N SPAN",
+            193: "TOMAHAWK DELTAM EC",
+            194: "QEMI DF 210FG",
+            195: "QEMI DF 220FG",
+            196: "QEMI DF 1000KFG",
+            197: "QEMI DF 8402",
+            198: "QEMI DF 8062",
+        }
+
+        for model_product_id, catalog_name in railway_catalog.items():
+            with self.subTest(catalog_name=catalog_name):
+                self.assertEqual(
+                    resolve_product_id(self.artifact, ForecastRequest(product_name=catalog_name)),
+                    model_product_id,
+                )
 
 
 if __name__ == "__main__":
