@@ -4,6 +4,8 @@ import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useDashboardGreeting } from '../../hooks/useDashboardGreeting';
 import { useNavigate } from 'react-router-dom';
+import { ADMIN_FORECAST_UNITS, readAdminForecastSnapshot, subscribeToAdminForecastSnapshot, type AdminForecastSnapshot } from '../../lib/adminForecastSnapshot';
+import { AI_FORECAST_ENABLED } from '../../config/features';
 import {
   PackageCheck,
   PackageMinus,
@@ -35,12 +37,12 @@ interface DashboardData {
   recent_purchase_orders: Array<{ id: number; po_number: string; supplier_name: string; total_amount: number; status: string }>;
   inventory_status: Array<{ id: number; product: string; category: string; stock: number; status: string }>;
   inventory_movement: Array<{ date: string; day: string; stock_in: number; stock_out: number }>;
-  ai_forecast: Array<{ date: string; day: string; actual: number; projected: number; source: string }>;
+  stock_out_actuals: Array<{ product_id: number; unit: string; week_start: string; quantity: number }>;
 }
 
 const emptyDashboard: DashboardData = {
   metrics: { warehouse_capacity: null, warehouse_utilization: null, warehouse_name: null, open_purchase_orders: 0, shipments_in_transit: 0, low_stock_items: 0, low_stock_threshold: 20, stock_in: 0, stock_out: 0, orders: 0, active_suppliers: 0 },
-  recent_purchase_orders: [], inventory_status: [], inventory_movement: [], ai_forecast: [],
+  recent_purchase_orders: [], inventory_status: [], inventory_movement: [], stock_out_actuals: [],
 };
 
 // Quick Actions
@@ -89,11 +91,17 @@ export default function AdminDashboard() {
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [forecastSnapshot, setForecastSnapshot] = useState<AdminForecastSnapshot | null>(() => AI_FORECAST_ENABLED ? readAdminForecastSnapshot() : null);
+  const [selectedForecastUnit, setSelectedForecastUnit] = useState<typeof ADMIN_FORECAST_UNITS[number]>('DRUM');
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/admin/dashboard');
+      const products = AI_FORECAST_ENABLED ? forecastSnapshot?.products ?? [] : [];
+      const response = await apiClient.get('/admin/dashboard', { params: {
+        forecast_product_ids: [...new Set(products.map((product) => product.id))],
+        forecast_week_starts: [...new Set(products.flatMap((product) => product.forecast.map((week) => week.week_start)))],
+      }});
       setDashboard(response.data?.data ?? emptyDashboard);
       setError('');
     } catch (requestError: any) {
@@ -101,9 +109,14 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [forecastSnapshot]);
 
   useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+  useEffect(() => AI_FORECAST_ENABLED ? subscribeToAdminForecastSnapshot(setForecastSnapshot) : undefined, []);
+  const availableForecastUnits = useMemo(() => ADMIN_FORECAST_UNITS.filter((unit) => forecastSnapshot?.products.some((product) => product.unit === unit)), [forecastSnapshot]);
+  useEffect(() => {
+    if (availableForecastUnits.length > 0 && !availableForecastUnits.includes(selectedForecastUnit)) setSelectedForecastUnit(availableForecastUnits[0]);
+  }, [availableForecastUnits, selectedForecastUnit]);
 
   const dateLabel = useMemo(() => new Intl.DateTimeFormat('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -132,17 +145,46 @@ export default function AdminDashboard() {
     { title: 'Suppliers', value: loading ? '—' : dashboard.metrics.active_suppliers.toLocaleString(), subtitle: 'Active suppliers', subtitleColor: 'text-cyan-600 dark:text-cyan-400', icon: <Building2 className="w-5 h-5 text-cyan-600 dark:text-cyan-400"/>, iconBg: 'bg-cyan-50 dark:bg-cyan-500/10' },
   ];
   const movementData = dashboard.inventory_movement;
-  const forecastData = dashboard.ai_forecast;
-  const purchaseOrders = dashboard.recent_purchase_orders;
   const inventoryStatus = dashboard.inventory_status;
+  const forecastVsActualData = useMemo(() => {
+    const products = (forecastSnapshot?.products ?? []).filter((product) => product.unit === selectedForecastUnit);
+    const firstForecast = products[0]?.forecast ?? [];
+    const productIds = new Set(products.map((product) => product.id));
+    const snapshotCreatedAt = forecastSnapshot ? new Date(forecastSnapshot.savedAt).getTime() : Number.POSITIVE_INFINITY;
+    const now = Date.now();
+
+    return firstForecast.map((week, index) => {
+      const weekStart = new Date(`${week.week_start}T00:00:00Z`);
+      const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const snapshotExistedBeforeWeek = snapshotCreatedAt <= weekStart.getTime();
+      const completedWeek = weekEnd.getTime() <= now;
+      const matchingActuals = dashboard.stock_out_actuals.filter((actual) =>
+        actual.week_start === week.week_start
+        && actual.unit === selectedForecastUnit
+        && productIds.has(actual.product_id));
+      const actualAvailable = completedWeek && snapshotExistedBeforeWeek && matchingActuals.length > 0;
+      const formatDate = (value: Date) => value.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+      const inclusiveEnd = new Date(weekEnd.getTime() - 24 * 60 * 60 * 1000);
+      return {
+        weekStart: week.week_start,
+        week: `${formatDate(weekStart)}–${formatDate(inclusiveEnd)}`,
+        forecast: products.reduce((sum, product) => sum + (product.forecast[index]?.expected_quantity ?? 0), 0),
+        actual: actualAvailable ? matchingActuals.reduce((sum, actual) => sum + actual.quantity, 0) : null,
+        completedWeek,
+        snapshotExistedBeforeWeek,
+      };
+    });
+  }, [dashboard.stock_out_actuals, forecastSnapshot, selectedForecastUnit]);
+  const hasCompletedActualComparison = forecastVsActualData.some((week) => week.actual !== null);
+  const purchaseOrders = dashboard.recent_purchase_orders;
   const isDark = theme === 'dark';
   const chartGridColor = isDark ? '#334155' : '#E2E8F0';
   const chartAxisColor = isDark ? '#CBD5E1' : '#64748B';
   const chartCardColor = isDark ? '#0d1322' : '#FFFFFF';
-  const stockInColor = isDark ? '#60A5FA' : '#3B82F6';
-  const stockOutColor = isDark ? '#34D399' : '#22C55E';
-  const projectedColor = isDark ? '#FBBF24' : '#F59E0B';
-  const actualColor = isDark ? '#60A5FA' : '#3B82F6';
+  const stockInColor = isDark ? '#34D399' : '#16A34A';
+  const stockOutColor = isDark ? '#60A5FA' : '#2563EB';
+  const forecastColors: Record<typeof ADMIN_FORECAST_UNITS[number], string> = { DRUM: '#10B981', PCS: '#A855F7', SACK: '#F59E0B' };
+  const actualStockOutColor = '#3B82F6';
   const tooltipStyle = {
     backgroundColor: isDark ? '#111827' : '#FFFFFF',
     borderColor: isDark ? '#475569' : '#CBD5E1',
@@ -235,52 +277,55 @@ export default function AdminDashboard() {
 
           <div className="flex items-center justify-center gap-6 mt-3 text-xs">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 dark:bg-blue-400"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-green-600 dark:bg-emerald-400"></span>
               <span className="text-slate-600 dark:text-slate-300">Stock In</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 dark:bg-blue-400"></span>
               <span className="text-slate-600 dark:text-slate-300">Stock Out</span>
             </div>
           </div>
         </div>
 
-        {/* AI Demand Forecast */}
+        {AI_FORECAST_ENABLED && <>
+        {/* Forecast vs Actual Stock Out */}
         <div className="min-w-0 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-lg dark:shadow-black/20 rounded-xl p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">AI Demand Forecast</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">7-day projection</p>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Forecast vs Actual Stock Out</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Weekly comparison of predicted demand and recorded stock-out</p>
             </div>
-            <button onClick={() => void loadDashboard()} disabled={loading} aria-label="Refresh dashboard" className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white disabled:opacity-50">
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/>
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <label htmlFor="forecast-unit" className="sr-only">Forecast comparison unit</label>
+              <select id="forecast-unit" value={selectedForecastUnit} onChange={(event) => setSelectedForecastUnit(event.target.value as typeof selectedForecastUnit)} className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                {ADMIN_FORECAST_UNITS.map((unit) => <option key={unit} value={unit} disabled={!availableForecastUnits.includes(unit)}>{unit}</option>)}
+              </select>
+              <button onClick={() => { setForecastSnapshot(readAdminForecastSnapshot()); void loadDashboard(); }} disabled={loading} aria-label="Refresh forecast comparison" className="flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}/>
+              </button>
+            </div>
           </div>
 
           <div className="h-64 w-full">
+            {!forecastSnapshot && <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-300 px-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No forecast snapshot is available yet. Open AI Demand Forecasting to load the current authorized forecast.</div>}
+            {forecastSnapshot && forecastVsActualData.length === 0 && <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-500 dark:text-slate-400">No forecast products use {selectedForecastUnit}.</div>}
+            {forecastVsActualData.length > 0 && (
             <ResponsiveContainer height="100%" width="100%">
-              <LineChart margin={{ left: -20, right: 10, bottom: 0, top: 10 }} data={forecastData}>
+              <LineChart margin={{ left: -20, right: 10, bottom: 0, top: 10 }} data={forecastVsActualData}>
                 <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" strokeOpacity={isDark ? 0.7 : 1} vertical={false} />
-                <XAxis dataKey="day" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 6000]} ticks={[0, 1500, 3000, 4500, 6000]} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={{ stroke: chartAxisColor, strokeOpacity: 0.35 }} />
-                <Line type="monotone" dataKey="projected" name="Projected" stroke={projectedColor} strokeWidth={3} dot={{ fill: projectedColor, stroke: chartCardColor, strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: chartCardColor, strokeWidth: 2 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
-                <Line type="monotone" dataKey="actual" name="Actual" stroke={actualColor} strokeWidth={2.75} strokeDasharray="5 5" dot={{ fill: actualColor, stroke: chartCardColor, strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: chartCardColor, strokeWidth: 2 }} isAnimationActive={true} animationDuration={1500} animationEasing="ease-in-out" animationBegin={300}/>
+                <XAxis dataKey="week" stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis stroke={chartAxisColor} tick={{ fill: chartAxisColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 'auto']} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} cursor={{ stroke: chartAxisColor, strokeOpacity: 0.35 }} formatter={(value, name) => value === null || value === undefined ? ['Unavailable', String(name)] : [`${Number(value).toLocaleString(undefined, { maximumFractionDigits: 3 })} ${selectedForecastUnit}`, String(name)]} labelFormatter={(label) => `Week: ${label}`} />
+                <Line type="monotone" dataKey="forecast" name={`Forecast ${selectedForecastUnit}`} stroke={forecastColors[selectedForecastUnit]} strokeWidth={3} dot={{ fill: forecastColors[selectedForecastUnit], stroke: chartCardColor, strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: chartCardColor, strokeWidth: 2 }} connectNulls={false} isAnimationActive={true} animationDuration={500}/>
+                <Line type="monotone" dataKey="actual" name={`Actual Stock Out ${selectedForecastUnit}`} stroke={actualStockOutColor} strokeWidth={2.75} strokeDasharray="5 5" dot={{ fill: actualStockOutColor, stroke: chartCardColor, strokeWidth: 2, r: 4 }} activeDot={{ r: 6, stroke: chartCardColor, strokeWidth: 2 }} connectNulls={false} isAnimationActive={true} animationDuration={500}/>
               </LineChart>
             </ResponsiveContainer>
+            )}
           </div>
 
-          <div className="flex items-center justify-center gap-6 mt-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 dark:bg-blue-400"></span>
-              <span className="text-slate-600 dark:text-slate-300">Actual</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 dark:bg-amber-400"></span>
-              <span className="text-slate-600 dark:text-slate-300">Projected</span>
-            </div>
-          </div>
+          {forecastVsActualData.length > 0 && <><div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs"><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: forecastColors[selectedForecastUnit] }}></span><span className="text-slate-600 dark:text-slate-300">Forecast {selectedForecastUnit}</span></div><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: actualStockOutColor }}></span><span className="text-slate-600 dark:text-slate-300">Actual Stock Out {selectedForecastUnit}</span></div></div>{!hasCompletedActualComparison && <p className="mt-2 text-center text-[11px] leading-4 text-slate-500 dark:text-slate-400">No completed weekly stock-out data is available for comparison yet. Actuals require a completed week and a forecast snapshot saved before that week began.</p>}</>}
         </div>
+        </>}
       </div>
 
       {/* 3. MIDDLE TABLES SECTION */}

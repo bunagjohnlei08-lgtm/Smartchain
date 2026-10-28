@@ -22,6 +22,12 @@ class DashboardController extends Controller
     public function index(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
+        $comparison = $request->validate([
+            'forecast_product_ids' => ['sometimes', 'array', 'max:100'],
+            'forecast_product_ids.*' => ['integer', 'distinct', 'exists:products,id'],
+            'forecast_week_starts' => ['sometimes', 'array', 'max:8'],
+            'forecast_week_starts.*' => ['date_format:Y-m-d', 'distinct'],
+        ]);
 
         $start = now()->subDays(6)->startOfDay();
         $end = now()->endOfDay();
@@ -54,6 +60,33 @@ class DashboardController extends Controller
                 'stock_out' => (int) ($stockOut[$key] ?? 0),
             ];
         });
+
+        $forecastProductIds = $comparison['forecast_product_ids'] ?? [];
+        $forecastWeekStarts = collect($comparison['forecast_week_starts'] ?? [])->sort()->values();
+        $stockOutActuals = collect();
+        if ($forecastProductIds !== [] && $forecastWeekStarts->isNotEmpty()) {
+            $comparisonStart = Carbon::parse($forecastWeekStarts->first(), 'UTC')->startOfDay();
+            $comparisonEnd = Carbon::parse($forecastWeekStarts->last(), 'UTC')->addWeek()->startOfDay();
+            $stockOutActuals = StockOutTransaction::query()
+                ->whereIn('product_id', $forecastProductIds)
+                ->where('created_at', '>=', $comparisonStart)
+                ->where('created_at', '<', $comparisonEnd)
+                ->get(['product_id', 'unit', 'quantity', 'created_at'])
+                ->groupBy(fn (StockOutTransaction $transaction) => implode('|', [
+                    $transaction->product_id,
+                    strtoupper(trim((string) $transaction->unit)),
+                    $transaction->created_at->copy()->utc()->startOfWeek(Carbon::MONDAY)->toDateString(),
+                ]))
+                ->map(function ($transactions) {
+                    $transaction = $transactions->first();
+                    return [
+                        'product_id' => (int) $transaction->product_id,
+                        'unit' => strtoupper(trim((string) $transaction->unit)),
+                        'week_start' => $transaction->created_at->copy()->utc()->startOfWeek(Carbon::MONDAY)->toDateString(),
+                        'quantity' => (int) $transactions->sum('quantity'),
+                    ];
+                })->values();
+        }
 
         $inventoryStatus = Inventory::query()
             ->join('products', 'products.id', '=', 'inventories.product_id')
@@ -125,6 +158,7 @@ class DashboardController extends Controller
                 'recent_purchase_orders' => $recentPurchaseOrders,
                 'inventory_status' => $inventoryStatus,
                 'inventory_movement' => $movement,
+                'stock_out_actuals' => $stockOutActuals,
                 'ai_forecast' => $forecast,
                 'generated_at' => Carbon::now()->toIso8601String(),
             ],

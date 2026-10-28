@@ -199,6 +199,8 @@ class AdminProcurementController extends Controller
             'warehouse_id' => $replenishmentRequest->warehouse_id,
             'warehouse_name' => $replenishmentRequest->warehouse?->name,
             'requested_qty' => $replenishmentRequest->requested_qty,
+            'source' => $replenishmentRequest->source ?? 'MANUAL',
+            'recommendation_snapshot' => $replenishmentRequest->recommendation_snapshot,
             'priority' => $replenishmentRequest->priority,
             'status' => $replenishmentRequest->lifecycleStatus(),
             'requested_by' => $replenishmentRequest->requester?->name,

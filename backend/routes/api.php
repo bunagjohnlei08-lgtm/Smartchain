@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\AdminSupplierAccreditationController;
 use App\Http\Controllers\Api\AwardPurchaseOrderController;
 use App\Http\Controllers\Api\AdminSupplierRejectionController;
 use App\Http\Controllers\Api\AdminWarehouseLocationController;
+use App\Http\Controllers\Api\AIForecastController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
@@ -118,6 +119,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
         Route::post('/purchase-orders/{purchaseOrder}/acknowledgments', [SupplierPurchaseOrderController::class, 'acknowledge'])->whereNumber('purchaseOrder')->middleware('throttle:20,1');
         Route::get('/performance', [SupplierPurchaseOrderController::class, 'performance']);
     });
+    Route::post('/ai/forecast', [AIForecastController::class, 'forecast'])->middleware('throttle:30,1');
     Route::get('/session/status', [SessionController::class, 'status'])->middleware('throttle:session-status');
     Route::post('/session/activity', [SessionController::class, 'activity'])->middleware('throttle:session-activity');
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -293,6 +295,8 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     });
 
     Route::prefix('plant-manager/procurement')->group(function () {
+        Route::get('/forecast-recommendations', [PlantManagerProcurementController::class, 'forecastRecommendations']);
+        Route::post('/forecast-requests', [PlantManagerProcurementController::class, 'storeForecastRequest']);
         Route::get('/options', [PlantManagerProcurementController::class, 'options']);
         Route::get('/requests', [PlantManagerProcurementController::class, 'index']);
         Route::post('/requests', [PlantManagerProcurementController::class, 'store']);

@@ -1,9 +1,12 @@
 // src/page/plant-manager/Dashboard.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useDashboardGreeting } from '../../hooks/useDashboardGreeting';
 import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
+import { loadForecastRecommendations, type ForecastRecommendation } from '../../lib/forecastRecommendations';
+import { AI_FORECAST_ENABLED } from '../../config/features';
 import {
   Package,
   Layers,
@@ -87,14 +90,6 @@ interface SupplierPerformance {
   quality: number;  // percentage
 }
 
-interface ForecastProduct {
-  id: string;
-  name: string;
-  demand: number;
-  reorder: number;
-  confidence: number;
-}
-
 interface DashboardData {
   metrics: { total_products: number; total_categories: number; stock_value: number; low_stock_items: number; out_of_stock: number; todays_stock_in: number; todays_stock_out: number };
   inventory_trend: Array<{ month: string; stock: number; availability: number }>;
@@ -104,13 +99,11 @@ interface DashboardData {
   recent_transactions: Transaction[];
   all_transactions: Transaction[];
   supplier_performance: SupplierPerformance[];
-  ai_forecast_summary: { headline: string; products: ForecastProduct[]; source: string };
 }
 
 const emptyDashboard: DashboardData = {
   metrics: { total_products: 0, total_categories: 0, stock_value: 0, low_stock_items: 0, out_of_stock: 0, todays_stock_in: 0, todays_stock_out: 0 },
   inventory_trend: [], stock_movement: [], monthly_inventory_activity: [], low_stock_summary: [], recent_transactions: [], all_transactions: [], supplier_performance: [],
-  ai_forecast_summary: { headline: '', products: [], source: 'placeholder' },
 };
 
 // ============================================
@@ -148,6 +141,7 @@ const LowStockBadge: React.FC<{ status: string }> = ({ status }) => {
 // ============================================
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const greeting = useDashboardGreeting();
   const [date] = useState(new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
@@ -157,6 +151,10 @@ const Dashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const refreshInFlight = useRef(false);
   const [error, setError] = useState('');
+  const [forecastRows, setForecastRows] = useState<ForecastRecommendation[]>([]);
+  const [forecastWarehouse, setForecastWarehouse] = useState('');
+  const [forecastLoading, setForecastLoading] = useState(AI_FORECAST_ENABLED);
+  const [forecastError, setForecastError] = useState('');
   const [transactionsOpen, setTransactionsOpen] = useState(false);
   usePlantManagerDetailOverlay(transactionsOpen);
 
@@ -179,6 +177,25 @@ const Dashboard: React.FC = () => {
   }, []);
 
   useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+
+  const loadForecastSummary = useCallback(async () => {
+    if (!AI_FORECAST_ENABLED) return;
+    setForecastLoading(true);
+    setForecastError('');
+    try {
+      const response = await loadForecastRecommendations();
+      setForecastWarehouse(response.warehouse.name);
+      setForecastRows([...response.data].sort((a, b) => a.unit.localeCompare(b.unit) || (b.recommended_reorder ?? -1) - (a.recommended_reorder ?? -1) || a.product_name.localeCompare(b.product_name)).slice(0, 4));
+    } catch (requestError: any) {
+      setForecastRows([]);
+      setForecastWarehouse('');
+      setForecastError(requestError?.response?.data?.message || 'Forecast recommendations are unavailable.');
+    } finally {
+      setForecastLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { if (AI_FORECAST_ENABLED) void loadForecastSummary(); }, [loadForecastSummary]);
 
   const formatCurrency = (value: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value);
   const kpiData: KPI[] = [
@@ -210,7 +227,6 @@ const Dashboard: React.FC = () => {
   const transactions = dashboard.recent_transactions;
   const allTransactions = dashboard.all_transactions ?? transactions;
   const supplierData = dashboard.supplier_performance;
-  const forecastData = dashboard.ai_forecast_summary.products;
 
   const trendColor = (trend: 'up' | 'down' | 'neutral') =>
     trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-400';
@@ -564,6 +580,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
+        {AI_FORECAST_ENABLED && <>
         {/* AI Forecast Summary */}
         <div className="min-w-0 bg-[#0d1322] border border-slate-800/80 rounded-2xl p-6">
           <div className="flex flex-col items-start justify-between gap-3 mb-1 sm:flex-row sm:items-center">
@@ -571,41 +588,37 @@ const Dashboard: React.FC = () => {
               <h3 className="text-white font-semibold">AI Forecast Summary</h3>
               <p className="text-slate-400 text-xs">View only — model training is not available to Plant Manager</p>
             </div>
-            <button className="text-slate-400 hover:text-white text-xs flex items-center gap-1 transition-colors">
+            <button type="button" onClick={() => navigate('/plant-manager/forecast')} className="text-slate-400 hover:text-white text-xs flex items-center gap-1 transition-colors">
               Open forecast <ExternalLink className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 dark:border-sky-500/30 dark:bg-sky-950/40 dark:text-sky-400">
-            <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            <span>{dashboard.ai_forecast_summary.headline || 'Forecast summary will appear when dashboard data is available.'}</span>
+          <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 dark:border-sky-500/30 dark:bg-sky-950/40 dark:text-sky-400">
+            <span className="flex min-w-0 items-start gap-2.5"><Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" /><span>{forecastWarehouse ? `Four-week recommendations for ${forecastWarehouse}. Ordered by unit, then highest reorder.` : 'Authorized four-week warehouse recommendations.'}</span></span>
+            <button type="button" onClick={() => void loadForecastSummary()} disabled={forecastLoading} aria-label="Refresh AI forecast summary" className="shrink-0 rounded-lg p-1 hover:bg-sky-500/10 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${forecastLoading ? 'animate-spin' : ''}`}/></button>
           </div>
 
           <div className="mt-4 space-y-2">
-            {forecastData.map((product) => (
+            {forecastLoading && <p role="status" className="py-5 text-center text-sm text-slate-400">Loading authorized recommendations…</p>}
+            {!forecastLoading && forecastError && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{forecastError}</p>}
+            {!forecastLoading && !forecastError && forecastRows.map((product) => (
               <div
-                key={product.id}
+                key={`${product.product_id}-${product.warehouse_id}`}
                 className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4"
               >
                 <div className="min-w-0">
-                  <p className="text-white text-sm font-medium">{product.name}</p>
+                  <p className="text-white text-sm font-medium">{product.product_name}</p>
                   <p className="text-slate-400 text-xs">
-                    Demand {product.demand} · Reorder {product.reorder}
+                    {product.planning_demand === undefined ? 'Demand unavailable' : `Demand ${product.planning_demand.toLocaleString()} ${product.unit}`} · {product.recommended_reorder === undefined ? 'Reorder unavailable' : `Reorder ${product.recommended_reorder.toLocaleString()} ${product.unit}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-cyan-400 text-sm font-semibold">{product.confidence}%</span>
-                  <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-cyan-500"
-                      style={{ width: `${product.confidence}%` }}
-                    />
-                  </div>
-                </div>
+                <span className="text-right text-xs font-medium text-cyan-400">{product.existing_request ? `${product.existing_request.reference} · ${product.existing_request.status}` : product.status.replaceAll('_', ' ')}</span>
               </div>
             ))}
+            {!forecastLoading && !forecastError && forecastRows.length === 0 && <p className="py-5 text-center text-sm text-slate-400">No forecast recommendations are available for the assigned warehouse.</p>}
           </div>
         </div>
+        </>}
       </div>
 
       {transactionsOpen && (

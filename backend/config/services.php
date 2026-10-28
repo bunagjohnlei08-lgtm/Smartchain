@@ -2,6 +2,13 @@
 
 return [
 
+    'ai_forecast' => [
+        'enabled' => filter_var(env('AI_FORECAST_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'url' => env('AI_FORECAST_URL', 'http://127.0.0.1:8001'),
+        'connect_timeout' => env('AI_FORECAST_CONNECT_TIMEOUT', 2),
+        'timeout' => env('AI_FORECAST_TIMEOUT', 10),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

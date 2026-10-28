@@ -872,6 +872,43 @@
   max-width: 100%;
 }
 
+/* AI Demand Forecast owns horizontal overflow inside its card at every
+   breakpoint. This keeps long product/model values from widening the page when
+   the admin sidebar reduces the main content width. */
+.admin-main .admin-table-scroll:has(> .admin-forecast-table) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-main :has(> .admin-table-scroll > .admin-forecast-table) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-forecast-table {
+  min-width: 65.5rem;
+  table-layout: fixed;
+}
+
+.admin-forecast-table :is(th, td):nth-child(1) { width: 16rem; }
+.admin-forecast-table :is(th, td):nth-child(2) { width: 5rem; }
+.admin-forecast-table :is(th, td):nth-child(3) { width: 4rem; }
+.admin-forecast-table :is(th, td):nth-child(4) { width: 8.5rem; }
+.admin-forecast-table :is(th, td):nth-child(5) { width: 8rem; }
+.admin-forecast-table :is(th, td):nth-child(6) { width: 6rem; }
+.admin-forecast-table :is(th, td):nth-child(7) { width: 8rem; }
+.admin-forecast-table :is(th, td):nth-child(8) { width: 7rem; }
+.admin-forecast-table :is(th, td):nth-child(9) { width: 4.5rem; }
+
+/* Admin Inventory (tablet/desktop): every column has an explicit width, so no
+   single column absorbs the spare space. Their sum is the table's min-width;
+   wider content areas stretch all columns proportionally, narrower ones scroll
+   inside the wrapper. Mobile geometry lives in the max-width: 639px block. */
 .admin-main .admin-inventory-table td:nth-child(2) > div > span {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -1525,17 +1562,18 @@
   .admin-user-table td:nth-child(6) button { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
 
   /* AI Demand Forecasting: keep long headers within explicit mobile column boundaries. */
-  .admin-forecast-table { min-width: 715px !important; }
-  .admin-forecast-table :is(th, td):nth-child(1) { width: 125px; min-width: 125px; max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .admin-forecast-table :is(th, td):nth-child(2) { width: 75px; min-width: 75px; max-width: 75px; }
-  .admin-forecast-table :is(th, td):nth-child(3) { width: 95px; min-width: 95px; max-width: 95px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .admin-forecast-table :is(th, td):nth-child(4) { width: 85px; min-width: 85px; max-width: 85px; }
-  .admin-forecast-table :is(th, td):nth-child(5) { width: 75px; min-width: 75px; max-width: 75px; }
+  .admin-forecast-table { min-width: 825px !important; }
+  .admin-forecast-table :is(th, td):nth-child(1) { width: 170px; min-width: 170px; max-width: 170px; }
+  .admin-forecast-table :is(th, td):nth-child(2) { width: 65px; min-width: 65px; max-width: 65px; }
+  .admin-forecast-table :is(th, td):nth-child(3) { width: 55px; min-width: 55px; max-width: 55px; }
+  .admin-forecast-table :is(th, td):nth-child(4) { width: 105px; min-width: 105px; max-width: 105px; }
+  .admin-forecast-table :is(th, td):nth-child(5) { width: 100px; min-width: 100px; max-width: 100px; }
   .admin-forecast-table :is(th, td):nth-child(6) { width: 80px; min-width: 80px; max-width: 80px; }
-  .admin-forecast-table :is(th, td):nth-child(7) { width: 105px; min-width: 105px; max-width: 105px; white-space: normal; }
-  .admin-forecast-table :is(th, td):nth-child(8) { width: 75px; min-width: 75px; max-width: 75px; }
-  .admin-forecast-table td:nth-child(8) > div { justify-content: center; }
-  .admin-forecast-table td:nth-child(8) button { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
+  .admin-forecast-table :is(th, td):nth-child(7) { width: 95px; min-width: 95px; max-width: 95px; }
+  .admin-forecast-table :is(th, td):nth-child(8) { width: 95px; min-width: 95px; max-width: 95px; white-space: normal; }
+  .admin-forecast-table :is(th, td):nth-child(9) { width: 60px; min-width: 60px; max-width: 60px; }
+  .admin-forecast-table td:nth-child(9) > div { justify-content: center; }
+  .admin-forecast-table td:nth-child(9) button { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
 
   /* Admin Inventory: realistic mobile column widths. The table keeps its full
      width and scrolls inside .admin-table-scroll instead of squeezing columns

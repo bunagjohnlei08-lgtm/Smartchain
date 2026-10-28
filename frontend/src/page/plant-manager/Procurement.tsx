@@ -1,7 +1,7 @@
 import { ClassificationBadge } from '../../components/catalog/ProductFields';
 import type { Classification } from '../../lib/catalog';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle,
@@ -15,11 +15,14 @@ import {
   Search,
   Send,
   ShoppingCart,
+  Brain,
   X,
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
+import { loadForecastRecommendations, type ForecastRecommendation } from '../../lib/forecastRecommendations';
+import { AI_FORECAST_ENABLED } from '../../config/features';
 
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
 type RequestStatus = 'not_submitted' | 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order' | 'po_created' | 'completed' | 'cancelled';
@@ -189,6 +192,7 @@ function formatDate(value: string | null): string {
 }
 
 const ReplenishmentPlanning: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [recentActivity, setRecentActivity] = useState<RequestRecord[]>([]);
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
@@ -210,8 +214,25 @@ const ReplenishmentPlanning: React.FC = () => {
     setDetail(request);
   };
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [aiRecommendations, setAiRecommendations] = useState<ForecastRecommendation[]>([]);
+  const [aiLoading, setAiLoading] = useState(AI_FORECAST_ENABLED);
+  const [aiError, setAiError] = useState('');
+  const [aiReview, setAiReview] = useState<ForecastRecommendation | null>(null);
+  const [aiQuantity, setAiQuantity] = useState('');
+  const [aiQuantityError, setAiQuantityError] = useState('');
 
-  usePlantManagerDetailOverlay(requestCandidates.length > 0 || detail !== null);
+  usePlantManagerDetailOverlay(requestCandidates.length > 0 || detail !== null || aiReview !== null);
+
+  const loadAiRecommendations = useCallback(async () => {
+    if (!AI_FORECAST_ENABLED) return;
+    setAiLoading(true); setAiError('');
+    try {
+      const response = await loadForecastRecommendations();
+      setAiRecommendations(response.data);
+    } catch (error: unknown) {
+      setAiRecommendations([]); setAiError(getErrorMessage(error));
+    } finally { setAiLoading(false); }
+  }, []);
 
   const loadPlanning = useCallback(async () => {
     setLoading(true);
@@ -232,7 +253,44 @@ const ReplenishmentPlanning: React.FC = () => {
 
   useEffect(() => {
     void loadPlanning();
-  }, [loadPlanning]);
+    if (AI_FORECAST_ENABLED) void loadAiRecommendations();
+  }, [loadAiRecommendations, loadPlanning]);
+
+  useEffect(() => {
+    const productId = Number(searchParams.get('ai_product'));
+    if (!productId || aiLoading) return;
+    const match = aiRecommendations.find((row) => row.product_id === productId && row.actionable && !row.stale);
+    if (match) { setAiReview(match); setAiQuantity(String(match.recommended_reorder ?? '')); }
+    setSearchParams({}, { replace: true });
+  }, [aiLoading, aiRecommendations, searchParams, setSearchParams]);
+
+  const openAiReview = (recommendation: ForecastRecommendation) => {
+    setAiReview(recommendation); setAiQuantity(String(recommendation.recommended_reorder ?? '')); setAiQuantityError('');
+  };
+
+  const submitAiRequest = async () => {
+    if (!aiReview) return;
+    const error = quantityError(aiQuantity);
+    setAiQuantityError(error);
+    if (error) return;
+    setSubmitting(true);
+    try {
+      const response = await apiClient.post('/plant-manager/procurement/forecast-requests', {
+        product_id: aiReview.product_id,
+        requested_qty: Number(aiQuantity),
+        recommendation_generated_at: aiReview.generated_at,
+        raw_demand: aiReview.raw_demand,
+        available_stock: aiReview.available_stock,
+        recommended_reorder: aiReview.recommended_reorder,
+      });
+      setToast({ type: 'success', message: `AI-backed request ${response.data.request_no} was forwarded to Admin.` });
+      setAiReview(null);
+      await Promise.all([loadPlanning(), loadAiRecommendations()]);
+    } catch (error: unknown) {
+      setAiQuantityError(getErrorMessage(error));
+      if ((error as any)?.response?.status === 409) await loadAiRecommendations();
+    } finally { setSubmitting(false); }
+  };
 
   const filteredCandidates = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -393,6 +451,12 @@ const ReplenishmentPlanning: React.FC = () => {
           </article>
         ))}
       </section>
+
+      {AI_FORECAST_ENABLED && <section className="min-w-0 overflow-hidden rounded-2xl border border-cyan-500/30 bg-[var(--bg-card)] shadow-sm" aria-labelledby="ai-reorders-title">
+        <div className="flex flex-col gap-3 border-b border-[var(--border-color)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div className="flex items-start gap-3"><span className="rounded-xl bg-cyan-500/10 p-2.5"><Brain className="h-5 w-5 text-cyan-600 dark:text-cyan-400"/></span><div><h2 id="ai-reorders-title" className="text-lg font-semibold text-[var(--text-primary)]">AI Reorder Recommendations</h2><p className="mt-1 text-sm text-[var(--text-secondary)]">Four-week net need, rounded up once to whole PCS, SACK, or DRUM packages. Review is required before forwarding.</p></div></div><button type="button" onClick={() => void loadAiRecommendations()} disabled={aiLoading} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] px-4 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)] disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${aiLoading ? 'animate-spin' : ''}`}/>Refresh AI</button></div>
+        {aiError && <p role="alert" className="m-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">{aiError}</p>}
+        {aiLoading ? <p role="status" className="p-6 text-sm text-[var(--text-secondary)]">Loading authorized recommendations…</p> : <div className="overflow-x-auto"><table className="w-full min-w-[900px]"><thead><tr className="border-b border-[var(--border-color)] text-left text-xs uppercase tracking-wide text-[var(--text-muted)]"><th className="px-4 py-3">Product</th><th className="px-4 py-3">Classification</th><th className="px-4 py-3">Warehouse</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">4-week demand</th><th className="px-4 py-3 text-right">Whole reorder</th><th className="px-4 py-3">Request status</th><th className="px-4 py-3 text-right">Action</th></tr></thead><tbody>{aiRecommendations.map((row) => <tr key={`${row.product_id}-${row.warehouse_id}`} className="border-b border-[var(--border-color)] last:border-0"><td className="px-4 py-4"><p className="max-w-64 break-words font-semibold text-[var(--text-primary)]">{row.product_name}</p></td><td className="px-4 py-4 text-sm text-[var(--text-secondary)]">{row.item_classification?.replace('_', ' ') ?? '—'}</td><td className="px-4 py-4 text-sm text-[var(--text-secondary)]">{row.warehouse_name}</td><td className="px-4 py-4 text-right text-sm text-[var(--text-primary)]">{row.available_stock.toLocaleString()} {row.unit}</td><td className="px-4 py-4 text-right text-sm text-[var(--text-primary)]">{row.raw_demand === undefined ? 'Unavailable' : `${row.raw_demand.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${row.unit}`}</td><td className="px-4 py-4 text-right font-semibold text-cyan-700 dark:text-cyan-300">{row.recommended_reorder === undefined ? '—' : `${row.recommended_reorder.toLocaleString()} ${row.unit}`}</td><td className="px-4 py-4 text-sm text-[var(--text-secondary)]">{row.existing_request ? `${row.existing_request.reference} · ${row.existing_request.status}` : row.status.replaceAll('_', ' ')}</td><td className="px-4 py-4 text-right"><button type="button" disabled={!row.actionable || row.stale} onClick={() => openAiReview(row)} className="min-h-11 cursor-pointer rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white hover:bg-cyan-600 focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-40">{row.existing_request ? 'View Request' : 'Review Replenishment'}</button></td></tr>)}</tbody></table>{!aiRecommendations.length && !aiError && <p className="p-8 text-center text-sm text-[var(--text-secondary)]">No warehouse inventory products are available for forecasting.</p>}</div>}
+      </section>}
 
       <section className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
         <div className="border-b border-[var(--border-color)] p-4 sm:p-5">
@@ -639,6 +703,8 @@ const ReplenishmentPlanning: React.FC = () => {
           </div>
         )}
       </section>
+
+      {aiReview && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ai-review-title"><div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl sm:max-w-xl sm:rounded-2xl"><div className="flex items-start justify-between border-b border-[var(--border-color)] p-5"><div><p className="text-xs font-bold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">AI forecast · {aiReview.horizon_weeks} weeks</p><h2 id="ai-review-title" className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Review {aiReview.product_name}</h2></div><button type="button" aria-label="Close AI recommendation review" onClick={() => setAiReview(null)} className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-xl hover:bg-[var(--bg-surface-alt)]"><X className="h-5 w-5"/></button></div><div className="space-y-5 p-5"><dl className="grid gap-4 sm:grid-cols-2">{[['Warehouse', aiReview.warehouse_name], ['Unit', aiReview.unit], ['Available stock', `${aiReview.available_stock} ${aiReview.unit}`], ['Raw four-week demand', `${aiReview.raw_demand} ${aiReview.unit}`], ['Whole-package planning demand', `${aiReview.planning_demand} ${aiReview.unit}`], ['Recommended reorder', `${aiReview.recommended_reorder} ${aiReview.unit}`]].map(([label, value]) => <div key={label} className="rounded-xl bg-[var(--bg-surface-alt)] p-3"><dt className="text-xs text-[var(--text-muted)]">{label}</dt><dd className="mt-1 font-semibold text-[var(--text-primary)]">{value}</dd></div>)}</dl><p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-[var(--text-secondary)]">Confirmed incoming quantity is 0 because supplier-confirmed incoming is not supported by the current workflow. SmartChain will re-check forecast freshness, warehouse stock, and duplicate requests before submission.</p><label className="block text-sm font-semibold text-[var(--text-primary)]" htmlFor="ai-requested-quantity">Requested quantity<input id="ai-requested-quantity" type="number" inputMode="numeric" min={1} max={MAX_REQUESTED_QTY} step={1} value={aiQuantity} onChange={(event) => { setAiQuantity(event.target.value); setAiQuantityError(''); }} aria-invalid={Boolean(aiQuantityError)} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500"/></label>{aiQuantityError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{aiQuantityError}</p>}</div><div className="flex flex-col-reverse gap-2 border-t border-[var(--border-color)] p-5 sm:flex-row sm:justify-end"><button type="button" onClick={() => setAiReview(null)} disabled={submitting} className="min-h-11 cursor-pointer rounded-xl border border-[var(--border-color)] px-4 font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]">Cancel</button><button type="button" onClick={() => void submitAiRequest()} disabled={submitting} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-700 px-5 font-semibold text-white hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}Forward to Admin</button></div></div></div>}
 
       {requestCandidates.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="request-dialog-title">

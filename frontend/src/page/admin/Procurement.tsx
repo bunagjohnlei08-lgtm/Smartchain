@@ -41,6 +41,18 @@ interface ReplenishmentRequest {
   warehouse_id: number | null;
   warehouse_name: string;
   requested_qty: number;
+  source?: 'MANUAL' | 'AI_FORECAST';
+  recommendation_snapshot?: {
+    horizon_weeks: number;
+    generated_at: string;
+    raw_demand: number;
+    planning_demand: number;
+    available_stock: number;
+    eligible_confirmed_incoming: number;
+    recommended_reorder: number;
+    requested_quantity: number;
+    model_version?: string;
+  } | null;
   priority: Priority;
   status: RequestStatus;
   requested_by: string | null;
@@ -995,8 +1007,10 @@ const Procurement: React.FC = () => {
                 <dd className="text-[var(--text-primary)] font-medium">
                   {selectedRequest.product_name}
                   {selectedRequest.item_classification && <div className="mt-2"><ClassificationBadge value={selectedRequest.item_classification}/></div>}
+                  {selectedRequest.source === 'AI_FORECAST' && <span className="mt-2 inline-flex rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300">AI forecast assisted</span>}
                 </dd>
               </div>
+              {selectedRequest.recommendation_snapshot && <div className="col-span-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3"><dt className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">AI recommendation context</dt><dd className="mt-2 text-sm text-[var(--text-secondary)]">{selectedRequest.recommendation_snapshot.horizon_weeks}-week raw demand {selectedRequest.recommendation_snapshot.raw_demand}; available stock {selectedRequest.recommendation_snapshot.available_stock}; recommended whole reorder {selectedRequest.recommendation_snapshot.recommended_reorder}; Plant Manager requested {selectedRequest.recommendation_snapshot.requested_quantity}.</dd></div>}
               <div>
                 <dt className="text-xs text-[var(--text-muted)]">Warehouse</dt>
                 <dd className="text-[var(--text-primary)] font-medium">

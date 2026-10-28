@@ -67,7 +67,7 @@ class ReplenishmentRequest extends Model
 
     protected $fillable = [
         'request_no', 'requested_by', 'warehouse_id', 'product_id', 'requested_qty',
-        'priority', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at',
+        'priority', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at', 'source', 'recommendation_snapshot',
         'admin_decision',
         'sourcing_method', 'sourcing_selected_by', 'sourcing_selected_at',
     ];
@@ -78,6 +78,7 @@ class ReplenishmentRequest extends Model
             'submitted_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'requested_qty' => 'integer',
+            'recommendation_snapshot' => 'array',
             'sourcing_selected_at' => 'datetime',
         ];
     }

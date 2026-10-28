@@ -7,6 +7,7 @@ use App\Models\Inventory;
 use App\Models\ReplenishmentRequest;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\ForecastReorderService;
 use App\Notifications\WorkflowNotification;
 use App\Support\AuditLogger;
 use App\Support\ReplenishmentFulfillmentStage;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class PlantManagerProcurementController extends Controller
 {
@@ -28,6 +30,103 @@ class PlantManagerProcurementController extends Controller
 
     /** Requested quantities are entered by the Plant Manager; this only bounds them. */
     public const MAX_REQUESTED_QTY = 1000000;
+
+    public function forecastRecommendations(Request $request, ForecastReorderService $recommendations): JsonResponse
+    {
+        abort_unless($request->user()->isPlantManager(), 403);
+        abort_unless(config('services.ai_forecast.enabled') === true, 404, 'AI forecasting is not enabled.');
+        abort_unless($this->supportsForecastContext(), 503, 'AI forecast persistence requires the Phase 2 database schema.');
+        $warehouseId = $request->user()->warehouse_id;
+        abort_unless($warehouseId, 403, 'A warehouse assignment is required.');
+
+        $inventories = Inventory::query()
+            ->where('warehouse_id', $warehouseId)
+            ->with(['product:id,name,unit,item_classification', 'warehouse:id,name'])
+            ->orderBy('product_id')->get();
+
+        $rows = $inventories->map(function (Inventory $inventory) use ($recommendations) {
+            try {
+                return $recommendations->recommendation($inventory);
+            } catch (HttpException $exception) {
+                if ($exception->getStatusCode() === 503) throw $exception;
+                return [
+                    'product_id' => $inventory->product_id,
+                    'product_name' => $inventory->product?->name,
+                    'item_classification' => $inventory->product?->item_classification,
+                    'warehouse_id' => $inventory->warehouse_id,
+                    'warehouse_name' => $inventory->warehouse?->name,
+                    'unit' => $inventory->product?->unit,
+                    'available_stock' => (int) $inventory->available_stock,
+                    'status' => in_array($exception->getStatusCode(), [404, 422], true) ? 'NO_HISTORY' : 'UNAVAILABLE',
+                    'actionable' => false,
+                    'message' => $exception->getMessage(),
+                ];
+            }
+        })->values();
+
+        return response()->json([
+            'data' => $rows,
+            'warehouse' => Warehouse::query()->find($warehouseId)?->only(['id', 'name']),
+            'scope' => 'Company-wide demand is used only when this warehouse is the product\'s sole inventory location.',
+            'formula' => 'ceil(max(0, raw_4_week_demand - available_stock - eligible_confirmed_incoming))',
+            'incoming_data_supported' => false,
+        ]);
+    }
+
+    public function storeForecastRequest(Request $request, ForecastReorderService $recommendations): JsonResponse
+    {
+        abort_unless($request->user()->isPlantManager(), 403);
+        abort_unless(config('services.ai_forecast.enabled') === true, 404, 'AI forecasting is not enabled.');
+        abort_unless($this->supportsForecastContext(), 503, 'AI forecast persistence requires the Phase 2 database schema.');
+        $validated = $request->validate([
+            'product_id' => ['required', 'integer', 'exists:products,id'],
+            'requested_qty' => ['required', 'integer', 'min:1', 'max:'.self::MAX_REQUESTED_QTY],
+            'recommendation_generated_at' => ['required', 'date'],
+            'raw_demand' => ['required', 'numeric', 'min:0'],
+            'available_stock' => ['required', 'integer', 'min:0'],
+            'recommended_reorder' => ['required', 'integer', 'min:1', 'max:'.self::MAX_REQUESTED_QTY],
+        ]);
+        $warehouseId = $request->user()->warehouse_id;
+        abort_unless($warehouseId, 403, 'A warehouse assignment is required.');
+
+        $inventory = Inventory::query()->where('product_id', $validated['product_id'])
+            ->where('warehouse_id', $warehouseId)->firstOrFail();
+        $current = $recommendations->recommendation($inventory);
+        abort_unless(($current['actionable'] ?? false) === true, 422, $current['message'] ?? 'This recommendation is not actionable.');
+
+        $changed = abs((float) $validated['raw_demand'] - (float) $current['raw_demand']) > 0.0005
+            || (int) $validated['available_stock'] !== (int) $current['available_stock']
+            || (int) $validated['recommended_reorder'] !== (int) $current['recommended_reorder'];
+        abort_if($changed, 409, 'The forecast or stock position changed. Review the refreshed recommendation before forwarding.');
+
+        $replenishmentRequest = DB::transaction(function () use ($validated, $warehouseId, $request, $current) {
+            Warehouse::query()->lockForUpdate()->findOrFail($warehouseId);
+            $inventory = Inventory::query()->where('product_id', $validated['product_id'])
+                ->where('warehouse_id', $warehouseId)->lockForUpdate()->firstOrFail();
+            $this->ensureNoOpenRequest((int) $validated['product_id'], (int) $warehouseId);
+            $lockedRecommendation = (int) ceil(max(0, (float) $current['raw_demand'] - (int) $inventory->available_stock));
+            abort_if($lockedRecommendation !== (int) $current['recommended_reorder'], 409, 'The stock position changed. Review the refreshed recommendation before forwarding.');
+
+            return $this->createRequest(
+                (int) $validated['product_id'], (int) $warehouseId, (int) $validated['requested_qty'],
+                (int) $request->user()->id, self::STATUS_PENDING, (int) $inventory->available_stock,
+                'AI_FORECAST', [
+                    'horizon_weeks' => $current['horizon_weeks'],
+                    'generated_at' => $current['generated_at'],
+                    'raw_demand' => $current['raw_demand'],
+                    'planning_demand' => $current['planning_demand'],
+                    'available_stock' => (int) $inventory->available_stock,
+                    'eligible_confirmed_incoming' => 0,
+                    'recommended_reorder' => $current['recommended_reorder'],
+                    'requested_quantity' => (int) $validated['requested_qty'],
+                    'model_version' => $current['model_version'],
+                ],
+            );
+        }, 3);
+
+        $this->afterRequestCreated($replenishmentRequest, true);
+        return response()->json($this->requestData($replenishmentRequest), 201);
+    }
 
     public function options(Request $request): JsonResponse
     {
@@ -377,6 +476,8 @@ class PlantManagerProcurementController extends Controller
             'unit' => $request->product?->unit,
             'item_classification' => $request->product?->item_classification,
             'requested_qty' => $request->requested_qty,
+            'source' => $request->source ?? 'MANUAL',
+            'recommendation_snapshot' => $request->recommendation_snapshot,
             'priority' => $request->priority,
             'current_priority' => $currentPriority,
             'status' => $request->lifecycleStatus(),
