@@ -82,6 +82,10 @@ class PlantManagerForecastRecommendationTest extends TestCase
         $this->assertSame(1, $rows[$sack->product_id]['recommended_reorder']);
         $this->assertSame(0, $rows[$pcs->product_id]['recommended_reorder']);
         $this->assertSame(197.6, $rows[$drum->product_id]['raw_demand']);
+        $this->assertCount(4, $rows[$drum->product_id]['forecast']);
+        $this->assertSame([49.4, 49.4, 49.4, 49.4], collect($rows[$drum->product_id]['forecast'])->pluck('expected_quantity')->all());
+        $this->assertCount(4, $rows[$pcs->product_id]['forecast'], 'Zero-reorder products must retain weekly chart data.');
+        $this->assertSame(197.0, collect($rows[$pcs->product_id]['forecast'])->sum('expected_quantity'));
     }
 
     public function test_company_forecast_is_not_replicated_to_multiple_warehouses(): void

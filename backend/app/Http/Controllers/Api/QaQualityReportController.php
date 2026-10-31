@@ -132,6 +132,43 @@ class QaQualityReportController extends Controller
             ->sortByDesc('pass_rate')
             ->values();
 
+        $productionInspections = DB::table('production_batches as pb')
+            ->leftJoin('users as inspector', 'inspector.id', '=', 'pb.assigned_qa_user_id')
+            ->leftJoin('production_non_conformances as nc', 'nc.production_batch_id', '=', 'pb.id')
+            ->whereNotNull('pb.qa_completed_at')
+            ->when($fromDate, fn ($query) => $query->where('pb.qa_completed_at', '>=', $fromDate))
+            ->when($toDate, fn ($query) => $query->where('pb.qa_completed_at', '<', $toDate))
+            ->when($user->isQaSupervisor(), fn ($query) => $query->where('pb.assigned_qa_user_id', $user->id))
+            ->orderByDesc('pb.qa_completed_at')->orderByDesc('pb.id')
+            ->get(['pb.id as inspection_id', 'pb.batch_number', 'pb.product_name as product', 'inspector.name as inspector',
+                'pb.qa_completed_at as inspection_date', 'pb.status', 'pb.actual_quantity as inspected_quantity',
+                'pb.passed_quantity as accepted_quantity', 'pb.failed_quantity as rejected_quantity', 'pb.qa_notes as findings',
+                'nc.disposition', 'nc.notes as non_conformance_reason'])->map(fn ($row) => (array) $row)->values();
+
+        $inventoryAudits = DB::table('inventory_audit_items as ai')
+            ->join('inventories as i', 'i.id', '=', 'ai.inventory_id')->join('products as p', 'p.id', '=', 'i.product_id')
+            ->join('warehouses as w', 'w.id', '=', 'i.warehouse_id')->leftJoin('users as qa', 'qa.id', '=', 'ai.qa_user_id')
+            ->when($user->isQaSupervisor(), fn ($query) => $query->where('ai.qa_user_id', $user->id))
+            ->when($fromDate, fn ($query) => $query->where('ai.submitted_at', '>=', $fromDate))
+            ->when($toDate, fn ($query) => $query->where('ai.submitted_at', '<', $toDate))
+            ->orderByDesc('ai.submitted_at')->orderByDesc('ai.id')
+            ->get(['ai.audit_reference', 'w.name as warehouse', 'p.name as product', 'qa.name as submitted_by', 'ai.submitted_at as audit_date',
+                'ai.status', 'ai.audited_quantity', 'ai.failed_quantity', 'ai.result as qa_outcome', 'ai.failure_reason', 'ai.qa_remarks',
+                DB::raw("CASE WHEN ai.status = 'APPROVED_FOR_BACKLOAD' THEN 'Approved for backload' WHEN ai.status = 'RETURNED_FOR_REINSPECTION' THEN 'Reinspection required' ELSE NULL END as resolution")])
+            ->map(fn ($row) => (array) $row)->values();
+
+        $pendingReceiving = DB::table('receivings as r')->leftJoin('users as qa', 'qa.id', '=', 'r.assigned_qa_user_id')
+            ->where('r.status', 'Pending QA')->where('r.assigned_qa_user_id', $user->id)
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('qa_inspections as qi')->whereColumn('qi.receiving_id', 'r.id')->whereNotNull('qi.completed_at'))
+            ->get(['r.receiving_no as record_id', DB::raw("'Receiving QA' as category"), DB::raw('NULL::text as product_or_batch'), 'r.delivery_date as waiting_since', 'r.status', 'qa.name as assigned_inspector']);
+        $pendingProduction = DB::table('production_batches as pb')->leftJoin('users as qa', 'qa.id', '=', 'pb.assigned_qa_user_id')
+            ->where('pb.status', 'PENDING_QA')->where('pb.assigned_qa_user_id', $user->id)
+            ->get(['pb.batch_number as record_id', DB::raw("'Production QA' as category"), 'pb.product_name as product_or_batch', 'pb.output_recorded_at as waiting_since', 'pb.status', 'qa.name as assigned_inspector']);
+        $pendingAudits = DB::table('inventory_audit_items as ai')->leftJoin('users as qa', 'qa.id', '=', 'ai.qa_user_id')
+            ->where('ai.qa_user_id', $user->id)->where('ai.status', 'RETURNED_FOR_REINSPECTION')
+            ->get(['ai.audit_reference as record_id', DB::raw("'Inventory Audit' as category"), DB::raw('NULL::text as product_or_batch'), 'ai.reviewed_at as waiting_since', 'ai.status', 'qa.name as assigned_inspector']);
+        $pendingWorkload = $pendingReceiving->concat($pendingProduction)->concat($pendingAudits)->map(fn ($row) => (array) $row)->values();
+
         return response()->json([
             'data' => [
                 'report_period' => [
@@ -180,6 +217,16 @@ class QaQualityReportController extends Controller
                         ])->values(),
                     ];
                 })->values(),
+                'production_inspections' => $productionInspections,
+                'inventory_audits' => $inventoryAudits,
+                'pending_workload' => $pendingWorkload,
+                'operational_summary' => [
+                    'production_inspections' => $productionInspections->count(),
+                    'production_accepted_quantity' => (int) $productionInspections->sum('accepted_quantity'),
+                    'production_rejected_quantity' => (int) $productionInspections->sum('rejected_quantity'),
+                    'inventory_audits' => $inventoryAudits->count(),
+                    'pending_workload' => $pendingWorkload->count(),
+                ],
             ],
         ]);
     }

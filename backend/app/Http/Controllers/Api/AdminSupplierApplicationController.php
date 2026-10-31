@@ -9,6 +9,7 @@ use App\Models\SupplierApplication;
 use App\Models\SupplierApplicationAttachment;
 use App\Models\SupplierApplicationEvent;
 use App\Models\Role;
+use App\Models\Product;
 use App\Models\User;
 use App\Support\AuditLogger;
 use App\Support\SupplierName;
@@ -187,13 +188,32 @@ class AdminSupplierApplicationController extends Controller
     public function approve(Request $request, SupplierApplication $supplierApplication): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
+        $validated = $request->validate([
+            'supply_categories' => ['sometimes', 'array', 'min:1', 'max:20'],
+            'supply_categories.*' => ['required', 'string', 'max:150', 'distinct'],
+        ]);
+        $approvedCategories = collect($validated['supply_categories'] ?? [])->map(fn ($category) => trim($category))->filter()->values();
+        $catalogCategories = Product::query()->whereIn('category', $approvedCategories)->pluck('category')->unique()->values();
+        if ($approvedCategories->isNotEmpty() && $catalogCategories->count() !== $approvedCategories->unique()->count()) {
+            throw ValidationException::withMessages(['supply_categories' => ['Select only categories from the current Product Catalog.']]);
+        }
 
-        $result = DB::transaction(function () use ($request, $supplierApplication) {
+        $result = DB::transaction(function () use ($request, $supplierApplication, $catalogCategories) {
             $application = SupplierApplication::query()->lockForUpdate()->findOrFail($supplierApplication->id);
 
             if ($application->status === SupplierApplication::STATUS_APPROVED && $application->approved_supplier_id) {
                 return [$application->fresh(['reviewedBy:id,name', 'approvedSupplier:id,supplier_code,name', 'attachments']), false];
             }
+
+            // Historical applications retain their recorded category assignment.
+            // New applications submit an empty value and require an Admin catalog selection.
+            $effectiveCategories = $catalogCategories->isNotEmpty()
+                ? $catalogCategories
+                : collect(explode(',', (string) $application->supply_category))->map(fn ($category) => trim($category))->filter()->values();
+            if ($effectiveCategories->isEmpty()) {
+                throw ValidationException::withMessages(['supply_categories' => ['Assign at least one Product Catalog category before approval.']]);
+            }
+            $approvedCategoryList = $effectiveCategories->sort()->join(', ');
 
             abort_if($application->status === SupplierApplication::STATUS_REJECTED, 422, 'A rejected application cannot be approved.');
             abort_if($application->status === SupplierApplication::STATUS_APPROVED, 409, 'The approved application no longer has its linked supplier. Resolve the official record before retrying.');
@@ -224,7 +244,7 @@ class AdminSupplierApplicationController extends Controller
                 'phone' => $application->phone,
                 'address' => $application->address,
                 'business_type' => $application->business_type,
-                'supply_category' => $application->supply_category,
+                'supply_category' => $approvedCategoryList,
                 'products_services' => $application->products_services,
                 'status' => 'ACTIVE',
                 'accreditation_status' => 'ACTIVE',
@@ -246,6 +266,7 @@ class AdminSupplierApplicationController extends Controller
                 'decision_reason_codes' => null,
                 'revision_reason_codes' => null,
                 'approved_supplier_id' => $supplier->id,
+                'supply_category' => $approvedCategoryList,
             ]);
             $application->events()->create([
                 'event_type' => SupplierApplicationEvent::APPROVED,
@@ -257,7 +278,7 @@ class AdminSupplierApplicationController extends Controller
             AuditLogger::success('SUPPLIER_APPLICATION_APPROVED', AuditLogger::MODULE_SUPPLIERS, [
                 'actor' => $request->user(), 'resource' => $application, 'resource_label' => $application->application_number,
                 'details' => "Approved and created active supplier {$supplier->supplier_code}.",
-                'metadata' => ['supplier_id' => $supplier->id],
+                'metadata' => ['supplier_id' => $supplier->id, 'approved_categories' => $effectiveCategories->all()],
             ]);
 
             $supplierRole = Role::query()->where('slug', 'SUPPLIER')->lockForUpdate()->firstOrFail();
@@ -521,6 +542,8 @@ class AdminSupplierApplicationController extends Controller
             'created_at' => $attachment->created_at,
         ])->values()->all();
         $data['approval_eligibility'] = $this->approvalEligibility($application);
+        $data['category_options'] = Product::query()->whereNotNull('category')->where('category', '!=', '')
+            ->distinct()->orderBy('category')->pluck('category')->values()->all();
 
         return $data;
     }
@@ -537,7 +560,7 @@ class AdminSupplierApplicationController extends Controller
             ? $application->attachments->where('is_current', true)
             : $application->attachments()->where('is_current', true)->get();
         $requirements = [
-            SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE => 'Business Certificate',
+            SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE => 'Business Registration Document',
             SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT => 'Business Permit',
         ];
         $results = [];

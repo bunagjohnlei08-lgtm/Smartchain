@@ -95,8 +95,8 @@ class ReceivingReceiptAttachmentTest extends TestCase
 
     public function test_receipt_count_type_size_and_role_are_enforced(): void
     {
-        $four = collect(range(1, 4))->map(fn (int $index) => UploadedFile::fake()->image("receipt-{$index}.png"))->all();
-        $this->actingAs($this->manager)->post('/api/receivings', [...$this->payload(), 'receipts' => $four], ['Accept' => 'application/json'])
+        $five = collect(range(1, 5))->map(fn (int $index) => UploadedFile::fake()->image("receipt-{$index}.png"))->all();
+        $this->actingAs($this->manager)->post('/api/receivings', [...$this->payload(), 'receipts' => $five], ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('receipts');
 
         $this->actingAs($this->manager)->post('/api/receivings', [
@@ -104,13 +104,40 @@ class ReceivingReceiptAttachmentTest extends TestCase
         ], ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('receipts.0');
 
         $this->actingAs($this->manager)->post('/api/receivings', [
-            ...$this->payload(), 'receipts' => [UploadedFile::fake()->create('oversized.pdf', 5121, 'application/pdf')],
+            ...$this->payload(), 'receipts' => [UploadedFile::fake()->create('oversized.pdf', 10241, 'application/pdf')],
         ], ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('receipts.0');
 
         $ordinaryUser = User::factory()->create(['status' => 'ACTIVE']);
         $this->actingAs($ordinaryUser)->post('/api/receivings', [
             ...$this->payload(), 'receipts' => [UploadedFile::fake()->image('receipt.jpg')],
         ], ['Accept' => 'application/json'])->assertForbidden();
+    }
+
+    public function test_four_receipts_with_a_ten_mb_file_are_allowed(): void
+    {
+        $receipts = [
+            UploadedFile::fake()->create('boundary.pdf', 10240, 'application/pdf'),
+            UploadedFile::fake()->image('receipt-two.jpg'),
+            UploadedFile::fake()->image('receipt-three.png'),
+            UploadedFile::fake()->createWithContent('receipt-four.pdf', "%PDF-1.4\nfourth receipt\n%%EOF"),
+        ];
+
+        $this->actingAs($this->manager)->post('/api/receivings', [
+            ...$this->payload(), 'receipts' => $receipts,
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonCount(4, 'receipt_attachments');
+
+        $this->assertDatabaseCount('receiving_receipt_attachments', 4);
+    }
+
+    public function test_three_receipts_are_allowed(): void
+    {
+        $receipts = collect(range(1, 3))
+            ->map(fn (int $index) => $this->receipt("receipt-{$index}.pdf", "receipt content {$index}"))
+            ->all();
+
+        $this->actingAs($this->manager)->post('/api/receivings', [
+            ...$this->payload(), 'receipts' => $receipts,
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonCount(3, 'receipt_attachments');
     }
 
     public function test_duplicate_receipts_in_same_create_request_are_rejected_when_renamed(): void

@@ -267,6 +267,31 @@ class SupplierRejectionReplacementTest extends TestCase
         $this->assertCount(1, Storage::disk('local')->allFiles("receiving-receipts/{$replacement->id}"));
     }
 
+    public function test_replacement_confirmation_enforces_four_receipts_in_total(): void
+    {
+        $replacement = $this->route($this->sentCase());
+        $item = $replacement->items()->sole();
+        $replacement->receiptAttachments()->create([
+            'original_name' => 'existing.pdf',
+            'stored_path' => "receiving-receipts/{$replacement->id}/existing.pdf",
+            'mime_type' => 'application/pdf',
+            'file_size' => 100,
+            'file_sha256' => hash('sha256', 'existing receipt'),
+            'uploaded_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager)->post("/api/receivings/{$replacement->id}/confirm-replacement", [
+            'delivery_date' => now()->toDateString(),
+            'items' => [['receiving_item_id' => $item->id, 'delivered_quantity' => $item->ordered_quantity]],
+            'receipts' => collect(range(1, 4))->map(fn (int $index) => UploadedFile::fake()->image("replacement-{$index}.jpg"))->all(),
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('receipts');
+
+        $this->assertSame(Receiving::STATUS_AWAITING_REPLACEMENT, $replacement->fresh()->status);
+        $this->assertDatabaseCount('receiving_receipt_attachments', 1);
+    }
+
     public function test_replacement_appears_in_plant_manager_receiving_with_traceability(): void
     {
         $case = $this->sentCase();

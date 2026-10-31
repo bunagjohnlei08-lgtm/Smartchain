@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Services\ReportAccessAuthorization;
 use Illuminate\Validation\ValidationException;
 
 class ReportsController extends Controller
@@ -31,6 +32,8 @@ class ReportsController extends Controller
         'damage-waste' => 'Damage & Waste Report',
         'order-fulfillment' => 'Order Fulfillment Report',
         'production' => 'Production Batch History',
+        'replenishment' => 'Replenishment Request Report',
+        'production-materials' => 'Production Material Usage Report',
     ];
 
     /** The date each report's From/To filter applies to; null means a current-state report that ignores dates. */
@@ -46,6 +49,8 @@ class ReportsController extends Controller
         'damage-waste' => 'QA completed at',
         'order-fulfillment' => 'Order date',
         'production' => 'Batch created at',
+        'replenishment' => 'Request created at',
+        'production-materials' => 'Batch created at',
     ];
 
     /** Event timestamps are stored in the app timezone and shown to users in business time. */
@@ -142,13 +147,15 @@ class ReportsController extends Controller
         ]);
     }
 
-    public function generate(Request $request): JsonResponse
+    public function generate(Request $request, ReportAccessAuthorization $authorizations): JsonResponse
     {
         $this->authorizePlantManager($request);
         $validated = $request->validate([
             'type' => ['required', Rule::in(array_keys(self::REPORTS))],
             'format' => ['required', Rule::in(['preview', 'print', 'pdf', 'excel'])],
         ]);
+        $action = $validated['format'] === 'preview' ? 'PREVIEW' : ($validated['format'] === 'print' ? 'PRINT' : 'EXPORT');
+        $authorizations->consume($request, 'plant-manager:'.$validated['type'], $validated['format'], $action);
         [$from, $to] = $this->validatedRange($request);
         $dateField = self::REPORT_DATE_FIELDS[$validated['type']];
 
@@ -240,7 +247,46 @@ class ReportsController extends Controller
             'damage-waste' => $this->damageReport($from, $to),
             'order-fulfillment' => $this->orderReport($from, $to),
             'production' => $this->productionReport($from, $to),
+            'replenishment' => $this->replenishmentReport($from, $to),
+            'production-materials' => $this->productionMaterialReport($from, $to),
         };
+    }
+
+    private function replenishmentReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
+    {
+        $query = DB::table('replenishment_requests as rr')
+            ->join('users as requester', 'requester.id', '=', 'rr.requested_by')
+            ->join('products as p', 'p.id', '=', 'rr.product_id')
+            ->leftJoin('users as reviewer', 'reviewer.id', '=', 'rr.reviewed_by')
+            ->leftJoin('purchase_orders as po', 'po.replenishment_request_id', '=', 'rr.id')
+            ->where('rr.warehouse_id', request()->user()->warehouse_id)
+            ->select(['rr.request_no', 'rr.created_at as request_date', 'requester.name as requested_by', 'p.name as product',
+                'rr.requested_qty', 'p.unit', 'rr.status', 'reviewer.name as decided_by', 'rr.reviewed_at as decision_date',
+                'po.po_number', 'po.status as purchase_order_status', 'po.expected_delivery_date'])
+            ->selectRaw('(SELECT COALESCE(SUM(ri.delivered_quantity), 0) FROM receivings r JOIN receiving_items ri ON ri.receiving_id = r.id WHERE r.purchase_order_id = po.id AND ri.product_id = rr.product_id) as received_quantity')
+            ->selectRaw('GREATEST(rr.requested_qty - COALESCE((SELECT SUM(ri.delivered_quantity) FROM receivings r JOIN receiving_items ri ON ri.receiving_id = r.id WHERE r.purchase_order_id = po.id AND ri.product_id = rr.product_id), 0), 0) as outstanding_quantity')
+            ->orderByDesc('rr.created_at')->orderByDesc('rr.id');
+        $this->applyTimestampRange($query, 'rr.created_at', $from, $to);
+        $rows = $query->get()->map(fn ($row) => (array) $row)->all();
+
+        return [array_keys($rows[0] ?? ['request_no' => null, 'request_date' => null, 'requested_by' => null, 'product' => null, 'requested_qty' => null, 'unit' => null, 'status' => null, 'decided_by' => null, 'decision_date' => null, 'po_number' => null, 'purchase_order_status' => null, 'expected_delivery_date' => null, 'received_quantity' => null, 'outstanding_quantity' => null]), $rows, ['records' => count($rows), 'outstanding_requests' => collect($rows)->whereNotIn('status', ['REJECTED', 'PO_CREATED'])->count()]];
+    }
+
+    private function productionMaterialReport(?CarbonImmutable $from, ?CarbonImmutable $to): array
+    {
+        $query = DB::table('production_batch_materials as bm')
+            ->join('production_batches as pb', 'pb.id', '=', 'bm.production_batch_id')
+            ->leftJoin('boms as b', 'b.id', '=', 'pb.bom_id')
+            ->leftJoin('production_material_issues as mi', 'mi.production_batch_material_id', '=', 'bm.id')
+            ->where('pb.warehouse_id', request()->user()->warehouse_id)
+            ->select(['pb.batch_number', 'pb.product_name as product', 'pb.created_at as batch_date', 'pb.status', 'pb.target_quantity',
+                'pb.actual_quantity', 'b.id as bom_id', 'b.output_quantity as bom_output_quantity', 'bm.product_name as material', 'bm.required_quantity',
+                'mi.quantity as actual_consumed_quantity', 'bm.blocking_reason as shortage', 'bm.unit'])
+            ->orderByDesc('pb.created_at')->orderByDesc('pb.id')->orderBy('bm.id');
+        $this->applyTimestampRange($query, 'pb.created_at', $from, $to);
+        $rows = $query->get()->map(fn ($row) => (array) $row)->all();
+
+        return [array_keys($rows[0] ?? ['batch_number' => null, 'product' => null, 'batch_date' => null, 'status' => null, 'target_quantity' => null, 'actual_quantity' => null, 'bom_id' => null, 'bom_output_quantity' => null, 'material' => null, 'required_quantity' => null, 'actual_consumed_quantity' => null, 'shortage' => null, 'unit' => null]), $rows, ['records' => count($rows), 'batches' => collect($rows)->pluck('batch_number')->unique()->count()]];
     }
 
     private function inventoryReport(bool $lowStock): array

@@ -15,6 +15,7 @@ use App\Reports\ReportGenerationFailed;
 use App\Reports\ReportInput;
 use App\Reports\ReportRegistry;
 use App\Reports\ReportRunner;
+use App\Services\ReportAccessAuthorization;
 use App\Support\AuditLogger;
 use App\Support\WarehouseCapacity;
 use Illuminate\Http\JsonResponse;
@@ -67,6 +68,9 @@ class AdminReportController extends Controller
 
         $configured = $warehouseCapacity->filter(fn (array $warehouse) => $warehouse['capacity'] !== null && $warehouse['capacity'] > 0);
         $totalCapacity = (int) $configured->sum('capacity');
+        // A slot is one stored package in the existing capacity policy; the
+        // snapshot already reconciles PCS/SACK/DRUM and returned-stock areas.
+        $usedCapacity = (int) $configured->sum(fn (array $warehouse) => (int) $warehouse['used_capacity']);
         $today = now()->startOfDay();
         $successToday = ReportExport::query()->where('status', ReportExport::STATUS_SUCCESS)->where('generated_at', '>=', $today);
         $definitions = collect($this->registry->all());
@@ -81,10 +85,10 @@ class AdminReportController extends Controller
                 'last_generated_at' => ReportExport::query()->where('status', ReportExport::STATUS_SUCCESS)
                     ->orderByDesc('generated_at')->first(['generated_at'])?->generated_at?->toIso8601String(),
                 'warehouse_capacity' => [
-                    'used' => null,
+                    'used' => $usedCapacity,
                     'total' => $totalCapacity > 0 ? $totalCapacity : null,
                     'allocated_total' => (int) $configured->sum('allocated_total'),
-                    'utilization_percentage' => null,
+                    'utilization_percentage' => $totalCapacity > 0 ? round(($usedCapacity / $totalCapacity) * 100, 2) : null,
                 ],
                 'total_stock_units' => (int) (DB::table('inventories')->selectRaw('COALESCE(SUM(available_stock + reserved_stock), 0) as total')->value('total') ?? 0),
                 // No forecast results are persisted anywhere, so accuracy cannot be measured.
@@ -153,7 +157,7 @@ class AdminReportController extends Controller
         ]);
     }
 
-    public function export(Request $request): BinaryFileResponse|JsonResponse
+    public function export(Request $request, ReportAccessAuthorization $authorizations): BinaryFileResponse|JsonResponse
     {
         $this->authorizeAdmin($request);
         [$definition, $filters, $extra] = $this->input->resolve($request->all(), [
@@ -164,6 +168,7 @@ class AdminReportController extends Controller
         if (! $definition->supportsFormat($extra['format'])) {
             throw ValidationException::withMessages(['format' => "{$definition->name} does not support {$extra['format']} export."]);
         }
+        $authorizations->consume($request, 'admin:'.$definition->key, $extra['format'], 'EXPORT');
 
         try {
             $file = $this->runner->export(

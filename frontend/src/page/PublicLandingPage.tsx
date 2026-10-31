@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Building2, Check, ChevronDown, ClipboardCheck, Factory,
-  FileCheck2, LockKeyhole, Menu, Moon, PackageCheck, Route, ShieldCheck, ShoppingCart,
+  ArrowRight, Building2, ChevronDown, ClipboardCheck, Factory,
+  FileCheck2, Gavel, LockKeyhole, Menu, Moon, PackageCheck, Route, ShieldCheck, ShoppingCart,
   Sun, Truck, UserCheck, Warehouse, X, MapPin, Navigation,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
@@ -19,18 +19,27 @@ const platformFlow = [
 ];
 
 const operations = [
-  { title: 'Warehousing', description: 'Monitor inventory movement, receiving, stock-in, and stock-out operations.', icon: Warehouse },
-  { title: 'Procurement', description: 'Coordinate purchase orders, suppliers, and sourcing activities.', icon: ShoppingCart },
-  { title: 'Quality Assurance', description: 'Inspect received products and maintain quality assurance records.', icon: ClipboardCheck },
-  { title: 'Supply Chain Visibility', description: 'Track operational progress from receiving through shipment preparation.', icon: Route },
+  { title: 'Smart Warehousing', description: 'Manage warehouse storage, stock availability, receiving, and inventory movements.', icon: Warehouse },
+  { title: 'Procurement & Sourcing', description: 'Manage approved supply requirements, RFQs, competitive quotations, and purchasing workflows.', icon: ShoppingCart },
+  { title: 'Supplier Management & Bidding', description: 'Support supplier applications, accreditation, quotation submissions, awards, and supplier performance.', icon: Gavel },
+  { title: 'Quality Assurance', description: 'Verify received and produced goods through documented inspection workflows.', icon: ClipboardCheck },
+  { title: 'Supply Chain Visibility', description: 'Track operational progress across inventory, receiving, and shipment preparation.', icon: Route },
 ];
 
 const onboardingSteps = [
   { title: 'Submit Application', description: 'Submit company details and required business documents.', icon: FileCheck2 },
-  { title: 'Admin Review', description: 'Authorized staff review the application and submitted documents.', icon: UserCheck },
-  { title: 'Qualified for Meeting', description: 'Qualified applicants receive available meeting schedules.', icon: ClipboardCheck },
-  { title: 'Meeting & Evaluation', description: 'The applicant selects a schedule and completes the supplier evaluation meeting.', icon: Building2 },
-  { title: 'Final Decision', description: 'After evaluation, the application is either approved as a supplier or rejected.', icon: ShieldCheck },
+  { title: 'Admin Review', description: 'Authorized staff review your application and supporting documents.', icon: UserCheck },
+  { title: 'Qualified for Meeting', description: 'Qualified applicants receive information about available meeting schedules.', icon: ClipboardCheck },
+  { title: 'Meeting & Evaluation', description: 'Select an available schedule and complete the supplier evaluation meeting.', icon: Building2 },
+  { title: 'Final Decision', description: 'After evaluation, your application is approved or rejected by authorized staff.', icon: ShieldCheck },
+];
+
+const afterApprovalSteps = [
+  { title: 'Activate Your Account', description: 'Follow your official account invitation and complete secure sign-in.', icon: LockKeyhole },
+  { title: 'Maintain Accreditation', description: 'Keep required documents valid and request approval for the product categories you are qualified to supply.', icon: ShieldCheck },
+  { title: 'Explore Supply Opportunities', description: 'Browse published RFQs relevant to your approved supplier categories.', icon: PackageCheck },
+  { title: 'Submit and Manage Bids', description: 'Submit quotations, revise eligible bids before the deadline, and track your bidding activity.', icon: Gavel },
+  { title: 'Track Awards and Orders', description: 'Review awarded requirements and related Purchase Orders through your authorized supplier account.', icon: ClipboardCheck },
 ];
 
 interface PublicCompanyLocation {
@@ -105,7 +114,7 @@ const PublicLandingPage: React.FC = () => {
             <a href="#platform" onClick={scrollToPlatform} className={`inline-flex min-h-11 cursor-pointer items-center rounded-lg px-3 text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white ${focusClasses}`}>About SmartChain</a>
             <Link to="/supplier-application" className={`inline-flex min-h-11 cursor-pointer items-center rounded-lg px-3 text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white ${focusClasses}`}>Supplier Application</Link>
             <Link to="/login" className={`ml-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-sky-700 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}>
-              <LockKeyhole className="h-4 w-4" aria-hidden="true" /> Staff Sign In
+              <LockKeyhole className="h-4 w-4" aria-hidden="true" /> Sign In
             </Link>
           </nav>
 
@@ -122,14 +131,14 @@ const PublicLandingPage: React.FC = () => {
             <div className="mx-auto grid max-w-7xl gap-2">
               <a href="#platform" onClick={scrollToPlatform} className={`inline-flex min-h-11 cursor-pointer items-center justify-between rounded-lg px-3 text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 ${focusClasses}`}>About SmartChain <ChevronDown className="h-4 w-4" aria-hidden="true" /></a>
               <Link to="/supplier-application" onClick={() => setMobileMenuOpen(false)} className={`inline-flex min-h-11 cursor-pointer items-center justify-between rounded-lg px-3 text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 ${focusClasses}`}>Supplier Application <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-              <Link to="/login" onClick={() => setMobileMenuOpen(false)} className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-sky-700 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}><LockKeyhole className="h-4 w-4" aria-hidden="true" /> Staff Sign In</Link>
+              <Link to="/login" onClick={() => setMobileMenuOpen(false)} className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-sky-700 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}><LockKeyhole className="h-4 w-4" aria-hidden="true" /> Sign In</Link>
             </div>
           </nav>
         )}
       </header>
 
       <main>
-      <section className="relative isolate overflow-hidden border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#030812]" aria-labelledby="hero-heading">
+      <section id="welcome" className="relative isolate scroll-mt-20 overflow-hidden border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#030812]" aria-labelledby="hero-heading">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-20 opacity-60 [background-image:linear-gradient(rgba(14,116,144,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(14,116,144,0.07)_1px,transparent_1px)] [background-size:56px_56px] dark:opacity-50 dark:[background-image:linear-gradient(rgba(56,189,248,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.055)_1px,transparent_1px)]" />
         <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 -z-10 h-80 w-80 -translate-x-1/2 rounded-full bg-sky-400/10 blur-3xl dark:bg-sky-500/10" />
         <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1.02fr)_minmax(440px,0.98fr)] lg:items-center lg:gap-14 lg:px-8 lg:py-24">
@@ -137,11 +146,12 @@ const PublicLandingPage: React.FC = () => {
             <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/70 bg-sky-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-sky-800 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-300"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Secure SmartChain Platform</div>
             <h1 id="hero-heading" className="mt-6 max-w-3xl text-4xl font-extrabold leading-[1.08] tracking-[-0.035em] text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">Smarter warehousing.<span className="mt-1 block text-sky-700 dark:text-sky-400">Stronger supply chains.</span></h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-slate-700 dark:text-slate-300 sm:text-lg sm:leading-8">SmartChain is Archon Nell Incorporated&apos;s integrated platform for warehouse operations, procurement, supplier coordination, quality assurance, inventory movement, and shipment preparation.</p>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400 sm:text-base">Explore published supply requirements, apply to become an accredited supplier, and, once approved and qualified, submit quotations and manage procurement opportunities through your SmartChain account.</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link to="/login" className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-700 px-5 py-3 font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}><LockKeyhole className="h-4 w-4" aria-hidden="true" /> Staff Sign In <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+              <Link to="/login" className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-700 px-5 py-3 font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}><LockKeyhole className="h-4 w-4" aria-hidden="true" /> Sign In <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
               <Link to="/supplier-application" className={`inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white/80 px-5 py-3 font-semibold text-slate-900 transition-colors duration-200 hover:border-sky-400 hover:bg-sky-50 dark:border-slate-700 dark:bg-white/[0.03] dark:text-white dark:hover:border-sky-400/60 dark:hover:bg-sky-400/10 ${focusClasses}`}>Apply as Supplier <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
             </div>
-            <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">Secure staff access · Structured supplier onboarding</p>
+            <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">One secure sign-in for authorized staff and approved suppliers</p>
           </div>
 
           <div className="relative min-w-0 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-2xl shadow-slate-950/10 backdrop-blur-sm dark:border-white/10 dark:bg-[#081322]/95 dark:shadow-black/30 sm:p-7">
@@ -164,22 +174,24 @@ const PublicLandingPage: React.FC = () => {
 
       <OpenSupplyNeeds />
 
-      <section className="bg-slate-50 py-12 dark:bg-[#06101d] sm:py-16 lg:py-20" aria-labelledby="access-heading">
+      <section id="access" className="scroll-mt-20 bg-slate-50 py-12 dark:bg-[#06101d] sm:py-16 lg:py-20" aria-labelledby="access-heading">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-400">Access paths</p><h2 id="access-heading" className="mt-3 text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Choose how you want to access SmartChain</h2><p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300 sm:text-lg">Staff members and prospective suppliers follow separate secure workflows.</p></div>
-          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:gap-6">
-            <article className="flex min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-5 transition-colors duration-200 hover:border-slate-300 dark:border-white/10 dark:bg-[#0a1524] dark:hover:border-white/20 sm:p-6">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white/10 dark:text-sky-300"><LockKeyhole className="h-6 w-6" aria-hidden="true" /></span>
-              <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Internal access</p><h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">SmartChain Staff</h3><p className="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300">Access your authorized SmartChain workspace using your assigned staff credentials.</p>
-              <ul className="mt-6 grid gap-3 text-sm text-slate-700 dark:text-slate-300">{['Role-based access', 'Secure authentication', 'Operational workspace'].map((item) => <li key={item} className="flex items-center gap-3"><Check className="h-4 w-4 shrink-0 text-sky-700 dark:text-sky-400" aria-hidden="true" />{item}</li>)}</ul>
-              <Link to="/login" className={`mt-8 inline-flex min-h-11 cursor-pointer items-center gap-2 self-start rounded-lg font-semibold text-sky-700 transition-colors duration-200 hover:text-sky-900 dark:text-sky-400 dark:hover:text-sky-300 ${focusClasses}`}>Continue to Staff Sign In <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-            </article>
+          <div className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-400">Access SmartChain</p><h2 id="access-heading" className="mt-3 text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Choose the path that fits you</h2><p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300 sm:text-lg">New suppliers apply for accreditation. Approved suppliers and authorized staff use the same secure sign-in page.</p></div>
+          <div className="mt-10 grid auto-rows-fr gap-5 md:grid-cols-3 lg:gap-6">
             <article className="flex min-w-0 flex-col rounded-3xl border border-sky-300 bg-sky-50/60 p-5 transition-colors duration-200 hover:border-sky-500 dark:border-sky-400/35 dark:bg-[linear-gradient(180deg,rgba(14,116,144,0.13),rgba(10,21,36,0.98))] dark:hover:border-sky-400/60 sm:p-6">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-700 text-white dark:bg-sky-400 dark:text-slate-950"><Factory className="h-6 w-6" aria-hidden="true" /></span>
-              <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-sky-800 dark:text-sky-300">Supplier onboarding</p><h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">Become an Archon Nell Supplier</h3><p className="mt-3 text-base leading-7 text-slate-700 dark:text-slate-300">Submit your company information for evaluation by Archon Nell Incorporated.</p>
-              <ul className="mt-6 grid gap-3 text-sm text-slate-700 dark:text-slate-300">{['Company application', 'Admin evaluation', 'Supplier qualification'].map((item) => <li key={item} className="flex items-center gap-3"><Check className="h-4 w-4 shrink-0 text-sky-700 dark:text-sky-400" aria-hidden="true" />{item}</li>)}</ul>
-              <Link to="/supplier-application" className={`mt-8 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 self-stretch rounded-xl bg-sky-700 px-5 py-3 font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 sm:self-start ${focusClasses}`}>Start Supplier Application <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-              <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-400">Submitting an application does not create a SmartChain account.</p>
+              <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-sky-800 dark:text-sky-300">Supplier onboarding</p><h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">New Supplier</h3><p className="mt-3 flex-1 text-base leading-7 text-slate-700 dark:text-slate-300">Register your company and submit the required business documents for supplier accreditation.</p>
+              <Link to="/supplier-application" className={`mt-8 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-700 px-5 py-3 font-semibold text-white transition-colors duration-200 hover:bg-sky-800 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300 ${focusClasses}`}>Start Application <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+            </article>
+            <article className="flex min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-5 transition-colors duration-200 hover:border-sky-300 dark:border-white/10 dark:bg-[#0a1524] dark:hover:border-sky-400/35 sm:p-6">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white/10 dark:text-sky-300"><Gavel className="h-6 w-6" aria-hidden="true" /></span>
+              <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Approved account</p><h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">Existing Supplier</h3><p className="mt-3 flex-1 text-base leading-7 text-slate-600 dark:text-slate-300">Sign in to manage accreditation, view eligible opportunities, submit bids, and track awards and purchase orders.</p>
+              <Link to="/login" className={`mt-8 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-900 transition-colors hover:border-sky-400 hover:bg-sky-50 dark:border-slate-700 dark:text-white dark:hover:bg-white/5 ${focusClasses}`}><LockKeyhole className="h-4 w-4" aria-hidden="true" />Sign In</Link>
+            </article>
+            <article className="flex min-w-0 flex-col rounded-3xl border border-slate-200 bg-white p-5 transition-colors duration-200 hover:border-sky-300 dark:border-white/10 dark:bg-[#0a1524] dark:hover:border-sky-400/35 sm:p-6">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white/10 dark:text-sky-300"><LockKeyhole className="h-6 w-6" aria-hidden="true" /></span>
+              <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Internal access</p><h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">SmartChain Staff</h3><p className="mt-3 flex-1 text-base leading-7 text-slate-600 dark:text-slate-300">Access your authorized warehouse, procurement, inventory, or quality assurance workspace.</p>
+              <Link to="/login" className={`mt-8 inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-900 transition-colors hover:border-sky-400 hover:bg-sky-50 dark:border-slate-700 dark:text-white dark:hover:bg-white/5 ${focusClasses}`}><LockKeyhole className="h-4 w-4" aria-hidden="true" />Sign In</Link>
             </article>
           </div>
         </div>
@@ -188,7 +200,7 @@ const PublicLandingPage: React.FC = () => {
       <section id="platform" className="scroll-mt-20 border-y border-slate-200 bg-white py-12 dark:border-white/10 dark:bg-[#030812] sm:py-16 lg:py-20" aria-labelledby="platform-heading">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center"><p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-400">Platform capabilities</p><h2 id="platform-heading" className="mt-3 text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Connected supply chain operations</h2><p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300 sm:text-lg">One integrated platform supports the essential workflows behind warehouse and supply chain operations.</p></div>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {operations.map(({ title, description, icon: Icon }) => (
               <article key={title} className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-colors duration-200 hover:border-sky-300 hover:bg-white dark:border-white/10 dark:bg-[#0a1524] dark:hover:border-sky-400/35 dark:hover:bg-[#0c192a]">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300"><Icon className="h-5 w-5" aria-hidden="true" /></span><h3 className="mt-5 text-sm font-bold uppercase tracking-[0.12em] text-slate-950 dark:text-white">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{description}</p>
@@ -198,7 +210,7 @@ const PublicLandingPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="bg-slate-50 py-12 dark:bg-[#06101d] sm:py-16 lg:py-20" aria-labelledby="onboarding-heading">
+      <section id="supplier-process" className="scroll-mt-20 bg-slate-50 py-12 dark:bg-[#06101d] sm:py-16 lg:py-20" aria-labelledby="onboarding-heading">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-400">Supplier process</p><h2 id="onboarding-heading" className="mt-3 text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">How supplier onboarding works</h2></div>
           <ol className="mt-10 grid gap-0 lg:grid-cols-5" aria-label="Supplier onboarding steps">
@@ -214,7 +226,17 @@ const PublicLandingPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white py-12 dark:border-white/10 dark:bg-[#030812] sm:py-16 lg:py-20" aria-labelledby="location-heading">
+      <section id="after-approval" className="scroll-mt-20 border-y border-slate-200 bg-white py-12 dark:border-white/10 dark:bg-[#030812] sm:py-16 lg:py-20" aria-labelledby="after-approval-heading">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-400">Approved supplier journey</p><h2 id="after-approval-heading" className="mt-3 text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">What Happens After Approval?</h2><p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">Approval enables the next secure steps; it does not guarantee bidding eligibility, an award, or a Purchase Order.</p></div>
+          <ol className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Approved supplier journey">
+            {afterApprovalSteps.map(({ title, description, icon: Icon }, index) => <li key={title} className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-[#0a1524]"><div className="flex items-center justify-between gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300"><Icon className="h-5 w-5" aria-hidden="true" /></span><span className="text-xs font-bold text-slate-400">{String(index + 1).padStart(2, '0')}</span></div><h3 className="mt-5 font-semibold text-slate-950 dark:text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{description}</p></li>)}
+          </ol>
+          <p className="mt-6 text-sm leading-6 text-slate-600 dark:text-slate-400">Bidding requires current accreditation, valid documents, and eligibility for the RFQ&apos;s product category. Authorized procurement staff evaluate quotations; supplier approval alone does not guarantee an award.</p>
+        </div>
+      </section>
+
+      <section id="company-location" className="scroll-mt-20 border-y border-slate-200 bg-white py-12 dark:border-white/10 dark:bg-[#030812] sm:py-16 lg:py-20" aria-labelledby="location-heading">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-[#081322] lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
             <div className="flex min-h-64 flex-col justify-center p-6 sm:p-8 lg:p-10">
@@ -237,13 +259,20 @@ const PublicLandingPage: React.FC = () => {
 
       <footer className="border-t border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-[#030812] dark:text-slate-300">
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="border-b border-slate-200 pb-7 dark:border-white/10">
+          <div className="grid gap-8 border-b border-slate-200 pb-7 dark:border-white/10 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
             <div className="max-w-md">
               <div className="flex items-center gap-3"><span className="flex h-10 w-14 items-center justify-center rounded-lg border border-slate-200 bg-white px-1.5 dark:border-slate-700"><img src={logo} alt="Archon Nell Incorporated" className="h-auto max-h-8 w-full object-contain" /></span><div><p className="font-bold text-slate-950 dark:text-white">SmartChain</p><p className="text-xs text-slate-600 dark:text-slate-400">Archon Nell Inc. · Warehousing &amp; Supply Chain</p></div></div>
               <p className="mt-5 text-sm leading-6 text-slate-600 dark:text-slate-400">Integrated Smart Warehousing and Supply Chain Management System</p>
             </div>
+            <nav aria-label="Footer navigation" className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+              <a href="#platform" className={`min-h-11 py-2 font-medium hover:text-sky-700 dark:hover:text-sky-300 ${focusClasses}`}>About SmartChain</a>
+              <a href="#open-supply-needs" className={`min-h-11 py-2 font-medium hover:text-sky-700 dark:hover:text-sky-300 ${focusClasses}`}>Open Supply Needs</a>
+              <Link to="/supplier-application" className={`min-h-11 py-2 font-medium hover:text-sky-700 dark:hover:text-sky-300 ${focusClasses}`}>Supplier Application</Link>
+              <Link to="/login" className={`min-h-11 py-2 font-medium hover:text-sky-700 dark:hover:text-sky-300 ${focusClasses}`}>Sign In</Link>
+              <a href="#company-location" className={`min-h-11 py-2 font-medium hover:text-sky-700 dark:hover:text-sky-300 ${focusClasses}`}>Company Location</a>
+            </nav>
           </div>
-          <div className="flex flex-col gap-2 pt-6 text-xs leading-5 text-slate-600 dark:text-slate-500 sm:flex-row sm:items-center sm:justify-between"><p>&copy; 2026 Archon Nell Incorporated. All rights reserved.</p><p>Authorized staff access only for internal SmartChain workspaces.</p></div>
+          <div className="flex flex-col gap-2 pt-6 text-xs leading-5 text-slate-600 dark:text-slate-500 sm:flex-row sm:items-center sm:justify-between"><p>&copy; 2026 Archon Nell Incorporated. All rights reserved.</p><p>Public opportunities are visible to visitors; accounts and operational workspaces require authorization.</p></div>
         </div>
       </footer>
     </div>

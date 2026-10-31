@@ -155,10 +155,13 @@ const emptyForm = (): CreateReceivingFormData => ({
   receipts: [],
 });
 
+const RECEIPT_MAX_FILES = 4;
+const RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
+
 const validateReceiptFile = (file: File): string | null => {
   const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
   if (!allowedTypes.includes(file.type)) return `${file.name}: use JPG, PNG, or PDF.`;
-  if (file.size > 5 * 1024 * 1024) return `${file.name}: each receipt must not exceed 5 MB.`;
+  if (file.size > RECEIPT_MAX_BYTES) return `${file.name}: each receipt must not exceed 10 MB.`;
   return null;
 };
 
@@ -278,48 +281,56 @@ const ReceiptFilePicker: React.FC<{
   disabled?: boolean;
   inputId: string;
 }> = ({ files, onChange, disabled, inputId }) => {
-  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const [processingFiles, setProcessingFiles] = useState(false);
 
   const addFiles = async (incoming: File[]) => {
-    const availableSlots = Math.max(0, 3 - files.length);
-    const filesToAdd = incoming.slice(0, availableSlots);
-    if (filesToAdd.length === 0) return;
+    const availableSlots = Math.max(0, RECEIPT_MAX_FILES - files.length);
+    if (incoming.length > availableSlots) {
+      setReceiptError(`A receiving may contain no more than ${RECEIPT_MAX_FILES} supplier receipt files.`);
+      return;
+    }
+    const validationError = incoming.map(validateReceiptFile).find(Boolean);
+    if (validationError) {
+      setReceiptError(validationError);
+      return;
+    }
+    if (incoming.length === 0) return;
 
     setProcessingFiles(true);
     try {
       const knownHashes = new Set(await Promise.all(files.map(sha256File)));
-      for (const file of filesToAdd) {
+      for (const file of incoming) {
         const hash = await sha256File(file);
         if (knownHashes.has(hash)) {
-          setDuplicateError('Duplicate file detected. This exact receipt has already been added.');
+          setReceiptError('Duplicate file detected. This exact receipt has already been added.');
           return;
         }
         knownHashes.add(hash);
       }
-      setDuplicateError(null);
-      onChange([...files, ...filesToAdd]);
+      setReceiptError(null);
+      onChange([...files, ...incoming]);
     } catch {
-      setDuplicateError('We could not read one of the selected receipts. Please select it again.');
+      setReceiptError('We could not read one of the selected receipts. Please select it again.');
     } finally {
       setProcessingFiles(false);
     }
   };
 
-  const pickerDisabled = disabled || processingFiles || files.length >= 3;
+  const pickerDisabled = disabled || processingFiles || files.length >= RECEIPT_MAX_FILES;
 
   return <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4" aria-labelledby={`${inputId}-title`}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div>
         <h3 id={`${inputId}-title`} className="text-sm font-semibold text-slate-100">Supplier Delivery Receipt *</h3>
-        <p className="mt-1 text-xs text-slate-400">Attach 1–3 supplier document copies. JPG, PNG, or PDF; 5 MB each.</p>
+        <p className="mt-1 text-xs text-slate-400">Attach 1–4 supplier document copies. JPG, PNG, or PDF; 10 MB each.</p>
       </div>
-      <span className="rounded-full border border-slate-600 px-2.5 py-1 text-xs font-medium text-slate-300">{files.length} / 3 files</span>
+      <span className="rounded-full border border-slate-600 px-2.5 py-1 text-xs font-medium text-slate-300">{files.length} / {RECEIPT_MAX_FILES} files</span>
     </div>
-    {files.length > 0 && <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{files.map((file, index) => <ReceiptPreview key={`${file.name}-${file.lastModified}-${index}`} file={file} disabled={disabled || processingFiles} onRemove={() => { setDuplicateError(null); onChange(files.filter((_, fileIndex) => fileIndex !== index)); }} />)}</ul>}
+    {files.length > 0 && <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{files.map((file, index) => <ReceiptPreview key={`${file.name}-${file.lastModified}-${index}`} file={file} disabled={disabled || processingFiles} onRemove={() => { setReceiptError(null); onChange(files.filter((_, fileIndex) => fileIndex !== index)); }} />)}</ul>}
     <input id={inputId} type="file" accept="image/jpeg,image/png,application/pdf" multiple disabled={pickerDisabled} className="sr-only" onChange={(event) => { const selected = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ''; void addFiles(selected); }} />
     <label htmlFor={inputId} aria-disabled={pickerDisabled} className={`mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-500/30 px-4 text-sm font-medium text-cyan-300 transition-colors focus-within:ring-2 focus-within:ring-cyan-500 ${pickerDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-cyan-500/10'}`}><Upload className="h-4 w-4" /> {processingFiles ? 'Checking receipts...' : 'Add receipt'}</label>
-    {duplicateError && <p role="alert" className="mt-2 text-sm text-rose-300">{duplicateError}</p>}
+    {receiptError && <p role="alert" className="mt-2 text-sm text-rose-300">{receiptError}</p>}
   </section>
 };
 
@@ -1170,7 +1181,7 @@ const ReceivingManagement: React.FC = () => {
               <section className="border-t border-[#1f2937] p-4 sm:p-5" aria-labelledby="saved-receipts-title">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div><h4 id="saved-receipts-title" className="text-sm font-medium text-slate-200">Supplier Delivery Receipt</h4><p className="mt-1 text-xs text-slate-400">Documentary delivery evidence; quantities remain based on the physical count.</p></div>
-                  <span className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300">{selectedReceiving.receipt_attachments?.length ?? 0} / 3 files</span>
+                  <span className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300">{selectedReceiving.receipt_attachments?.length ?? 0} / {RECEIPT_MAX_FILES} files</span>
                 </div>
                 <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {(selectedReceiving.receipt_attachments ?? []).map((receipt) => (

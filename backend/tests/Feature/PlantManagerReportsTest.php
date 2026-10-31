@@ -65,7 +65,13 @@ class PlantManagerReportsTest extends TestCase
 
     private function generate(string $type, array $query = [], string $format = 'preview')
     {
-        return $this->actingAs($this->manager)->getJson('/api/plant-manager/reports/generate?'.http_build_query(['type' => $type, 'format' => $format] + $query));
+        $action = $format === 'preview' ? 'PREVIEW' : ($format === 'print' ? 'PRINT' : 'EXPORT');
+        $authorization = $this->actingAs($this->manager)->postJson('/api/report-access/confirm', [
+            'password' => 'password', 'resource' => 'plant-manager:'.$type, 'format' => $format, 'action' => $action,
+        ])->assertOk()->json('authorization');
+
+        return $this->actingAs($this->manager)->withHeader('X-Report-Authorization', $authorization)
+            ->getJson('/api/plant-manager/reports/generate?'.http_build_query(['type' => $type, 'format' => $format] + $query));
     }
 
     private function receiving(string $status, array $attributes = []): Receiving
@@ -141,7 +147,11 @@ class PlantManagerReportsTest extends TestCase
         foreach ($urls as $url) {
             $this->actingAs($this->admin)->getJson($url)->assertForbidden();
             $this->actingAs($qa)->getJson($url)->assertForbidden();
-            $this->actingAs($this->manager)->getJson($url)->assertOk();
+            if (str_contains($url, '/generate')) {
+                $this->generate('inventory')->assertOk();
+            } else {
+                $this->actingAs($this->manager)->getJson($url)->assertOk();
+            }
         }
     }
 
@@ -345,6 +355,17 @@ class PlantManagerReportsTest extends TestCase
     }
 
     // ----------------------------------------------------------------- exports
+
+    public function test_new_operational_reports_are_available_in_every_supported_format_and_require_authorization(): void
+    {
+        foreach (['replenishment', 'production-materials'] as $type) {
+            foreach (['preview', 'print', 'pdf', 'excel'] as $format) {
+                $this->generate($type, format: $format)->assertOk()->assertJsonPath('report.type', $type);
+            }
+            $this->actingAs($this->manager)->getJson("/api/plant-manager/reports/generate?type={$type}&format=preview")
+                ->assertForbidden();
+        }
+    }
 
     public function test_generated_reports_apply_the_same_inclusive_range_in_every_format(): void
     {

@@ -58,6 +58,7 @@ class PurchaseOrder extends Model
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class); }
     public function award(): BelongsTo { return $this->belongsTo(SupplierAward::class, 'supplier_award_id'); }
     public function acknowledgments(): HasMany { return $this->hasMany(PurchaseOrderAcknowledgment::class)->orderByDesc('acted_at'); }
+    public function financialSubmission(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(FinancialPoSubmission::class); }
     public function receivings(): HasMany { return $this->hasMany(Receiving::class); }
     public function discrepancies(): HasMany { return $this->hasMany(ReceivingDiscrepancy::class); }
 }

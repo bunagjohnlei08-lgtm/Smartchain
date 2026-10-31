@@ -37,7 +37,7 @@ class AdminReportsDashboardTest extends TestCase
             ->assertJsonPath('metrics.generated_today', 0)
             ->assertJsonPath('metrics.last_generated_at', null)
             ->assertJsonPath('metrics.ai_forecast_accuracy', null)
-            ->assertJsonPath('metrics.warehouse_capacity.used', null)
+            ->assertJsonPath('metrics.warehouse_capacity.used', 16)
             ->assertJsonPath('metrics.warehouse_capacity.total', 100)
             ->assertJsonPath('metrics.warehouse_capacity.allocated_total', 100)
             ->assertJsonPath('metrics.total_stock_units', 16)
@@ -62,11 +62,19 @@ class AdminReportsDashboardTest extends TestCase
 
     public function test_admin_can_export_an_allowlisted_report_as_csv(): void
     {
-        $response = $this->actingAs($this->user('ADMIN'))->postJson('/api/admin/reports/export', [
+        $admin = $this->user('ADMIN');
+        $authorization = $this->actingAs($admin)->postJson('/api/report-access/confirm', [
+            'password' => 'password',
+            'resource' => 'admin:inventory.summary',
+            'format' => 'CSV',
+            'action' => 'EXPORT',
+        ])->assertOk()->json('authorization');
+        $response = $this->actingAs($admin)->withHeader('X-Report-Authorization', $authorization)
+            ->postJson('/api/admin/reports/export', [
             'report_key' => 'inventory.summary',
             'format' => 'CSV',
             'title' => 'Inventory Summary',
-        ]);
+            ]);
 
         $response->assertOk();
         $this->assertStringContainsString('Inventory_Summary_'.now()->toDateString(), $response->headers->get('Content-Disposition'));

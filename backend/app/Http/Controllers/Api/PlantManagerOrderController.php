@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Inventory;
+use App\Support\WarehouseCapacity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,9 @@ class PlantManagerOrderController extends Controller
         $query = $this->assignedOrders($user->id)
             ->with([
                 'items:id,order_id,product_id,product_name,quantity,unit',
-                'items.product:id,name',
+                'items.product:id,name,unit',
+                'items.product.inventories:id,product_id,warehouse_id,available_stock,reserved_stock,status,pending_receiving',
+                'items.stockOutTransactions:id,order_item_id,quantity',
                 'assignee:id,name,employee_id,warehouse_id',
                 'assignee.warehouse:id,name,code',
             ])
@@ -93,6 +96,8 @@ class PlantManagerOrderController extends Controller
         $record = $this->assignedOrders($user->id)
             ->with([
                 'items.product:id,name,unit',
+                'items.product.inventories:id,product_id,warehouse_id,available_stock,reserved_stock,status,pending_receiving',
+                'items.stockOutTransactions:id,order_item_id,quantity',
                 'assignee:id,name,employee_id,warehouse_id',
                 'assignee.warehouse:id,name,code',
                 'histories' => fn ($query) => $query->with('performer:id,name')->oldest(),
@@ -135,6 +140,14 @@ class PlantManagerOrderController extends Controller
                         'items' => "Order item {$invalidItem->id} does not have a valid product reference.",
                     ]);
                 }
+                $unitMismatch = $record->items->first(fn ($item) =>
+                    WarehouseCapacity::normalizeUnit($item->unit) !== WarehouseCapacity::normalizeUnit($item->product->unit)
+                );
+                if ($unitMismatch) {
+                    throw ValidationException::withMessages([
+                        'items' => "Order item {$unitMismatch->id} uses {$unitMismatch->unit}, but its catalog product uses {$unitMismatch->product->unit}. Reconcile the order before Stock Out; units are not converted automatically.",
+                    ]);
+                }
                 $warehouseId = $user->warehouse_id;
                 if (!$warehouseId) throw ValidationException::withMessages(['warehouse' => 'A warehouse assignment is required before Stock Out.']);
                 $missingInventory = $record->items->first(function ($item) use ($warehouseId) {
@@ -161,7 +174,10 @@ class PlantManagerOrderController extends Controller
         });
 
         $order->load([
-            'items.product:id,name,unit', 'assignee:id,name,employee_id,warehouse_id',
+            'items.product:id,name,unit',
+            'items.product.inventories:id,product_id,warehouse_id,available_stock,reserved_stock,status,pending_receiving',
+            'items.stockOutTransactions:id,order_item_id,quantity',
+            'assignee:id,name,employee_id,warehouse_id',
             'assignee.warehouse:id,name,code', 'histories.performer:id,name',
         ]);
 
@@ -210,6 +226,7 @@ class PlantManagerOrderController extends Controller
 
     private function listData(Order $order): array
     {
+        $warehouseId = $order->assignee?->warehouse_id;
         return [
             'id' => $order->id,
             'order_no' => $order->order_no,
@@ -223,14 +240,7 @@ class PlantManagerOrderController extends Controller
             'priority' => $this->priority($order),
             'status' => $order->status,
             'items_count' => $order->items_count,
-            'items' => $order->items->map(fn ($item) => [
-                'id' => $item->id,
-                'product_id' => $item->product_id,
-                'product_name' => $item->product?->name ?? $item->product_name ?? 'Unnamed product',
-                'required_quantity' => $item->quantity,
-                'unit' => $item->unit,
-                'product_reference_required' => !$item->product_id || !$item->product,
-            ])->values(),
+            'items' => $order->items->map(fn ($item) => $this->itemAllocationData($item, $warehouseId))->values(),
             'total_amount' => $order->total_amount,
             'fulfillment_progress' => $this->workflowProgress($order->status),
             'allocation_status' => 'NOT_TRACKED',
@@ -239,6 +249,7 @@ class PlantManagerOrderController extends Controller
 
     private function detailData(Order $order): array
     {
+        $warehouseId = $order->assignee?->warehouse_id;
         return array_merge($order->only([
             'id', 'order_no', 'reference_no', 'customer_name', 'customer_address', 'customer_contact',
             'order_date', 'required_delivery_date', 'assigned_at', 'total_amount', 'status', 'created_at', 'updated_at',
@@ -249,15 +260,8 @@ class PlantManagerOrderController extends Controller
             'fulfillment_progress' => $this->workflowProgress($order->status),
             'allocation_status' => 'NOT_TRACKED',
             'items' => $order->items->map(fn ($item) => [
-                'id' => $item->id,
-                'product_id' => $item->product_id,
-                'product_name' => $item->product?->name ?? $item->product_name ?? 'Unnamed product',
-                'product_reference_required' => !$item->product_id || !$item->product,
-                'required_quantity' => $item->quantity,
-                'allocated_quantity' => null,
+                ...$this->itemAllocationData($item, $warehouseId),
                 'picked_quantity' => null,
-                'remaining_quantity' => $item->quantity,
-                'unit' => $item->unit,
                 'unit_price' => $item->unit_price,
                 'subtotal' => $item->subtotal,
             ])->values(),
@@ -270,5 +274,44 @@ class PlantManagerOrderController extends Controller
                 'created_at' => $history->created_at,
             ])->values(),
         ]);
+    }
+
+    private function itemAllocationData($item, ?int $warehouseId): array
+    {
+        $product = $item->product;
+        $catalogUnit = $product?->unit;
+        $unitMismatch = filled($catalogUnit)
+            && WarehouseCapacity::normalizeUnit($item->unit) !== WarehouseCapacity::normalizeUnit($catalogUnit);
+        $inventory = $product?->inventories?->firstWhere('warehouse_id', $warehouseId);
+        $released = (float) $item->stockOutTransactions->sum('quantity');
+        $required = (float) $item->quantity;
+        $remaining = max($required - $released, 0);
+        $usable = $inventory && !$inventory->pending_receiving && $inventory->status !== 'Out of Stock';
+        $available = $usable ? (float) $inventory->available_stock : 0;
+
+        $allocationState = match (true) {
+            !$item->product_id || !$product => 'ALLOCATION_BLOCKED',
+            $unitMismatch => 'UNIT_MISMATCH',
+            $remaining <= 0 => 'FULLY_ALLOCATED',
+            $available <= 0 => 'OUT_OF_STOCK',
+            $available < $remaining => 'INSUFFICIENT_STOCK',
+            default => 'PENDING_ALLOCATION',
+        };
+
+        return [
+            'id' => $item->id,
+            'product_id' => $item->product_id,
+            'product_name' => $product?->name ?? $item->product_name ?? 'Unnamed product',
+            'product_reference_required' => !$item->product_id || !$product,
+            'required_quantity' => $item->quantity,
+            'allocated_quantity' => $released,
+            'remaining_quantity' => $remaining,
+            'available_quantity' => $available,
+            'reserved_quantity' => (float) ($inventory?->reserved_stock ?? 0),
+            'unit' => $item->unit,
+            'catalog_unit' => $catalogUnit,
+            'unit_mismatch' => $unitMismatch,
+            'allocation_state' => $allocationState,
+        ];
     }
 }

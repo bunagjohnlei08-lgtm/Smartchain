@@ -37,6 +37,12 @@ const shipmentStatusLabels: Record<string, ShipmentStatus> = {
   READY_FOR_SHIPMENT: 'Ready for Shipment',
 };
 
+const PACKING_INSTRUCTIONS = [
+  'Ensure all products are properly sealed and free from damage before dispatch.',
+  'Check the product quantity and weight before releasing the items.',
+  'Keep the products dry and handle them with care during transportation.',
+] as const;
+
 interface ShipmentItem {
   id: string;
   name: string;
@@ -314,6 +320,7 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
   const boxes = Number(packing.boxes);
   const weight = Number(packing.weight);
   const packingComplete = Number.isInteger(boxes) && boxes >= 1 && Number.isFinite(weight) && weight > 0;
+  const hasHistoricalPackingNote = packing.notes !== '' && !PACKING_INSTRUCTIONS.includes(packing.notes as typeof PACKING_INSTRUCTIONS[number]);
 
   const handleSubmit = () => {
     if (!shipment.barcodeVerifiedAll || !checklistComplete || !packingComplete) {
@@ -458,14 +465,20 @@ const PrepareModal: React.FC<PrepareModalProps> = ({ shipment, isOpen, onClose, 
                 </label>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs text-slate-400 mb-1">Packing Notes</label>
-                <textarea
+                <label htmlFor="packing-notes" className="block text-xs text-slate-400 mb-1">Packing Notes</label>
+                <select
+                  id="packing-notes"
                   value={packing.notes}
                   onChange={(e) => setPacking({ ...packing, notes: e.target.value })}
-                  rows={2}
+                  title={packing.notes || undefined}
+                  aria-describedby={packing.notes ? 'packing-notes-selection' : undefined}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-slate-700 dark:bg-[#0b0f19] dark:text-slate-200 dark:placeholder:text-slate-500"
-                  placeholder="Any special instructions..."
-                />
+                >
+                  <option value="">Select packing instructions</option>
+                  {hasHistoricalPackingNote && <option value={packing.notes} hidden>{packing.notes}</option>}
+                  {PACKING_INSTRUCTIONS.map((instruction) => <option key={instruction} value={instruction}>{instruction}</option>)}
+                </select>
+                {packing.notes && <p id="packing-notes-selection" className="mt-1.5 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">{packing.notes}</p>}
               </div>
             </div>
           </div>

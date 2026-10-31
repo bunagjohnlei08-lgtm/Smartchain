@@ -288,6 +288,40 @@ class StockOutManagementTest extends TestCase
         $this->assertDatabaseCount('stock_out_transactions', 1);
     }
 
+    public function test_drum_stock_out_records_catalog_unit_and_exact_quantity(): void
+    {
+        $this->product->update(['unit' => 'DRUM']);
+        $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 2);
+        $order->items()->update(['unit' => 'DRUM']);
+        $inventory = $this->inventory($this->product, $this->warehouse, 'drum-release', 4);
+
+        $this->scan($order, $inventory->barcode, 2)->assertOk()
+            ->assertJsonPath('inventory_remaining_quantity', 2)
+            ->assertJsonPath('order_status', 'FOR_PACKING');
+
+        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 2]);
+        $this->assertDatabaseHas('stock_out_transactions', [
+            'order_item_id' => $order->items()->firstOrFail()->id,
+            'quantity' => 2, 'unit' => 'DRUM',
+        ]);
+    }
+
+    public function test_unit_mismatch_blocks_stock_out_without_inventory_deduction(): void
+    {
+        $this->product->update(['unit' => 'DRUM']);
+        $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 2);
+        $inventory = $this->inventory($this->product, $this->warehouse, 'mismatch-release', 4);
+
+        $this->scan($order, $inventory->barcode, 1)
+            ->assertUnprocessable()->assertJsonValidationErrors('unit');
+
+        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'available_stock' => 4]);
+        $this->assertDatabaseCount('stock_out_transactions', 0);
+        $this->assertDatabaseHas('order_items', [
+            'id' => $order->items()->firstOrFail()->id, 'unit' => 'pcs',
+        ]);
+    }
+
     public function test_all_order_items_must_complete_before_stock_out_completes(): void
     {
         $order = $this->order('STOCK_OUT_IN_PROGRESS', quantity: 2);

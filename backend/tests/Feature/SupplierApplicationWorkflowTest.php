@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\SupplierApplicationPortalMail;
 use App\Mail\UserInvitationMail;
 use App\Models\Role;
+use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierApplication;
 use App\Models\SupplierApplicationAttachment;
@@ -32,6 +33,7 @@ class SupplierApplicationWorkflowTest extends TestCase
         Mail::fake();
         $role = Role::create(['name' => 'Admin', 'slug' => 'ADMIN']);
         $this->admin = User::factory()->create(['role_id' => $role->id, 'status' => 'ACTIVE']);
+        Product::create(['name' => 'Safety Helmet', 'category' => 'Safety Equipment']);
     }
 
     private function payload(array $overrides = []): array
@@ -139,7 +141,7 @@ class SupplierApplicationWorkflowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.owner_name', 'Andrea Reyes')
             ->assertJsonPath('data.contact_person', 'Maria Santos')
-            ->assertJsonPath('data.phone', '639171234567');
+            ->assertJsonPath('data.phone', '+639171234567');
     }
 
     public function test_successful_application_notifies_each_active_admin_once_with_safe_context(): void
@@ -454,7 +456,9 @@ class SupplierApplicationWorkflowTest extends TestCase
         $rejected->update(['status' => SupplierApplication::STATUS_UNDER_REVIEW]);
         $this->verifyMandatoryDocuments($approved);
 
-        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$approved->id}/approve")
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$approved->id}/approve", [
+            'supply_categories' => ['Safety Equipment'],
+        ])
             ->assertOk()->assertJsonCount(3, 'data.attachments');
         $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$rejected->id}/reject", [
             'reason_codes' => ['DOCUMENTS_CANNOT_BE_VALIDATED'],
@@ -471,17 +475,18 @@ class SupplierApplicationWorkflowTest extends TestCase
     public function test_public_validation_is_enforced(): void
     {
         $this->postJson('/api/supplier-applications', [])->assertUnprocessable()
-            ->assertJsonValidationErrors(['company_name', 'owner_name', 'address', 'contact_person', 'email', 'phone', 'business_type', 'supply_category', 'offerings', 'business_certificate', 'business_permit', 'product_service_image'])
-            ->assertJsonPath('errors.owner_name.0', 'Owner name is required.');
+            ->assertJsonValidationErrors(['company_name', 'owner_name', 'address', 'contact_person', 'email', 'phone', 'business_type', 'offerings', 'business_certificate', 'business_permit', 'product_service_image'])
+            ->assertJsonPath('errors.owner_name.0', 'Owner name is required.')
+            ->assertJsonPath('errors.product_service_image.0', 'At least one Product Image is required.');
     }
 
-    public function test_phone_number_accepts_digits_only_and_rejects_other_characters(): void
+    public function test_phone_number_normalizes_philippine_mobile_formats_and_rejects_invalid_values(): void
     {
         $invalidPhones = [
             '0912ABC5678',
-            '0912 345 6789',
-            '0912-345-6789',
-            '+639123456789',
+            '08171234567',
+            '917123456',
+            '+63917123456789',
         ];
 
         foreach ($invalidPhones as $index => $phone) {
@@ -491,8 +496,7 @@ class SupplierApplicationWorkflowTest extends TestCase
                     'phone' => $phone,
                 ]), ['Accept' => 'application/json'])
                 ->assertUnprocessable()
-                ->assertJsonValidationErrors('phone')
-                ->assertJsonPath('errors.phone.0', 'Phone number must contain numbers only.');
+                ->assertJsonValidationErrors('phone');
         }
 
         $application = $this->submit([
@@ -500,7 +504,7 @@ class SupplierApplicationWorkflowTest extends TestCase
             'phone' => '09171234567',
         ], '198.51.100.11');
 
-        $this->assertSame('09171234567', $application->phone);
+        $this->assertSame('+639171234567', $application->phone);
     }
 
     public function test_admin_detail_supports_historical_application_without_owner_name(): void
@@ -689,7 +693,9 @@ class SupplierApplicationWorkflowTest extends TestCase
         $application = $this->submit();
         $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
         $this->verifyMandatoryDocuments($application);
-        $first = $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
+        $first = $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve", [
+            'supply_categories' => ['Safety Equipment'],
+        ])
             ->assertOk()->assertJsonPath('data.status', SupplierApplication::STATUS_APPROVED);
         $second = $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
             ->assertOk()->assertJsonPath('data.approved_supplier.id', $first->json('data.approved_supplier.id'));
@@ -697,7 +703,7 @@ class SupplierApplicationWorkflowTest extends TestCase
         $this->assertDatabaseCount('suppliers', 1);
         $this->assertDatabaseHas('suppliers', [
             'id' => $first->json('data.approved_supplier.id'), 'name' => 'Atlas Industrial Supply',
-            'business_type' => 'Corporation', 'supply_category' => 'Industrial materials',
+            'business_type' => 'Corporation', 'supply_category' => 'Safety Equipment',
             'products_services' => 'Industrial materials, safety equipment, and local delivery services.', 'status' => 'ACTIVE',
         ]);
         $this->assertDatabaseMissing('suppliers', ['supplier_code' => null]);
@@ -741,7 +747,9 @@ class SupplierApplicationWorkflowTest extends TestCase
         $application->update(['status' => SupplierApplication::STATUS_MEETING_COMPLETED]);
         $this->verifyMandatoryDocuments($application);
 
-        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve", [
+            'supply_categories' => ['Safety Equipment'],
+        ])
             ->assertUnprocessable()->assertJsonValidationErrors('application');
         $this->assertDatabaseCount('suppliers', 1);
         $this->assertSame(SupplierApplication::STATUS_MEETING_COMPLETED, $application->fresh()->status);
@@ -796,7 +804,9 @@ class SupplierApplicationWorkflowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.approval_eligibility.eligible', false)
             ->assertJsonPath('data.approval_eligibility.documents.1.status', 'MISSING');
-        $this->postJson("/api/admin/supplier-applications/{$application->id}/approve")
+        $this->postJson("/api/admin/supplier-applications/{$application->id}/approve", [
+            'supply_categories' => ['Safety Equipment'],
+        ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('application');
         $this->assertDatabaseCount('suppliers', 0);
@@ -811,7 +821,9 @@ class SupplierApplicationWorkflowTest extends TestCase
             SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT,
         ])->update(['verification_status' => SupplierApplicationAttachment::STATUS_VERIFIED, 'expires_on' => today()]);
 
-        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve", [
+            'supply_categories' => ['Safety Equipment'],
+        ])
             ->assertOk()
             ->assertJsonPath('data.status', SupplierApplication::STATUS_APPROVED);
         $this->assertDatabaseCount('suppliers', 1);

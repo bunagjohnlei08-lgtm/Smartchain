@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -42,9 +43,8 @@ class SupplierApplicationController extends Controller
             'address' => trim((string) $request->input('address')),
             'contact_person' => trim((string) $request->input('contact_person')),
             'email' => mb_strtolower(trim((string) $request->input('email'))),
-            'phone' => trim((string) $request->input('phone')),
+            'phone' => $this->normalizePhilippineMobile((string) $request->input('phone')),
             'business_type' => trim((string) $request->input('business_type')),
-            'supply_category' => trim((string) $request->input('supply_category')),
             'products_services' => trim((string) $request->input('products_services')),
             'offerings' => SupplierApplicationOfferings::trimInput($request->input('offerings')),
         ]);
@@ -55,9 +55,8 @@ class SupplierApplicationController extends Controller
             'address' => ['required', 'string', 'min:5', 'max:2000'],
             'contact_person' => ['required', 'string', 'min:2', 'max:255'],
             'email' => ['required', 'email:rfc', 'max:255'],
-            'phone' => ['required', 'string', 'regex:/^[0-9]+$/', 'max:30'],
-            'business_type' => ['required', 'string', 'min:2', 'max:100'],
-            'supply_category' => ['required', 'string', 'min:2', 'max:150'],
+            'phone' => ['required', 'string', 'regex:/^\+639\d{9}$/', 'max:13'],
+            'business_type' => ['required', 'string', Rule::in(['Sole Proprietorship', 'Corporation', 'Partnership', 'One Person Corporation (OPC)', 'Cooperative'])],
             'products_services' => ['nullable', 'string', 'max:5000'],
             'rfq_line_ids' => ['nullable', 'array', 'max:50'],
             'rfq_line_ids.*' => ['integer', 'distinct', 'exists:rfq_lines,id'],
@@ -82,15 +81,15 @@ class SupplierApplicationController extends Controller
         ], [
             ...SupplierApplicationOfferings::messages(),
             'owner_name.required' => 'Owner name is required.',
-            'phone.regex' => 'Phone number must contain numbers only.',
-            'business_certificate.required' => 'At least one Business Certificate is required.',
-            'business_certificate.array' => 'The Business Certificate files must be uploaded as a collection.',
-            'business_certificate.min' => 'At least one Business Certificate is required.',
-            'business_certificate.max' => 'You may upload a maximum of 2 Business Certificate files.',
-            'business_certificate.*.mimes' => 'Each Business Certificate must be a PDF, JPG, or PNG file.',
-            'business_certificate.*.mimetypes' => 'Each Business Certificate must be a PDF, JPG, or PNG file.',
-            'business_certificate.*.extensions' => 'Each Business Certificate must be a PDF, JPG, or PNG file.',
-            'business_certificate.*.max' => 'Each Business Certificate must not exceed 5 MB.',
+            'phone.regex' => 'Enter a valid Philippine mobile number, such as +63 917 123 4567.',
+            'business_certificate.required' => 'At least one Business Registration Document is required.',
+            'business_certificate.array' => 'The Business Registration Document files must be uploaded as a collection.',
+            'business_certificate.min' => 'At least one Business Registration Document is required.',
+            'business_certificate.max' => 'You may upload a maximum of 2 Business Registration Document files.',
+            'business_certificate.*.mimes' => 'Each Business Registration Document must be a PDF, JPG, or PNG file.',
+            'business_certificate.*.mimetypes' => 'Each Business Registration Document must be a PDF, JPG, or PNG file.',
+            'business_certificate.*.extensions' => 'Each Business Registration Document must be a PDF, JPG, or PNG file.',
+            'business_certificate.*.max' => 'Each Business Registration Document must not exceed 5 MB.',
             'business_permit.required' => 'At least one Business Permit is required.',
             'business_permit.array' => 'The Business Permit files must be uploaded as a collection.',
             'business_permit.min' => 'At least one Business Permit is required.',
@@ -99,15 +98,15 @@ class SupplierApplicationController extends Controller
             'business_permit.*.mimetypes' => 'Each Business Permit must be a PDF, JPG, or PNG file.',
             'business_permit.*.extensions' => 'Each Business Permit must be a PDF, JPG, or PNG file.',
             'business_permit.*.max' => 'Each Business Permit must not exceed 5 MB.',
-            'product_service_image.required' => 'At least one Product / Service Image is required.',
-            'product_service_image.array' => 'The Product / Service Images must be uploaded as a collection.',
-            'product_service_image.min' => 'At least one Product / Service Image is required.',
-            'product_service_image.max' => 'You may upload a maximum of 5 Product / Service Images.',
-            'product_service_image.*.image' => 'Each Product / Service Image must be a JPG or PNG image.',
-            'product_service_image.*.mimes' => 'Each Product / Service Image must be a JPG or PNG image.',
-            'product_service_image.*.mimetypes' => 'Each Product / Service Image must be a JPG or PNG image.',
-            'product_service_image.*.extensions' => 'Each Product / Service Image must be a JPG or PNG image.',
-            'product_service_image.*.max' => 'Each Product / Service Image must not exceed 5 MB.',
+            'product_service_image.required' => 'At least one Product Image is required.',
+            'product_service_image.array' => 'The Product Images must be uploaded as a collection.',
+            'product_service_image.min' => 'At least one Product Image is required.',
+            'product_service_image.max' => 'You may upload a maximum of 5 Product Images.',
+            'product_service_image.*.image' => 'Each Product Image must be a JPG or PNG image.',
+            'product_service_image.*.mimes' => 'Each Product Image must be a JPG or PNG image.',
+            'product_service_image.*.mimetypes' => 'Each Product Image must be a JPG or PNG image.',
+            'product_service_image.*.extensions' => 'Each Product Image must be a JPG or PNG image.',
+            'product_service_image.*.max' => 'Each Product Image must not exceed 5 MB.',
         ]);
 
         $companyName = $validated['company_name'];
@@ -132,7 +131,7 @@ class SupplierApplicationController extends Controller
                     'contact_person' => trim($validated['contact_person']),
                     'phone' => trim($validated['phone']),
                     'business_type' => trim($validated['business_type']),
-                    'supply_category' => trim($validated['supply_category']),
+                    'supply_category' => '',
                     'address' => trim($validated['address']),
                     'products_services' => filled($validated['products_services'] ?? null) ? trim($validated['products_services']) : null,
                     'status' => SupplierApplication::STATUS_PENDING,
@@ -198,6 +197,22 @@ class SupplierApplicationController extends Controller
                 'submitted_at' => $application->submitted_at,
             ],
         ], 201);
+    }
+
+    private function normalizePhilippineMobile(string $value): string
+    {
+        if (! preg_match('/^[+\d\s().-]+$/', trim($value))) {
+            return trim($value);
+        }
+        $digits = preg_replace('/\D+/', '', trim($value)) ?? '';
+        if (str_starts_with($digits, '63')) {
+            $digits = substr($digits, 2);
+        }
+        if (str_starts_with($digits, '0')) {
+            $digits = substr($digits, 1);
+        }
+
+        return '+63'.$digits;
     }
 
     private function notifyAdmins(SupplierApplication $application): void

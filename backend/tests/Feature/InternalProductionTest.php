@@ -16,8 +16,15 @@ class InternalProductionTest extends ProductionFixture
             ->assertJsonFragment(['product' => $raw->name, 'unit' => 'SACK'])->assertJsonMissing(['product' => $output->name]);
         $this->getJson('/api/admin/reports/preview?report_key=inventory.finished_products')->assertOk()->assertJsonFragment(['product' => $output->name]);
         $this->getJson('/api/admin/reports/preview?report_key=warehouse.production_batches')->assertOk()->assertJsonFragment(['product' => $output->name, 'unit' => 'PCS']);
-        $this->actingAs($this->manager)->getJson('/api/plant-manager/reports/generate?type=production&format=preview')->assertOk()->assertJsonCount(1, 'report.rows');
-        $this->actingAs($this->otherManager)->getJson('/api/plant-manager/reports/generate?type=production&format=preview')->assertOk()->assertJsonCount(0, 'report.rows');
+        foreach ([[$this->manager, 1], [$this->otherManager, 0]] as [$manager, $expectedRows]) {
+            $authorization = $this->actingAs($manager)->postJson('/api/report-access/confirm', [
+                'password' => 'password', 'resource' => 'plant-manager:production',
+                'format' => 'preview', 'action' => 'PREVIEW',
+            ])->assertOk()->json('authorization');
+            $this->actingAs($manager)->withHeader('X-Report-Authorization', $authorization)
+                ->getJson('/api/plant-manager/reports/generate?type=production&format=preview')
+                ->assertOk()->assertJsonCount($expectedRows, 'report.rows');
+        }
     }
 
     public function test_production_notifications_follow_admin_warehouse_manager_and_assigned_qa_roles(): void

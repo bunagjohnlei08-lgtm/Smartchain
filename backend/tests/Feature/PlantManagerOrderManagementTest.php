@@ -119,6 +119,42 @@ class PlantManagerOrderManagementTest extends TestCase
         ]);
     }
 
+    public function test_order_detail_reports_truthful_drum_availability_and_pending_allocation(): void
+    {
+        $this->product->update(['unit' => 'DRUM']);
+        $order = $this->order($this->manager, 'PREPARING');
+        $order->items()->update(['unit' => 'DRUM']);
+        Inventory::create([
+            'barcode' => 'drum-availability', 'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id, 'available_stock' => 5,
+            'reserved_stock' => 0, 'backload' => 0, 'status' => 'Available', 'pending_receiving' => false,
+        ]);
+
+        $this->actingAs($this->manager)->getJson("/api/plant-manager/orders/{$order->id}")
+            ->assertOk()
+            ->assertJsonPath('items.0.unit', 'DRUM')
+            ->assertJsonPath('items.0.catalog_unit', 'DRUM')
+            ->assertJsonPath('items.0.available_quantity', 5)
+            ->assertJsonPath('items.0.allocated_quantity', 0)
+            ->assertJsonPath('items.0.allocation_state', 'PENDING_ALLOCATION')
+            ->assertJsonPath('items.0.unit_mismatch', false);
+    }
+
+    public function test_order_detail_exposes_unit_mismatch_without_rewriting_legacy_snapshot(): void
+    {
+        $this->product->update(['unit' => 'DRUM']);
+        $order = $this->order($this->manager, 'PREPARING');
+
+        $this->actingAs($this->manager)->getJson("/api/plant-manager/orders/{$order->id}")
+            ->assertOk()
+            ->assertJsonPath('items.0.unit', 'pcs')
+            ->assertJsonPath('items.0.catalog_unit', 'DRUM')
+            ->assertJsonPath('items.0.unit_mismatch', true)
+            ->assertJsonPath('items.0.allocation_state', 'UNIT_MISMATCH');
+
+        $this->assertDatabaseHas('order_items', ['order_id' => $order->id, 'unit' => 'pcs']);
+    }
+
     public function test_orders_are_sorted_by_latest_assignment_before_pagination_with_id_tie_breaker(): void
     {
         $oldest = $this->order($this->manager, overrides: ['assigned_at' => now()->subHours(2)]);

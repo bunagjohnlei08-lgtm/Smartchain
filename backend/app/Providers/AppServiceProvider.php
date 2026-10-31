@@ -119,6 +119,10 @@ class AppServiceProvider extends ServiceProvider
             'logistics-send:'.($request->user()?->id ?: $request->ip())
         ));
 
+        RateLimiter::for('financial-send', fn (Request $request) => Limit::perMinute(6)->by(
+            'financial-send:'.($request->user()?->id ?: $request->ip())
+        ));
+
         RateLimiter::for('logistics-callback', fn (Request $request) => [
             Limit::perMinute(120)->by('logistics-callback-ip:'.$request->ip()),
             Limit::perMinute(120)->by('logistics-callback-partner:'.hash('sha256', (string) $request->header('X-SmartChain-Partner'))),

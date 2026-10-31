@@ -28,6 +28,7 @@ import {
   Building,
   LayoutGrid,
   LayoutList,
+  Landmark,
 } from 'lucide-react';
 
 // ============================================
@@ -47,6 +48,11 @@ interface ReceivingDiscrepancy {
 }
 interface SupplierOption { id: number; supplier_code: string; name: string; }
 interface PurchaseOrderSummary { total: number; pending: number; approved: number; completed: number; cancelled: number; }
+type FinancialState = 'NOT_SUBMITTED' | 'PENDING' | 'SUBMITTING' | 'ACKNOWLEDGED' | 'RETRY_PENDING' | 'RECONCILIATION_REQUIRED' | 'FAILED';
+interface FinancialIntegration {
+  enabled: boolean; contractConfirmed: boolean; state: FinancialState; messageId?: string; financialReference?: string;
+  partnerAcknowledgment?: string; submittedAt?: string; acknowledgedAt?: string; lastErrorCode?: string; lastErrorMessage?: string;
+}
 
 const mapDiscrepancy = (item: any): ReceivingDiscrepancy => ({
   id: Number(item.id), receivingId: Number(item.receiving_id), type: item.type ?? item.discrepancy_type,
@@ -74,6 +80,7 @@ interface PurchaseOrder {
   sentAt?: string;
   receivingHistory: ReceivingHistory[];
   discrepancies: ReceivingDiscrepancy[];
+  financialIntegration: FinancialIntegration;
 }
 
 // ============================================
@@ -128,6 +135,7 @@ const PurchaseOrders: React.FC = () => {
   useAdminDetailOverlay(showDetailsDrawer && selectedOrder !== null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendingToFinancial, setSendingToFinancial] = useState(false);
   const [resolvingDiscrepancyId, setResolvingDiscrepancyId] = useState<number | null>(null);
   const [discrepancyDialog, setDiscrepancyDialog] = useState<{ item: ReceivingDiscrepancy; mode: 'contact' | 'response' | 'close' } | null>(null);
   const [discrepancyForm, setDiscrepancyForm] = useState({ contactMethod: 'PHONE', contactNote: '', responseCode: 'WILL_FULFILL' as SupplierResponseCode, responseNotes: '', expectedDate: '', closureReason: '' });
@@ -149,6 +157,14 @@ const PurchaseOrders: React.FC = () => {
     expectedDeliveryDate: order.expected_delivery_date, deliveryDetails: order.delivery_details, totalAmount: Number(order.total_amount),
     status: order.status as POStatus, createdAt: order.created_at,
     approvedBy: order.approved_by, signatureData: order.signature_data, sentAt: order.sent_at,
+    financialIntegration: {
+      enabled: Boolean(order.financial_integration?.enabled), contractConfirmed: Boolean(order.financial_integration?.contract_confirmed),
+      state: (order.financial_integration?.state ?? 'NOT_SUBMITTED') as FinancialState,
+      messageId: order.financial_integration?.message_id, financialReference: order.financial_integration?.financial_reference,
+      partnerAcknowledgment: order.financial_integration?.partner_acknowledgment, submittedAt: order.financial_integration?.submitted_at,
+      acknowledgedAt: order.financial_integration?.acknowledged_at, lastErrorCode: order.financial_integration?.last_error_code,
+      lastErrorMessage: order.financial_integration?.last_error_message,
+    },
     items: (order.items ?? []).map((item: any) => ({
       unit: item.unit ?? null, item_classification: item.item_classification ?? null, productName: item.product_name, quantity: Number(item.ordered_quantity), receivedQuantity: Number(item.received_quantity ?? 0), remainingQuantity: Number(item.remaining_quantity ?? item.ordered_quantity),
       unitPrice: Number(item.unit_price), amount: Number(item.total_price),
@@ -405,6 +421,31 @@ const PurchaseOrders: React.FC = () => {
       showToast('error', requestError?.response?.data?.message || 'Purchase Order could not be sent.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSendToFinancial = async (order: PurchaseOrder) => {
+    if (sendingToFinancial) return;
+    setSendingToFinancial(true);
+    try {
+      const response = await apiClient.post(`/purchase-orders/${order.id}/financial-submissions`);
+      const integration = response.data?.financial_integration ?? {};
+      const updated: PurchaseOrder = { ...order, financialIntegration: {
+        enabled: Boolean(integration.enabled), contractConfirmed: Boolean(integration.contract_confirmed),
+        state: (integration.state ?? 'NOT_SUBMITTED') as FinancialState,
+        messageId: integration.message_id, financialReference: integration.financial_reference,
+        partnerAcknowledgment: integration.partner_acknowledgment, submittedAt: integration.submitted_at,
+        acknowledgedAt: integration.acknowledged_at, lastErrorCode: integration.last_error_code,
+        lastErrorMessage: integration.last_error_message,
+      } };
+      setOrders((current) => current.map((value) => value.id === order.id ? updated : value));
+      setSelectedOrder(updated);
+      showToast(updated.financialIntegration.state === 'ACKNOWLEDGED' ? 'success' : 'error', response.data?.message || 'Financial submission status was updated.');
+    } catch (requestError: any) {
+      const validationMessage = Object.values(requestError?.response?.data?.errors ?? {}).flat().find(Boolean);
+      showToast('error', String(validationMessage || requestError?.response?.data?.message || 'Purchase Order could not be submitted to Financial.'));
+    } finally {
+      setSendingToFinancial(false);
     }
   };
 
@@ -772,6 +813,23 @@ const PurchaseOrders: React.FC = () => {
             )}
 
             {/* Action Buttons */}
+            <section className="mb-4 rounded-xl border border-indigo-500/25 bg-indigo-500/10 p-3 sm:p-4" aria-label="Financial transmission status">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2"><Landmark className="h-4 w-4 text-indigo-300" aria-hidden="true" /><h3 className="text-xs font-semibold text-white sm:text-sm">Financial Integration</h3></div>
+                  <p className="mt-1 text-xs leading-5 text-slate-300">
+                    {!selectedOrder.financialIntegration.enabled ? 'Disabled by server configuration.'
+                      : !selectedOrder.financialIntegration.contractConfirmed ? 'Waiting for the partner contract to be confirmed.'
+                        : selectedOrder.financialIntegration.state === 'NOT_SUBMITTED' ? 'Not submitted to Financial.'
+                          : selectedOrder.financialIntegration.lastErrorMessage || `Transmission state: ${selectedOrder.financialIntegration.state.replaceAll('_', ' ').toLowerCase()}.`}
+                  </p>
+                  {selectedOrder.financialIntegration.financialReference && <p className="mt-1 text-xs text-slate-300">Financial reference: <span className="font-medium text-white">{selectedOrder.financialIntegration.financialReference}</span></p>}
+                </div>
+                <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${selectedOrder.financialIntegration.state === 'ACKNOWLEDGED' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : selectedOrder.financialIntegration.state === 'FAILED' || selectedOrder.financialIntegration.state === 'RECONCILIATION_REQUIRED' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-200'}`}>
+                  {selectedOrder.financialIntegration.state.replaceAll('_', ' ')}
+                </span>
+              </div>
+            </section>
             <div className="admin-po-details-actions grid grid-cols-1 gap-2 border-t border-[#1f2937] pt-3 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap sm:pt-4">
               <button onClick={() => openPrintablePo(selectedOrder)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-2 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]">
                 <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">Print PO</span>
@@ -781,6 +839,16 @@ const PurchaseOrders: React.FC = () => {
               </button>
               <button onClick={() => void handleSendToSupplier(selectedOrder)} disabled={sending} aria-busy={sending} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/50 px-2 py-2 text-xs font-medium text-cyan-400 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]">
                 <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{sending ? 'Sending…' : selectedOrder.status === 'Sent to Supplier' ? 'Resend PO to Supplier' : 'Send PO to Supplier'}</span>
+              </button>
+              <button
+                onClick={() => void handleSendToFinancial(selectedOrder)}
+                disabled={sendingToFinancial || !selectedOrder.financialIntegration.enabled || !selectedOrder.financialIntegration.contractConfirmed || selectedOrder.status !== 'Approved' || ['SUBMITTING', 'ACKNOWLEDGED', 'RECONCILIATION_REQUIRED', 'FAILED'].includes(selectedOrder.financialIntegration.state)}
+                aria-busy={sendingToFinancial}
+                title={!selectedOrder.financialIntegration.enabled ? 'Financial integration is disabled.' : !selectedOrder.financialIntegration.contractConfirmed ? 'The partner contract is not confirmed.' : selectedOrder.status !== 'Approved' ? 'Only approved Purchase Orders are eligible.' : undefined}
+                className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-indigo-400/50 px-2 py-2 text-xs font-medium text-indigo-300 transition-colors duration-200 hover:bg-indigo-500/10 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]"
+              >
+                <Landmark className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+                <span className="admin-po-action-label">{sendingToFinancial ? 'Submitting…' : selectedOrder.financialIntegration.state === 'RETRY_PENDING' ? 'Retry Financial Submission' : selectedOrder.financialIntegration.state === 'ACKNOWLEDGED' ? 'Financial Acknowledged' : 'Send to Financial'}</span>
               </button>
               <button onClick={() => setShowHistory((visible) => !visible)} aria-expanded={showHistory} className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-[#1f2937] px-2 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 sm:flex-1 sm:gap-2 sm:px-0 sm:text-[13px]">
                 <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="admin-po-action-label">{showHistory ? 'Hide History' : 'View History'}</span>

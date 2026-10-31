@@ -219,7 +219,11 @@ class ReceivingQueueTest extends TestCase
         [$replacement] = $this->receiving(5, 0, true, true);
         $replacement->update(['replacement_for_rejection_case_id' => $case->id]);
 
-        $rows = collect($this->actingAs($this->manager)
+        $authorization = $this->actingAs($this->manager)->postJson('/api/report-access/confirm', [
+            'password' => 'password', 'resource' => 'plant-manager:receiving',
+            'format' => 'preview', 'action' => 'PREVIEW',
+        ])->assertOk()->json('authorization');
+        $rows = collect($this->actingAs($this->manager)->withHeader('X-Report-Authorization', $authorization)
             ->getJson('/api/plant-manager/reports/generate?type=receiving&format=preview')
             ->assertOk()->json('report.rows'))->keyBy('receiving_no');
 

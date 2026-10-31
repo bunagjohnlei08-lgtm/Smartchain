@@ -328,7 +328,7 @@ const AIDemandForecast: React.FC = () => {
       ? `Requesting forecasts sequentially${loadProgress.total ? ` (${loadProgress.completed}/${loadProgress.total})` : ''}.`
       : error}</p>
     </div>}
-    {!loading && !error && loadNotice && <div role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">Partial forecast coverage: {loadNotice}.</div>}
+    {!loading && !error && loadNotice && <div role="status" className="rounded-xl border border-amber-700 bg-amber-800 px-4 py-3 text-sm text-white dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">Partial forecast coverage: {loadNotice}.</div>}
 
     {/* ============================================ */}
     {/* SECTION 1 (TOP): Predict Dashboard Stats / Metrics Cards */}
@@ -461,9 +461,9 @@ const AIDemandForecast: React.FC = () => {
      </div>
     </div>
 
-     {forecastContext && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-slate-300">
+     {forecastContext && <div className="rounded-xl border border-amber-700 bg-amber-800 px-4 py-3 text-sm text-white dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-slate-300">
       <p className="font-semibold text-white">Forecast reference: training data through {forecastContext.forecastAsOf} ({forecastContext.forecastTimezone})</p>
-      <p className="mt-1 text-slate-400">The four periods begin after that week. Source: {forecastContext.trainingDataType === 'synthetic_mock_demand_v1' ? 'simulated thesis/demo demand' : forecastContext.trainingDataType}. Model: {forecastContext.modelVersion}.</p>
+      <p className="mt-1 text-amber-50 dark:text-slate-400">The four periods begin after that week. Source: {forecastContext.trainingDataType === 'synthetic_mock_demand_v1' ? 'simulated thesis/demo demand' : forecastContext.trainingDataType}. Model: {forecastContext.modelVersion}.</p>
      </div>}
 
     {/* ============================================ */}

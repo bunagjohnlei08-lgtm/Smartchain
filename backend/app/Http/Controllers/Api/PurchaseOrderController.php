@@ -37,7 +37,7 @@ class PurchaseOrderController extends Controller
         $query = PurchaseOrder::query()
             ->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)
             ->with([
-            'items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'receivings.items',
+            'items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'financialSubmission', 'receivings.items',
             'discrepancies.reportedBy:id,name', 'discrepancies.contactedBy:id,name',
             'discrepancies.respondedBy:id,name', 'discrepancies.resolvedBy:id,name',
             'discrepancies.resolvedByReceiving:id,receiving_no,delivery_date',
@@ -338,6 +338,18 @@ class PurchaseOrderController extends Controller
             'approved_by' => $order->approver?->name,
             'signature_data' => $order->signature_data,
             'created_at' => $order->created_at?->toDateString(),
+            'financial_integration' => [
+                'enabled' => (bool) config('financial.enabled'),
+                'contract_confirmed' => (bool) config('financial.contract_confirmed'),
+                'state' => $order->financialSubmission?->state ?? 'NOT_SUBMITTED',
+                'message_id' => $order->financialSubmission?->message_id,
+                'financial_reference' => $order->financialSubmission?->financial_reference,
+                'partner_acknowledgment' => $order->financialSubmission?->partner_acknowledgment,
+                'submitted_at' => $order->financialSubmission?->submitted_at?->toIso8601String(),
+                'acknowledged_at' => $order->financialSubmission?->acknowledged_at?->toIso8601String(),
+                'last_error_code' => $order->financialSubmission?->last_error_code,
+                'last_error_message' => $order->financialSubmission?->last_error_message,
+            ],
             'items' => $order->items->map(function ($item) use ($order) {
                 $received = (int) $order->receivings->whereNull('replacement_for_rejection_case_id')->flatMap->items
                     ->where('product_name', $item->product_name)->sum('delivered_quantity');

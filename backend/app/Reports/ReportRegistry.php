@@ -284,6 +284,20 @@ class ReportRegistry
                     'total_quantity' => ['Total Qty', 'number'], 'latest_activity' => ['Latest Activity', 'datetime'],
                 ], ['date'], dateLabel: 'Created date',
                 source: fn (ReportFilters $f) => $this->procurementStatus($f)),
+            new ReportDefinition('procurement.rfqs', 'RFQ Lifecycle Report', 'RFQs with line, quotation and award counts from the sourcing workflow.', 'procurement',
+                [
+                    'rfq_number' => ['RFQ No.', 'text'], 'title' => ['Title', 'text'], 'status' => ['Status', 'status'],
+                    'opens_at' => ['Opens', 'datetime'], 'closes_at' => ['Closes', 'datetime'], 'required_delivery_date' => ['Required Delivery', 'date'],
+                    'currency' => ['Currency', 'text'], 'line_count' => ['Lines', 'number'], 'quotation_count' => ['Quotations', 'number'],
+                    'award_number' => ['Award No.', 'text'], 'award_status' => ['Award Status', 'status'], 'created_by' => ['Created By', 'text'],
+                ], ['date', 'status'], dateLabel: 'Created date', source: fn (ReportFilters $f) => $this->rfqQuery($f)),
+            new ReportDefinition('procurement.bid_awards', 'Bid Award Report', 'Approved award lines linked to RFQs, products and registered suppliers.', 'procurement',
+                [
+                    'award_number' => ['Award No.', 'text'], 'rfq_number' => ['RFQ No.', 'text'], 'product' => ['Product', 'text'],
+                    'supplier_code' => ['Supplier Code', 'text'], 'supplier' => ['Supplier', 'text'], 'awarded_quantity' => ['Awarded Qty', 'number'],
+                    'unit' => ['Unit', 'text'], 'awarded_unit_price' => ['Unit Price', 'currency'], 'currency' => ['Currency', 'text'],
+                    'status' => ['Status', 'status'], 'approved_at' => ['Approved', 'datetime'], 'approved_by' => ['Approved By', 'text'],
+                ], ['date', 'supplier', 'product', 'status'], dateLabel: 'Approval date', source: fn (ReportFilters $f) => $this->bidAwardQuery($f)),
 
             // ---------------- Suppliers ----------------
             new ReportDefinition('suppliers.directory', 'Supplier Directory', 'Registered suppliers and their contact details.', 'supplier',
@@ -314,6 +328,13 @@ class ReportRegistry
                     'resolution' => ['Resolution', 'text'], 'resolved_at' => ['Resolved Date', 'datetime'],
                 ], ['date', 'product', 'supplier', 'status'], self::REJECTION_STATUSES, dateLabel: 'Case created date',
                 source: fn (ReportFilters $f) => $this->rejectionQuery($f)),
+            new ReportDefinition('suppliers.applications', 'Supplier Application Report', 'Supplier onboarding applications and their recorded review decisions.', 'supplier',
+                [
+                    'application_number' => ['Application No.', 'text'], 'company_name' => ['Company', 'text'], 'business_type' => ['Business Type', 'text'],
+                    'supply_category' => ['Supply Category', 'text'], 'contact_person' => ['Contact Person', 'text'], 'email' => ['Email', 'text'],
+                    'status' => ['Status', 'status'], 'submitted_at' => ['Submitted', 'datetime'], 'reviewed_at' => ['Reviewed', 'datetime'],
+                    'reviewed_by' => ['Reviewed By', 'text'], 'approved_supplier_code' => ['Supplier Code', 'text'],
+                ], ['date', 'status'], dateLabel: 'Submitted date', source: fn (ReportFilters $f) => $this->supplierApplicationQuery($f)),
 
             // ---------------- Warehouse ----------------
             new ReportDefinition('warehouse.capacity', 'Warehouse Capacity Report', 'Capacity, used quantity and alert level per warehouse (shared capacity calculation).', 'warehouse',
@@ -327,6 +348,28 @@ class ReportRegistry
             new ReportDefinition('warehouse.capacity_alerts', 'Capacity Alert Report', 'Warehouses currently at the WARNING or FULL capacity level.', 'warehouse',
                 $capacityColumns, ['warehouse'],
                 source: fn (ReportFilters $f) => $this->warehouseCapacity($f)->where('alert_level', '!=', WarehouseCapacity::NORMAL)->values()),
+            new ReportDefinition('warehouse.inventory_audits', 'Inventory Quality Audit Report', 'QA inventory audit attempts with product, warehouse and Admin review outcome.', 'warehouse',
+                [
+                    'audit_reference' => ['Audit Ref.', 'text'], 'cycle_reference' => ['Cycle Ref.', 'text'], 'scheduled_for' => ['Scheduled', 'date'],
+                    'product' => ['Product', 'text'], 'barcode' => ['Barcode', 'text'], 'warehouse' => ['Warehouse', 'text'],
+                    'attempt_number' => ['Attempt', 'number'], 'audited_quantity' => ['Audited Qty', 'number'], 'failed_quantity' => ['Failed Qty', 'number'],
+                    'result' => ['Result', 'status'], 'status' => ['Review Status', 'status'], 'qa_user' => ['QA User', 'text'],
+                    'submitted_at' => ['Submitted', 'datetime'], 'reviewed_by' => ['Reviewed By', 'text'], 'reviewed_at' => ['Reviewed', 'datetime'],
+                ], ['date', 'warehouse', 'product', 'status'], dateLabel: 'Submitted date', source: fn (ReportFilters $f) => $this->inventoryAuditQuery($f)),
+            new ReportDefinition('warehouse.production_material_usage', 'Production Material Usage Report', 'Required and issued raw materials per production batch, including recorded issue details.', 'warehouse',
+                [
+                    'batch_number' => ['Batch', 'text'], 'finished_product' => ['Finished Product', 'text'], 'material' => ['Material', 'text'],
+                    'unit' => ['Unit', 'text'], 'required_quantity' => ['Required Qty', 'number'], 'issued_quantity' => ['Issued Qty', 'number'],
+                    'variance' => ['Variance', 'number'], 'disposition' => ['Disposition', 'status'], 'warehouse' => ['Issue Warehouse', 'text'],
+                    'issued_by' => ['Issued By', 'text'], 'issued_at' => ['Issued At', 'datetime'], 'batch_status' => ['Batch Status', 'status'],
+                ], ['date', 'warehouse', 'product', 'status'], dateLabel: 'Batch created date', source: fn (ReportFilters $f) => $this->productionMaterialQuery($f)),
+            new ReportDefinition('shipment.logistics_integration', 'Logistics Integration Report', 'Delivery request state and safe submission/status metadata; request payloads and partner secrets are excluded.', 'shipment',
+                [
+                    'request_uuid' => ['Request UUID', 'text'], 'order_no' => ['Order No.', 'text'], 'partner' => ['Partner', 'text'],
+                    'state' => ['State', 'status'], 'partner_request_id' => ['Partner Request ID', 'text'], 'retry_count' => ['Retries', 'number'],
+                    'submitted_at' => ['Submitted', 'datetime'], 'accepted_at' => ['Accepted', 'datetime'], 'latest_event_at' => ['Latest Event', 'datetime'],
+                    'last_error_code' => ['Last Error Code', 'text'], 'latest_partner_status' => ['Partner Status', 'status'],
+                ], ['date', 'status'], dateLabel: 'Created date', source: fn (ReportFilters $f) => $this->logisticsIntegrationQuery($f)),
 
             // ---------------- AI forecast ----------------
             new ReportDefinition('ai.forecast', 'AI Demand Forecast Report', 'Persisted AI demand forecast results.', 'ai-forecast',
@@ -643,6 +686,105 @@ class ReportRegistry
             ->selectRaw('MAX(po.updated_at) as latest_activity');
 
         return DB::query()->fromSub($requests->unionAll($orders), 'ps')->orderByDesc('record_type')->orderBy('status');
+    }
+
+    private function rfqQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('rfqs as r')
+            ->join('users as creator', 'creator.id', '=', 'r.created_by')
+            ->leftJoin('supplier_awards as a', 'a.rfq_id', '=', 'r.id')
+            ->select(['r.rfq_number', 'r.title', 'r.status', 'r.opens_at', 'r.closes_at', 'r.required_delivery_date', 'r.currency',
+                'a.award_number', 'a.status as award_status', 'creator.name as created_by'])
+            ->selectRaw('(SELECT COUNT(*) FROM rfq_lines l WHERE l.rfq_id = r.id) as line_count')
+            ->selectRaw('(SELECT COUNT(*) FROM supplier_quotations q WHERE q.rfq_id = r.id) as quotation_count')
+            ->orderByDesc('r.created_at')->orderByDesc('r.id');
+        if ($f->status) $query->where('r.status', $f->status);
+
+        return $this->dateRange($query, 'r.created_at', $f);
+    }
+
+    private function bidAwardQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('supplier_award_lines as al')
+            ->join('supplier_awards as a', 'a.id', '=', 'al.supplier_award_id')
+            ->join('rfqs as r', 'r.id', '=', 'a.rfq_id')
+            ->join('rfq_lines as rl', 'rl.id', '=', 'al.rfq_line_id')
+            ->join('suppliers as s', 's.id', '=', 'al.supplier_id')
+            ->join('users as approver', 'approver.id', '=', 'a.approved_by')
+            ->select(['a.award_number', 'r.rfq_number', 'rl.product_name as product', 's.supplier_code', 's.name as supplier',
+                'al.awarded_quantity', 'rl.unit', 'al.awarded_unit_price', 'r.currency', 'a.status', 'a.approved_at', 'approver.name as approved_by'])
+            ->orderByDesc('a.approved_at')->orderByDesc('al.id');
+        if ($f->supplierId) $query->where('al.supplier_id', $f->supplierId);
+        if ($f->productId) $query->where('rl.product_id', $f->productId);
+        if ($f->status) $query->where('a.status', $f->status);
+
+        return $this->dateRange($query, 'a.approved_at', $f);
+    }
+
+    private function supplierApplicationQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('supplier_applications as sa')
+            ->leftJoin('users as reviewer', 'reviewer.id', '=', 'sa.reviewed_by_id')
+            ->leftJoin('suppliers as s', 's.id', '=', 'sa.approved_supplier_id')
+            ->select(['sa.application_number', 'sa.company_name', 'sa.business_type', 'sa.supply_category', 'sa.contact_person',
+                'sa.email', 'sa.status', 'sa.submitted_at', 'sa.reviewed_at', 'reviewer.name as reviewed_by', 's.supplier_code as approved_supplier_code'])
+            ->orderByDesc('sa.submitted_at')->orderByDesc('sa.id');
+        if ($f->status) $query->where('sa.status', $f->status);
+
+        return $this->dateRange($query, 'sa.submitted_at', $f);
+    }
+
+    private function inventoryAuditQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('inventory_audit_items as ai')
+            ->join('inventory_audit_cycles as ac', 'ac.id', '=', 'ai.inventory_audit_cycle_id')
+            ->join('inventories as i', 'i.id', '=', 'ai.inventory_id')
+            ->join('products as p', 'p.id', '=', 'i.product_id')
+            ->join('warehouses as w', 'w.id', '=', 'i.warehouse_id')
+            ->leftJoin('users as qa', 'qa.id', '=', 'ai.qa_user_id')
+            ->leftJoin('users as admin', 'admin.id', '=', 'ai.admin_user_id')
+            ->select(['ai.audit_reference', 'ac.reference as cycle_reference', 'ac.scheduled_for', 'p.name as product', 'i.barcode', 'w.name as warehouse',
+                'ai.attempt_number', 'ai.audited_quantity', 'ai.failed_quantity', 'ai.result', 'ai.status', 'qa.name as qa_user',
+                'ai.submitted_at', 'admin.name as reviewed_by', 'ai.reviewed_at'])
+            ->orderByDesc('ai.submitted_at')->orderByDesc('ai.id');
+        if ($f->warehouseId) $query->where('i.warehouse_id', $f->warehouseId);
+        if ($f->productId) $query->where('i.product_id', $f->productId);
+        if ($f->status) $query->where('ai.status', $f->status);
+
+        return $this->dateRange($query, 'ai.submitted_at', $f);
+    }
+
+    private function productionMaterialQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('production_batch_materials as bm')
+            ->join('production_batches as b', 'b.id', '=', 'bm.production_batch_id')
+            ->join('products as fp', 'fp.id', '=', 'b.product_id')
+            ->leftJoin('production_material_issues as mi', 'mi.production_batch_material_id', '=', 'bm.id')
+            ->leftJoin('warehouses as w', 'w.id', '=', 'mi.warehouse_id')
+            ->leftJoin('users as issuer', 'issuer.id', '=', 'mi.issued_by_id')
+            ->select(['b.batch_number', 'fp.name as finished_product', 'bm.product_name as material', 'bm.unit', 'bm.required_quantity',
+                'bm.issued_quantity', DB::raw('COALESCE(bm.issued_quantity, 0) - COALESCE(bm.required_quantity, 0) as variance'),
+                'bm.disposition', 'w.name as warehouse', 'issuer.name as issued_by', 'mi.issued_at', 'b.status as batch_status'])
+            ->orderByDesc('b.created_at')->orderByDesc('b.id')->orderBy('bm.id');
+        if ($f->warehouseId) $query->where('mi.warehouse_id', $f->warehouseId);
+        if ($f->productId) $query->where('bm.product_id', $f->productId);
+        if ($f->status) $query->where('b.status', $f->status);
+
+        return $this->dateRange($query, 'b.created_at', $f);
+    }
+
+    private function logisticsIntegrationQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('delivery_requests as dr')
+            ->join('orders as o', 'o.id', '=', 'dr.order_id')
+            ->join('logistics_partners as lp', 'lp.id', '=', 'dr.logistics_partner_id')
+            ->select(['dr.request_uuid', 'o.order_no', 'lp.name as partner', 'dr.state', 'dr.partner_request_id', 'dr.retry_count',
+                'dr.submitted_at', 'dr.accepted_at', 'dr.latest_event_at', 'dr.last_error_code'])
+            ->selectRaw('(SELECT e.partner_status FROM delivery_status_events e WHERE e.delivery_request_id = dr.id ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1) as latest_partner_status')
+            ->orderByDesc('dr.created_at')->orderByDesc('dr.id');
+        if ($f->status) $query->where('dr.state', $f->status);
+
+        return $this->dateRange($query, 'dr.created_at', $f);
     }
 
     private function supplierBase(ReportFilters $f): Builder

@@ -56,6 +56,9 @@ interface OrderItem {
   availableQty: number; // in assigned warehouse
   allocatedQty: number;
   unit: string;
+  catalogUnit: string | null;
+  unitMismatch: boolean;
+  allocationState: 'FULLY_ALLOCATED' | 'PENDING_ALLOCATION' | 'INSUFFICIENT_STOCK' | 'OUT_OF_STOCK' | 'UNIT_MISMATCH' | 'ALLOCATION_BLOCKED';
 }
 
 interface Order {
@@ -134,6 +137,9 @@ const mapOrder = (order: any): Order => ({
     availableQty: Number(item.available_quantity || 0),
     allocatedQty: Number(item.allocated_quantity || 0),
     unit: item.unit,
+    catalogUnit: item.catalog_unit || null,
+    unitMismatch: Boolean(item.unit_mismatch),
+    allocationState: item.allocation_state || 'ALLOCATION_BLOCKED',
   })),
   totalItems: Number(order.items_count ?? order.items?.length ?? 0),
   totalAmount: Number(order.total_amount),
@@ -711,7 +717,7 @@ const OrderManagement: React.FC = () => {
         <div className="bg-[#0b101d] border border-slate-800/80 rounded-xl p-5">
           <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
             <Layers className="w-4 h-4 text-cyan-400" />
-            Assigned Inventory Reserved Summary
+            Stock Allocation Summary
           </h3>
           {visibleSelectedOrder ? <div className="space-y-3">
             <p className="-mt-2 text-xs text-slate-400">Showing {visibleSelectedOrder.orderNumber}</p>
@@ -727,10 +733,11 @@ const OrderManagement: React.FC = () => {
                     <p className="text-xs text-slate-400">
                       {item.requiredQty > 0 ? Math.round((item.allocatedQty / item.requiredQty) * 100) : 0}% allocated
                     </p>
+                    <p className="text-[11px] text-slate-500">{item.availableQty} {item.unit} available</p>
                   </div>
                 </div>
               ))}
-            <p className="text-xs text-slate-500 mt-2">Reservation values are shown exactly as returned by the order detail API.</p>
+            <p className="text-xs text-slate-500 mt-2">Allocation and assigned-warehouse availability are shown exactly as returned by the order detail API.</p>
           </div> : <p className="text-sm text-slate-400">{isSelectionLoading ? 'Loading selected order inventory…' : 'Select an order to view its inventory summary.'}</p>}
         </div>
       </div>
@@ -771,7 +778,15 @@ const OrderManagement: React.FC = () => {
               <div className="space-y-3">
                 {selectedOrder.items.map((item) => {
                   const isFullyAllocated = item.allocatedQty >= item.requiredQty;
-                  const isPartial = item.allocatedQty > 0 && item.allocatedQty < item.requiredQty;
+                  const allocationLabel = {
+                    FULLY_ALLOCATED: '✓ Fully Allocated',
+                    PENDING_ALLOCATION: 'Pending Allocation',
+                    INSUFFICIENT_STOCK: '⚠ Insufficient Stock',
+                    OUT_OF_STOCK: '✗ Out of Stock',
+                    UNIT_MISMATCH: '⚠ Unit Mismatch',
+                    ALLOCATION_BLOCKED: '⚠ Allocation Blocked',
+                  }[item.allocationState];
+                  const isWarning = ['PENDING_ALLOCATION', 'INSUFFICIENT_STOCK', 'UNIT_MISMATCH', 'ALLOCATION_BLOCKED'].includes(item.allocationState);
                   return (
                     <div key={item.id} className="bg-slate-800/30 rounded-xl p-3 border border-slate-700">
                       <div className="flex items-start justify-between">
@@ -782,14 +797,16 @@ const OrderManagement: React.FC = () => {
                           <p className="text-sm text-white">
                             {item.allocatedQty} / {item.requiredQty} {item.unit}
                           </p>
-                          <p className={`text-xs ${isFullyAllocated ? 'text-emerald-400' : isPartial ? 'text-amber-400' : 'text-rose-400'}`}>
-                            {isFullyAllocated ? '✓ Fully Allocated' : isPartial ? '⚠ Partial Stock' : '✗ No Stock'}
+                          <p className={`text-xs ${isFullyAllocated ? 'text-emerald-400' : isWarning ? 'text-amber-400' : 'text-rose-400'}`}>
+                            {allocationLabel}
                           </p>
+                          {!item.unitMismatch && item.allocationState !== 'ALLOCATION_BLOCKED' && <p className="mt-0.5 text-[11px] text-slate-400">{item.availableQty} {item.unit} available</p>}
+                          {item.unitMismatch && <p className="mt-0.5 text-[11px] text-rose-300">Order: {item.unit} · Catalog: {item.catalogUnit}</p>}
                         </div>
                       </div>
                       <div className="w-full h-1.5 bg-slate-700 rounded-full mt-2 overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${isFullyAllocated ? 'bg-emerald-500' : isPartial ? 'bg-amber-500' : 'bg-rose-500'}`}
+                          className={`h-full rounded-full ${isFullyAllocated ? 'bg-emerald-500' : isWarning ? 'bg-amber-500' : 'bg-rose-500'}`}
                           style={{ width: `${Math.min((item.allocatedQty / item.requiredQty) * 100, 100)}%` }}
                         />
                       </div>

@@ -5,16 +5,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
+import CompactDatePicker from '../../components/ui/CompactDatePicker';
 import {
   FileText,
   Eye,
   Download,
   BarChart3,
-  Clock,
   Calendar,
   ChevronRight,
   CheckCircle,
-  Plus,
   Search,
   AlertCircle,
   Package,
@@ -38,7 +37,7 @@ import {
 } from 'recharts';
 import ReportPreviewDrawer from './reports/ReportPreviewDrawer';
 import ReportExportModal, { type ExportMode } from './reports/ReportExportModal';
-import ReportScheduleModal from './reports/ReportScheduleModal';
+import ReportPasswordModal, { type ReportAccessRequest } from '../../components/reports/ReportPasswordModal';
 import { StatusPill } from './reports/ReportTable';
 import {
   downloadReport, errorMessage, formatBytes, formatDateTime, FORMAT_LABELS,
@@ -158,6 +157,9 @@ const CategoryBadge: React.FC<{ category: string }> = ({ category }) => {
 // ============================================
 
 const Reports: React.FC = () => {
+  // The underlying export history remains available to the reporting service,
+  // but these redundant dashboard panels were removed from the Admin workflow.
+  const renderRemovedDashboardPanels = false;
   const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string>('inventory');
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,9 +176,11 @@ const Reports: React.FC = () => {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
+  const [accessRequest, setAccessRequest] = useState<ReportAccessRequest | null>(null);
+  const [pendingDownload, setPendingDownload] = useState<{ payload: Parameters<typeof downloadReport>[0]; busyKey: string; success: (filename: string, rows: number) => string } | null>(null);
   const [previewReport, setPreviewReport] = useState<ReportDefinition | null>(null);
   const [exportModal, setExportModal] = useState<{ mode: ExportMode; reportKey?: string } | null>(null);
-  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [dateFilters, setDateFilters] = useState<{ date_from?: string; date_to?: string }>({});
   const itemsPerPage = 10;
   const isDark = theme === 'dark';
   const chartGridColor = isDark ? '#1e293b' : '#E2E8F0';
@@ -191,7 +195,7 @@ const Reports: React.FC = () => {
     padding: '10px',
   };
 
-  useAdminDetailOverlay(previewReport !== null || exportModal !== null || isScheduleOpen);
+  useAdminDetailOverlay(previewReport !== null || exportModal !== null);
 
   const fetchDashboard = useCallback(async (signal?: AbortSignal, silent = false) => {
     if (!silent) setDashboardLoading(true);
@@ -226,35 +230,35 @@ const Reports: React.FC = () => {
     void fetchDashboard(undefined, true);
   }, [fetchDashboard]);
 
-  const quickDownload = async (report: ReportDefinition) => {
+  const quickDownload = (report: ReportDefinition) => {
     const format = report.formats[0];
     if (!format || downloadingKey) return;
-    setDownloadingKey(report.key);
     setActionMessage(null);
+    setPendingDownload({ payload: { report_key: report.key, format }, busyKey: report.key, success: (filename, rows) => `${filename} downloaded${Number.isFinite(rows) ? ` (${rows.toLocaleString()} records)` : ''}.` });
+    setAccessRequest({ resource: `admin:${report.key}`, format, action: 'EXPORT', label: `Download ${report.name} as ${FORMAT_LABELS[format]}` });
+  };
+
+  const downloadAuthorized = async (authorization: string) => {
+    if (!pendingDownload) return;
+    setDownloadingKey(pendingDownload.busyKey);
     try {
-      const result = await downloadReport({ report_key: report.key, format });
-      handleGenerated(`${result.filename} downloaded${Number.isFinite(result.rows) ? ` (${result.rows.toLocaleString()} records)` : ''}.`);
+      const result = await downloadReport(pendingDownload.payload, authorization);
+      handleGenerated(pendingDownload.success(result.filename, result.rows));
     } catch (error) {
       setActionMessage({ type: 'error', text: await errorMessage(error, 'Unable to export report data.') });
       handleGenerated(null);
     } finally {
       setDownloadingKey(null);
+      setAccessRequest(null);
+      setPendingDownload(null);
     }
   };
 
-  const regenerate = async (item: ReportHistoryItem) => {
+  const regenerate = (item: ReportHistoryItem) => {
     if (!item.format || downloadingKey) return;
-    setDownloadingKey(`history-${item.id}`);
     setActionMessage(null);
-    try {
-      const result = await downloadReport({ report_key: item.report_key, format: item.format, ...item.filters });
-      handleGenerated(`${result.filename} regenerated with the same filters.`);
-    } catch (error) {
-      setActionMessage({ type: 'error', text: await errorMessage(error, 'Unable to regenerate this export.') });
-      handleGenerated(null);
-    } finally {
-      setDownloadingKey(null);
-    }
+    setPendingDownload({ payload: { report_key: item.report_key, format: item.format, ...item.filters }, busyKey: `history-${item.id}`, success: (filename) => `${filename} regenerated with the same filters.` });
+    setAccessRequest({ resource: `admin:${item.report_key}`, format: item.format, action: 'EXPORT', label: `Download ${item.report_name} again` });
   };
 
   const categoryCounts = useMemo(() => reports.reduce<Record<string, number>>((counts, report) => {
@@ -291,24 +295,13 @@ const Reports: React.FC = () => {
         <div className="max-w-3xl">
           <h1 className="text-2xl font-bold text-white tracking-tight">Reports & Exports</h1>
           <p className="text-slate-400 text-sm mt-1">
-            Preview and export live SmartChain data by category, schedule recurring reports, and review generation history.
+            Select an essential report, apply supported filters, preview current SmartChain data, and export it on demand.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <button onClick={() => setExportModal({ mode: 'STANDARD' })} className="inline-flex min-h-11 cursor-pointer items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
             <Download className="w-4 h-4 shrink-0" />
             Export Data
-          </button>
-          <button onClick={() => setIsScheduleOpen(true)} className="inline-flex min-h-11 cursor-pointer items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg border border-slate-700 hover:bg-slate-800/50 text-slate-300 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
-            <Calendar className="w-4 h-4 shrink-0" />
-            Schedule Report
-          </button>
-          <button
-            onClick={() => setExportModal({ mode: 'CUSTOM' })}
-            className="inline-flex min-h-11 cursor-pointer items-center gap-2 px-4 py-2 text-xs md:text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-cyan-300/60"
-          >
-            <Plus className="w-4 h-4 shrink-0" />
-            Create Custom Report
           </button>
         </div>
       </div>
@@ -319,12 +312,9 @@ const Reports: React.FC = () => {
       {dashboardError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{dashboardError}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {[
-          { label: 'Total Reports', value: metrics?.total_reports_available ?? 'N/A', subtitle: metrics ? `${metrics.total_reports_available} available of ${metrics.total_report_definitions} definitions` : 'Report definitions', icon: <FileText className="w-4 h-4 text-blue-400" /> },
+          { label: 'Available Reports', value: metrics?.total_reports_available ?? 'N/A', subtitle: metrics ? `${metrics.total_reports_available} available of ${metrics.total_report_definitions} definitions` : 'Report definitions', icon: <FileText className="w-4 h-4 text-blue-400" /> },
           { label: 'Exports Today', value: metrics?.exports_today ?? 'N/A', subtitle: 'Successful file downloads today', icon: <Download className="w-4 h-4 text-emerald-400" /> },
-          { label: 'Pending Reports', value: metrics?.pending_reports ?? 'N/A', subtitle: 'Active schedules awaiting next run', icon: <Clock className="w-4 h-4 text-amber-400" /> },
-          { label: 'Generated Today', value: metrics?.generated_today ?? 'N/A', subtitle: metrics?.last_generated_at ? `Last generated ${formatDateTime(metrics.last_generated_at)}` : 'No reports generated yet', icon: <CheckCircle className="w-4 h-4 text-cyan-400" /> },
-          { label: 'Warehouse Capacity Allocation', value: metrics?.warehouse_capacity.total ? metrics.warehouse_capacity.allocated_total.toLocaleString() : 'Not configured', subtitle: metrics?.warehouse_capacity.total ? `${metrics.warehouse_capacity.total.toLocaleString()} total budget · usage shown per unit` : 'Allocation setup required', icon: <WarehouseIcon className="w-4 h-4 text-purple-400" /> },
-          { label: 'AI Forecast Accuracy', value: metrics?.ai_forecast_accuracy === null || metrics?.ai_forecast_accuracy === undefined ? 'N/A' : `${metrics.ai_forecast_accuracy}%`, subtitle: metrics?.ai_forecast_accuracy == null ? 'No measured forecast results' : 'Measured forecast performance', icon: <TrendingUp className="w-4 h-4 text-rose-400" /> },
+          { label: 'Warehouse Capacity Used', value: metrics?.warehouse_capacity.total != null && metrics?.warehouse_capacity.used != null ? `${metrics.warehouse_capacity.used.toLocaleString()} / ${metrics.warehouse_capacity.total.toLocaleString()}` : 'Not configured', subtitle: 'Current occupied capacity / total warehouse capacity', icon: <WarehouseIcon className="w-4 h-4 text-purple-400" /> },
         ].map((kpi, idx) => (
           <div key={idx} className="min-h-32 bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
             <div className="flex items-start justify-between">
@@ -407,6 +397,12 @@ const Reports: React.FC = () => {
                 <option value="Unavailable">Unavailable</option>
               </select>
             </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,12rem)_auto] sm:items-end">
+              <div><span className="mb-1.5 block text-xs font-medium text-slate-300">From date</span><CompactDatePicker label="Main report from date" value={dateFilters.date_from ?? ''} max={dateFilters.date_to} onChange={(value) => setDateFilters((current) => ({ ...current, date_from: value || undefined }))} /></div>
+              <div><span className="mb-1.5 block text-xs font-medium text-slate-300">To date</span><CompactDatePicker label="Main report to date" value={dateFilters.date_to ?? ''} min={dateFilters.date_from} onChange={(value) => setDateFilters((current) => ({ ...current, date_to: value || undefined }))} /></div>
+              <button type="button" onClick={() => setDateFilters({})} disabled={!dateFilters.date_from && !dateFilters.date_to} className="min-h-11 cursor-pointer rounded-xl border border-slate-700 px-4 text-xs text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">Clear dates</button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">This range prefills preview and Export Data only for reports that support their documented date field. Current-state snapshots ignore it.</p>
           </div>
 
           {selectedCategory === 'ai-forecast' && (
@@ -573,8 +569,8 @@ const Reports: React.FC = () => {
           </dl>
         </div>
 
-        {/* Recent Exports */}
-        <div className="min-w-0 min-h-[280px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
+        {/* Historical export data remains available through the backend; this redundant dashboard panel is intentionally not rendered. */}
+        {renderRemovedDashboardPanels && <div className="min-w-0 min-h-[280px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="text-sm font-semibold text-white flex items-center gap-2">
               <FileText className="w-4 h-4 text-cyan-400" />
@@ -603,26 +599,26 @@ const Reports: React.FC = () => {
             ))}
             {!dashboardLoading && recentExports.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No exports yet. Downloaded reports appear here.</p>}
           </div>
-        </div>
+        </div>}
 
         {/* Quick Actions */}
-        <div className="min-w-0 min-h-[280px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
+        {renderRemovedDashboardPanels && <div className="min-w-0 min-h-[280px] bg-[#0b101d] border border-slate-800/80 rounded-xl p-5 flex flex-col">
           <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <Zap className="w-4 h-4 text-cyan-400" />
             Quick Actions
           </h4>
+          <p className="mb-4 text-xs leading-5 text-slate-400">Use the report catalog to preview filtered data first, or open the standard export flow for a direct download.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button onClick={() => setExportModal({ mode: 'CUSTOM' })} className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"><Plus className="h-4 w-4" />Create Custom Report</button>
-            <button onClick={() => setIsScheduleOpen(true)} className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg border border-slate-700 px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/50 hover:text-white"><Calendar className="h-4 w-4" />Schedule Report</button>
+            <button onClick={() => setExportModal({ mode: 'STANDARD' })} className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"><Download className="h-4 w-4" />Export Data</button>
             <button onClick={() => setExportModal({ mode: 'RAW' })} className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg border border-slate-700 px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/50 hover:text-white"><Download className="h-4 w-4" />Export Raw Data</button>
           </div>
           {/* Scheduler infrastructure warning intentionally hidden from Admin UI.
               Restore here if scheduled delivery is enabled/configured in production. */}
-        </div>
+        </div>}
       </div>
 
       {previewReport && (
-        <ReportPreviewDrawer definition={previewReport} options={options} onClose={() => setPreviewReport(null)} onGenerated={handleGenerated} />
+        <ReportPreviewDrawer definition={previewReport} options={options} initialFilters={dateFilters} onClose={() => setPreviewReport(null)} onGenerated={handleGenerated} />
       )}
       {exportModal && (
         <ReportExportModal
@@ -632,20 +628,12 @@ const Reports: React.FC = () => {
           options={options}
           initialCategory={selectedCategory}
           initialReportKey={exportModal.reportKey}
+          initialFilters={dateFilters}
           onClose={() => setExportModal(null)}
           onGenerated={handleGenerated}
         />
       )}
-      {isScheduleOpen && (
-        <ReportScheduleModal
-          definitions={reports}
-          categories={categoryOptions}
-          options={options}
-          initialCategory={selectedCategory}
-          onClose={() => setIsScheduleOpen(false)}
-          onChanged={() => void fetchDashboard(undefined, true)}
-        />
-      )}
+      <ReportPasswordModal request={accessRequest} onCancel={() => { setAccessRequest(null); setPendingDownload(null); }} onAuthorized={downloadAuthorized} />
 
       <div className="text-center text-xs text-slate-500 pt-4 border-t border-slate-800/60">
         © 2026 SmartChain. All rights reserved.

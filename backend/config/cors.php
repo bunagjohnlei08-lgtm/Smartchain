@@ -57,7 +57,7 @@ return [
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'X-Requested-With', 'X-Supplier-Portal-Session'],
+    'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'X-Requested-With', 'X-Supplier-Portal-Session', 'X-Report-Authorization'],
 
     // Content-Disposition carries server-generated export filenames to the SPA.
     'exposed_headers' => ['Retry-After', 'Content-Disposition', 'X-Report-Rows'],

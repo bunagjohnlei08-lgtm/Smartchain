@@ -42,6 +42,8 @@ use App\Http\Controllers\Api\PublicCompanyLocationController;
 use App\Http\Controllers\Api\PublicRfqController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\FinancialPurchaseOrderController;
+use App\Http\Controllers\Api\FinancialObligationController;
 use App\Http\Controllers\Api\QaDashboardController;
 use App\Http\Controllers\Api\QaInspectionController;
 use App\Http\Controllers\Api\QaInspectionHistoryController;
@@ -51,6 +53,7 @@ use App\Http\Controllers\Api\QaRejectedItemsController;
 use App\Http\Controllers\Api\ReceivingController;
 use App\Http\Controllers\Api\ReceivingDiscrepancyController;
 use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\ReportAccessController;
 use App\Http\Controllers\Api\SessionController;
 use App\Http\Controllers\Api\StockInController;
 use App\Http\Controllers\Api\StockOutController;
@@ -101,6 +104,8 @@ Route::middleware('throttle:invitations')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
+    Route::post('/report-access/confirm', [ReportAccessController::class, 'confirm'])->middleware('throttle:60,1');
+    Route::post('/report-access/consume', [ReportAccessController::class, 'consume'])->middleware('throttle:60,1');
     Route::middleware('supplier.account')->prefix('supplier-account')->group(function () {
         Route::get('/profile', [SupplierAccountController::class, 'show']);
         Route::get('/accreditation-requests', [SupplierAccreditationController::class, 'index']);
@@ -310,6 +315,10 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::patch('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve']);
     Route::get('/purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf']);
     Route::patch('/purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send']);
+    Route::post('/purchase-orders/{purchaseOrder}/financial-submissions', [FinancialPurchaseOrderController::class, 'store'])
+        ->middleware('throttle:financial-send');
+    Route::post('/purchase-orders/{purchaseOrder}/receivings/{receiving}/financial-obligation', [FinancialObligationController::class, 'store'])
+        ->middleware('throttle:financial-send');
     Route::get('/admin/receiving-discrepancies', [ReceivingDiscrepancyController::class, 'index']);
     Route::patch('/admin/receiving-discrepancies/{receivingDiscrepancy}', [ReceivingDiscrepancyController::class, 'update']);
 

@@ -71,6 +71,21 @@ class CorsTest extends TestCase
         $this->assertStringNotContainsString('cache-control', $allowedHeaders);
     }
 
+    public function test_protected_report_preflight_accepts_the_single_use_authorization_header(): void
+    {
+        $response = $this->call('OPTIONS', '/api/admin/reports/export', [], [], [], [
+            'HTTP_ORIGIN' => self::PRODUCTION_ORIGIN,
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
+            'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'authorization,content-type,x-report-authorization,x-requested-with',
+        ]);
+
+        $response->assertNoContent();
+        $response->assertHeader('Access-Control-Allow-Origin', self::PRODUCTION_ORIGIN);
+
+        $allowedHeaders = strtolower((string) $response->headers->get('Access-Control-Allow-Headers'));
+        $this->assertStringContainsString('x-report-authorization', $allowedHeaders);
+    }
+
     public function test_an_unknown_origin_is_not_allowed(): void
     {
         $response = $this->postJson('/api/login', [], ['Origin' => 'https://evil.example.com']);

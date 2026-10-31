@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import CompactDatePicker from '../../../components/ui/CompactDatePicker';
 import type { ReportDefinition, ReportFilterValues, ReportOptions } from './reportApi';
 
@@ -11,15 +11,36 @@ interface Props {
   onChange: (values: ReportFilterValues) => void;
   options: ReportOptions | null;
   hideDates?: boolean;
+  hideWarehouse?: boolean;
   idPrefix: string;
 }
 
 /** Renders only the filters the selected report definition declares. */
-const ReportFilterFields: React.FC<Props> = ({ definition, values, onChange, options, hideDates = false, idPrefix }) => {
+const ReportFilterFields: React.FC<Props> = ({ definition, values, onChange, options, hideDates = false, hideWarehouse = false, idPrefix }) => {
   const set = (key: keyof ReportFilterValues, value: string) => onChange({ ...values, [key]: value || undefined });
   const has = (filter: ReportDefinition['filters'][number]) => definition.filters.includes(filter);
   const dateInvalid = Boolean(values.date_from && values.date_to && values.date_to < values.date_from);
-  const visible = definition.filters.filter((filter) => !(hideDates && filter === 'date'));
+  const visible = definition.filters.filter((filter) => !((hideDates && filter === 'date') || (hideWarehouse && filter === 'warehouse')));
+  const [productOpen, setProductOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const productBox = useRef<HTMLDivElement>(null);
+  const eligibleProducts = useMemo(() => (options?.products ?? []).filter((product) =>
+    (!values.category || product.category === values.category)
+    && (!productSearch.trim() || product.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+  ), [options?.products, productSearch, values.category]);
+  const selectedProduct = options?.products.find((product) => String(product.id) === values.product_id);
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => { if (!productBox.current?.contains(event.target as Node)) setProductOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const setCategory = (category: string) => {
+    const selectedStillValid = !values.product_id || options?.products.some((product) => String(product.id) === values.product_id && (!category || product.category === category));
+    onChange({ ...values, category: category || undefined, product_id: selectedStillValid ? values.product_id : undefined });
+    setProductSearch('');
+  };
 
   if (visible.length === 0) {
     return <p className="text-xs text-slate-500">This report has no filters. It always reflects current data.</p>;
@@ -40,7 +61,7 @@ const ReportFilterFields: React.FC<Props> = ({ definition, values, onChange, opt
           </div>
         </>
       )}
-      {has('warehouse') && (
+      {has('warehouse') && !hideWarehouse && (
         <div>
           <label htmlFor={`${idPrefix}-warehouse`} className={labelClass}>Warehouse</label>
           <select id={`${idPrefix}-warehouse`} value={values.warehouse_id ?? ''} onChange={(event) => set('warehouse_id', event.target.value)} className={fieldClass}>
@@ -50,12 +71,19 @@ const ReportFilterFields: React.FC<Props> = ({ definition, values, onChange, opt
         </div>
       )}
       {has('product') && (
-        <div>
-          <label htmlFor={`${idPrefix}-product`} className={labelClass}>Product</label>
-          <select id={`${idPrefix}-product`} value={values.product_id ?? ''} onChange={(event) => set('product_id', event.target.value)} className={fieldClass}>
-            <option value="">All products</option>
-            {options?.products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-          </select>
+        <div ref={productBox} className="relative">
+          <label id={`${idPrefix}-product-label`} className={labelClass}>Product</label>
+          <button type="button" aria-labelledby={`${idPrefix}-product-label`} aria-haspopup="listbox" aria-expanded={productOpen} onClick={() => setProductOpen((open) => !open)} className={`${fieldClass} flex items-center justify-between gap-2 text-left`}>
+            <span className="truncate">{selectedProduct?.name ?? (values.category ? `All products in ${values.category}` : 'All products')}</span><span aria-hidden="true">▾</span>
+          </button>
+          {productOpen && <div className="absolute left-0 top-full z-[80] mt-1 w-full min-w-[16rem] rounded-xl border border-slate-700 bg-[#0b101d] p-2 shadow-2xl">
+            <input type="search" autoFocus value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Search products…" aria-label="Search products" className={`${fieldClass} mb-2`} />
+            <div role="listbox" aria-labelledby={`${idPrefix}-product-label`} className="max-h-56 overflow-y-auto overscroll-contain">
+              <button type="button" role="option" aria-selected={!values.product_id} onClick={() => { set('product_id', ''); setProductOpen(false); }} className="min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none">{values.category ? `All products in ${values.category}` : 'All products'}</button>
+              {eligibleProducts.map((product) => <button key={product.id} type="button" role="option" aria-selected={String(product.id) === values.product_id} onClick={() => { set('product_id', String(product.id)); setProductOpen(false); }} className={`min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-800 focus:bg-slate-800 focus:outline-none ${String(product.id) === values.product_id ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-200'}`}>{product.name}<span className="ml-2 text-xs text-slate-500">{product.category ?? 'Uncategorized'}</span></button>)}
+              {eligibleProducts.length === 0 && <p className="px-3 py-4 text-center text-xs text-slate-500">No matching products.</p>}
+            </div>
+          </div>}
         </div>
       )}
       {has('supplier') && (
@@ -70,7 +98,7 @@ const ReportFilterFields: React.FC<Props> = ({ definition, values, onChange, opt
       {has('category') && (
         <div>
           <label htmlFor={`${idPrefix}-category`} className={labelClass}>Product category</label>
-          <select id={`${idPrefix}-category`} value={values.category ?? ''} onChange={(event) => set('category', event.target.value)} className={fieldClass}>
+          <select id={`${idPrefix}-category`} value={values.category ?? ''} onChange={(event) => setCategory(event.target.value)} className={fieldClass}>
             <option value="">All categories</option>
             {options?.product_categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>

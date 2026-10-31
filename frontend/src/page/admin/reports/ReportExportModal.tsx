@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
+import ReportPasswordModal, { type ReportAccessRequest } from '../../../components/reports/ReportPasswordModal';
 import ReportFilterFields, { fieldClass, labelClass } from './ReportFilterFields';
 import {
-  applicableFilters, downloadReport, errorMessage, FORMAT_LABELS,
+  applicableFilters, downloadReport, errorMessage, FORMAT_LABELS, initialReportFilters,
   type ReportDefinition, type ReportFilterValues, type ReportFormat, type ReportOptions,
 } from './reportApi';
 
@@ -21,11 +22,12 @@ interface Props {
   options: ReportOptions | null;
   initialCategory: string;
   initialReportKey?: string;
+  initialFilters?: ReportFilterValues;
   onClose: () => void;
   onGenerated: (message: string | null) => void;
 }
 
-const ReportExportModal: React.FC<Props> = ({ mode, definitions, categories, options, initialCategory, initialReportKey, onClose, onGenerated }) => {
+const ReportExportModal: React.FC<Props> = ({ mode, definitions, categories, options, initialCategory, initialReportKey, initialFilters = {}, onClose, onGenerated }) => {
   const available = useMemo(() => definitions.filter((definition) => definition.available), [definitions]);
   const startCategory = available.some((definition) => definition.category === initialCategory) ? initialCategory : (available[0]?.category ?? '');
   const [category, setCategory] = useState(startCategory);
@@ -33,16 +35,22 @@ const ReportExportModal: React.FC<Props> = ({ mode, definitions, categories, opt
   const [reportKey, setReportKey] = useState(initialReportKey && available.some((definition) => definition.key === initialReportKey) ? initialReportKey : (inCategory[0]?.key ?? ''));
   const definition = available.find((item) => item.key === reportKey) ?? null;
   const [format, setFormat] = useState<ReportFormat>('CSV');
-  const [filters, setFilters] = useState<ReportFilterValues>({});
+  const [filters, setFilters] = useState<ReportFilterValues>(() => definition ? initialReportFilters(definition, options, initialFilters) : {});
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accessRequest, setAccessRequest] = useState<ReportAccessRequest | null>(null);
   const dateInvalid = Boolean(filters.date_from && filters.date_to && filters.date_to < filters.date_from);
   const titleInvalid = mode === 'CUSTOM' && title.trim() !== '' && !/^[A-Za-z0-9 ,.()_-]+$/.test(title.trim());
+  const mainWarehouseMissing = Boolean(definition?.filters.includes('warehouse') && !filters.warehouse_id);
 
   useEffect(() => {
     if (definition && !definition.formats.includes(format)) setFormat(definition.formats[0] ?? 'CSV');
   }, [definition, format]);
+
+  useEffect(() => {
+    if (definition) setFilters((current) => initialReportFilters(definition, options, { ...initialFilters, ...current }));
+  }, [definition, initialFilters, options]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onClose(); };
@@ -53,27 +61,35 @@ const ReportExportModal: React.FC<Props> = ({ mode, definitions, categories, opt
   const changeCategory = (next: string) => {
     setCategory(next);
     setReportKey(available.find((item) => item.category === next)?.key ?? '');
-    setFilters({});
+    const nextDefinition = available.find((item) => item.category === next);
+    setFilters(nextDefinition ? initialReportFilters(nextDefinition, options, initialFilters) : {});
   };
 
-  const submit = async () => {
+  const submit = () => {
     if (!definition) return;
     if (mode === 'CUSTOM' && !title.trim()) { setError('Enter a report title.'); return; }
+    if (mainWarehouseMissing) { setError('Main Warehouse (WH-MAIN) is unavailable. Refresh the page and try again.'); return; }
     if (dateInvalid || titleInvalid) return;
-    setBusy(true);
     setError(null);
+    setAccessRequest({ resource: `admin:${definition.key}`, format, action: 'EXPORT', label: `${copy.action} ${FORMAT_LABELS[format]}` });
+  };
+
+  const exportAuthorized = async (authorization: string) => {
+    if (!definition) return;
+    setBusy(true);
     try {
       const result = await downloadReport({
         report_key: definition.key, format, source: mode,
         ...(mode === 'CUSTOM' ? { title: title.trim() } : {}),
         ...applicableFilters(definition, filters),
-      });
+      }, authorization);
       onGenerated(`${result.filename} downloaded${Number.isFinite(result.rows) ? ` (${result.rows.toLocaleString()} records)` : ''}.`);
       onClose();
     } catch (requestError) {
       setError(await errorMessage(requestError, 'Unable to export report data.'));
       onGenerated(null);
     } finally {
+      setAccessRequest(null);
       setBusy(false);
     }
   };
@@ -111,7 +127,7 @@ const ReportExportModal: React.FC<Props> = ({ mode, definitions, categories, opt
             </div>
             <div>
               <label htmlFor="export-report" className={labelClass}>Report</label>
-              <select id="export-report" value={reportKey} onChange={(event) => { setReportKey(event.target.value); setFilters({}); }} className={fieldClass}>
+              <select id="export-report" value={reportKey} onChange={(event) => { const key = event.target.value; setReportKey(key); const next = available.find((item) => item.key === key); setFilters(next ? initialReportFilters(next, options, initialFilters) : {}); }} className={fieldClass}>
                 {inCategory.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
               </select>
             </div>
@@ -131,7 +147,8 @@ const ReportExportModal: React.FC<Props> = ({ mode, definitions, categories, opt
                   ))}
                 </div>
               </fieldset>
-              <ReportFilterFields definition={definition} values={filters} onChange={setFilters} options={options} idPrefix="export" />
+              <ReportFilterFields definition={definition} values={filters} onChange={setFilters} options={options} hideWarehouse idPrefix="export" />
+              {definition.filters.includes('warehouse') && filters.warehouse_id && <p className="text-xs text-slate-500">Warehouse scope: Main Warehouse (WH-MAIN)</p>}
             </>
           )}
           {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300 sm:text-sm">{error}</p>}
@@ -139,12 +156,13 @@ const ReportExportModal: React.FC<Props> = ({ mode, definitions, categories, opt
 
         <div className="flex items-center justify-end gap-3 border-t border-slate-800/60 p-4 sm:p-5">
           <button onClick={onClose} disabled={busy} className="min-h-11 cursor-pointer rounded-xl border border-slate-700 px-4 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50 sm:text-sm">Cancel</button>
-          <button onClick={() => void submit()} disabled={busy || !definition || dateInvalid || titleInvalid}
+          <button onClick={() => void submit()} disabled={busy || !definition || dateInvalid || titleInvalid || mainWarehouseMissing}
             className="min-h-11 cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 sm:text-sm">
             {busy ? 'Generating…' : `${copy.action} ${FORMAT_LABELS[format]}`}
           </button>
         </div>
       </div>
+      <ReportPasswordModal request={accessRequest} onCancel={() => setAccessRequest(null)} onAuthorized={exportAuthorized} />
     </div>
   );
 };

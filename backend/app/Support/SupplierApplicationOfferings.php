@@ -18,7 +18,7 @@ final class SupplierApplicationOfferings
             // New offerings are products only; SERVICE remains readable for historical rows.
             'offerings.*.type' => ['sometimes', Rule::in([SupplierApplicationOffering::TYPE_PRODUCT])],
             'offerings.*.name' => ['required', 'string', 'min:2', 'max:150'],
-            'offerings.*.category' => ['required', 'string', 'min:2', 'max:150'],
+            'offerings.*.category' => ['nullable', 'string', 'min:2', 'max:150'],
             'offerings.*.description' => ['nullable', 'string', 'max:1000'],
         ];
     }
@@ -31,7 +31,6 @@ final class SupplierApplicationOfferings
             'offerings.max' => 'You may list a maximum of '.SupplierApplicationOffering::MAX_PER_APPLICATION.' products.',
             'offerings.*.type.in' => 'Only product offerings are accepted.',
             'offerings.*.name.required' => 'Enter the product name.',
-            'offerings.*.category.required' => 'Enter a category for each product.',
         ];
     }
 
@@ -56,7 +55,8 @@ final class SupplierApplicationOfferings
             'type' => SupplierApplicationOffering::TYPE_PRODUCT,
             'name' => $offering['name'],
             'normalized_name' => SupplierApplicationOffering::normalizeName($offering['name']),
-            'category' => filled($offering['category'] ?? null) ? $offering['category'] : null,
+            // Applicant text never becomes an approved catalog classification.
+            'category' => null,
             'description' => filled($offering['description'] ?? null) ? $offering['description'] : null,
             'sort_order' => $index,
         ]);

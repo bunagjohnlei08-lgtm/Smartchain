@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieCh
 import { apiClient } from '../../lib/api';
 import CompactDatePicker from '../../components/ui/CompactDatePicker';
 import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
+import ReportPasswordModal, { type ReportAccessRequest } from '../../components/reports/ReportPasswordModal';
 
 type ReportFormat = 'preview' | 'print' | 'pdf' | 'excel';
 type Row = Record<string, unknown>;
@@ -26,6 +27,8 @@ interface ReportCardData { type: string; title: string; description: string; ico
 
 const reportCards: ReportCardData[] = [
   { type: 'production', title: 'Production Batch History', description: 'Internal batches, manual QA and stock-in in your warehouse.', icon: <Package className="w-5 h-5 text-cyan-400" /> },
+  { type: 'production-materials', title: 'Production Material Usage', description: 'BOM requirements and recorded material issues by production batch.', icon: <BarChart3 className="w-5 h-5 text-indigo-400" /> },
+  { type: 'replenishment', title: 'Replenishment Requests', description: 'Request decisions, linked purchase orders, receipts and outstanding quantities.', icon: <RefreshCw className="w-5 h-5 text-amber-400" /> },
   { type: 'inventory', title: 'Inventory Report', description: 'Comprehensive inventory levels, valuation and aging.', icon: <Package className="w-5 h-5 text-blue-400" /> },
   { type: 'receiving', title: 'Receiving Report', description: 'Delivery receiving summary, QA results and inspection.', icon: <Truck className="w-5 h-5 text-emerald-400" /> },
   { type: 'stock-in', title: 'Stock In Report', description: 'Items received into warehouse and stock in summary.', icon: <ArrowUp className="w-5 h-5 text-cyan-400" /> },
@@ -41,7 +44,8 @@ const colors: Record<string, string> = { Available: '#10b981', Reserved: '#8b5cf
 const num = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const show = (value: unknown) => value === null || value === undefined || value === '' ? '—' : String(value);
 const heading = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-const csvCell = (value: unknown) => `"${show(value).replaceAll('"', '""')}"`;
+const csvCell = (value: unknown) => { const text = show(value); const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text; return `"${safe.replaceAll('"', '""')}"`; };
+const formatLabel = (format: ReportFormat) => format === 'excel' ? 'CSV (Excel-compatible)' : format[0].toUpperCase() + format.slice(1);
 const dateTime = (value?: string) => value ? new Date(value).toLocaleString() : '—';
 // Mobile preview column widths (px), keyed by report column so every report schema shares one map.
 // Applied only by the mobile CSS through <colgroup>, so <th> and <td> always share one width.
@@ -81,6 +85,8 @@ const Reports: React.FC = () => {
   const [to, setTo] = useState('');
   const [generating, setGenerating] = useState<string | null>(null);
   const [preview, setPreview] = useState<GeneratedReport | null>(null);
+  const [accessRequest, setAccessRequest] = useState<ReportAccessRequest | null>(null);
+  const [pendingReport, setPendingReport] = useState<{ type: string; format: ReportFormat } | null>(null);
   usePlantManagerDetailOverlay(preview !== null);
   const latestRequest = useRef(0);
   // Same YYYY-MM-DD filter payload for the dashboard and every generated report.
@@ -90,13 +96,14 @@ const Reports: React.FC = () => {
     const request = ++latestRequest.current;
     setLoading(true); setError('');
     try {
-      const [dashboardResponse, recentResponse] = await Promise.all([
+      const [dashboardResult, recentResult] = await Promise.allSettled([
         apiClient.get<DashboardData>('/plant-manager/reports/dashboard', { params: dateParams }),
         apiClient.get<{ data: RecentReport[] }>('/plant-manager/reports/recent'),
       ]);
       if (request !== latestRequest.current) return;
-      setDashboard(dashboardResponse.data);
-      setRecent(Array.isArray(recentResponse.data.data) ? recentResponse.data.data : []);
+      if (dashboardResult.status === 'rejected') throw dashboardResult.reason;
+      setDashboard(dashboardResult.value.data);
+      if (recentResult.status === 'fulfilled') setRecent(Array.isArray(recentResult.value.data.data) ? recentResult.value.data.data : []);
     } catch (requestError: any) {
       if (request !== latestRequest.current) return;
       // Never leave charts from a previous range on screen next to a rejected one.
@@ -111,28 +118,35 @@ const Reports: React.FC = () => {
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${report.type}-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click(); URL.revokeObjectURL(url);
   };
-  const printReport = (report: GeneratedReport, pdf: boolean) => {
-    const popup = window.open('', '_blank');
-    if (!popup) { setActionError('Allow pop-ups to print this report.'); return; }
+  const printReport = (report: GeneratedReport, pdf: boolean, popup?: Window) => {
+    if (!popup || popup.closed) throw new Error('The report window was blocked or closed. Allow pop-ups and try again.');
     popup.opener = null;
     const headers = report.columns.map((column) => `<th>${html(heading(column))}</th>`).join('');
     const rows = report.rows.map((row) => `<tr>${report.columns.map((column) => `<td>${html(row[column])}</td>`).join('')}</tr>`).join('');
     popup.document.write(`<!doctype html><html><head><title>${html(report.title)}</title><style>body{font:14px Arial;padding:24px;color:#111}h1{margin-bottom:4px}p{color:#555}table{border-collapse:collapse;width:100%;margin-top:20px}th,td{border:1px solid #ccc;padding:7px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>${html(report.title)}</h1><p>Generated ${html(dateTime(report.generated_at))} · ${html(reportPeriod(report))}${pdf ? ' · Choose Save as PDF in the print dialog.' : ''}</p><button onclick="window.print()">Print</button><table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`);
     popup.document.close();
   };
-  const generate = async (type: string, format: ReportFormat) => {
+  const requestGenerate = (type: string, format: ReportFormat) => {
+    const action = format === 'preview' ? 'PREVIEW' : format === 'print' ? 'PRINT' : 'EXPORT';
+    setPendingReport({ type, format });
+    setAccessRequest({ resource: `plant-manager:${type}`, format, action, label: `${format === 'pdf' ? 'Download PDF' : formatLabel(format)} report`, opensPrintWindow: format === 'print' || format === 'pdf' });
+  };
+  const generate = async (authorization: string, printWindow?: Window) => {
+    if (!pendingReport) return;
+    const { type, format } = pendingReport;
     setGenerating(`${type}:${format}`); setActionError('');
     try {
-      const response = await apiClient.get<{ report: GeneratedReport }>('/plant-manager/reports/generate', { params: { type, format, ...dateParams } });
+      const response = await apiClient.get<{ report: GeneratedReport }>('/plant-manager/reports/generate', { params: { type, format, ...dateParams }, headers: { 'X-Report-Authorization': authorization } });
       const report = response.data.report;
       if (format === 'preview') setPreview(report);
       else if (format === 'excel') downloadCsv(report);
-      else printReport(report, format === 'pdf');
+      else printReport(report, format === 'pdf', printWindow);
       const recentResponse = await apiClient.get<{ data: RecentReport[] }>('/plant-manager/reports/recent');
       setRecent(Array.isArray(recentResponse.data.data) ? recentResponse.data.data : []);
     } catch (requestError: any) {
-      setActionError(errorMessage(requestError, 'Report generation failed.'));
-    } finally { setGenerating(null); }
+      printWindow?.close();
+      setActionError(errorMessage(requestError, requestError?.message || 'Report generation failed.'));
+    } finally { setGenerating(null); setAccessRequest(null); setPendingReport(null); }
   };
 
   const movement = (dashboard?.stock_movement_trend ?? []).map((point) => ({ date: point.date.slice(5), stockIn: num(point.stock_in), stockOut: num(point.stock_out) }));
@@ -160,24 +174,25 @@ const Reports: React.FC = () => {
 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4" aria-busy={loading}>{loading ? Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-32 animate-pulse bg-[#111827] border border-[#1f2937] rounded-xl" />) : kpis.map(([name, value, subtitle, metric, icon]) => { const change = num(metric.change_percentage); return <div key={name} className="bg-[#111827] border border-[#1f2937] rounded-xl p-4 hover:border-gray-600 transition-colors"><div className="flex justify-between"><div><p className="mobile-kpi-title text-xs font-medium text-slate-400 uppercase tracking-wider">{name}</p><p className="mobile-kpi-value text-2xl font-bold text-white mt-1">{value}</p></div><div className="p-2 h-fit rounded-lg bg-slate-800/30">{icon}</div></div><p className="mobile-kpi-helper text-xs text-slate-400 mt-1">{subtitle}</p>{metric.change_percentage === null && <p className="mobile-kpi-helper text-xs mt-1 text-slate-400">No previous data</p>}{metric.change_percentage !== undefined && metric.change_percentage !== null && <p className={`mobile-kpi-helper text-xs mt-1 flex gap-1 ${change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}{change > 0 ? '+' : ''}{change}% vs yesterday</p>}</div>; })}</div>
 
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
       <Chart title={movementTitle} empty={!movement.length}><ResponsiveContainer width="100%" height={200}><LineChart data={movement}><CartesianGrid strokeDasharray="3 3" stroke="var(--report-grid-stroke)" className="[--report-grid-stroke:#e2e8f0] dark:[--report-grid-stroke:#1e293b]" /><XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 10 }} /><YAxis stroke="#64748b" tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} /><Legend /><Line type="monotone" dataKey="stockIn" stroke="#3b82f6" name="Stock In" strokeWidth={2} /><Line type="monotone" dataKey="stockOut" stroke="#ef4444" name="Stock Out" strokeWidth={2} /></LineChart></ResponsiveContainer></Chart>
       <Chart title={comparisonTitle} empty={!weekly.length}><ResponsiveContainer width="100%" height={200}><BarChart data={weekly}><CartesianGrid strokeDasharray="3 3" stroke="var(--report-grid-stroke)" className="[--report-grid-stroke:#e2e8f0] dark:[--report-grid-stroke:#1e293b]" /><XAxis dataKey="week" stroke="#64748b" tick={{ fontSize: 10 }} /><YAxis stroke="#64748b" tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} /><Legend /><Bar dataKey="stockIn" fill="#3b82f6" name="Stock In" radius={[6, 6, 0, 0]} /><Bar dataKey="stockOut" fill="#ef4444" name="Stock Out" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></Chart>
       <Chart title="Inventory Status Overview" empty={!inventory.some((item) => item.value > 0)}><Donut data={inventory} /></Chart>
       <Chart title="Warehouse Allocations" empty={!capacity}>{capacity && <CapacitySummary capacity={capacity} />}</Chart>
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{reportCards.map((report) => <div key={report.type} className="bg-[#111827] border border-[#1f2937] rounded-xl p-4 flex flex-col hover:border-gray-600 transition-colors"><div className="flex gap-3"><div className="p-2 h-fit rounded-lg bg-slate-800/30">{report.icon}</div><div><h4 className="text-sm font-semibold text-white">{report.title}</h4><p className="text-xs text-slate-400">Real-time database records</p></div></div><p className="text-xs text-slate-400 mt-2 flex-1">{report.description}</p><div className="grid grid-cols-2 gap-2 mt-3">{(['preview', 'print', 'pdf', 'excel'] as ReportFormat[]).map((format) => { const busy = generating === `${report.type}:${format}`; const Icon = format === 'preview' ? Eye : format === 'print' ? Printer : format === 'excel' ? FileSpreadsheet : Download; return <button key={format} onClick={() => void generate(report.type, format)} disabled={generating !== null} className="min-h-11 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-inherit transition-colors disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer focus:ring-2 focus:ring-cyan-500/40"><Icon className={`w-3.5 h-3.5 ${busy ? 'animate-pulse' : ''}`} />{busy ? 'Working…' : format[0].toUpperCase() + format.slice(1)}</button>; })}</div></div>)}</div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{reportCards.map((report) => <div key={report.type} className="bg-[#111827] border border-[#1f2937] rounded-xl p-4 flex flex-col hover:border-gray-600 transition-colors"><div className="flex gap-3"><div className="p-2 h-fit rounded-lg bg-slate-800/30">{report.icon}</div><div><h4 className="text-sm font-semibold text-white">{report.title}</h4><p className="text-xs text-slate-400">Real-time database records</p></div></div><p className="text-xs text-slate-400 mt-2 flex-1">{report.description}</p><div className="grid grid-cols-2 gap-2 mt-3">{(['preview', 'print', 'pdf', 'excel'] as ReportFormat[]).map((format) => { const busy = generating === `${report.type}:${format}`; const Icon = format === 'preview' ? Eye : format === 'print' ? Printer : format === 'excel' ? FileSpreadsheet : Download; return <button key={format} onClick={() => requestGenerate(report.type, format)} disabled={generating !== null} className="min-h-11 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-inherit transition-colors disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer focus:ring-2 focus:ring-cyan-500/40"><Icon className={`w-3.5 h-3.5 ${busy ? 'animate-pulse' : ''}`} />{busy ? 'Working…' : formatLabel(format)}</button>; })}</div></div>)}</div>
 
     <div className="bg-[#111827] border border-[#1f2937] rounded-xl p-4"><div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"><h3 className="text-sm font-semibold text-white">Recent Generated Reports</h3><div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap"><div className="relative w-full min-w-0 sm:w-auto"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input aria-label="Search recent reports" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reports..." className="w-full min-w-0 bg-[#0f172a] border border-[#1f2937] rounded-lg pl-8 pr-3 py-2 text-sm sm:w-auto" /></div><select aria-label="Filter report category" value={category} onChange={(event) => setCategory(event.target.value)} className="w-full min-w-0 bg-[#0f172a] border border-[#1f2937] rounded-lg px-2 py-2 text-sm sm:w-auto"><option value="All">All Categories</option>{reportCards.map((report) => <option key={report.type} value={report.type}>{report.title}</option>)}</select></div></div><div className="max-w-full overflow-x-auto"><table className="w-full text-sm"><thead className="bg-[#0f172a]"><tr>{['Report Name', 'Category', 'Date Generated', 'Generated By', 'Format'].map((title) => <th key={title} className="px-3 py-2 text-left text-xs uppercase text-slate-400">{title}</th>)}</tr></thead><tbody>{filtered.map((report) => <tr key={report.id} className="border-b border-[#1f2937]"><td className="px-3 py-2 text-white">{report.name}</td><td className="px-3 py-2">{report.category ?? report.type}</td><td className="px-3 py-2">{dateTime(report.generated_at ?? report.dateGenerated)}</td><td className="px-3 py-2">{report.generated_by ?? report.generatedBy ?? '—'}</td><td className="px-3 py-2">{report.format}</td></tr>)}{!filtered.length && <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-400">No generated report history is available.</td></tr>}</tbody></table></div></div>
     <div className="bg-[#111827] border border-[#1f2937] rounded-xl p-4"><h3 className="text-sm font-semibold text-white">Report Notes</h3><ul className="text-xs text-slate-400 mt-2 space-y-1 list-disc list-inside"><li>Reports use current database data when generated.</li><li>From/To filters the charts and dated reports by Asia/Manila business day; today's cards, pending counts, inventory and capacity always show current data.</li><li>Excel exports are CSV-compatible files.</li><li>PDF uses the browser Save as PDF workflow.</li></ul></div>
     {preview && <Preview report={preview} close={() => setPreview(null)} />}
+    <ReportPasswordModal request={accessRequest} onCancel={() => { setAccessRequest(null); setPendingReport(null); }} onAuthorized={generate} />
   </div>;
 };
 
 const Alert = ({ text, warning, children }: { text: string; warning?: boolean; children?: React.ReactNode }) => <div role="alert" className={`flex justify-between gap-4 rounded-xl border p-4 text-sm ${warning ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-rose-500/30 bg-rose-500/10 text-rose-300'}`}><span>{text}</span>{children}</div>;
 const Chart = ({ title, empty, children }: { title: string; empty: boolean; children: React.ReactNode }) => <div className="relative bg-[#111827] border border-[#1f2937] rounded-xl p-4"><h3 className="text-sm font-semibold text-white mb-2">{title}</h3>{children}{empty && <div className="absolute inset-x-4 top-12 bottom-4 flex items-center justify-center bg-[#111827]/80 text-sm text-slate-400 pointer-events-none">No data available</div>}</div>;
-const Donut = ({ data }: { data: Array<{ name: string; value: number; color: string }> }) => <ResponsiveContainer width="100%" height={200}><PieChart><Pie data={data} cx="50%" cy="50%" innerRadius={50} outerRadius={70} dataKey="value">{data.map((entry) => <Cell key={entry.name} fill={entry.color} stroke="var(--report-segment-stroke)" strokeWidth={2} className="[--report-segment-stroke:none] dark:[--report-segment-stroke:#111827]" />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} /><Legend /></PieChart></ResponsiveContainer>;
+const Donut = ({ data }: { data: Array<{ name: string; value: number; color: string }> }) => <div className="mx-auto h-[220px] w-full max-w-md"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data} cx="50%" cy="44%" innerRadius={48} outerRadius={72} dataKey="value">{data.map((entry) => <Cell key={entry.name} fill={entry.color} stroke="var(--report-segment-stroke)" strokeWidth={2} className="[--report-segment-stroke:none] dark:[--report-segment-stroke:#111827]" />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} /><Legend verticalAlign="bottom" height={32} /></PieChart></ResponsiveContainer></div>;
 const Preview = ({ report, close }: { report: GeneratedReport; close: () => void }) => <div className="pm-report-preview fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="preview-title"><div className="pm-report-preview-panel flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-[#334155] bg-[#111827]"><div className="flex shrink-0 justify-between border-b border-[#1f2937] bg-white p-4 dark:bg-[#111827]"><div><h2 id="preview-title" className="text-lg font-semibold">{report.title}</h2><p className="text-xs text-slate-400">Generated {dateTime(report.generated_at)} · {report.rows.length.toLocaleString()} {report.rows.length === 1 ? 'record' : 'records'}</p><p className="text-xs text-slate-400">{reportPeriod(report)}</p></div><button aria-label="Close report preview" onClick={close} className="min-w-11 min-h-11 flex items-center justify-center rounded-lg hover:bg-slate-800 cursor-pointer focus:ring-2 focus:ring-cyan-500/40"><X className="w-5 h-5" /></button></div><div className="pm-report-preview-scroll min-h-0 flex-1 overflow-auto p-4"><table className="pm-report-table w-full text-xs" data-report={report.type} style={{ '--pm-report-min-width': `${report.columns.reduce((total, column) => total + previewColumnWidth(column, report.type), 0)}px` } as React.CSSProperties}><colgroup>{report.columns.map((column) => <col key={column} style={{ '--pm-col-width': `${previewColumnWidth(column, report.type)}px` } as React.CSSProperties} />)}</colgroup><thead className="sticky top-0 z-10 bg-white dark:bg-[#0f172a]"><tr>{report.columns.map((column) => <th key={column} className="px-3 py-2 text-left whitespace-nowrap" style={inventoryCellWidth(report.type, column)}>{heading(column)}</th>)}</tr></thead><tbody>{report.rows.map((row, index) => <tr key={index} className="border-b border-[#1f2937]">{report.columns.map((column) => <td key={column} className="px-3 py-2 whitespace-nowrap text-slate-300" style={inventoryCellWidth(report.type, column)}>{show(row[column])}</td>)}</tr>)}{!report.rows.length && <tr><td colSpan={Math.max(1, report.columns.length)} className="p-8 text-center text-slate-400">No records match these filters.</td></tr>}</tbody></table></div></div></div>;
 
 export default Reports;

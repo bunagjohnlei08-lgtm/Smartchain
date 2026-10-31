@@ -244,10 +244,16 @@ class StockOutController extends Controller
             $expected = 'inventories.barcode -> inventory product';
             if ($warehouseId) {
                 $inventory = $this->inventoryForItem($item, $warehouseId);
-                if (!$inventory) $reason = 'No inventory exists for this product in the assigned warehouse.';
-                elseif (!trim((string) $inventory->barcode)) $reason = 'Inventory has no valid barcode.';
-                elseif ($inventory->pending_receiving || $inventory->status === 'Out of Stock') $reason = 'Inventory is not usable for Stock Out.';
-                elseif ($inventory->available_stock < (float) $item->quantity) $reason = 'Available inventory is insufficient for the ordered quantity.';
+                $catalogProduct = $item->product ?? $inventory?->product;
+                if ($catalogProduct && WarehouseCapacity::normalizeUnit($item->unit) !== WarehouseCapacity::normalizeUnit($catalogProduct->unit)) {
+                    $reason = "Order unit {$item->unit} does not match catalog unit {$catalogProduct->unit}; automatic conversion is not allowed.";
+                }
+                if (!$reason) {
+                    if (!$inventory) $reason = 'No inventory exists for this product in the assigned warehouse.';
+                    elseif (!trim((string) $inventory->barcode)) $reason = 'Inventory has no valid barcode.';
+                    elseif ($inventory->pending_receiving || $inventory->status === 'Out of Stock') $reason = 'Inventory is not usable for Stock Out.';
+                    elseif ($inventory->available_stock < (float) $item->quantity) $reason = 'Available inventory is insufficient for the ordered quantity.';
+                }
             }
             if ($reason) {
                 $errors[] = ['order_item_id' => $item->id, 'product_name' => $item->product_name, 'reason' => $reason, 'expected_reference' => $expected];
@@ -285,6 +291,15 @@ class StockOutController extends Controller
             $belongs = (clone $items)->exists();
             if ($belongs) throw ValidationException::withMessages(['quantity' => 'This item has already been fully released.']);
             throw ValidationException::withMessages(['barcode' => 'This product is not included in this order.']);
+        }
+        $catalogProduct = $item->product ?? $inventory->product;
+        if (!$catalogProduct) {
+            throw ValidationException::withMessages(['unit' => 'This legacy order item has no authoritative catalog product. Reconcile it before Stock Out.']);
+        }
+        if (WarehouseCapacity::normalizeUnit($item->unit) !== WarehouseCapacity::normalizeUnit($catalogProduct->unit)) {
+            throw ValidationException::withMessages([
+                'unit' => "Order unit {$item->unit} does not match catalog unit {$catalogProduct->unit}. Stock Out cannot convert or reinterpret quantities.",
+            ]);
         }
         $released = $this->releasedFor($item);
         $remaining = (int) ((float) $item->quantity - $released);

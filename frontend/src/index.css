@@ -2893,6 +2893,49 @@
   }
 }
 
+/* Shared mobile density for routed Admin, Plant Manager, and QA content.
+   This intentionally excludes fixed dialogs/drawers and leaves desktop/tablet
+   utilities untouched. */
+@layer utilities {
+  @media (max-width: 639px) {
+    :is(.admin-main, .plant-manager-main, .qa-main) a[class*="px-"][class*="rounded-"]:not(.fixed *) {
+      min-height: 32px !important;
+      gap: 4px !important;
+      padding: 5px 10px !important;
+      border-radius: 8px !important;
+      font-size: 12px !important;
+      line-height: 16px !important;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) a[class*="px-"][class*="rounded-"]:not(.fixed *) > svg {
+      width: 14px !important;
+      height: 14px !important;
+      flex-shrink: 0;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) :is(section, article)[class~="p-5"]:not(.fixed *),
+    :is(.admin-main, .plant-manager-main, .qa-main) :is(section, article)[class~="p-6"]:not(.fixed *) {
+      padding: 16px !important;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) h2:is([class~="text-xl"], [class~="text-2xl"]):not(.fixed *) {
+      font-size: 18px !important;
+      line-height: 24px !important;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) :is(th, td)[class*="px-"]:not(.fixed *) {
+      padding: 8px 10px !important;
+      font-size: 12px !important;
+      line-height: 16px !important;
+    }
+
+    :is(.admin-main, .plant-manager-main, .qa-main) :is(.flex, .grid):has(> input:is([type="search"], [placeholder*="search" i]), > label input:is([type="search"], [placeholder*="search" i])):not(.fixed *),
+    :is(.admin-main, .plant-manager-main, .qa-main) :is(.flex, .grid):has(> select, > label select):not(.fixed *) {
+      gap: 8px !important;
+    }
+  }
+}
+
 /* Procurement table actions override the shared page-button scale at the same
    cascade layer. These controls intentionally use the compact table scale. */
 @layer utilities {
@@ -3128,6 +3171,13 @@
   --text-secondary: #334155;
   --text-muted: #64748b;
   --text-inverse: #ffffff;
+
+  --accent-primary: #0f172a;
+  --accent-hover: #1e293b;
+  --accent-active: #020617;
+  --accent-surface: #e2e8f0;
+  --accent-border: #94a3b8;
+  --accent-on-primary: #ffffff;
 
   --shadow-color: rgba(74, 80, 95, 0.618);
   --shadow-color-light: rgba(47, 41, 60, 0.473);
@@ -4058,6 +4108,7 @@ body {
       min-height: 28px !important;
       gap: 4px !important;
       padding: 4px 8px !important;
+      border-radius: 8px !important;
       font-size: 12px !important;
       line-height: 18px !important;
       -webkit-text-size-adjust: none;
@@ -4123,6 +4174,7 @@ body {
       min-height: 28px !important;
       gap: 4px !important;
       padding: 4px 8px !important;
+      border-radius: 8px !important;
       font-size: 12px !important;
       line-height: 18px !important;
       -webkit-text-size-adjust: none;
@@ -4171,10 +4223,10 @@ body {
   @media (max-width: 639px) {
     .admin-main input:is([type="search"], [placeholder*="Search" i]):not(.fixed *),
     .admin-main input:is([type="search"], [placeholder*="search" i]):not(.fixed *) {
-      height: 32px !important;
+      height: 38px !important;
       min-height: 0 !important;
       padding: 6px 8px 6px 30px !important;
-      font-size: 11px !important;
+      font-size: 12px !important;
       line-height: 18px !important;
       -webkit-text-size-adjust: none;
       text-size-adjust: none;
@@ -4257,20 +4309,20 @@ body {
     }
 
     .admin-main select:not(.fixed *) {
-      height: 30px !important;
+      height: 36px !important;
       min-height: 0 !important;
-      padding: 5px 9px !important;
-      font-size: 11px !important;
+      padding: 6px 10px !important;
+      font-size: 12px !important;
       line-height: 18px !important;
       -webkit-text-size-adjust: none;
       text-size-adjust: none;
     }
 
     .admin-main input:is([type="date"], [type="datetime-local"]):not(.fixed *) {
-      height: 30px !important;
+      height: 36px !important;
       min-height: 0 !important;
-      padding: 5px 8px !important;
-      font-size: 11px !important;
+      padding: 6px 10px !important;
+      font-size: 12px !important;
       line-height: 18px !important;
     }
 
@@ -4308,30 +4360,30 @@ body {
 @layer utilities {
   @media (max-width: 639px) {
     :is(.plant-manager-main, .qa-main) input:is([type="search"], [placeholder*="search" i]):not(.fixed *) {
-      height: 32px !important;
+      height: 38px !important;
       min-height: 0 !important;
       padding: 6px 8px 6px 30px !important;
-      font-size: 11px !important;
+      font-size: 12px !important;
       line-height: 18px !important;
       -webkit-text-size-adjust: none;
       text-size-adjust: none;
     }
 
     :is(.plant-manager-main, .qa-main) select:not(.fixed *) {
-      height: 30px !important;
+      height: 36px !important;
       min-height: 0 !important;
-      padding: 5px 9px !important;
-      font-size: 11px !important;
+      padding: 6px 10px !important;
+      font-size: 12px !important;
       line-height: 18px !important;
       -webkit-text-size-adjust: none;
       text-size-adjust: none;
     }
 
     :is(.plant-manager-main, .qa-main) input:is([type="date"], [type="datetime-local"]):not(.fixed *) {
-      height: 30px !important;
+      height: 36px !important;
       min-height: 0 !important;
-      padding: 5px 8px !important;
-      font-size: 11px !important;
+      padding: 6px 10px !important;
+      font-size: 12px !important;
       line-height: 18px !important;
     }
 
@@ -5730,8 +5782,8 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 .admin-product-catalog .product-catalog-table {
-  width: 1934px;
-  min-width: 1934px;
+  width: 1966px;
+  min-width: 1966px;
   table-layout: fixed;
 }
 .admin-product-catalog .product-catalog-table :is(th, td) { min-width: 0; max-width: none; overflow: hidden; vertical-align: middle; }
@@ -5746,8 +5798,8 @@ body {
 .admin-product-catalog .product-catalog-table :is(th, td):nth-child(9) { width: 112px; }
 .admin-product-catalog .product-catalog-table :is(th, td):nth-child(10) { width: 72px; }
 .admin-product-catalog .product-catalog-table :is(th, td):nth-child(11),
-.admin-product-catalog .product-catalog-table :is(th, td):nth-child(12),
-.admin-product-catalog .product-catalog-table :is(th, td):nth-child(13) { width: 128px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(12) { width: 128px; }
+.admin-product-catalog .product-catalog-table :is(th, td):nth-child(13) { width: 160px; }
 .admin-product-catalog .product-catalog-table :is(th, td):nth-child(14) { width: 144px; }
 .admin-product-catalog .product-catalog-table th { white-space: normal; }
 .admin-product-catalog .product-catalog-table td:nth-child(3) {
@@ -5768,3 +5820,121 @@ body {
 .rfq-records-table th:nth-child(5), .rfq-records-table th:nth-child(6) { width: 180px; }
 .rfq-records-table th:nth-child(7) { width: 320px; }
 .rfq-records-table th, .rfq-records-table td { padding-inline: 12px; vertical-align: middle; }
+
+@media (max-width: 639px) {
+  .product-sourcing-page input[aria-label="Search products"] { padding-left: 36px !important; }
+  .product-sourcing-page label .relative > svg { left: 10px; width: 14px; height: 14px; }
+  .forecast-insights-table { min-width: 760px !important; font-size: 11px; line-height: 16px; }
+  .forecast-insights-table thead { font-size: 10px; line-height: 14px; }
+  .forecast-insights-table :is(th, td) { padding: 8px 10px !important; }
+  .forecast-insights-table tbody th p:first-child { line-height: 16px; overflow-wrap: normal; word-break: normal; }
+  .forecast-insights-table tbody :is(td:nth-child(2), td:nth-child(3), td:nth-child(4)) { white-space: nowrap; }
+  .forecast-insights-table tbody td:last-child button { min-height: 40px !important; gap: 6px !important; padding-inline: 10px !important; border-radius: 8px !important; font-size: 11px !important; line-height: 16px !important; white-space: nowrap; }
+  .forecast-insights-table tbody td:last-child svg { width: 14px; height: 14px; }
+}
+
+/* Semantic interactive accent normalization. This is intentionally limited to
+   light-mode controls in authenticated role content; status badges, charts,
+   legends, and the independently branded Supplier Portal remain untouched. */
+@layer utilities {
+  .auth-surface[data-appearance="light"] {
+    --accent-primary: #0f172a;
+    --accent-hover: #1e293b;
+    --accent-active: #020617;
+    --accent-surface: #e2e8f0;
+    --accent-border: #94a3b8;
+    --accent-on-primary: #ffffff;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(button, a, [role="button"], [role="tab"]):is(
+      [class~="bg-cyan-500"], [class~="bg-cyan-600"], [class~="bg-cyan-700"],
+      [class~="bg-blue-600"], [class~="bg-blue-700"], [class~="bg-sky-700"],
+      [class~="bg-[#00a3c4]"], [class~="bg-[#092635]"]
+    ) {
+    background-color: var(--accent-primary) !important;
+    border-color: var(--accent-primary) !important;
+    color: var(--accent-on-primary) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(button, a, [role="button"], [role="tab"]):is(
+      [class~="hover:bg-cyan-400"], [class~="hover:bg-cyan-500"], [class~="hover:bg-cyan-600"],
+      [class~="hover:bg-blue-700"], [class~="hover:bg-blue-800"], [class~="hover:bg-sky-800"]
+    ):hover {
+    background-color: var(--accent-hover) !important;
+    border-color: var(--accent-hover) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(button, a, [role="button"], [role="tab"]):is(
+      [class~="bg-cyan-500"], [class~="bg-cyan-600"], [class~="bg-cyan-700"],
+      [class~="bg-blue-600"], [class~="bg-blue-700"], [class~="bg-sky-700"],
+      [class~="bg-[#00a3c4]"], [class~="bg-[#092635]"]
+    ):active {
+    background-color: var(--accent-active) !important;
+    border-color: var(--accent-active) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(a, button, [role="button"], [role="tab"]):is(
+      [class~="text-cyan-600"], [class~="text-cyan-700"],
+      [class~="text-blue-600"], [class~="text-blue-700"],
+      [class~="text-sky-600"], [class~="text-sky-700"]
+    ):not([class*="bg-"]) {
+    color: var(--accent-primary) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(button, a, [role="button"], [role="tab"]):is(
+      [class~="bg-cyan-50"], [class~="bg-cyan-500/10"], [class~="bg-cyan-500/15"],
+      [class~="bg-blue-50"], [class~="bg-blue-500/10"], [class~="bg-sky-50"]
+    ) {
+    background-color: var(--accent-surface) !important;
+    border-color: var(--accent-border) !important;
+    color: var(--accent-primary) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(a, button, [role="button"], [role="tab"]):is(
+      [class~="border-cyan-500"], [class~="border-cyan-600"], [class~="border-cyan-700"],
+      [class~="border-blue-600"], [class~="border-blue-700"]
+    ) {
+    border-color: var(--accent-primary) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is([class*="focus:ring-cyan-"], [class*="focus-visible:ring-cyan-"], [class*="focus:ring-blue-"], [class*="focus-visible:ring-blue-"]) {
+    --tw-ring-color: color-mix(in srgb, var(--accent-primary) 45%, transparent) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(input, select, textarea):focus {
+    border-color: var(--accent-primary) !important;
+  }
+
+  html:not(.dark) :is(.admin-main, .plant-manager-main, .qa-main)
+    :is(input[type="checkbox"], input[type="radio"]) {
+    accent-color: var(--accent-primary);
+  }
+
+  .auth-surface[data-appearance="light"] .auth-primary-button {
+    background: var(--accent-primary) !important;
+    color: var(--accent-on-primary) !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+  }
+
+  .auth-surface[data-appearance="light"] .auth-primary-button:hover {
+    background: var(--accent-hover) !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.24);
+  }
+
+  .auth-surface[data-appearance="light"] .auth-primary-button:active {
+    background: var(--accent-active) !important;
+  }
+
+  .auth-surface[data-appearance="light"] .login-light-input:focus {
+    border-color: var(--accent-primary) !important;
+    --tw-ring-color: color-mix(in srgb, var(--accent-primary) 25%, transparent) !important;
+  }
+}

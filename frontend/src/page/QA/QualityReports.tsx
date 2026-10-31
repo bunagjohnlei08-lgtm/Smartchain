@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import CompactDatePicker from '../../components/ui/CompactDatePicker';
 import { apiClient } from '../../lib/api';
 import { EvidenceGallery, type QaAttachment } from './components/EvidenceGallery';
+import ReportPasswordModal, { type ReportAccessRequest } from '../../components/reports/ReportPasswordModal';
 
 interface QualityReportData {
   report_period: {
@@ -26,10 +27,14 @@ interface QualityReportData {
   top_rejected_products: { product: string; quantity: number }[];
   supplier_quality: { name: string; inspections: number; accepted_quantity: number; rejected_quantity: number; pass_rate: number }[];
   inspection_evidence: { inspection_id: number; receiving_id: number; receiving_no: string; supplier: string; status: string; completed_at: string; attachments: QaAttachment[] }[];
+  production_inspections: Record<string, string | number | null>[];
+  inventory_audits: Record<string, string | number | null>[];
+  pending_workload: Record<string, string | number | null>[];
+  operational_summary: { production_inspections: number; production_accepted_quantity: number; production_rejected_quantity: number; inventory_audits: number; pending_workload: number };
 }
 
 const distributionColors: Record<string, string> = { Passed: '#22C55E', Rejected: '#EF4444' };
-const escapeCsv = (value: string | number): string => `"${String(value).replace(/"/g, '""')}"`;
+const escapeCsv = (value: string | number): string => { const text = String(value); const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text; return `"${safe.replace(/"/g, '""')}"`; };
 const escapeHtml = (value: string | number): string => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 const evidenceFiles = (attachments: QaAttachment[]): string => attachments.map((item) => item.original_name).join('; ');
 const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob); });
@@ -51,6 +56,10 @@ const KpiCard: React.FC<{ label: string; value: string | number; subtext: string
 );
 
 const EmptyChart: React.FC<{ message: string }> = ({ message }) => <div className="h-[300px] flex items-center justify-center text-sm text-slate-500">{message}</div>;
+const DataTable: React.FC<{ title: string; description: string; rows: Record<string, string | number | null>[] }> = ({ title, description, rows }) => {
+  const columns = Object.keys(rows[0] ?? {});
+  return <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none"><h3 className="text-lg font-semibold">{title}</h3><p className="mb-4 text-sm text-slate-600 dark:text-slate-400">{description}</p>{rows.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No records for this period.</p> : <div className="max-w-full overflow-x-auto"><table className="w-full min-w-max text-left text-sm"><thead><tr>{columns.map((column) => <th key={column} className="border-b border-slate-200 px-3 py-2 font-semibold dark:border-slate-700">{column.replaceAll('_', ' ')}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} className="border-b border-slate-100 dark:border-slate-800">{columns.map((column) => <td key={column} className="px-3 py-2">{row[column] ?? '—'}</td>)}</tr>)}</tbody></table></div>}</section>;
+};
 
 const QualityReports: React.FC = () => {
   const { theme } = useTheme();
@@ -62,6 +71,7 @@ const QualityReports: React.FC = () => {
   const [toDate, setToDate] = useState('');
   const [appliedRange, setAppliedRange] = useState({ fromDate: '', toDate: '' });
   const [dateError, setDateError] = useState<string | null>(null);
+  const [accessRequest, setAccessRequest] = useState<ReportAccessRequest | null>(null);
 
   const fetchReport = useCallback(async (range: { fromDate: string; toDate: string }) => {
     setLoading(true);
@@ -106,7 +116,7 @@ const QualityReports: React.FC = () => {
     void fetchReport(range);
   };
 
-  const exportExcel = () => {
+  const exportCsv = () => {
     if (!report) return;
     const rows: Array<Array<string | number>> = [
       ['Quality Reports'],
@@ -126,6 +136,9 @@ const QualityReports: React.FC = () => {
       ...report.supplier_quality.map((item) => [item.name, item.inspections, item.accepted_quantity, item.rejected_quantity, `${item.pass_rate}%`]),
       [], ['Inspection Evidence', 'Supplier', 'Completed At', 'Evidence Count', 'Evidence Files'],
       ...report.inspection_evidence.map((item) => [item.receiving_no, item.supplier, item.completed_at, item.attachments.length, evidenceFiles(item.attachments)]),
+      [], ['Production QA Inspections'], Object.keys(report.production_inspections[0] ?? {}), ...report.production_inspections.map((item) => Object.values(item).map((value) => value ?? '')),
+      [], ['Inventory Quality Audits'], Object.keys(report.inventory_audits[0] ?? {}), ...report.inventory_audits.map((item) => Object.values(item).map((value) => value ?? '')),
+      [], ['Pending QA Workload'], Object.keys(report.pending_workload[0] ?? {}), ...report.pending_workload.map((item) => Object.values(item).map((value) => value ?? '')),
     ];
     const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -136,17 +149,37 @@ const QualityReports: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const printReport = async () => {
+  const printReport = async (printWindow?: Window) => {
     if (!report) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) { setError('The report window was blocked. Allow pop-ups and try again.'); return; }
+    if (!printWindow || printWindow.closed) { throw new Error('The report window was blocked or closed. Allow pop-ups and try again.'); }
     printWindow.opener = null;
     const trendRows = report.trend.map((item) => `<tr><td>${escapeHtml(item.date)}</td><td>${item.passed}</td><td>${item.rejected}</td></tr>`).join('');
     const productRows = report.top_rejected_products.map((item) => `<tr><td>${escapeHtml(item.product)}</td><td>${item.quantity}</td></tr>`).join('');
     const supplierRows = report.supplier_quality.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${item.inspections}</td><td>${item.accepted_quantity}</td><td>${item.rejected_quantity}</td><td>${item.pass_rate}%</td></tr>`).join('');
+    const operationalTable = (title: string, rows: Record<string, string | number | null>[]) => { const columns = Object.keys(rows[0] ?? {}); return `<h2>${escapeHtml(title)}</h2><table><thead><tr>${columns.map((column) => `<th>${escapeHtml(column.replaceAll('_', ' '))}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${columns.map((column) => `<td>${escapeHtml(row[column] ?? '—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`; };
     const evidenceRows = (await Promise.all(report.inspection_evidence.map(async (item) => `<tr><td>${escapeHtml(item.receiving_no)}</td><td>${escapeHtml(item.supplier)}</td><td>${escapeHtml(new Date(item.completed_at).toLocaleString())}</td><td><strong>Evidence (${item.attachments.length})</strong><div class="evidence">${await printEvidence(item.attachments)}</div></td></tr>`))).join('');
-    printWindow.document.write(`<!doctype html><html><head><title>QA Quality Report</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px}h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin-top:24px}p{color:#555}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border:1px solid #bbb;padding:7px;text-align:left;vertical-align:top}th{background:#eee}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card{border:1px solid #bbb;padding:10px}.value{font-size:18px;font-weight:bold}.evidence{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.evidence figure{width:100px;margin:0}.evidence img{width:100px;height:70px;object-fit:contain;border:1px solid #ddd}.evidence figcaption,.file{display:block;max-width:120px;font-size:8px;overflow-wrap:anywhere}.muted{color:#666}@media print{body{padding:0}}</style></head><body><h1>QA Quality Report</h1><p>Generated ${escapeHtml(new Date().toLocaleString())}</p><p><strong>Report Period:</strong> ${escapeHtml(report.report_period.label)}</p><div class="summary"><div class="card">Completed<div class="value">${report.summary.completed_inspections}</div></div><div class="card">Passed<div class="value">${report.summary.passed_rate}%</div></div><div class="card">Rejected<div class="value">${report.summary.rejected_rate}%</div></div></div><h2>Inspection Trend</h2><table><thead><tr><th>Date</th><th>Passed</th><th>Rejected</th></tr></thead><tbody>${trendRows}</tbody></table><h2>Top Rejected Products</h2><table><thead><tr><th>Product</th><th>Rejected Quantity</th></tr></thead><tbody>${productRows}</tbody></table><h2>Supplier Quality Rating</h2><table><thead><tr><th>Supplier</th><th>Inspections</th><th>Accepted</th><th>Rejected</th><th>Pass Rate</th></tr></thead><tbody>${supplierRows}</tbody></table><h2>Inspection Evidence</h2><table><thead><tr><th>Receiving No.</th><th>Supplier</th><th>Completed</th><th>Evidence</th></tr></thead><tbody>${evidenceRows}</tbody></table></body></html>`);
+    printWindow.document.write(`<!doctype html><html><head><title>QA Quality Report</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px}h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin-top:24px}p{color:#555}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}th,td{border:1px solid #bbb;padding:7px;text-align:left;vertical-align:top}th{background:#eee}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card{border:1px solid #bbb;padding:10px}.value{font-size:18px;font-weight:bold}.evidence{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.evidence figure{width:100px;margin:0}.evidence img{width:100px;height:70px;object-fit:contain;border:1px solid #ddd}.evidence figcaption,.file{display:block;max-width:120px;font-size:8px;overflow-wrap:anywhere}.muted{color:#666}@media print{body{padding:0}}</style></head><body><h1>QA Quality Report</h1><p>Generated ${escapeHtml(new Date().toLocaleString())}</p><p><strong>Report Period:</strong> ${escapeHtml(report.report_period.label)}</p><div class="summary"><div class="card">Completed<div class="value">${report.summary.completed_inspections}</div></div><div class="card">Passed<div class="value">${report.summary.passed_rate}%</div></div><div class="card">Rejected<div class="value">${report.summary.rejected_rate}%</div></div></div><h2>Inspection Trend</h2><table><thead><tr><th>Date</th><th>Passed</th><th>Rejected</th></tr></thead><tbody>${trendRows}</tbody></table><h2>Top Rejected Products</h2><table><thead><tr><th>Product</th><th>Rejected Quantity</th></tr></thead><tbody>${productRows}</tbody></table><h2>Supplier Quality Rating</h2><table><thead><tr><th>Supplier</th><th>Inspections</th><th>Accepted</th><th>Rejected</th><th>Pass Rate</th></tr></thead><tbody>${supplierRows}</tbody></table>${operationalTable('Production QA Inspections', report.production_inspections)}${operationalTable('Inventory Quality Audits', report.inventory_audits)}${operationalTable('Pending QA Workload', report.pending_workload)}<h2>Inspection Evidence</h2><table><thead><tr><th>Receiving No.</th><th>Supplier</th><th>Completed</th><th>Evidence</th></tr></thead><tbody>${evidenceRows}</tbody></table></body></html>`);
     printWindow.document.close(); printWindow.focus(); printWindow.print();
+  };
+
+  const requestAction = (format: 'PDF' | 'CSV' | 'PRINT') => {
+    setAccessRequest({ resource: 'qa:quality-report', format, action: format === 'PRINT' ? 'PRINT' : 'EXPORT', label: format === 'PRINT' ? 'Print Report' : `Export ${format}`, opensPrintWindow: format !== 'CSV' });
+  };
+
+  const runAuthorizedAction = async (authorization: string, printWindow?: Window) => {
+    if (!accessRequest) return;
+    try {
+      await apiClient.post('/report-access/consume', {
+        resource: accessRequest.resource, format: accessRequest.format, action: accessRequest.action,
+      }, { headers: { 'X-Report-Authorization': authorization } });
+      const format = accessRequest.format;
+      setAccessRequest(null);
+      if (format === 'CSV') exportCsv(); else await printReport(printWindow);
+    } catch (requestError: any) {
+      printWindow?.close();
+      setError(requestError?.response?.data?.message || requestError?.message || 'The protected report action could not be completed. Please try again.');
+      setAccessRequest(null);
+    }
   };
 
   const summary = report?.summary;
@@ -166,7 +199,7 @@ const QualityReports: React.FC = () => {
 
   return (
     <div className="qa-quality-reports min-h-screen w-full min-w-0 space-y-6 bg-slate-50 p-4 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 md:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quality Reports</h1><p className="text-sm text-slate-600 dark:text-slate-400">Aggregated quality performance from completed QA inspections.</p></div><div className="flex flex-wrap items-center gap-3"><button onClick={printReport} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileText className="w-4 h-4" /> Export PDF</button><button onClick={exportExcel} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileSpreadsheet className="w-4 h-4" /> Export Excel</button><button onClick={printReport} disabled={!report || loading} className="cursor-pointer bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"><Printer className="w-4 h-4" /> Print</button></div></div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h1 className="text-2xl font-bold text-slate-900 dark:text-white">Quality Reports</h1><p className="text-sm text-slate-600 dark:text-slate-400">Aggregated quality performance from completed QA inspections.</p></div><div className="flex flex-wrap items-center gap-3"><button onClick={() => requestAction('PDF')} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileText className="w-4 h-4" /> Export PDF</button><button onClick={() => requestAction('CSV')} disabled={!report || loading} className="cursor-pointer border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 dark:border-gray-700 dark:bg-[#0d1322] dark:hover:bg-gray-800 dark:text-white font-medium px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"><FileSpreadsheet className="w-4 h-4" /> Export CSV</button><button onClick={() => requestAction('PRINT')} disabled={!report || loading} className="cursor-pointer bg-[#092635] hover:opacity-90 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:hover:opacity-100 dark:text-black font-semibold px-4 py-2 rounded-xl flex items-center gap-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"><Printer className="w-4 h-4" /> Print</button></div></div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800/50 dark:bg-[#0d1322] dark:shadow-none" aria-labelledby="quality-report-period-heading">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -205,7 +238,11 @@ const QualityReports: React.FC = () => {
           <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">Evidence retained with completed inspections.</p>
           <div className="space-y-3">{report.inspection_evidence.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">{hasCustomRange ? 'No completed inspections found for this period.' : 'No completed inspection evidence is available.'}</p> : report.inspection_evidence.map((inspection) => <details key={inspection.inspection_id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-800"><summary className="min-h-11 cursor-pointer py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-cyan-500"><span className="mr-2">{inspection.receiving_no}</span><span className="text-slate-500">{inspection.supplier} • Evidence: {inspection.attachments.length} files</span></summary><div className="mt-3"><EvidenceGallery attachments={inspection.attachments} receivingId={inspection.receiving_id} /></div></details>)}</div>
         </section>
+        <DataTable title="Production QA Inspections" description="Recorded production QA decisions; completed production is not inferred as QA approval." rows={report.production_inspections} />
+        <DataTable title="Inventory Quality Audits" description="Your submitted audit findings and workflow outcome; restricted Admin reviewer details are excluded." rows={report.inventory_audits} />
+        <DataTable title="Pending QA Workload" description="Actionable receiving, production and returned inventory-audit work currently assigned to you." rows={report.pending_workload} />
       </>}
+      <ReportPasswordModal request={accessRequest} onCancel={() => setAccessRequest(null)} onAuthorized={runAuthorizedAction} />
     </div>
   );
 };

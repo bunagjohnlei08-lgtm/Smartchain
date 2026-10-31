@@ -25,7 +25,10 @@ class Supplier extends Model
         'status', 'payment_terms', 'notes', 'removal_requested_at',
         'removal_requested_by_id', 'archived_at', 'accreditation_status',
         'accredited_at', 'accreditation_expires_on',
+        'bank_name', 'bank_account',
     ];
+
+    protected $hidden = ['bank_account'];
 
     protected function casts(): array
     {
@@ -34,6 +37,7 @@ class Supplier extends Model
             'archived_at' => 'datetime',
             'accredited_at' => 'datetime',
             'accreditation_expires_on' => 'date',
+            'bank_account' => 'encrypted',
         ];
     }
 

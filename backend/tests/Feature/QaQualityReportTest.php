@@ -59,6 +59,9 @@ class QaQualityReportTest extends TestCase
             ->assertJsonPath('data.inspection_evidence.0.attachments.0.original_name', 'damage.jpg')
             ->assertJsonPath('data.inspection_evidence.1.receiving_no', 'RCV-PARTIAL')
             ->assertJsonPath('data.inspection_evidence.2.receiving_no', 'RCV-PASS');
+        $response->assertJsonStructure(['data' => ['production_inspections', 'inventory_audits', 'pending_workload', 'operational_summary' => [
+            'production_inspections', 'production_accepted_quantity', 'production_rejected_quantity', 'inventory_audits', 'pending_workload',
+        ]]]);
     }
 
     public function test_inspection_evidence_uses_id_as_a_deterministic_newest_first_tie_breaker(): void

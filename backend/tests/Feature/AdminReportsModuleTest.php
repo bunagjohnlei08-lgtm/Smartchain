@@ -82,6 +82,18 @@ class AdminReportsModuleTest extends TestCase
         return $this->preview($key, $filters + ['per_page' => 100])->assertOk()->json('rows');
     }
 
+    private function exportReport(array $payload, ?User $as = null)
+    {
+        $user = $as ?? $this->admin;
+        $authorization = $this->actingAs($user)->postJson('/api/report-access/confirm', [
+            'password' => 'password', 'resource' => 'admin:'.$payload['report_key'],
+            'format' => $payload['format'], 'action' => 'EXPORT',
+        ])->assertOk()->json('authorization');
+
+        return $this->actingAs($user)->withHeader('X-Report-Authorization', $authorization)
+            ->postJson('/api/admin/reports/export', $payload);
+    }
+
     private function purchaseOrder(string $number = 'PO-2026-0001', string $status = 'Completed'): PurchaseOrder
     {
         $po = PurchaseOrder::create([
@@ -172,7 +184,7 @@ class AdminReportsModuleTest extends TestCase
         $categories = collect($response->json('data'))->pluck('category')->unique()->values()->all();
         $this->assertEqualsCanonicalizing(['inventory', 'stock-movement', 'receiving', 'shipment', 'order', 'procurement', 'supplier', 'warehouse', 'ai-forecast', 'system'], $categories);
         $keys = collect($response->json('data'))->pluck('key');
-        foreach (['inventory.summary', 'inventory.low_stock', 'inventory.out_of_stock', 'stock.stock_in', 'stock.stock_out', 'stock.movement_summary', 'receiving.replacements', 'shipment.in_transit', 'orders.fulfillment', 'procurement.purchase_orders', 'suppliers.rejections', 'warehouse.capacity', 'system.audit_logs', 'system.user_activity'] as $key) {
+        foreach (['inventory.summary', 'inventory.low_stock', 'inventory.out_of_stock', 'stock.stock_in', 'stock.stock_out', 'stock.movement_summary', 'receiving.replacements', 'shipment.in_transit', 'orders.fulfillment', 'procurement.purchase_orders', 'procurement.rfqs', 'procurement.bid_awards', 'suppliers.rejections', 'suppliers.applications', 'warehouse.capacity', 'warehouse.inventory_audits', 'warehouse.production_material_usage', 'shipment.logistics_integration', 'system.audit_logs', 'system.user_activity'] as $key) {
             $this->assertTrue($keys->contains($key), "Missing {$key}");
         }
     }
@@ -244,6 +256,25 @@ class AdminReportsModuleTest extends TestCase
         $this->assertArrayNotHasKey('cost_price', $rows['INV-HEALTHY']);
 
         $this->assertSame(['INV-OUT'], collect($this->rows('inventory.summary', ['category' => 'Pigments']))->pluck('barcode')->all());
+    }
+
+    public function test_raw_material_export_accepts_valid_main_warehouse_product_category_and_date_filters(): void
+    {
+        $this->healthy->update(['item_classification' => Product::RAW_MATERIAL]);
+
+        $response = $this->exportReport([
+            'report_key' => 'inventory.raw_materials', 'format' => 'CSV',
+            'warehouse_id' => $this->main->id, 'product_id' => $this->healthy->id,
+            'category' => 'Chemicals', 'date_from' => now()->subDay()->toDateString(), 'date_to' => now()->toDateString(),
+        ])->assertOk()->assertHeader('X-Report-Rows', '1');
+
+        $this->assertStringContainsString('INV-HEALTHY', file_get_contents($response->baseResponse->getFile()->getPathname()));
+    }
+
+    public function test_report_rejects_a_product_that_does_not_belong_to_the_selected_category(): void
+    {
+        $this->preview('inventory.summary', ['product_id' => $this->healthy->id, 'category' => 'Pigments'])
+            ->assertUnprocessable()->assertJsonValidationErrors('product_id');
     }
 
     public function test_low_stock_and_out_of_stock_follow_reorder_level_rules(): void
@@ -554,7 +585,7 @@ class AdminReportsModuleTest extends TestCase
             ->assertJsonPath('warehouse_capacity_overview.0.code', 'WH-MAIN')
             ->assertJsonPath('warehouse_capacity_overview.0.unit_capacity.SACK.used', 55)
             ->assertJsonPath('warehouse_capacity_overview.0.unit_capacity.DRUM.used', 4)
-            ->assertJsonPath('metrics.warehouse_capacity.used', null)
+            ->assertJsonPath('metrics.warehouse_capacity.used', 78)
             ->assertJsonPath('metrics.warehouse_capacity.allocated_total', 120)
             ->assertJsonPath('metrics.warehouse_capacity.total', 120);
     }
@@ -578,7 +609,7 @@ class AdminReportsModuleTest extends TestCase
         }
         $this->assertSame(['LOGIN_FAILED'], array_column($this->rows('system.audit_logs', ['status' => 'FAILED']), 'action'));
 
-        $export = $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'system.audit_logs', 'format' => 'CSV'])->assertOk();
+        $export = $this->exportReport(['report_key' => 'system.audit_logs', 'format' => 'CSV'])->assertOk();
         $csv = file_get_contents($export->baseResponse->getFile()->getPathname());
         foreach (['123456', 'plain-token', 'hunter2', 'SecretAgent'] as $secret) {
             $this->assertStringNotContainsString($secret, $csv);
@@ -592,7 +623,7 @@ class AdminReportsModuleTest extends TestCase
 
     public function test_csv_export_returns_actual_rows_and_records_history(): void
     {
-        $response = $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'CSV', 'warehouse_id' => $this->main->id]);
+        $response = $this->exportReport(['report_key' => 'inventory.summary', 'format' => 'CSV', 'warehouse_id' => $this->main->id]);
 
         $response->assertOk()->assertHeader('X-Report-Rows', '2');
         $this->assertStringStartsWith('text/csv', $response->headers->get('Content-Type'));
@@ -622,17 +653,53 @@ class AdminReportsModuleTest extends TestCase
         $this->assertNotNull($definition['last_generated_at']);
     }
 
+    public function test_export_files_support_zero_one_and_multiple_rows(): void
+    {
+        $empty = $this->exportReport([
+            'report_key' => 'inventory.summary', 'format' => 'CSV',
+            'warehouse_id' => $this->main->id, 'category' => 'No matching category',
+        ])->assertOk()->assertHeader('X-Report-Rows', '0');
+        $emptyCsv = trim(ltrim(file_get_contents($empty->baseResponse->getFile()->getPathname()), "\xEF\xBB\xBF"));
+        $this->assertCount(1, preg_split('/\r?\n/', $emptyCsv));
+        $this->assertStringStartsWith('Product,Barcode,Category', $emptyCsv);
+
+        foreach (['CSV', 'XLSX', 'PDF'] as $format) {
+            $single = $this->exportReport([
+                'report_key' => 'inventory.summary', 'format' => $format,
+                'warehouse_id' => $this->main->id, 'category' => 'Chemicals', 'product_id' => $this->healthy->id,
+            ])->assertOk()->assertHeader('X-Report-Rows', '1');
+            $contents = file_get_contents($single->baseResponse->getFile()->getPathname());
+            if ($format === 'CSV') {
+                $this->assertCount(2, preg_split('/\r?\n/', trim(ltrim($contents, "\xEF\xBB\xBF"))));
+                $this->assertStringContainsString('INV-HEALTHY', $contents);
+            } elseif ($format === 'XLSX') {
+                $zip = new ZipArchive();
+                $this->assertTrue($zip->open($single->baseResponse->getFile()->getPathname()) === true);
+                $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+                $zip->close();
+                $this->assertStringContainsString('INV-HEALTHY', $sheet);
+            } else {
+                $this->assertStringStartsWith('%PDF', $contents);
+                $this->assertGreaterThan(1000, strlen($contents));
+            }
+        }
+
+        $this->exportReport([
+            'report_key' => 'inventory.summary', 'format' => 'CSV', 'warehouse_id' => $this->main->id,
+        ])->assertOk()->assertHeader('X-Report-Rows', '2');
+    }
+
     public function test_csv_export_neutralizes_formula_values(): void
     {
         $this->healthy->update(['name' => '=HYPERLINK("http://x")']);
-        $response = $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'CSV'])->assertOk();
+        $response = $this->exportReport(['report_key' => 'inventory.summary', 'format' => 'CSV'])->assertOk();
 
         $this->assertStringContainsString("'=HYPERLINK", file_get_contents($response->baseResponse->getFile()->getPathname()));
     }
 
     public function test_excel_and_pdf_exports_are_real_files_and_only_offered_where_supported(): void
     {
-        $xlsx = $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'XLSX'])->assertOk();
+        $xlsx = $this->exportReport(['report_key' => 'inventory.summary', 'format' => 'XLSX'])->assertOk();
         $this->assertSame('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $xlsx->headers->get('Content-Type'));
         $zip = new ZipArchive();
         $this->assertTrue($zip->open($xlsx->baseResponse->getFile()->getPathname()) === true);
@@ -641,7 +708,7 @@ class AdminReportsModuleTest extends TestCase
         $this->assertStringContainsString('INV-HEALTHY', $sheet);
         $this->assertStringContainsString('<v>50</v>', $sheet);
 
-        $pdf = $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'PDF'])->assertOk();
+        $pdf = $this->exportReport(['report_key' => 'inventory.summary', 'format' => 'PDF'])->assertOk();
         $this->assertSame('application/pdf', $pdf->headers->get('Content-Type'));
         $this->assertStringStartsWith('%PDF', file_get_contents($pdf->baseResponse->getFile()->getPathname()));
 
@@ -668,9 +735,9 @@ class AdminReportsModuleTest extends TestCase
         ]);
         StockOutTransaction::insert($rows->all());
 
-        $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'stock.stock_out', 'format' => 'PDF'])
+        $this->exportReport(['report_key' => 'stock.stock_out', 'format' => 'PDF'])
             ->assertUnprocessable()->assertJsonValidationErrors('format');
-        $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'stock.stock_out', 'format' => 'CSV'])
+        $this->exportReport(['report_key' => 'stock.stock_out', 'format' => 'CSV'])
             ->assertOk()->assertHeader('X-Report-Rows', '1001');
     }
 
@@ -678,7 +745,7 @@ class AdminReportsModuleTest extends TestCase
     {
         $this->mock(XlsxReportWriter::class)->shouldReceive('write')->andThrow(new RuntimeException('disk /var/secret full'));
 
-        $response = $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'XLSX']);
+        $response = $this->exportReport(['report_key' => 'inventory.summary', 'format' => 'XLSX']);
 
         $response->assertStatus(500)->assertJsonPath('message', 'The report could not be generated. Please try again.');
         $this->assertStringNotContainsString('/var/secret', $response->getContent());
@@ -709,9 +776,9 @@ class AdminReportsModuleTest extends TestCase
 
     public function test_history_is_newest_first(): void
     {
-        $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'inventory.summary', 'format' => 'CSV'])->assertOk();
+        $this->exportReport(['report_key' => 'inventory.summary', 'format' => 'CSV'])->assertOk();
         $this->travel(1)->minutes();
-        $this->actingAs($this->admin)->postJson('/api/admin/reports/export', ['report_key' => 'suppliers.directory', 'format' => 'CSV'])->assertOk();
+        $this->exportReport(['report_key' => 'suppliers.directory', 'format' => 'CSV'])->assertOk();
 
         $this->actingAs($this->admin)->getJson('/api/admin/reports/history?action=EXPORT')->assertOk()
             ->assertJsonPath('data.0.report_key', 'suppliers.directory')
@@ -827,6 +894,7 @@ class AdminReportsModuleTest extends TestCase
         $this->assertSame('SENT', SupplierRejectionCase::query()->sole()->status);
         $this->actingAs($this->admin)->getJson('/api/inventory')->assertOk()->assertJsonCount(3, 'data');
         $this->actingAs($this->admin)->getJson('/api/admin/rejected-items')->assertOk()->assertJsonCount(1, 'data');
-        $this->actingAs($this->manager)->getJson('/api/plant-manager/reports/generate?type=inventory&format=preview')->assertOk();
+        $authorization = $this->actingAs($this->manager)->postJson('/api/report-access/confirm', ['password' => 'password', 'resource' => 'plant-manager:inventory', 'format' => 'preview', 'action' => 'PREVIEW'])->assertOk()->json('authorization');
+        $this->actingAs($this->manager)->withHeader('X-Report-Authorization', $authorization)->getJson('/api/plant-manager/reports/generate?type=inventory&format=preview')->assertOk();
     }
 }

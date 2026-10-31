@@ -91,7 +91,7 @@ class SupplierCatalogMappingTest extends TestCase
         return [
             'company_name' => 'Atlas Industrial', 'owner_name' => 'Andrea Reyes', 'address' => '123 Manufacturing Avenue',
             'contact_person' => 'Maria Santos', 'email' => 'sales@atlas.test', 'phone' => '639171234567',
-            'business_type' => 'Corporation', 'supply_category' => 'Construction Chemicals',
+            'business_type' => 'Corporation',
             'offerings' => $offerings,
             'business_certificate' => [UploadedFile::fake()->create('certificate.pdf', 20, 'application/pdf')],
             'business_permit' => [UploadedFile::fake()->image('permit.jpg')],
@@ -133,14 +133,16 @@ class SupplierCatalogMappingTest extends TestCase
         $this->assertDatabaseCount('products', 0);
     }
 
-    public function test_offering_validation_rejects_bad_type_missing_product_category_duplicates_and_unknown_keys(): void
+    public function test_offering_validation_accepts_no_applicant_category_and_rejects_bad_type_duplicates_and_unknown_keys(): void
     {
         $this->post('/api/supplier-applications', $this->publicPayload([['type' => 'OTHER', 'name' => 'X1', 'category' => 'Chemicals']]), ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('offerings.0.type');
         $this->post('/api/supplier-applications', $this->publicPayload([['type' => 'SERVICE', 'name' => 'Consulting', 'category' => 'Services']]), ['Accept' => 'application/json'])
             ->assertUnprocessable()->assertJsonValidationErrors('offerings.0.type');
-        $this->post('/api/supplier-applications', $this->publicPayload([['name' => 'MegaAdd SAL']]), ['Accept' => 'application/json'])
-            ->assertUnprocessable()->assertJsonValidationErrors('offerings.0.category');
+        $this->post('/api/supplier-applications', $this->publicPayload([['name' => 'Category-free Product']]), ['Accept' => 'application/json'])
+            ->assertCreated();
+        $this->assertDatabaseHas('supplier_application_offerings', ['name' => 'Category-free Product', 'category' => null]);
+        SupplierApplication::query()->delete();
         $this->post('/api/supplier-applications', $this->publicPayload([
             ['type' => 'PRODUCT', 'name' => 'MegaAdd SAL', 'category' => 'Chemicals'],
             ['type' => 'PRODUCT', 'name' => 'megaadd  sal', 'category' => 'Chemicals'],
@@ -154,6 +156,23 @@ class SupplierCatalogMappingTest extends TestCase
     }
 
     // TEST 3 + TEST 4
+    public function test_new_category_free_application_requires_admin_catalog_assignment_before_approval(): void
+    {
+        $application = $this->application(SupplierApplication::STATUS_MEETING_COMPLETED, [['name' => 'Category-free Product']]);
+        $application->update(['supply_category' => '']);
+        $this->addVerifiedMandatoryDocuments($application);
+
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-applications/{$application->id}/approve")
+            ->assertUnprocessable()->assertJsonValidationErrors('supply_categories');
+
+        Product::create(['name' => 'Catalog Product', 'category' => 'Construction Chemicals']);
+        $this->postJson("/api/admin/supplier-applications/{$application->id}/approve", [
+            'supply_categories' => ['Construction Chemicals'],
+        ])->assertOk();
+
+        $this->assertSame('Construction Chemicals', $application->fresh()->approvedSupplier->supply_category);
+    }
+
     public function test_final_approval_creates_one_supplier_and_no_catalog_records(): void
     {
         $application = $this->application(SupplierApplication::STATUS_MEETING_COMPLETED, [['name' => 'MegaAdd P4 (Powder)'], ['name' => 'MegaFlow MP']]);

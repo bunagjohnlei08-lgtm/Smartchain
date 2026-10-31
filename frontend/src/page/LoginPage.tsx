@@ -171,11 +171,11 @@ const LoginPage: React.FC = () => {
   return (
     <AuthLayout appearance="light">
       <div className="mb-4 text-center">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-sky-500/30 bg-sky-50 text-sky-600 shadow-[0_0_24px_rgba(56,189,248,0.14)] lg:h-11 lg:w-11">
+        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-[var(--accent-border)] bg-[var(--accent-surface)] text-[var(--accent-primary)] shadow-[0_0_24px_rgba(15,23,42,0.12)] lg:h-11 lg:w-11">
           <LockKeyhole className="h-[18px] w-[18px] lg:h-5 lg:w-5" strokeWidth={1.8} />
         </div>
         <h2 className="mt-2.5 text-lg font-bold tracking-tight text-slate-900 sm:text-xl lg:text-[22px] xl:text-2xl">
-          Sign in to <span className="text-sky-600">SmartChain</span>
+          Sign in to <span className="text-[var(--accent-primary)]">SmartChain</span>
         </h2>
         <p className="mt-1 text-[13px] leading-5 text-slate-600 lg:text-xs">
           Welcome back! Please enter your credentials.
@@ -227,27 +227,27 @@ const LoginPage: React.FC = () => {
           appearance="light"
         />
 
-        <div className="flex justify-end">
+        <div className="!mt-2 flex flex-nowrap items-center justify-center gap-3">
+          <div className="w-fit shrink-0 [&>button]:!min-h-11 [&>button]:!min-w-[104px] [&>button]:!gap-1.5 [&>button]:!rounded-lg [&>button]:!px-3 [&>button]:!py-0 [&>button]:!text-xs [&>button]:!font-semibold lg:[&>button]:!min-w-28">
+            <FormButton type="submit" variant="primary" isLoading={isLoginBusy} disabled={isLoginBusy}>
+              {!isLoginBusy && <LogIn className="h-3.5 w-3.5" />}
+              {isLoginBusy ? 'Signing in...' : 'Sign In'}
+            </FormButton>
+          </div>
+
           <button
             type="button"
             onClick={() => navigate('/forgot-password')}
-            className="min-h-11 rounded-lg border-none bg-transparent px-1 text-[11px] font-medium text-blue-600 transition-colors hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:text-xs"
+            className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg border-none bg-transparent px-1 text-xs font-medium text-[var(--accent-primary)] transition-colors hover:text-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-border)]"
           >
             Forgot Password?
           </button>
-        </div>
-
-        <div className="mx-auto w-1/2 pt-1 [&>button]:!min-h-[37px] [&>button]:!gap-1.5 [&>button]:!rounded-[10px] [&>button]:!px-3 [&>button]:!py-0 [&>button]:!text-xs [&>button]:!font-medium sm:w-full sm:[&>button]:!min-h-[42px] sm:[&>button]:!gap-2 sm:[&>button]:!rounded-xl sm:[&>button]:!px-4 sm:[&>button]:!py-2.5 sm:[&>button]:!text-[13px] sm:[&>button]:!font-semibold">
-          <FormButton type="submit" variant="primary" isLoading={isLoginBusy} disabled={isLoginBusy}>
-            {!isLoginBusy && <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-            {isLoginBusy ? 'Signing in...' : 'Sign In'}
-          </FormButton>
         </div>
       </form>
 
       <div className="mt-4 text-center text-xs text-slate-600">
         Interested in supplying SmartChain?{' '}
-        <Link to="/supplier-application" className="inline-flex min-h-11 items-center rounded-lg px-1 font-semibold text-sky-600 transition-colors hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500/40">Apply as a supplier</Link>
+        <Link to="/supplier-application" className="inline-flex min-h-11 items-center rounded-lg px-1 font-semibold text-[var(--accent-primary)] transition-colors hover:text-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-border)]">Apply as a supplier</Link>
       </div>
 
       <footer className="mt-4 border-t border-slate-200 pt-3 text-center text-[10px] leading-4 text-slate-500 lg:mt-5 lg:pt-4">

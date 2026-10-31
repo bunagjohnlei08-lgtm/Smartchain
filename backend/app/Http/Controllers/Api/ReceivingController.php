@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -124,11 +125,11 @@ class ReceivingController extends Controller
     private function receiptValidationRules(): array
     {
         return [
-            'receipts' => 'required|array|min:1|max:3',
+            'receipts' => 'required|array|min:1|max:4',
             'receipts.*' => [
                 'file', 'mimes:jpeg,jpg,png,pdf',
                 'mimetypes:image/jpeg,image/png,application/pdf',
-                'extensions:jpeg,jpg,png,pdf', 'max:5120',
+                'extensions:jpeg,jpg,png,pdf', 'max:10240',
             ],
         ];
     }
@@ -138,13 +139,13 @@ class ReceivingController extends Controller
         return [
             'receipts.required' => 'At least one supplier delivery receipt is required.',
             'receipts.min' => 'At least one supplier delivery receipt is required.',
-            'receipts.max' => 'A receiving may contain no more than 3 supplier receipt files.',
+            'receipts.max' => 'A receiving may contain no more than 4 supplier receipt files.',
             'receipts.*.file' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
             'receipts.*.mimes' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
             'receipts.*.mimetypes' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
             'receipts.*.extensions' => 'Each supplier receipt must be a JPG, PNG, or PDF file.',
-            'receipts.*.max' => 'Each supplier receipt must not exceed 5 MB.',
-            'receipts.*.uploaded' => 'A supplier receipt could not be uploaded. Use JPG, PNG, or PDF files up to 5 MB each.',
+            'receipts.*.max' => 'Each supplier receipt must not exceed 10 MB.',
+            'receipts.*.uploaded' => 'A supplier receipt could not be uploaded. Use JPG, PNG, or PDF files up to 10 MB each.',
         ];
     }
 
@@ -578,6 +579,11 @@ class ReceivingController extends Controller
                 $locked = Receiving::query()->with('items')->lockForUpdate()->findOrFail($receiving->id);
                 abort_unless($locked->replacement_for_rejection_case_id !== null, 422, 'Only replacement receivings can be confirmed this way.');
                 abort_unless($locked->status === Receiving::STATUS_AWAITING_REPLACEMENT, 422, 'This replacement delivery has already been confirmed.');
+                if ($locked->receiptAttachments()->count() + count($request->file('receipts', [])) > 4) {
+                    throw ValidationException::withMessages([
+                        'receipts' => ['A receiving may contain no more than 4 supplier receipt files.'],
+                    ]);
+                }
 
                 $submitted = collect($validated['items'])->keyBy('receiving_item_id');
                 abort_unless($submitted->keys()->sort()->values()->all() === $locked->items->pluck('id')->sort()->values()->all(), 422, 'Delivered items must exactly match the expected replacement items.');

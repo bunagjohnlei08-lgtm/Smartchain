@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, Download, Filter, RefreshCw, X } from 'lucide-react';
 import { apiClient } from '../../../lib/api';
+import ReportPasswordModal, { type ReportAccessRequest } from '../../../components/reports/ReportPasswordModal';
 import ReportFilterFields from './ReportFilterFields';
 import ReportTable from './ReportTable';
 import {
-  applicableFilters, downloadReport, errorMessage, FORMAT_LABELS, formatDateTime,
+  applicableFilters, downloadReport, errorMessage, FORMAT_LABELS, formatDateTime, initialReportFilters,
   type ReportDefinition, type ReportFilterValues, type ReportFormat, type ReportOptions, type ReportPreview,
 } from './reportApi';
 
@@ -14,19 +15,22 @@ interface Props {
   onClose: () => void;
   /** Called after every export attempt so history refreshes; null means failure (shown inline). */
   onGenerated: (message: string | null) => void;
+  initialFilters?: ReportFilterValues;
 }
 
 const PER_PAGE = 25;
 
-const ReportPreviewDrawer: React.FC<Props> = ({ definition, options, onClose, onGenerated }) => {
-  const [draft, setDraft] = useState<ReportFilterValues>({});
-  const [applied, setApplied] = useState<ReportFilterValues>({});
+const ReportPreviewDrawer: React.FC<Props> = ({ definition, options, initialFilters = {}, onClose, onGenerated }) => {
+  const startingFilters = initialReportFilters(definition, options, initialFilters);
+  const [draft, setDraft] = useState<ReportFilterValues>(startingFilters);
+  const [applied, setApplied] = useState<ReportFilterValues>(startingFilters);
   const [page, setPage] = useState(1);
   const [preview, setPreview] = useState<ReportPreview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<ReportFormat | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [accessRequest, setAccessRequest] = useState<ReportAccessRequest | null>(null);
   const dateInvalid = Boolean(draft.date_from && draft.date_to && draft.date_to < draft.date_from);
 
   const load = useCallback(async (filters: ReportFilterValues, targetPage: number, signal?: AbortSignal) => {
@@ -69,16 +73,23 @@ const ReportPreviewDrawer: React.FC<Props> = ({ definition, options, onClose, on
     setApplied({});
   };
 
-  const exportAs = async (format: ReportFormat) => {
+  const exportAs = (format: ReportFormat) => {
+    setAccessRequest({ resource: `admin:${definition.key}`, format, action: 'EXPORT', label: `Download ${FORMAT_LABELS[format]}` });
+  };
+
+  const exportAuthorized = async (authorization: string) => {
+    if (!accessRequest) return;
+    const format = accessRequest.format as ReportFormat;
     setExporting(format);
     setError(null);
     try {
-      const result = await downloadReport({ report_key: definition.key, format, ...applicableFilters(definition, applied) });
+      const result = await downloadReport({ report_key: definition.key, format, ...applicableFilters(definition, applied) }, authorization);
       onGenerated(`${result.filename} downloaded${Number.isFinite(result.rows) ? ` (${result.rows.toLocaleString()} records)` : ''}.`);
     } catch (requestError) {
       setError(await errorMessage(requestError, 'Unable to export this report.'));
       onGenerated(null);
     } finally {
+      setAccessRequest(null);
       setExporting(null);
     }
   };
@@ -166,6 +177,7 @@ const ReportPreviewDrawer: React.FC<Props> = ({ definition, options, onClose, on
           ))}
         </div>
       </div>
+      <ReportPasswordModal request={accessRequest} onCancel={() => setAccessRequest(null)} onAuthorized={exportAuthorized} />
     </div>
   );
 };

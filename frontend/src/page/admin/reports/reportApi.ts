@@ -115,6 +115,15 @@ export const applicableFilters = (definition: ReportDefinition, values: ReportFi
   ) as ReportFilterValues;
 };
 
+export const initialReportFilters = (definition: ReportDefinition, options: ReportOptions | null, seed: ReportFilterValues = {}): ReportFilterValues => {
+  const filters = applicableFilters(definition, seed);
+  if (definition.filters.includes('warehouse') && !filters.warehouse_id) {
+    const main = options?.warehouses.find((warehouse) => warehouse.code === 'WH-MAIN' && warehouse.status === 'Active');
+    if (main) filters.warehouse_id = String(main.id);
+  }
+  return filters;
+};
+
 export const errorMessage = async (error: any, fallback: string): Promise<string> => {
   const data = error?.response?.data;
   if (data instanceof Blob) {
@@ -135,8 +144,8 @@ const firstValidationError = (data: any): string | null => {
   return Array.isArray(first) ? String(first[0]) : null;
 };
 
-export const downloadReport = async (payload: { report_key: string; format: ReportFormat; source?: string; title?: string } & ReportFilterValues) => {
-  const response = await apiClient.post('/admin/reports/export', payload, { responseType: 'blob' });
+export const downloadReport = async (payload: { report_key: string; format: ReportFormat; source?: string; title?: string } & ReportFilterValues, authorization: string) => {
+  const response = await apiClient.post('/admin/reports/export', payload, { responseType: 'blob', headers: { 'X-Report-Authorization': authorization } });
   const disposition = String(response.headers['content-disposition'] ?? '');
   const extension = payload.format === 'XLSX' ? 'xlsx' : payload.format.toLowerCase();
   const filename = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i)?.[1] || `${payload.report_key.replace(/\W+/g, '_')}.${extension}`;

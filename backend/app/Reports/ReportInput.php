@@ -2,6 +2,7 @@
 
 namespace App\Reports;
 
+use App\Models\Product;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -64,6 +65,10 @@ class ReportInput
         }
         if (($validated['status'] ?? null) && ! array_key_exists($validated['status'], $definition->statuses)) {
             $errors['status'] ??= 'The selected status is not valid for this report.';
+        }
+        if (($validated['product_id'] ?? null) && filled($validated['category'] ?? null)
+            && ! Product::query()->whereKey($validated['product_id'])->where('category', trim($validated['category']))->exists()) {
+            $errors['product_id'] = 'The selected product does not belong to the selected category.';
         }
         if ($errors !== []) throw ValidationException::withMessages($errors);
 
