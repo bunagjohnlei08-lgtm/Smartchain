@@ -10,6 +10,7 @@ class QaInspection extends Model
 {
     protected $fillable = [
         'receiving_id',
+        'cycle_number',
         'status',
         'started_at',
         'completed_at',
@@ -22,6 +23,7 @@ class QaInspection extends Model
         return [
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'cycle_number' => 'integer',
         ];
     }
 

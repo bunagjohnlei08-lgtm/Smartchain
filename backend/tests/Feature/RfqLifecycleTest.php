@@ -106,6 +106,46 @@ class RfqLifecycleTest extends TestCase
         $this->getJson('/api/public/rfqs')->assertOk()->assertJsonCount(0, 'data');
     }
 
+    public function test_resolved_destination_is_saved_for_single_and_multi_product_drafts_and_history_is_preserved(): void
+    {
+        [$admin, $requester, $warehouse] = $this->actors();
+        $warehouse->update(['code'=>'WH-PAMP', 'address'=>'Original configured address', 'status'=>'Active']);
+        foreach ([1, 2] as $lineCount) {
+            $requirements = collect();
+            for ($index = 0; $index < $lineCount; $index++) {
+                $requirements->push($this->requirement($requester, $warehouse, "Destination item {$lineCount}-{$index}"));
+            }
+            $destination = $this->actingAs($admin)->getJson('/api/admin/procurement/rfq-requirements')
+                ->assertOk()->json('delivery_destination.address');
+            $payload = $this->payload($requirements);
+            $payload['delivery_destination'] = $destination;
+            $id = $this->postJson('/api/admin/procurement/rfqs', $payload)->assertCreated()
+                ->assertJsonPath('data.delivery_destination', 'Original configured address')->json('data.id');
+            $this->assertDatabaseHas('rfqs', ['id'=>$id, 'delivery_destination'=>'Original configured address']);
+            $this->assertSame($lineCount, Rfq::findOrFail($id)->lines()->count());
+        }
+        $warehouse->update(['address'=>'New configured address']);
+        $this->getJson('/api/admin/procurement/rfq-requirements')->assertOk()
+            ->assertJsonPath('delivery_destination.address', 'New configured address');
+        $this->getJson("/api/admin/procurement/rfqs/{$id}")->assertOk()
+            ->assertJsonPath('data.delivery_destination', 'Original configured address');
+        $payload['version'] = 1;
+        $payload['title'] = 'Existing draft retains its destination';
+        $this->putJson("/api/admin/procurement/rfqs/{$id}", $payload)->assertOk()
+            ->assertJsonPath('data.delivery_destination', 'Original configured address');
+        $this->assertSame(2, Rfq::where('delivery_destination', 'Original configured address')->count());
+    }
+
+    public function test_missing_destination_still_blocks_draft_creation(): void
+    {
+        [$admin, $requester, $warehouse] = $this->actors();
+        $payload = $this->payload(collect([$this->requirement($requester, $warehouse)]));
+        $payload['delivery_destination'] = '';
+        $this->actingAs($admin)->postJson('/api/admin/procurement/rfqs', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('delivery_destination');
+        $this->assertDatabaseCount('rfqs', 0);
+    }
+
     private function actors(): array
     {
         $adminRole = Role::firstOrCreate(['slug' => 'ADMIN'], ['name' => 'Admin']);

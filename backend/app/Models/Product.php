@@ -40,6 +40,11 @@ class Product extends Model
         return $this->belongsToMany(Supplier::class)->withPivot('is_primary')->withTimestamps();
     }
 
+    public function purchasingTerms(): HasMany
+    {
+        return $this->hasMany(SupplierProductPurchasingTerm::class);
+    }
+
     public function replenishmentRequests(): HasMany
     {
         return $this->hasMany(ReplenishmentRequest::class);

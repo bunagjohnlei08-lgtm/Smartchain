@@ -21,11 +21,12 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
-import { loadForecastRecommendations, type ForecastRecommendation } from '../../lib/forecastRecommendations';
+import { loadForecastRecommendations, type ForecastRecommendation, type PurchasingRule } from '../../lib/forecastRecommendations';
 import { AI_FORECAST_ENABLED } from '../../config/features';
 
 type Priority = 'Low' | 'Medium' | 'High' | 'Critical';
 type RequestStatus = 'not_submitted' | 'draft' | 'pending' | 'approved' | 'rejected' | 'for_purchase_order' | 'po_created' | 'completed' | 'cancelled';
+type DisplayStatus = RequestStatus | 'ongoing';
 
 interface RequestRecord {
   id: number;
@@ -70,6 +71,9 @@ interface Candidate {
   recommendedReorderQty: number;
   priority: Priority;
   requestStatus: RequestStatus;
+  procurementProgress: 'not_submitted' | 'ongoing';
+  procurementProgressSource?: string | null;
+  purchasingRule: PurchasingRule;
   canRequest: boolean;
   request: RequestRecord | null;
   primarySupplier?: { id: number; name: string } | null;
@@ -84,7 +88,8 @@ interface Warehouse {
 const PAGE_SIZE = 10;
 const MAX_REQUESTED_QTY = 1000000;
 
-const statusLabels: Record<RequestStatus, string> = {
+const statusLabels: Record<DisplayStatus, string> = {
+  ongoing: 'Ongoing',
   not_submitted: 'Not Submitted',
   draft: 'Draft',
   pending: 'Pending Approval',
@@ -96,7 +101,8 @@ const statusLabels: Record<RequestStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-const statusStyles: Record<RequestStatus, string> = {
+const statusStyles: Record<DisplayStatus, string> = {
+  ongoing: 'border-blue-700 bg-blue-700 text-white dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-300',
   not_submitted: 'border-slate-700 bg-slate-700 text-slate-950 dark:border-slate-500/25 dark:bg-slate-500/10 dark:text-[var(--text-secondary)]',
   draft: 'border-slate-700 bg-slate-700 text-white dark:border-slate-500/25 dark:bg-slate-500/10 dark:text-slate-300',
   pending: 'border-amber-700 bg-amber-700 text-white dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-400',
@@ -115,12 +121,24 @@ const priorityStyles: Record<Priority, string> = {
   Critical: 'border-red-700 bg-red-700 text-white dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-400',
 };
 
-function StatusBadge({ status }: { status: RequestStatus }) {
+function StatusBadge({ status }: { status: DisplayStatus }) {
   return (
     <span className={'inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ' + statusStyles[status]}>
       {statusLabels[status]}
     </span>
   );
+}
+
+const displayStatus = (candidate:Candidate):DisplayStatus => candidate.procurementProgress==='ongoing'?'ongoing':candidate.requestStatus;
+
+function PurchasingRuleSummary({rule,unit}:{rule?:PurchasingRule;unit?:string}) {
+  if(rule?.mode!=='unique_agreement') return <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Supplier is not finalized. Admin will validate supplier-specific quantity rules.</p>;
+  return <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]" aria-label="Applicable supplier purchasing limits">
+    <span>Minimum: {rule.minimum_order_quantity??'None'} {unit}</span>
+    <span>{rule.maximum_order_quantity==null?'No contractual maximum':`Maximum: ${rule.maximum_order_quantity} ${unit}`}</span>
+    {rule.order_multiple!=null&&<span>Multiple: {rule.order_multiple} {unit}</span>}
+    <span className="basis-full text-[var(--text-muted)]">{rule.supplier_name}</span>
+  </div>;
 }
 
 function PriorityBadge({ priority }: { priority: Priority }) {
@@ -200,7 +218,7 @@ const ReplenishmentPlanning: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'all' | Priority>('all');
-  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<DisplayStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [requestCandidates, setRequestCandidates] = useState<Candidate[]>([]);
@@ -260,17 +278,17 @@ const ReplenishmentPlanning: React.FC = () => {
     const productId = Number(searchParams.get('ai_product'));
     if (!productId || aiLoading) return;
     const match = aiRecommendations.find((row) => row.product_id === productId && row.actionable && !row.stale);
-    if (match) { setAiReview(match); setAiQuantity(String(match.recommended_reorder ?? '')); }
+    if (match) { setAiReview(match); setAiQuantity(String(suggestedQuantity(match.recommended_reorder??1,match.purchasing_rule))); }
     setSearchParams({}, { replace: true });
   }, [aiLoading, aiRecommendations, searchParams, setSearchParams]);
 
   const openAiReview = (recommendation: ForecastRecommendation) => {
-    setAiReview(recommendation); setAiQuantity(String(recommendation.recommended_reorder ?? '')); setAiQuantityError('');
+    setAiReview(recommendation); setAiQuantity(String(suggestedQuantity(recommendation.recommended_reorder??1,recommendation.purchasing_rule))); setAiQuantityError('');
   };
 
   const submitAiRequest = async () => {
     if (!aiReview) return;
-    const error = quantityError(aiQuantity);
+    const error = quantityError(aiQuantity,aiReview.purchasing_rule,aiReview.unit);
     setAiQuantityError(error);
     if (error) return;
     setSubmitting(true);
@@ -282,6 +300,7 @@ const ReplenishmentPlanning: React.FC = () => {
         raw_demand: aiReview.raw_demand,
         available_stock: aiReview.available_stock,
         recommended_reorder: aiReview.recommended_reorder,
+        purchasing_term_id: aiReview.purchasing_rule?.term_id??null,
       });
       setToast({ type: 'success', message: `AI-backed request ${response.data.request_no} was forwarded to Admin.` });
       setAiReview(null);
@@ -300,7 +319,7 @@ const ReplenishmentPlanning: React.FC = () => {
         || candidate.sku.toLowerCase().includes(term)
         || candidate.warehouse.toLowerCase().includes(term);
       const matchesPriority = priorityFilter === 'all' || candidate.priority === priorityFilter;
-      const matchesStatus = statusFilter === 'all' || candidate.requestStatus === statusFilter;
+      const matchesStatus = statusFilter === 'all' || displayStatus(candidate) === statusFilter;
       return matchesSearch && matchesPriority && matchesStatus;
     });
   }, [candidates, priorityFilter, search, statusFilter]);
@@ -322,32 +341,52 @@ const ReplenishmentPlanning: React.FC = () => {
   }), [candidates]);
 
   const openRequestDialog = (items: Candidate[]) => {
-    setQuantities(Object.fromEntries(items.map((candidate) => [candidate.id, ''])));
+    setQuantities(Object.fromEntries(items.map((candidate) => [candidate.id, String(suggestedQuantity(candidate.recommendedReorderQty, candidate.purchasingRule))])));
     setQuantityErrors({});
     setRequestCandidates(items);
   };
 
-  const quantityError = (value: string | undefined): string => {
+  const quantityError = (value: string | undefined, rule?:PurchasingRule, unit='unit'): string => {
     const trimmed = (value ?? '').trim();
     if (!trimmed) return 'Enter a requested quantity.';
     if (!/^\d+$/.test(trimmed)) return 'Enter a whole number (no decimals or negative values).';
     const quantity = Number(trimmed);
     if (quantity < 1) return 'Requested quantity must be greater than zero.';
     if (quantity > MAX_REQUESTED_QTY) return `Requested quantity cannot exceed ${MAX_REQUESTED_QTY.toLocaleString()}.`;
+    if (rule?.mode==='unique_agreement') {
+      const minimum=rule.minimum_order_quantity;
+      const maximum=rule.maximum_order_quantity;
+      const multiple=rule.order_multiple;
+      if (minimum!=null&&quantity<minimum) return `Minimum replenishment quantity is ${minimum} ${unit}.`;
+      if (maximum!=null&&quantity>maximum) return `Maximum replenishment quantity is ${maximum} ${unit}.`;
+      if (multiple!=null&&((quantity-(minimum??0))<0||(quantity-(minimum??0))%multiple!==0)) return `Quantity must follow the agreed order multiple of ${multiple} ${unit}.`;
+    }
     return '';
   };
 
-  const normalizeQuantity = (value: string | undefined): string => {
+  const normalizeQuantity = (value: string | undefined, rule?:PurchasingRule, unit='unit'): string => {
     const trimmed = (value ?? '').trim();
-    return quantityError(trimmed) === '' ? String(Number(trimmed)) : trimmed;
+    return quantityError(trimmed,rule,unit) === '' ? String(Number(trimmed)) : trimmed;
   };
 
+  function suggestedQuantity(need:number,rule?:PurchasingRule):number {
+    if(rule?.mode!=='unique_agreement') return Math.max(1,Math.ceil(need));
+    const minimum=rule.minimum_order_quantity??0;
+    const multiple=rule.order_multiple;
+    let proposed=Math.max(1,Math.ceil(need),minimum);
+    if(multiple) proposed=minimum+Math.ceil(Math.max(0,proposed-minimum)/multiple)*multiple;
+    if(rule.maximum_order_quantity!=null&&proposed>rule.maximum_order_quantity){
+      proposed=multiple?minimum+Math.floor(Math.max(0,rule.maximum_order_quantity-minimum)/multiple)*multiple:rule.maximum_order_quantity;
+    }
+    return Math.max(1,proposed);
+  }
+
   const canForward = requestCandidates.length > 0
-    && requestCandidates.every((candidate) => quantityError(quantities[candidate.id]) === '');
+    && requestCandidates.every((candidate) => quantityError(quantities[candidate.id],candidate.purchasingRule,candidate.unit) === '');
 
   const submitRequests = async () => {
     if (!warehouse || requestCandidates.length === 0) return;
-    const errors = Object.fromEntries(requestCandidates.map((candidate) => [candidate.id, quantityError(quantities[candidate.id])]).filter(([, message]) => message));
+    const errors = Object.fromEntries(requestCandidates.map((candidate) => [candidate.id, quantityError(quantities[candidate.id],candidate.purchasingRule,candidate.unit)]).filter(([, message]) => message));
     setQuantityErrors(errors);
     if (Object.keys(errors).length > 0) {
       requestAnimationFrame(() => document.getElementById(`requested-qty-${Object.keys(errors)[0]}`)?.focus());
@@ -356,7 +395,7 @@ const ReplenishmentPlanning: React.FC = () => {
 
     const normalizedQuantities = Object.fromEntries(requestCandidates.map((candidate) => [
       candidate.id,
-      normalizeQuantity(quantities[candidate.id]),
+      normalizeQuantity(quantities[candidate.id],candidate.purchasingRule,candidate.unit),
     ]));
     setQuantities(normalizedQuantities);
 
@@ -369,12 +408,14 @@ const ReplenishmentPlanning: React.FC = () => {
           warehouse_id: warehouse.id,
           requested_qty: Number(normalizedQuantities[candidate.id]),
           status: 'pending',
+          purchasing_term_id: candidate.purchasingRule.term_id??null,
         });
       } else {
         await apiClient.post('/plant-manager/procurement/requests/bulk', {
           items: requestCandidates.map((candidate) => ({
             product_id: candidate.productId,
             requested_qty: Number(normalizedQuantities[candidate.id]),
+            purchasing_term_id: candidate.purchasingRule.term_id??null,
           })),
         });
       }
@@ -465,7 +506,7 @@ const ReplenishmentPlanning: React.FC = () => {
                 <input
                   value={search}
                   onChange={(event) => setFilterAndResetPage(() => setSearch(event.target.value))}
-                  placeholder="Search product, SKU, warehouse"
+                  placeholder="Search product,  warehouse"
                   className="min-h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] pl-10 pr-3 text-sm text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-cyan-500/40"
                 />
               </label>
@@ -486,10 +527,11 @@ const ReplenishmentPlanning: React.FC = () => {
                 <span className="sr-only">Filter by request status</span>
                 <select
                   value={statusFilter}
-                  onChange={(event) => setFilterAndResetPage(() => setStatusFilter(event.target.value as RequestStatus | 'all'))}
+                  onChange={(event) => setFilterAndResetPage(() => setStatusFilter(event.target.value as DisplayStatus | 'all'))}
                   className="min-h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-cyan-500/40"
                 >
                   <option value="all">All request statuses</option>
+                  <option value="ongoing">Ongoing</option>
                   <option value="not_submitted">Not Submitted</option>
                   <option value="pending">Pending Approval</option>
                   <option value="approved">Approved</option>
@@ -587,7 +629,7 @@ const ReplenishmentPlanning: React.FC = () => {
                         {candidate.currentStock < 0 && <span className="ml-2 text-xs font-semibold text-red-500">Invalid stock</span>}
                       </td>
                       <td className="px-4 py-4"><PriorityBadge priority={candidate.priority} /></td>
-                      <td className="px-4 py-4"><StatusBadge status={candidate.requestStatus} /><StageHint request={candidate.request} /></td>
+                      <td className="px-4 py-4"><StatusBadge status={displayStatus(candidate)} />{candidate.procurementProgressSource&&<p className="mt-1 text-xs text-[var(--text-muted)]">{candidate.procurementProgressSource}</p>}<StageHint request={candidate.request} /></td>
                       <td className="break-words px-4 py-4 text-[var(--text-secondary)]">{candidate.warehouse}</td>
                       <td className="px-4 py-4 text-right">
                         {candidate.request ? (
@@ -624,8 +666,9 @@ const ReplenishmentPlanning: React.FC = () => {
                       {candidate.supplierWarning && <SupplierWarning />}
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <PriorityBadge priority={candidate.priority} />
-                        <StatusBadge status={candidate.requestStatus} />
+                        <StatusBadge status={displayStatus(candidate)} />
                       </div>
+                      {candidate.procurementProgressSource&&<p className="mt-1 text-xs text-[var(--text-muted)]">{candidate.procurementProgressSource}</p>}
                       <StageHint request={candidate.request} />
                       <p className="mt-3 text-sm text-[var(--text-secondary)]">
                         Available stock: <strong className="text-[var(--text-primary)]">{candidate.currentStock} {candidate.unit}</strong>
@@ -701,7 +744,7 @@ const ReplenishmentPlanning: React.FC = () => {
         )}
       </section>
 
-      {aiReview && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ai-review-title"><div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl sm:max-w-xl sm:rounded-2xl"><div className="flex items-start justify-between border-b border-[var(--border-color)] p-5"><div><p className="text-xs font-bold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">AI forecast · {aiReview.horizon_weeks} weeks</p><h2 id="ai-review-title" className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Review {aiReview.product_name}</h2></div><button type="button" aria-label="Close AI recommendation review" onClick={() => setAiReview(null)} className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-xl hover:bg-[var(--bg-surface-alt)]"><X className="h-5 w-5"/></button></div><div className="space-y-5 p-5"><dl className="grid gap-4 sm:grid-cols-2">{[['Warehouse', aiReview.warehouse_name], ['Unit', aiReview.unit], ['Available stock', `${aiReview.available_stock} ${aiReview.unit}`], ['Raw four-week demand', `${aiReview.raw_demand} ${aiReview.unit}`], ['Whole-package planning demand', `${aiReview.planning_demand} ${aiReview.unit}`], ['Recommended reorder', `${aiReview.recommended_reorder} ${aiReview.unit}`]].map(([label, value]) => <div key={label} className="rounded-xl bg-[var(--bg-surface-alt)] p-3"><dt className="text-xs text-[var(--text-muted)]">{label}</dt><dd className="mt-1 font-semibold text-[var(--text-primary)]">{value}</dd></div>)}</dl><p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-[var(--text-secondary)]">Confirmed incoming quantity is 0 because supplier-confirmed incoming is not supported by the current workflow. SmartChain will re-check forecast freshness, warehouse stock, and duplicate requests before submission.</p><label className="block text-sm font-semibold text-[var(--text-primary)]" htmlFor="ai-requested-quantity">Requested quantity<input id="ai-requested-quantity" type="number" inputMode="numeric" min={1} max={MAX_REQUESTED_QTY} step={1} value={aiQuantity} onChange={(event) => { setAiQuantity(event.target.value); setAiQuantityError(''); }} aria-invalid={Boolean(aiQuantityError)} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500"/></label>{aiQuantityError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{aiQuantityError}</p>}</div><div className="flex flex-col-reverse gap-2 border-t border-[var(--border-color)] p-5 sm:flex-row sm:justify-end"><button type="button" onClick={() => setAiReview(null)} disabled={submitting} className="min-h-11 cursor-pointer rounded-xl border border-[var(--border-color)] px-4 font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]">Cancel</button><button type="button" onClick={() => void submitAiRequest()} disabled={submitting} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-700 px-5 font-semibold text-white hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}Forward to Admin</button></div></div></div>}
+      {aiReview && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ai-review-title"><div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl sm:max-w-xl sm:rounded-2xl"><div className="flex items-start justify-between border-b border-[var(--border-color)] p-5"><div><p className="text-xs font-bold uppercase tracking-wide text-cyan-600 dark:text-cyan-400">AI forecast · {aiReview.horizon_weeks} weeks</p><h2 id="ai-review-title" className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Review {aiReview.product_name}</h2></div><button type="button" aria-label="Close AI recommendation review" onClick={() => setAiReview(null)} className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-xl hover:bg-[var(--bg-surface-alt)]"><X className="h-5 w-5"/></button></div><div className="space-y-5 p-5"><dl className="grid gap-4 sm:grid-cols-2">{[['Warehouse', aiReview.warehouse_name], ['Unit', aiReview.unit], ['Available stock', `${aiReview.available_stock} ${aiReview.unit}`], ['Raw four-week demand', `${aiReview.raw_demand} ${aiReview.unit}`], ['Whole-package planning demand', `${aiReview.planning_demand} ${aiReview.unit}`], ['Recommended reorder', `${aiReview.recommended_reorder} ${aiReview.unit}`]].map(([label, value]) => <div key={label} className="rounded-xl bg-[var(--bg-surface-alt)] p-3"><dt className="text-xs text-[var(--text-muted)]">{label}</dt><dd className="mt-1 font-semibold text-[var(--text-primary)]">{value}</dd></div>)}</dl><PurchasingRuleSummary rule={aiReview.purchasing_rule} unit={aiReview.unit}/><p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-[var(--text-secondary)]">Confirmed incoming quantity is 0 because supplier-confirmed incoming is not supported by the current workflow. SmartChain will re-check forecast freshness, warehouse stock, and duplicate requests before submission.</p><label className="block text-sm font-semibold text-[var(--text-primary)]" htmlFor="ai-requested-quantity">Proposed Replenishment Quantity<div className="mt-2 flex items-center gap-2"><input id="ai-requested-quantity" type="number" inputMode="numeric" min={1} max={MAX_REQUESTED_QTY} step={1} placeholder="0" value={aiQuantity} onChange={(event) => { setAiQuantity(event.target.value); setAiQuantityError(''); }} aria-invalid={Boolean(aiQuantityError)} className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500"/><span className="text-sm text-[var(--text-secondary)]">{aiReview.unit}</span></div></label>{aiQuantityError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{aiQuantityError}</p>}</div><div className="flex flex-col-reverse gap-2 border-t border-[var(--border-color)] p-5 sm:flex-row sm:justify-end"><button type="button" onClick={() => setAiReview(null)} disabled={submitting} className="min-h-11 cursor-pointer rounded-xl border border-[var(--border-color)] px-4 font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-alt)]">Cancel</button><button type="button" onClick={() => void submitAiRequest()} disabled={submitting||Boolean(quantityError(aiQuantity,aiReview.purchasing_rule,aiReview.unit))} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-700 px-5 font-semibold text-white hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <RefreshCw className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}Forward to Admin</button></div></div></div>}
 
       {requestCandidates.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="request-dialog-title">
@@ -728,13 +771,15 @@ const ReplenishmentPlanning: React.FC = () => {
                       <dt className="text-[var(--text-muted)]">Assigned supplier</dt><dd className="font-medium text-[var(--text-primary)]">{candidate.primarySupplier?.name ?? <span className="text-amber-600 dark:text-amber-400">No Active Supplier Assigned</span>}</dd>
                     </dl>
                     {candidate.supplierWarning && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Admin will select an active supplier when creating the Purchase Order.</p>}
+                    <PurchasingRuleSummary rule={candidate.purchasingRule} unit={candidate.unit}/>
+                    {candidate.purchasingRule.mode==='unique_agreement'&&candidate.recommendedReorderQty<suggestedQuantity(candidate.recommendedReorderQty,candidate.purchasingRule)&&<p className="mt-1 text-xs text-cyan-700 dark:text-cyan-300">Suggested quantity adjusted to applicable supplier terms for review.</p>}
                     {candidate.requestStatus === 'rejected' && candidate.request?.admin_decision && (
                       <p className="mt-2 text-xs text-red-500">Previous decision: {candidate.request.admin_decision}</p>
                     )}
                   </div>
                   <div>
                     <label htmlFor={`requested-qty-${candidate.id}`} className="text-sm font-medium text-[var(--text-primary)]">
-                      Requested quantity <span aria-hidden="true" className="text-red-500">*</span>
+                      Proposed Replenishment Quantity <span aria-hidden="true" className="text-red-500">*</span>
                     </label>
                     <input
                       id={`requested-qty-${candidate.id}`}
@@ -753,12 +798,13 @@ const ReplenishmentPlanning: React.FC = () => {
                       }}
                       onBlur={() => setQuantities((current) => ({
                         ...current,
-                        [candidate.id]: normalizeQuantity(current[candidate.id]),
+                        [candidate.id]: normalizeQuantity(current[candidate.id],candidate.purchasingRule,candidate.unit),
                       }))}
                       aria-invalid={Boolean(quantityErrors[candidate.id])}
                       aria-describedby={quantityErrors[candidate.id] ? `requested-qty-${candidate.id}-error` : undefined}
                       className={'mt-2 min-h-11 w-full rounded-xl border bg-[var(--bg-input)] px-3 text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-cyan-500/40 ' + (quantityErrors[candidate.id] ? 'border-red-500' : 'border-[var(--border-color)]')}
                     />
+                    <span className="mt-1 block text-xs text-[var(--text-muted)]">{candidate.unit}</span>
                     {quantityErrors[candidate.id] && <p id={`requested-qty-${candidate.id}-error`} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">{quantityErrors[candidate.id]}</p>}
                   </div>
                 </div>

@@ -52,6 +52,42 @@ class RfqProductSourcingTest extends TestCase
         $this->actingAs($admin)->getJson('/api/admin/product-displays')->assertNotFound();
     }
 
+    public function test_renamed_private_main_warehouse_matches_manage_locations_and_uses_latest_address(): void
+    {
+        [$admin, , $warehouse] = $this->actors();
+        $warehouse->update(['code'=>'WH-PAMP', 'status'=>'Active', 'show_on_public_website'=>false]);
+        $location = $this->actingAs($admin)->getJson('/api/admin/warehouse/location')->assertOk()->json();
+        $this->getJson('/api/admin/procurement/rfq-requirements')->assertOk()
+            ->assertJsonPath('delivery_destination.name', $location['name'])
+            ->assertJsonPath('delivery_destination.address', $location['address']);
+        $warehouse->update(['address'=>'Updated authoritative warehouse address']);
+        $this->getJson('/api/admin/procurement/rfq-requirements')->assertOk()
+            ->assertJsonPath('delivery_destination.address', 'Updated authoritative warehouse address');
+    }
+
+    public function test_missing_address_and_inactive_main_are_not_replaced_by_another_location(): void
+    {
+        [$admin, , $warehouse] = $this->actors();
+        $warehouse->update(['address'=>null]);
+        $this->actingAs($admin)->getJson('/api/admin/procurement/rfq-requirements')->assertOk()
+            ->assertJsonPath('delivery_destination.address', null);
+        $warehouse->update(['address'=>'Saved address', 'status'=>'Inactive']);
+        Warehouse::create(['name'=>'Other active warehouse', 'code'=>'WH-OTHER', 'branch_id'=>$warehouse->branch_id, 'address'=>'Other address', 'status'=>'Active']);
+        $this->getJson('/api/admin/procurement/rfq-requirements')->assertOk()
+            ->assertJsonPath('delivery_destination', null);
+        $this->getJson('/api/admin/warehouse/location')->assertOk()->assertJsonPath('id', $warehouse->id);
+    }
+
+    public function test_named_main_still_takes_priority_over_the_first_warehouse(): void
+    {
+        [$admin, , $warehouse] = $this->actors();
+        $warehouse->update(['code'=>'WH-OLD']);
+        $main = Warehouse::create(['name'=>'Configured main', 'code'=>'WH-MAIN', 'branch_id'=>$warehouse->branch_id, 'address'=>'Primary address', 'status'=>'Active']);
+        $this->actingAs($admin)->getJson('/api/admin/warehouse/location')->assertOk()->assertJsonPath('id', $main->id);
+        $this->getJson('/api/admin/procurement/rfq-requirements')->assertOk()
+            ->assertJsonPath('delivery_destination.address', $main->address);
+    }
+
     private function actors(): array
     {
         $adminRole = Role::firstOrCreate(['slug'=>'ADMIN'],['name'=>'Admin']);
@@ -59,7 +95,7 @@ class RfqProductSourcingTest extends TestCase
         $admin = User::factory()->create(['role_id'=>$adminRole->id,'status'=>'ACTIVE']);
         $requester = User::factory()->create(['role_id'=>$requesterRole->id,'status'=>'ACTIVE']);
         $branch = Branch::create(['name'=>'Main Branch','code'=>'RFQ-MAIN']);
-        $warehouse = Warehouse::create(['name'=>'Main Warehouse','code'=>'WH-MAIN','branch_id'=>$branch->id,'address'=>'29 Flamingo, Marikina']);
+        $warehouse = Warehouse::create(['name'=>'Main Warehouse','code'=>'WH-MAIN','branch_id'=>$branch->id,'address'=>'29 Flamingo, Marikina','status'=>'Active']);
         return [$admin,$requester,$warehouse];
     }
 }

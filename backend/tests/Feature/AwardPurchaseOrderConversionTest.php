@@ -96,6 +96,91 @@ class AwardPurchaseOrderConversionTest extends TestCase
         $this->assertSame(2, PurchaseOrder::distinct()->count('supplier_id'));
     }
 
+    private function legacyEvidence(Supplier $supplier): \App\Models\SupplierAccreditationRequest
+    {
+        $supplier->approvedApplication()->get()->each(function ($application) {
+            $application->attachments()->delete(); $application->delete();
+        });
+        $request = \App\Models\SupplierAccreditationRequest::create([
+            'supplier_id'=>$supplier->id,'submitted_by_id'=>$supplier->authorizedUsers()->first()->id,
+            'request_type'=>'COMPLETION','status'=>'APPROVED','supplier_reason'=>'Verified legacy business evidence.',
+            'admin_reason'=>'Mandatory evidence approved.','submitted_at'=>now()->subDay(),
+            'reviewed_by_id'=>$this->admin->id,'reviewed_at'=>now(),
+        ]);
+        foreach (['BUSINESS_CERTIFICATE','BUSINESS_PERMIT'] as $type) $request->documents()->create([
+            'document_type'=>$type,'original_name'=>'verified.pdf','stored_path'=>'test/'.$supplier->id.'/'.$type.'.pdf',
+            'mime_type'=>'application/pdf','file_size'=>100,'file_sha256'=>hash('sha256',$type),'verification_status'=>'VERIFIED',
+            'verified_by_id'=>$this->admin->id,'verified_at'=>now(),'expires_on'=>today()->addYear(),
+        ]);
+        return $request;
+    }
+
+    public function test_legacy_conversion_preserves_winning_terms_lineage_and_duplicate_protection(): void
+    {
+        $award=$this->award('FULL_AWARD',Rfq::AWARDED,[['supplier'=>'SUP-LEG-PO','product'=>'Legacy Chemical','unit'=>'DRUM','required'=>10,'awarded'=>10,'price'=>'125.50']]);
+        $supplier=Supplier::where('supplier_code','SUP-LEG-PO')->firstOrFail();$this->legacyEvidence($supplier);
+        $response=$this->actingAs($this->admin)->postJson("/api/admin/supplier-awards/{$award->id}/purchase-orders")->assertCreated();
+        $order=PurchaseOrder::with('items')->sole();$item=$order->items->sole();
+        $this->assertSame($supplier->id,$order->supplier_id);$this->assertSame($award->id,$order->supplier_award_id);
+        $this->assertSame('125.50',(string)$item->unit_price);$this->assertSame('1255.00',(string)$order->total_amount);
+        $this->assertSame(10,$item->ordered_quantity);$this->assertSame('DRUM',$item->unit);
+        $this->assertSame($award->lines()->first()->rfqLine->product_id,$item->product_id);
+        $this->assertSame('AWARDED_BID',$item->price_source);$this->assertSame($award->lines()->first()->id,$item->supplier_award_line_id);
+        $this->assertSame('PHP',$order->currency);$this->assertTrue($order->tax_included);$this->assertTrue($order->freight_included);
+        $this->assertSame('Net 30',$order->commercial_terms);$this->assertSame($award->rfq->delivery_destination,$order->delivery_details);
+        $this->assertSame($award->rfq->required_delivery_date->toDateString(),$order->expected_delivery_date->toDateString());
+        $this->assertSame(PurchaseOrder::STATUS_PENDING_APPROVAL,$order->status);$this->assertNull($order->approved_by);
+        $this->postJson("/api/admin/supplier-awards/{$award->id}/purchase-orders")->assertOk();$this->assertDatabaseCount('purchase_orders',1);
+        $this->assertDatabaseCount('supplier_applications',0);
+    }
+
+    public static function disqualifications(): array
+    {
+        return array_map(fn ($case)=>[$case], ['no_evidence','pending','rejected','unverified','documents_expired','accreditation_expired','inactive','wrong_category','no_category','approval_removed','pending_application','rejected_application']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('disqualifications')]
+    public function test_conversion_rechecks_legacy_qualification_and_rolls_back_split_orders(string $case): void
+    {
+        $award=$this->award('SPLIT_AWARD',Rfq::AWARDED,[
+            ['supplier'=>'SUP-LEG-FIRST','product'=>'Split Chemical','unit'=>'PCS','required'=>100,'awarded'=>40,'price'=>'9.50'],
+            ['supplier'=>'SUP-LEG-SECOND','product'=>'Split Chemical','unit'=>'PCS','required'=>100,'awarded'=>60,'price'=>'10.00'],
+        ]);
+        $suppliers=Supplier::orderBy('id')->get();$this->legacyEvidence($suppliers[0]);$supplier=$suppliers[1];$request=$this->legacyEvidence($supplier);
+        switch($case) {
+            case 'no_evidence': $request->documents()->delete();$request->delete();break;
+            case 'pending':$request->update(['status'=>'PENDING']);break;
+            case 'rejected':$request->update(['status'=>'REJECTED']);break;
+            case 'unverified':$request->documents()->update(['verification_status'=>'PENDING_VERIFICATION']);break;
+            case 'documents_expired':$request->documents()->update(['expires_on'=>today()->subDay()]);break;
+            case 'accreditation_expired':$supplier->update(['accreditation_expires_on'=>today()->subDay()]);break;
+            case 'inactive':$supplier->update(['status'=>'INACTIVE']);break;
+            case 'wrong_category':$supplier->update(['supply_category'=>'PACKAGING']);break;
+            case 'no_category':$supplier->update(['supply_category'=>'']);break;
+            case 'approval_removed':$request->update(['reviewed_by_id'=>null,'reviewed_at'=>null]);break;
+            default:
+                SupplierApplication::create(['application_number'=>'APP-LINKED','company_name'=>$supplier->name,'owner_name'=>'Owner','normalized_company_name'=>'linked legacy','address'=>'Manila','contact_person'=>'Contact','email'=>$supplier->email,'normalized_email'=>$supplier->email,'phone'=>'09170000000','business_type'=>'Corporation','supply_category'=>'CHEMICALS','status'=>$case==='pending_application'?'UNDER_REVIEW':'REJECTED','submitted_at'=>now(),'approved_supplier_id'=>$supplier->id]);
+        }
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-awards/{$award->id}/purchase-orders")->assertUnprocessable();
+        $this->assertDatabaseCount('purchase_orders',0);$this->assertDatabaseCount('purchase_order_items',0);
+        $this->assertSame(0,ReplenishmentRequest::where('status',ReplenishmentRequest::STATUS_PO_CREATED)->count());
+        $this->assertDatabaseMissing('audit_logs',['action'=>'AWARD_PURCHASE_ORDER_GENERATED']);
+    }
+
+    public function test_legacy_renewal_and_application_renewal_are_both_effective_at_conversion(): void
+    {
+        $award=$this->award('SPLIT_AWARD',Rfq::AWARDED,[
+            ['supplier'=>'SUP-RENEW-A','product'=>'Renewed Chemical','unit'=>'SACK','required'=>100,'awarded'=>40,'price'=>'9.50'],
+            ['supplier'=>'SUP-RENEW-B','product'=>'Renewed Chemical','unit'=>'SACK','required'=>100,'awarded'=>60,'price'=>'10.00'],
+        ]);
+        $suppliers=Supplier::orderBy('id')->get();$request=$this->legacyEvidence($suppliers[0]);$request->update(['request_type'=>'RENEWAL']);
+        $application=$suppliers[1]->approvedApplication()->first();$application->attachments()->update(['expires_on'=>today()->subDay()]);
+        $renewal=\App\Models\SupplierAccreditationRequest::create(['supplier_id'=>$suppliers[1]->id,'submitted_by_id'=>$this->admin->id,'request_type'=>'RENEWAL','status'=>'APPROVED','supplier_reason'=>'Renewed documents.','reviewed_by_id'=>$this->admin->id,'reviewed_at'=>now(),'submitted_at'=>now()]);
+        foreach($request->documents as $document)$renewal->documents()->create($document->only(['document_type','original_name','stored_path','mime_type','file_size','file_sha256','verification_status','verified_by_id','verified_at','expires_on']));
+        $this->actingAs($this->admin)->postJson("/api/admin/supplier-awards/{$award->id}/purchase-orders")->assertCreated();
+        $this->assertDatabaseCount('purchase_orders',2);$this->assertDatabaseCount('purchase_order_items',2);
+    }
+
     /** @param array<int, array{supplier:string,product:string,unit:string,required:int,awarded:int,price:string}> $allocations */
     private function award(string $outcome, string $rfqStatus, array $allocations): SupplierAward
     {

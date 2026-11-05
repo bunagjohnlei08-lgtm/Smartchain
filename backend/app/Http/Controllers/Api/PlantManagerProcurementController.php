@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;
+use App\Models\Product;
 use App\Models\ReplenishmentRequest;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\ForecastReorderService;
+use App\Services\PurchasingTermResolver;
 use App\Notifications\WorkflowNotification;
 use App\Support\AuditLogger;
 use App\Support\ReplenishmentFulfillmentStage;
@@ -31,7 +33,7 @@ class PlantManagerProcurementController extends Controller
     /** Requested quantities are entered by the Plant Manager; this only bounds them. */
     public const MAX_REQUESTED_QTY = 1000000;
 
-    public function forecastRecommendations(Request $request, ForecastReorderService $recommendations): JsonResponse
+    public function forecastRecommendations(Request $request, ForecastReorderService $recommendations, PurchasingTermResolver $terms): JsonResponse
     {
         abort_unless($request->user()->isPlantManager(), 403);
         abort_unless(config('services.ai_forecast.enabled') === true, 404, 'AI forecasting is not enabled.');
@@ -44,9 +46,9 @@ class PlantManagerProcurementController extends Controller
             ->with(['product:id,name,unit,item_classification', 'warehouse:id,name'])
             ->orderBy('product_id')->get();
 
-        $rows = $inventories->map(function (Inventory $inventory) use ($recommendations) {
+        $rows = $inventories->map(function (Inventory $inventory) use ($recommendations, $terms) {
             try {
-                return $recommendations->recommendation($inventory);
+                return [...$recommendations->recommendation($inventory), 'purchasing_rule' => $this->purchasingRule($inventory->product, $terms)];
             } catch (HttpException $exception) {
                 if ($exception->getStatusCode() === 503) throw $exception;
                 return [
@@ -73,7 +75,7 @@ class PlantManagerProcurementController extends Controller
         ]);
     }
 
-    public function storeForecastRequest(Request $request, ForecastReorderService $recommendations): JsonResponse
+    public function storeForecastRequest(Request $request, ForecastReorderService $recommendations, PurchasingTermResolver $terms): JsonResponse
     {
         abort_unless($request->user()->isPlantManager(), 403);
         abort_unless(config('services.ai_forecast.enabled') === true, 404, 'AI forecasting is not enabled.');
@@ -85,6 +87,7 @@ class PlantManagerProcurementController extends Controller
             'raw_demand' => ['required', 'numeric', 'min:0'],
             'available_stock' => ['required', 'integer', 'min:0'],
             'recommended_reorder' => ['required', 'integer', 'min:1', 'max:'.self::MAX_REQUESTED_QTY],
+            'purchasing_term_id' => ['nullable', 'integer', 'exists:supplier_product_purchasing_terms,id'],
         ]);
         $warehouseId = $request->user()->warehouse_id;
         abort_unless($warehouseId, 403, 'A warehouse assignment is required.');
@@ -99,11 +102,12 @@ class PlantManagerProcurementController extends Controller
             || (int) $validated['recommended_reorder'] !== (int) $current['recommended_reorder'];
         abort_if($changed, 409, 'The forecast or stock position changed. Review the refreshed recommendation before forwarding.');
 
-        $replenishmentRequest = DB::transaction(function () use ($validated, $warehouseId, $request, $current) {
+        $replenishmentRequest = DB::transaction(function () use ($validated, $warehouseId, $request, $current, $terms) {
             Warehouse::query()->lockForUpdate()->findOrFail($warehouseId);
             $inventory = Inventory::query()->where('product_id', $validated['product_id'])
                 ->where('warehouse_id', $warehouseId)->lockForUpdate()->firstOrFail();
             $this->ensureNoOpenRequest((int) $validated['product_id'], (int) $warehouseId);
+            $this->validatePurchasingQuantity($inventory->product()->firstOrFail(), (int) $validated['requested_qty'], $validated['purchasing_term_id'] ?? null, $terms);
             $lockedRecommendation = (int) ceil(max(0, (float) $current['raw_demand'] - (int) $inventory->available_stock));
             abort_if($lockedRecommendation !== (int) $current['recommended_reorder'], 409, 'The stock position changed. Review the refreshed recommendation before forwarding.');
 
@@ -128,7 +132,7 @@ class PlantManagerProcurementController extends Controller
         return response()->json($this->requestData($replenishmentRequest), 201);
     }
 
-    public function options(Request $request): JsonResponse
+    public function options(Request $request, PurchasingTermResolver $terms): JsonResponse
     {
         abort_unless($request->user()->isPlantManager(), 403);
         $warehouseId = $request->user()->warehouse_id;
@@ -145,7 +149,7 @@ class PlantManagerProcurementController extends Controller
         $requests = ReplenishmentRequest::query()
             ->where('warehouse_id', $warehouseId)
             ->whereIn('product_id', $inventories->pluck('product_id'))
-            ->active()
+            ->where(fn ($query) => $query->active()->orWhereHas('purchaseOrder'))
             ->with([
                 'product:id,name,unit,item_classification', 'warehouse:id,name', 'requester:id,name',
                 ...ReplenishmentFulfillmentStage::RELATIONS,
@@ -153,10 +157,11 @@ class PlantManagerProcurementController extends Controller
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get()
+            ->filter(fn (ReplenishmentRequest $item) => $this->hasOngoingCoverage($item))
             ->unique('product_id')
             ->keyBy('product_id');
 
-        $items = $inventories->map(function (Inventory $inventory) use ($requests) {
+        $items = $inventories->map(function (Inventory $inventory) use ($requests, $terms) {
             $quantity = (int) $inventory->available_stock;
             $stockLevel = StockLevel::classify($quantity);
             /** @var ReplenishmentRequest|null $relatedRequest */
@@ -176,11 +181,14 @@ class PlantManagerProcurementController extends Controller
                 'currentStock' => $quantity,
                 'forecastedDemand' => $quantity + (int) $inventory->backload,
                 'recommendedReorderQty' => max((int) $inventory->backload, 1),
+                'purchasingRule' => $this->purchasingRule($inventory->product, $terms),
                 'priority' => $stockLevel['priority'],
                 'stockCondition' => $stockLevel['condition'],
                 'needsReplenishment' => true,
                 'request' => $relatedRequest ? $this->requestData($relatedRequest, $stockLevel['priority']) : null,
                 'requestStatus' => $relatedRequest?->lifecycleStatus() ?? 'not_submitted',
+                'procurementProgress' => $relatedRequest ? 'ongoing' : 'not_submitted',
+                'procurementProgressSource' => $relatedRequest ? ReplenishmentFulfillmentStage::resolve($relatedRequest)['label'] : null,
                 'canRequest' => ! $relatedRequest,
                 'primarySupplier' => $primarySupplier?->only(['id', 'name']),
                 'supplierWarning' => $primarySupplier ? null : 'NO_ACTIVE_SUPPLIER',
@@ -226,7 +234,7 @@ class PlantManagerProcurementController extends Controller
         return response()->json(['data' => $requests]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, PurchasingTermResolver $terms): JsonResponse
     {
         abort_unless($request->user()->isPlantManager(), 403);
         $validated = $request->validate([
@@ -234,15 +242,17 @@ class PlantManagerProcurementController extends Controller
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'requested_qty' => ['required', 'integer', 'min:1', 'max:'.self::MAX_REQUESTED_QTY],
             'status' => ['nullable', Rule::in([self::STATUS_DRAFT, self::STATUS_PENDING])],
+            'purchasing_term_id' => ['nullable', 'integer', 'exists:supplier_product_purchasing_terms,id'],
         ]);
 
         $warehouseId = $request->user()->warehouse_id;
         abort_unless($warehouseId && (int) $validated['warehouse_id'] === (int) $warehouseId, 403);
         $status = $validated['status'] ?? self::STATUS_PENDING;
-        $replenishmentRequest = DB::transaction(function () use ($validated, $warehouseId, $status, $request) {
+        $replenishmentRequest = DB::transaction(function () use ($validated, $warehouseId, $status, $request, $terms) {
             Warehouse::query()->lockForUpdate()->findOrFail($warehouseId);
             $inventory = $this->lockEligibleInventory((int) $validated['product_id'], (int) $warehouseId);
             $this->ensureNoOpenRequest((int) $validated['product_id'], (int) $warehouseId);
+            $this->validatePurchasingQuantity($inventory->product()->firstOrFail(), (int) $validated['requested_qty'], $validated['purchasing_term_id'] ?? null, $terms);
 
             return $this->createRequest(
                 (int) $validated['product_id'],
@@ -258,25 +268,27 @@ class PlantManagerProcurementController extends Controller
         return response()->json($this->requestData($replenishmentRequest), 201);
     }
 
-    public function bulkStore(Request $request): JsonResponse
+    public function bulkStore(Request $request, PurchasingTermResolver $terms): JsonResponse
     {
         abort_unless($request->user()->isPlantManager(), 403);
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*.product_id' => ['required', 'integer', 'distinct', 'exists:products,id'],
             'items.*.requested_qty' => ['required', 'integer', 'min:1', 'max:'.self::MAX_REQUESTED_QTY],
+            'items.*.purchasing_term_id' => ['nullable', 'integer', 'exists:supplier_product_purchasing_terms,id'],
         ]);
         $warehouseId = $request->user()->warehouse_id;
         abort_unless($warehouseId, 403, 'A warehouse assignment is required.');
 
         $items = collect($validated['items'])->sortBy('product_id')->values();
-        $requests = DB::transaction(function () use ($items, $warehouseId, $request) {
+        $requests = DB::transaction(function () use ($items, $warehouseId, $request, $terms) {
             Warehouse::query()->lockForUpdate()->findOrFail($warehouseId);
 
-            return $items->map(function (array $item) use ($warehouseId, $request) {
+            return $items->map(function (array $item) use ($warehouseId, $request, $terms) {
                 $productId = (int) $item['product_id'];
                 $inventory = $this->lockEligibleInventory($productId, (int) $warehouseId);
                 $this->ensureNoOpenRequest($productId, (int) $warehouseId);
+                $this->validatePurchasingQuantity($inventory->product()->firstOrFail(), (int) $item['requested_qty'], $item['purchasing_term_id'] ?? null, $terms, "items.{$productId}.requested_qty");
 
                 return $this->createRequest(
                     $productId,
@@ -363,15 +375,43 @@ class PlantManagerProcurementController extends Controller
         $duplicate = ReplenishmentRequest::query()
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
-            ->active()
+            ->where(fn ($query) => $query->active()->orWhereHas('purchaseOrder'))
             ->when($ignoreRequestId, fn ($query) => $query->whereKeyNot($ignoreRequestId))
-            ->exists();
+            ->with(ReplenishmentFulfillmentStage::RELATIONS)
+            ->get()
+            ->contains(fn (ReplenishmentRequest $item) => $this->hasOngoingCoverage($item));
 
         if ($duplicate) {
             throw ValidationException::withMessages([
-                'product_id' => 'An active replenishment request already exists for this product and warehouse.',
+                'product_id' => 'An ongoing procurement process already covers this product and warehouse. View its linked request or Purchase Order before submitting another request.',
             ]);
         }
+    }
+
+    private function hasOngoingCoverage(ReplenishmentRequest $request): bool
+    {
+        if (in_array($request->lifecycleStatus(), ReplenishmentRequest::ACTIVE_STATUSES, true)) {
+            return true;
+        }
+        if (! $request->purchaseOrder) {
+            return false;
+        }
+
+        return ! in_array(ReplenishmentFulfillmentStage::resolve($request)['key'], [
+            ReplenishmentFulfillmentStage::COMPLETED,
+            ReplenishmentFulfillmentStage::REJECTED,
+            ReplenishmentFulfillmentStage::CANCELLED,
+        ], true);
+    }
+
+    private function purchasingRule(?Product $product, PurchasingTermResolver $terms): array
+    {
+        return $product ? $terms->plantManagerRule($product) : ['mode' => 'admin_validation'];
+    }
+
+    private function validatePurchasingQuantity(Product $product, int $quantity, ?int $submittedTermId, PurchasingTermResolver $terms, string $errorKey = 'requested_qty'): void
+    {
+        $terms->validatePlantManagerQuantity($product, $quantity, $submittedTermId, $errorKey);
     }
 
     private function createRequest(

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Mail\PurchaseOrderMail;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\ExcessDeliveryReview;
 use App\Models\ReplenishmentRequest;
 use App\Models\Supplier;
+use App\Services\PurchasingTermResolver;
 use App\Support\AuditLogger;
 use App\Support\PurchaseOrderPdf;
 use App\Support\PurchaseOrderSupplier;
@@ -19,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -37,7 +40,7 @@ class PurchaseOrderController extends Controller
         $query = PurchaseOrder::query()
             ->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)
             ->with([
-            'items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'financialSubmission', 'receivings.items',
+            'items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'financialSubmission', 'receivings.items.excessReviewItem.review', 'receivings.excessDeliveryReview',
             'discrepancies.reportedBy:id,name', 'discrepancies.contactedBy:id,name',
             'discrepancies.respondedBy:id,name', 'discrepancies.resolvedBy:id,name',
             'discrepancies.resolvedByReceiving:id,receiving_no,delivery_date',
@@ -74,7 +77,39 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    public function store(Request $request, ReplenishmentLifecycle $replenishmentLifecycle): JsonResponse
+    public function purchasingOptions(Request $request, PurchasingTermResolver $resolver): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'integer', 'distinct', 'exists:products,id'],
+            'items.*.ordered_quantity' => ['required', 'integer', 'min:1'],
+        ]);
+        $products = Product::query()->whereIn('id', collect($validated['items'])->pluck('product_id'))->get()->keyBy('id');
+        $ordered = collect($validated['items'])->map(fn ($item) => $products->get($item['product_id']))->filter()->values();
+        $quantities = collect($validated['items'])->mapWithKeys(fn ($item) => [(int) $item['product_id'] => (int) $item['ordered_quantity']])->all();
+        $primaryIds = DB::table('product_supplier')->whereIn('product_id', $ordered->pluck('id'))->where('is_primary', true)->pluck('supplier_id')->unique();
+        $preferred = $primaryIds->count() === 1 ? (int) $primaryIds->first() : null;
+
+        $suppliers = $resolver->eligibleSuppliers($ordered)->map(function (Supplier $supplier) use ($resolver, $ordered, $quantities) {
+            $terms = $supplier->purchasingTerms->keyBy('product_id');
+            $data = ['id' => $supplier->id, 'supplier_code' => $supplier->supplier_code, 'name' => $supplier->name,
+                'lines' => $ordered->map(function (Product $product) use ($terms) { $term = $terms->get($product->id); return [
+                    'product_id' => $product->id, 'product_name' => $product->name, 'unit' => $product->unit,
+                    'purchasing_term_id' => $term?->id, 'unit_price' => $term?->agreed_unit_price, 'currency' => $term?->currency,
+                    'agreement_reference' => $term?->agreement_reference, 'delivery_lead_time_days' => $term?->delivery_lead_time_days,
+                    'lead_time_basis' => $term?->lead_time_basis, 'lead_time_start_event' => $term?->lead_time_start_event,
+                    'minimum_order_quantity' => $term?->minimum_order_quantity, 'order_multiple' => $term?->order_multiple,
+                    'maximum_order_quantity' => $term?->maximum_order_quantity,
+                ]; })->values(), 'can_create' => true, 'validation_message' => null];
+            try { $resolution = $resolver->resolve($supplier, $ordered, $quantities); $data['expected_delivery_date'] = $resolution['expected_date']; $data['currency'] = $resolution['currency']; }
+            catch (ValidationException $exception) { $data['can_create'] = false; $data['validation_message'] = collect($exception->errors())->flatten()->first(); $data['expected_delivery_date'] = null; }
+            return $data;
+        });
+        return response()->json(['data' => ['suppliers' => $suppliers, 'preferred_supplier_id' => $preferred && $suppliers->contains('id', $preferred) ? $preferred : null]]);
+    }
+
+    public function store(Request $request, ReplenishmentLifecycle $replenishmentLifecycle, PurchasingTermResolver $resolver): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
         $validated = $request->validate([
@@ -90,12 +125,14 @@ class PurchaseOrderController extends Controller
             'status' => ['prohibited'],
             'signature_data' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['nullable', 'integer', 'distinct', 'exists:products,id'],
             'items.*.product_name' => ['required', 'string', 'distinct', Rule::exists('products', 'name')],
             'items.*.ordered_quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_price' => ['required', 'decimal:0,2', 'min:0'],
+            'items.*.purchasing_term_id' => ['required', 'integer', 'distinct', 'exists:supplier_product_purchasing_terms,id'],
         ]);
 
-        $order = DB::transaction(function () use ($validated, $request) {
+        $order = DB::transaction(function () use ($validated, $request, $resolver) {
             $supplier = Supplier::query()->where('status', 'ACTIVE')->findOrFail($validated['supplier_id']);
             $replenishmentRequest = null;
             if (!empty($validated['replenishment_request_id'])) {
@@ -106,16 +143,34 @@ class PurchaseOrderController extends Controller
                     $replenishmentRequest->forceFill(['sourcing_method' => ReplenishmentRequest::SOURCING_DIRECT, 'sourcing_selected_by' => $request->user()->id, 'sourcing_selected_at' => now()])->save();
                 }
             }
-            $items = collect($validated['items'])->map(function (array $item) {
-                $product = Product::query()->where('name', $item['product_name'])->lockForUpdate()->firstOrFail();
+            $submitted = collect($validated['items']);
+            $products = $submitted->map(function (array $item) {
+                $product = Product::query()->when($item['product_id'] ?? null, fn ($query, $id) => $query->whereKey($id), fn ($query) => $query->where('name', $item['product_name']))->lockForUpdate()->firstOrFail();
+                if ($product->name !== $item['product_name']) throw ValidationException::withMessages(['items' => 'A selected product changed. Refresh the Product Catalog options.']);
+                return $product;
+            })->values();
+            $quantities = $products->mapWithKeys(fn (Product $product, $index) => [$product->id => (int) $submitted[$index]['ordered_quantity']])->all();
+            $resolution = $resolver->resolve($supplier, $products, $quantities, null, true);
+            if ($validated['expected_delivery_date'] !== $resolution['expected_date']) throw ValidationException::withMessages(['expected_delivery_date' => 'Purchasing terms changed or the expected delivery date is stale. Refresh the resolved terms.']);
+            $resolvedLines = $resolution['lines']->keyBy(fn ($line) => $line['product']->id);
+            $items = $submitted->map(function (array $item, int $index) use ($products, $resolvedLines) {
+                $product = $products[$index]; $term = $resolvedLines[$product->id]['term'];
+                if ((int) $item['purchasing_term_id'] !== $term->id || $this->moneyToCents((string) $item['unit_price']) !== $this->moneyToCents((string) $term->agreed_unit_price)) {
+                    throw ValidationException::withMessages(['items' => "The verified purchasing price for {$product->name} changed. Refresh before creating the Purchase Order."]);
+                }
+                $totalCents = (int) $item['ordered_quantity'] * $this->moneyToCents((string) $term->agreed_unit_price);
                 return [
                     'product_id' => $product->id,
                     'unit' => $product->unit,
                     'item_classification' => $product->item_classification,
                     'product_name' => $product->name,
                     'ordered_quantity' => (int) $item['ordered_quantity'],
-                    'unit_price' => round((float) $item['unit_price'], 2),
-                    'total_price' => round((int) $item['ordered_quantity'] * (float) $item['unit_price'], 2),
+                    'unit_price' => $term->agreed_unit_price,
+                    'total_price' => $this->centsToMoney($totalCents),
+                    'supplier_product_purchasing_term_id' => $term->id,
+                    'price_source' => 'SUPPLIER_AGREEMENT', 'agreement_reference' => $term->agreement_reference,
+                    'delivery_lead_time_days' => $term->delivery_lead_time_days, 'lead_time_basis' => $term->lead_time_basis,
+                    'lead_time_start_event' => $term->lead_time_start_event,
                 ];
             });
 
@@ -126,7 +181,9 @@ class PurchaseOrderController extends Controller
                 'supplier_name' => $supplier->name,
                 'delivery_details' => $validated['delivery_details'],
                 'expected_delivery_date' => $validated['expected_delivery_date'],
-                'total_amount' => $items->sum('total_price'),
+                'total_amount' => $this->centsToMoney((int) $items->sum(fn ($item) => $this->moneyToCents($item['total_price']))),
+                'currency' => $resolution['currency'],
+                'agreement_reference' => $items->pluck('agreement_reference')->unique()->count() === 1 ? $items->first()['agreement_reference'] : null,
                 'status' => PurchaseOrder::STATUS_APPROVED,
                 'approved_by' => $request->user()->id,
                 'signature_data' => $validated['signature_data'] ?? null,
@@ -173,7 +230,7 @@ class PurchaseOrderController extends Controller
         abort_unless($request->user()->isAdmin() || $request->user()->isPlantManager(), 403);
         $orders = PurchaseOrder::query()
             ->whereIn('status', ['Approved', 'Sent to Supplier', 'Partially Received'])
-            ->with(['items', 'approver:id,name', 'receivings.items'])
+            ->with(['items', 'approver:id,name', 'receivings.items.excessReviewItem.review', 'receivings.excessDeliveryReview'])
             ->latest()
             ->get();
         return response()->json(['data' => $orders->map(fn (PurchaseOrder $order) => $this->present($order))]);
@@ -210,7 +267,7 @@ class PurchaseOrderController extends Controller
             return $locked;
         });
 
-        $order->load(['items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'receivings.items']);
+        $order->load(['items', 'approver:id,name', 'award.rfq', 'acknowledgments.actor:id,name', 'receivings.items.excessReviewItem.review', 'receivings.excessDeliveryReview']);
 
         return response()->json($this->present($order));
     }
@@ -312,6 +369,17 @@ class PurchaseOrderController extends Controller
         return sprintf('PO-%s-%04d', $year, $sequence);
     }
 
+    private function moneyToCents(string $value): int
+    {
+        [$whole, $decimal] = array_pad(explode('.', $value, 2), 2, '');
+        return ((int) $whole * 100) + (int) substr(str_pad($decimal, 2, '0'), 0, 2);
+    }
+
+    private function centsToMoney(int $cents): string
+    {
+        return intdiv($cents, 100).'.'.str_pad((string) ($cents % 100), 2, '0', STR_PAD_LEFT);
+    }
+
     private function present(PurchaseOrder $order): array
     {
         return [
@@ -351,7 +419,9 @@ class PurchaseOrderController extends Controller
                 'last_error_message' => $order->financialSubmission?->last_error_message,
             ],
             'items' => $order->items->map(function ($item) use ($order) {
-                $received = (int) $order->receivings->whereNull('replacement_for_rejection_case_id')->flatMap->items
+                $received = (int) $order->receivings->whereNull('replacement_for_rejection_case_id')
+                    ->flatMap->items
+                    ->filter(fn ($receivingItem) => ! $receivingItem->excessReviewItem || $receivingItem->excessReviewItem->review?->status === ExcessDeliveryReview::STATUS_APPROVED)
                     ->where('product_name', $item->product_name)->sum('delivered_quantity');
                 return [
                 'id' => $item->id,
@@ -364,6 +434,11 @@ class PurchaseOrderController extends Controller
                 'product_id' => $item->product_id,
                 'unit_price' => (float) $item->unit_price,
                 'total_price' => (float) $item->total_price,
+                'price_source' => $item->price_source ?? ($item->supplier_award_line_id ? 'AWARDED_BID' : null),
+                'agreement_reference' => $item->agreement_reference,
+                'delivery_lead_time_days' => $item->delivery_lead_time_days,
+                'lead_time_basis' => $item->lead_time_basis,
+                'lead_time_start_event' => $item->lead_time_start_event,
                 ];
             })->values(),
             'receiving_history' => $order->relationLoaded('receivings') ? $order->receivings->map(fn ($receiving) => [

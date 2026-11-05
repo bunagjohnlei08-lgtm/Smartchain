@@ -51,8 +51,7 @@ class AdminWarehouseLocationController extends Controller
 
     private function mainWarehouse(): Warehouse
     {
-        return Warehouse::query()->where('code', 'WH-MAIN')->first()
-            ?? Warehouse::query()->orderBy('id')->firstOrFail();
+        return Warehouse::configuredMain() ?? abort(404);
     }
 
     private function present(Warehouse $warehouse): array

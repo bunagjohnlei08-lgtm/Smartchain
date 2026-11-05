@@ -1,6 +1,6 @@
 import { apiClient } from '../../../lib/api';
 
-export type ReportFormat = 'CSV' | 'XLSX' | 'PDF';
+export type ReportFormat = 'CSV' | 'XLSX' | 'PDF' | 'ZIP';
 export type ReportFilterName = 'date' | 'warehouse' | 'product' | 'supplier' | 'status' | 'movement_type' | 'category';
 export type ColumnType = 'text' | 'number' | 'percent' | 'date' | 'datetime' | 'status';
 
@@ -102,7 +102,7 @@ export interface ReportPreview {
   filters_applied: string[];
 }
 
-export const FORMAT_LABELS: Record<ReportFormat, string> = { CSV: 'CSV', XLSX: 'Excel', PDF: 'PDF' };
+export const FORMAT_LABELS: Record<ReportFormat, string> = { CSV: 'CSV', XLSX: 'Excel', PDF: 'PDF', ZIP: 'Export with Attachments' };
 
 /** Only the filters the definition declares are sent; empty values are dropped. */
 export const applicableFilters = (definition: ReportDefinition, values: ReportFilterValues): ReportFilterValues => {

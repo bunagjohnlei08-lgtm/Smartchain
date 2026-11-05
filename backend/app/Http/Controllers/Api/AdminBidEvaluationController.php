@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\{BidEvaluation,Rfq,Supplier,SupplierApplication,SupplierApplicationAttachment,SupplierAward,SupplierBidLine,SupplierBidRevision,SupplierQuotation};
+use App\Models\{BidEvaluation,Rfq,Supplier,SupplierAward,SupplierBidLine,SupplierBidRevision,SupplierQuotation};
 use App\Notifications\WorkflowNotification;
 use App\Services\SupplierPerformanceService;
+use App\Services\SupplierAccreditationEligibility;
 use App\Support\{AuditLogger,WorkflowNotificationSender};
 use Illuminate\Http\{JsonResponse,Request};
 use Illuminate\Support\Facades\DB;
@@ -172,17 +173,11 @@ class AdminBidEvaluationController extends Controller
 
     private function assertAwardEligible(Supplier $supplier, ?string $category): void
     {
-        abort_unless($supplier->status === Supplier::STATUS_ACTIVE && $supplier->accreditation_status === 'ACTIVE', 422, "Supplier {$supplier->supplier_code} is not active and accredited.");
-        abort_unless($supplier->accreditation_expires_on && ! $supplier->accreditation_expires_on->lt(today()), 422, "Supplier {$supplier->supplier_code} accreditation is missing or expired.");
+        $blockers = app(SupplierAccreditationEligibility::class)->blockersForUpdate($supplier);
+        abort_if($blockers !== [], 422, "Supplier {$supplier->supplier_code} is not eligible for award approval. "
+            .implode(' ', array_column($blockers, 'message')));
         $categories = collect(explode(',', (string) $supplier->supply_category))->map(fn($value)=>mb_strtoupper(trim($value)))->filter();
         abort_unless($categories->contains(mb_strtoupper((string) $category)), 422, "Supplier {$supplier->supplier_code} is not accredited for this category.");
-        $application = SupplierApplication::query()->where('approved_supplier_id',$supplier->id)->where('status',SupplierApplication::STATUS_APPROVED)->lockForUpdate()->first();
-        abort_unless($application, 422, "Supplier {$supplier->supplier_code} has no approved accreditation application.");
-        $documents = SupplierApplicationAttachment::query()->where('supplier_application_id',$application->id)->where('is_current',true)->lockForUpdate()->get();
-        foreach ([SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE,SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT] as $type) {
-            $valid = $documents->where('attachment_type',$type)->contains(fn($document)=>$document->verification_status===SupplierApplicationAttachment::STATUS_VERIFIED && ! $document->expires_on?->lt(today()));
-            abort_unless($valid, 422, "Supplier {$supplier->supplier_code} has no current verified {$type}.");
-        }
     }
 
     private function notifyResults(SupplierAward $award): void
@@ -225,16 +220,10 @@ class AdminBidEvaluationController extends Controller
     {
         $supplier = $bid->quotation->supplier;
         $results = collect($bid->evaluation?->mandatory_results ?? []);
-        $application = $supplier->approvedApplication;
-        $documents = $application?->attachments ?? collect();
-        $validAccreditation = $supplier->status === Supplier::STATUS_ACTIVE
-            && $supplier->accreditation_status === 'ACTIVE'
-            && $supplier->accreditation_expires_on
-            && ! $supplier->accreditation_expires_on->lt(today());
-        $validDocuments = $application?->status === SupplierApplication::STATUS_APPROVED
-            && collect([SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE,SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT])->every(
-                fn ($type) => $documents->where('attachment_type',$type)->contains(fn ($document) => $document->is_current && $document->verification_status === SupplierApplicationAttachment::STATUS_VERIFIED && ! $document->expires_on?->lt(today()))
-            );
+        $blockers = app(SupplierAccreditationEligibility::class)->blockers($supplier);
+        $codes = array_column($blockers, 'code');
+        $validAccreditation = !array_intersect($codes, ['ACCOUNT_INACTIVE','ACCREDITATION_INACTIVE','ACCREDITATION_EXPIRY_MISSING','ACCREDITATION_EXPIRED']);
+        $validDocuments = !array_intersect($codes, ['APPROVED_APPLICATION_MISSING','ACCREDITATION_EVIDENCE_REQUIRED','DOCUMENT_VERIFICATION_REQUIRED']);
         $categories = collect(explode(',', (string) $supplier->supply_category))->map(fn ($value) => mb_strtoupper(trim($value)))->filter();
         $categoryEligible = ! filled($bid->rfqLine->category) || $categories->contains(mb_strtoupper((string) $bid->rfqLine->category));
         $quantityValid = $bid->activeRevision && $bid->activeRevision->offered_quantity > 0

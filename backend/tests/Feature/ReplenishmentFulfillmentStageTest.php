@@ -197,4 +197,41 @@ class ReplenishmentFulfillmentStageTest extends TestCase
         ])->assertCreated()->assertJsonPath('status', 'pending')
             ->assertJsonPath('current_fulfillment_stage', 'pending_admin_approval');
     }
+
+    public function test_completed_request_remains_ongoing_until_accepted_quantity_is_stocked_in(): void
+    {
+        [, $po] = $this->cycle(ReplenishmentRequest::STATUS_COMPLETED, PurchaseOrder::STATUS_COMPLETED);
+        $receiving = $this->receiving($po, 'Pending QA');
+        $receivingItem = ReceivingItem::create([
+            'receiving_id' => $receiving->id, 'product_id' => $this->product->id,
+            'product_name' => $this->product->name, 'ordered_quantity' => 100,
+            'delivered_quantity' => 100, 'inspection_status' => 'Pending QA',
+        ]);
+
+        $this->candidates()
+            ->assertJsonPath('data.0.requestStatus', ReplenishmentRequest::STATUS_COMPLETED)
+            ->assertJsonPath('data.0.procurementProgress', 'ongoing')
+            ->assertJsonPath('data.0.procurementProgressSource', 'Pending QA')
+            ->assertJsonPath('data.0.canRequest', false);
+
+        $this->postJson('/api/plant-manager/procurement/requests', [
+            'product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'requested_qty' => 50,
+        ])->assertUnprocessable()->assertJsonValidationErrors('product_id');
+
+        $inspection = QaInspection::create([
+            'receiving_id' => $receiving->id, 'status' => 'Passed',
+            'started_at' => now(), 'completed_at' => now(),
+        ]);
+        QaInspectionItem::create([
+            'qa_inspection_id' => $inspection->id, 'receiving_item_id' => $receivingItem->id,
+            'accepted_quantity' => 100, 'rejected_quantity' => 0, 'inspection_result' => 'Passed',
+        ]);
+        $receiving->update(['status' => 'Passed']);
+        $receivingItem->update(['inspection_status' => 'Passed', 'stocked_in_at' => now()]);
+
+        $this->candidates()
+            ->assertJsonPath('data.0.requestStatus', 'not_submitted')
+            ->assertJsonPath('data.0.procurementProgress', 'not_submitted')
+            ->assertJsonPath('data.0.canRequest', true);
+    }
 }

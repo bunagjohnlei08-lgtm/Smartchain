@@ -2,7 +2,7 @@ import { classificationLabel } from '../../lib/catalog';
 import type { Classification, StockUnit } from '../../lib/catalog';
 
 export function ClassificationBadge({ value }: { value: Classification }) {
-  return <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-medium ${value === 'RAW_MATERIAL' ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200' : 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-700 dark:bg-sky-900/20 dark:text-sky-200'}`}>{classificationLabel(value)}</span>;
+  return <span className={`inline-flex min-w-max whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium ${value === 'RAW_MATERIAL' ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200' : 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-700 dark:bg-sky-900/20 dark:text-sky-200'}`}>{classificationLabel(value)}</span>;
 }
 
 export function ClassificationSelect({ value, onChange, label = 'Classification' }: { value: Classification | ''; onChange: (value: Classification | '') => void; label?: string }) {

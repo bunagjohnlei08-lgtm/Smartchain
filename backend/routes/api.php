@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\QaQualityReportController;
 use App\Http\Controllers\Api\QaRejectedItemsController;
 use App\Http\Controllers\Api\ReceivingController;
 use App\Http\Controllers\Api\ReceivingDiscrepancyController;
+use App\Http\Controllers\Api\ExcessDeliveryReviewController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\ReportAccessController;
 use App\Http\Controllers\Api\SessionController;
@@ -62,6 +63,7 @@ use App\Http\Controllers\Api\SupplierAccountController;
 use App\Http\Controllers\Api\SupplierAccreditationController;
 use App\Http\Controllers\Api\SupplierRfqController;
 use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\SupplierPurchasingTermController;
 use App\Http\Controllers\Api\SupplierPortalController;
 use App\Http\Controllers\Api\SupplierPurchaseOrderController;
 use App\Http\Controllers\Api\UserController;
@@ -104,6 +106,9 @@ Route::middleware('throttle:invitations')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
+    Route::get('/reports/receivings/{number}/receipts', [\App\Http\Controllers\Api\ReceivingReportEvidenceController::class, 'show'])->middleware('throttle:60,1');
+    Route::get('/reports/receivings/{number}/receipts/{attachment}', [\App\Http\Controllers\Api\ReceivingReportEvidenceController::class, 'file'])->middleware('throttle:30,1');
+    Route::get('/plant-manager/reports/receiving/export', [ReportsController::class, 'receivingExport'])->middleware('throttle:10,1');
     Route::post('/report-access/confirm', [ReportAccessController::class, 'confirm'])->middleware('throttle:60,1');
     Route::post('/report-access/consume', [ReportAccessController::class, 'consume'])->middleware('throttle:60,1');
     Route::middleware('supplier.account')->prefix('supplier-account')->group(function () {
@@ -223,6 +228,12 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     Route::get('/receivings/qa-assignees', [ReceivingController::class, 'qaAssignees']);
     Route::get('/receivings', [ReceivingController::class, 'index']);
     Route::post('/receivings', [ReceivingController::class, 'store']);
+    Route::post('/receivings/excess-reviews', [ExcessDeliveryReviewController::class, 'store']);
+    Route::get('/excess-delivery-reviews', [ExcessDeliveryReviewController::class, 'plantManagerIndex']);
+    Route::post('/excess-delivery-reviews/{excessDeliveryReview}/documentation', [ExcessDeliveryReviewController::class, 'submitDocumentation']);
+    Route::post('/excess-delivery-reviews/{excessDeliveryReview}/return/prepare', [ExcessDeliveryReviewController::class, 'prepareReturn']);
+    Route::post('/excess-delivery-reviews/{excessDeliveryReview}/return/complete', [ExcessDeliveryReviewController::class, 'completeReturn']);
+    Route::get('/excess-delivery-reviews/{excessDeliveryReview}/documents/{document}', [ExcessDeliveryReviewController::class, 'document']);
     Route::patch('/receivings/{receiving}/assign-qa', [ReceivingController::class, 'assignQa']);
     Route::post('/receivings/{receiving}/confirm-replacement', [ReceivingController::class, 'confirmReplacementDelivery']);
     Route::get('/receivings/{receiving}/receipts/{receiptAttachment}', [ReceivingController::class, 'receiptAttachment']);
@@ -293,6 +304,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
     });
 
     Route::prefix('admin/rejected-items')->group(function () {
+        Route::post('/{supplierRejectionCase}/reconcile-send', [AdminSupplierRejectionController::class, 'reconcileSend'])->middleware('throttle:10,1');
         Route::get('/', [AdminSupplierRejectionController::class, 'index']);
         Route::get('/{supplierRejectionCase}', [AdminSupplierRejectionController::class, 'show']);
         Route::post('/{supplierRejectionCase}/send', [AdminSupplierRejectionController::class, 'send'])->middleware('throttle:supplier-rejection-send');
@@ -311,6 +323,7 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
 
     Route::get('/purchase-orders/approved', [PurchaseOrderController::class, 'approved']);
     Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
+    Route::post('/purchase-orders/purchasing-options', [PurchaseOrderController::class, 'purchasingOptions']);
     Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
     Route::patch('/purchase-orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve']);
     Route::get('/purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf']);
@@ -321,14 +334,22 @@ Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
         ->middleware('throttle:financial-send');
     Route::get('/admin/receiving-discrepancies', [ReceivingDiscrepancyController::class, 'index']);
     Route::patch('/admin/receiving-discrepancies/{receivingDiscrepancy}', [ReceivingDiscrepancyController::class, 'update']);
+    Route::get('/admin/excess-delivery-reviews', [ExcessDeliveryReviewController::class, 'index']);
+    Route::post('/admin/excess-delivery-reviews/{excessDeliveryReview}', [ExcessDeliveryReviewController::class, 'update']);
+    Route::get('/admin/excess-delivery-reviews/{excessDeliveryReview}/evidence', [ExcessDeliveryReviewController::class, 'evidence']);
 
     Route::get('/suppliers', [SupplierController::class, 'index']);
     Route::post('/suppliers', [SupplierController::class, 'store']);
     Route::get('/suppliers/{supplier}', [SupplierController::class, 'show']);
+    Route::get('/suppliers/{supplier}/purchasing-terms', [SupplierPurchasingTermController::class, 'index']);
+    Route::post('/suppliers/{supplier}/purchasing-terms', [SupplierPurchasingTermController::class, 'store']);
+    Route::put('/suppliers/{supplier}/purchasing-terms/{purchasingTerm}', [SupplierPurchasingTermController::class, 'update']);
+    Route::patch('/suppliers/{supplier}/purchasing-terms/{purchasingTerm}/deactivate', [SupplierPurchasingTermController::class, 'deactivate']);
     Route::get('/suppliers/{supplier}/accreditation', [AdminSupplierAccreditationController::class, 'supplier']);
     Route::post('/suppliers/{supplier}/accreditation/legacy-correction', [AdminSupplierAccreditationController::class, 'correctLegacy'])->middleware('throttle:10,1');
     Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
     Route::patch('/suppliers/{supplier}/status', [SupplierController::class, 'updateStatus']);
+    Route::post('/suppliers/{supplier}/account-invitation', [SupplierController::class, 'sendAccountInvitation'])->middleware('throttle:invitation-resend');
     Route::post('/suppliers/{supplier}/restore', [SupplierController::class, 'restore']);
     Route::get('/admin/accreditation-requests', [AdminSupplierAccreditationController::class, 'index']);
     Route::get('/admin/accreditation-documents/{document}/download', [SupplierAccreditationController::class, 'document'])->whereNumber('document');

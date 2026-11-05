@@ -24,8 +24,13 @@ import {
   RotateCcw,
   AlertTriangle,
   ShieldCheck,
+  HandCoins,
+  Send,
+  CheckCircle2,
+  Ban,
 } from 'lucide-react';
 import AdminAccreditationReview from '../../components/supplier/AdminAccreditationReview';
+import SupplierPurchasingTerms from '../../components/supplier/SupplierPurchasingTerms';
 
 // ============================================
 // TYPES
@@ -47,6 +52,12 @@ interface Supplier {
   recoveryDeadline: string | null;
   recoveryDaysRemaining: number;
   restoreAllowed: boolean;
+  account: {
+    status: 'NO_ACCOUNT' | 'INVITATION_PENDING' | 'INVITATION_EXPIRED' | 'ACCOUNT_ACTIVE' | 'EMAIL_REQUIRED' | 'CONFLICT' | 'UNAVAILABLE';
+    canInvite: boolean;
+    reason: string;
+    expiresAt: string | null;
+  };
 }
 
 // ============================================
@@ -107,16 +118,19 @@ const Suppliers: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [accreditationSupplierId, setAccreditationSupplierId] = useState<string | null>(null);
+  const [termsSupplier, setTermsSupplier] = useState<Supplier | null>(null);
   const [actionSupplier, setActionSupplier] = useState<Supplier | null>(null);
   const [lifecycleAction, setLifecycleAction] = useState<'remove' | 'restore' | null>(null);
   const actionDialogRef = useRef<HTMLDivElement>(null);
   const cancelActionRef = useRef<HTMLButtonElement>(null);
   const actionTriggerRef = useRef<HTMLElement | null>(null);
-  useAdminDetailOverlay((showEditModal && selectedSupplier !== null) || actionSupplier !== null || accreditationSupplierId !== null);
+  useAdminDetailOverlay((showEditModal && selectedSupplier !== null) || actionSupplier !== null || accreditationSupplierId !== null || termsSupplier !== null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [invitingSupplierId, setInvitingSupplierId] = useState<string | null>(null);
 
   const apiStatus = (status: string) => status === 'On Hold' ? 'ON_HOLD' : status === 'Recently Removed' ? 'PENDING_REMOVAL' : status.toUpperCase();
   const uiStatus = (status: string): Supplier['status'] => status === 'ON_HOLD' ? 'On Hold' : status === 'INACTIVE' ? 'Inactive' : status === 'PENDING_REMOVAL' ? 'Recently Removed' : status === 'ARCHIVED' ? 'Archived' : 'Active';
@@ -127,6 +141,12 @@ const Suppliers: React.FC = () => {
     status: uiStatus(supplier.status), notes: supplier.notes || '',
     removedAt: supplier.removal_requested_at || null, recoveryDeadline: supplier.recovery_deadline || null,
     recoveryDaysRemaining: Number(supplier.recovery_days_remaining || 0), restoreAllowed: Boolean(supplier.restore_allowed),
+    account: {
+      status: supplier.account?.status || 'UNAVAILABLE',
+      canInvite: Boolean(supplier.account?.can_invite),
+      reason: supplier.account?.reason || 'Supplier Account status is unavailable.',
+      expiresAt: supplier.account?.expires_at || null,
+    },
   });
 
   const loadSuppliers = useCallback(async () => {
@@ -255,6 +275,31 @@ const Suppliers: React.FC = () => {
   const formatDate = (value: string | null) => value
     ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'long', timeZone: 'Asia/Manila' }).format(new Date(value))
     : 'Not available';
+
+  const sendAccountInvitation = async (supplier: Supplier) => {
+    setInvitingSupplierId(supplier.id); setError(''); setNotice('');
+    try {
+      const response = await apiClient.post(`/suppliers/${supplier.id}/account-invitation`);
+      setNotice(response.data?.message || 'Account activation invitation sent.');
+      await loadSuppliers();
+    } catch (requestError: any) {
+      await loadSuppliers();
+      setError(requestError?.response?.data?.message || 'The account activation invitation could not be sent.');
+    } finally {
+      setInvitingSupplierId(null);
+    }
+  };
+
+  const accountAction = (supplier: Supplier, compact = false) => {
+    if (supplier.account.status === 'ACCOUNT_ACTIVE') return <span title={supplier.account.reason} className="inline-flex min-h-11 items-center gap-2 px-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4"/><span>Account Active</span></span>;
+    if (!supplier.account.canInvite) return <span title={supplier.account.reason} className="inline-flex min-h-11 items-center gap-2 px-3 text-xs font-semibold text-[var(--text-muted)]"><Ban className="h-4 w-4"/><span>{supplier.account.status === 'CONFLICT' ? 'Account conflict' : supplier.account.status === 'EMAIL_REQUIRED' ? 'Valid email required' : 'Activation unavailable'}</span></span>;
+    const resend = supplier.account.status === 'INVITATION_PENDING' || supplier.account.status === 'INVITATION_EXPIRED';
+    const label = resend ? 'Resend Activation Link' : 'Send Account Activation Link';
+    return <div className="flex flex-col items-center gap-1">
+      <span className="text-xs text-[var(--text-muted)]">{supplier.account.status === 'INVITATION_PENDING' ? 'Invitation pending' : supplier.account.status === 'INVITATION_EXPIRED' ? 'Invitation expired' : 'No account'}</span>
+      <button type="button" onClick={() => void sendAccountInvitation(supplier)} disabled={invitingSupplierId !== null} title={`${label}. ${supplier.account.reason}`} aria-label={`${label} for ${supplier.name}`} className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold text-cyan-700 transition-colors hover:bg-cyan-500/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-300"><Send className="h-4 w-4"/><span className={compact ? 'sr-only' : ''}>{invitingSupplierId === supplier.id ? 'Sending…' : label}</span></button>
+    </div>;
+  };
 
   // Refresh and the view toggle are declared once and rendered in
   // two places: the desktop header keeps them exactly where they were, while the
@@ -409,6 +454,7 @@ const Suppliers: React.FC = () => {
       </div>
 
       {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>}
+      {notice && <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">{notice}</div>}
 
       {/* Supplier Cards Grid */}
       {viewMode === 'cards' && (
@@ -458,7 +504,7 @@ const Suppliers: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-4 flex items-center justify-between pt-3 border-t border-[var(--border-color)]">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[var(--border-color)]">
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="text-xs text-[var(--text-muted)]">Open POs</p>
@@ -470,6 +516,12 @@ const Suppliers: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {accountAction(supplier)}
+                  {['Active', 'On Hold', 'Inactive'].includes(supplier.status) && <button
+                    type="button" onClick={() => setTermsSupplier(supplier)}
+                    className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-500/10 dark:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                    title="Manage Purchasing Terms" aria-label={`Manage purchasing terms for ${supplier.name}`}
+                  ><HandCoins className="h-4 w-4"/><span className="hidden xl:inline">Terms</span></button>}
                   {['Active', 'On Hold', 'Inactive'].includes(supplier.status) && <button
                     type="button" onClick={() => handleEdit(supplier)}
                     className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -557,6 +609,12 @@ const Suppliers: React.FC = () => {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1">
+                        {accountAction(supplier, true)}
+                        {['Active', 'On Hold', 'Inactive'].includes(supplier.status) && <button
+                          type="button" onClick={() => setTermsSupplier(supplier)}
+                          className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-cyan-700 transition-colors hover:bg-cyan-500/10 dark:text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                          title="Manage Purchasing Terms" aria-label={`Manage purchasing terms for ${supplier.name}`}
+                        ><HandCoins className="h-4 w-4" /></button>}
                         {['Active', 'On Hold', 'Inactive'].includes(supplier.status) && <button
                           onClick={() => handleEdit(supplier)}
                           className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
@@ -900,6 +958,7 @@ const Suppliers: React.FC = () => {
         </div>
       )}
       {accreditationSupplierId && <AdminAccreditationReview supplierId={accreditationSupplierId} onClose={() => setAccreditationSupplierId(null)} />}
+      {termsSupplier && <SupplierPurchasingTerms supplierId={termsSupplier.id} supplierName={termsSupplier.name} onClose={() => setTermsSupplier(null)} />}
 
       {actionSupplier && lifecycleAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) closeLifecycleDialog(); }}>

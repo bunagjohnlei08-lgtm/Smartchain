@@ -29,6 +29,8 @@ import {
   LayoutGrid,
   LayoutList,
   Landmark,
+  FileUp,
+  ChevronDown,
 } from 'lucide-react';
 
 // ============================================
@@ -38,6 +40,7 @@ import {
 type POStatus = 'Pending Approval' | 'Approved' | 'Sent to Supplier' | 'Partially Received' | 'Completed' | 'Closed with Shortage' | 'Cancelled';
 
 interface PurchaseOrderItem { unit: string | null; item_classification?: Classification | null; productName: string; quantity: number; receivedQuantity: number; remainingQuantity: number; unitPrice: number; amount: number; }
+interface ProductOption { id:number; name:string; category?:string|null; unit:string; }
 interface ReceivingHistory { id: number; receivingNo: string; deliveryDate: string; deliveredQuantity: number; status: string; }
 type SupplierResponseCode = 'WILL_FULFILL' | 'WILL_NOT_FULFILL' | 'OTHER';
 interface ReceivingDiscrepancy {
@@ -46,13 +49,15 @@ interface ReceivingDiscrepancy {
   supplierResponseCode?: SupplierResponseCode; responseNotes?: string; expectedBalanceDeliveryDate?: string; respondedAt?: string; respondedBy?: string;
   resolutionNotes?: string; resolvedAt?: string; resolvedBy?: string; resolvedByReceiving?: { id: number; receivingNo: string; deliveryDate?: string };
 }
-interface SupplierOption { id: number; supplier_code: string; name: string; }
+interface PurchasingLine { product_id:number; product_name:string; unit:string; purchasing_term_id:number; unit_price:string; currency:string; agreement_reference:string; delivery_lead_time_days:number; lead_time_basis:string; lead_time_start_event:string; minimum_order_quantity?:number|null; order_multiple?:number|null; maximum_order_quantity?:number|null; }
+interface SupplierOption { id: number; supplier_code: string; name: string; lines:PurchasingLine[]; can_create:boolean; validation_message?:string|null; expected_delivery_date?:string|null; currency?:string; }
 interface PurchaseOrderSummary { total: number; pending: number; approved: number; completed: number; cancelled: number; }
 type FinancialState = 'NOT_SUBMITTED' | 'PENDING' | 'SUBMITTING' | 'ACKNOWLEDGED' | 'RETRY_PENDING' | 'RECONCILIATION_REQUIRED' | 'FAILED';
 interface FinancialIntegration {
   enabled: boolean; contractConfirmed: boolean; state: FinancialState; messageId?: string; financialReference?: string;
   partnerAcknowledgment?: string; submittedAt?: string; acknowledgedAt?: string; lastErrorCode?: string; lastErrorMessage?: string;
 }
+interface ExcessReview { id:number; reference:string; status:string; is_resolved:boolean; next_action:string; purchase_order:string; supplier:string; warehouse:string; receiving_no:string; delivery_date:string; submitted_by:string; cost_resolution?:string; financial_reconciliation_status:string; financial_review_reason?:string|null; financial_handoff?:{supported:boolean;transport_status:string;message:string}; has_supplier_evidence:boolean; documentation_type?:string; documents:Array<{id:number;name:string;internal_reference:string;document_type:string;uploaded_by?:string;created_at?:string;url:string}>; items:Array<{product:string;expected_quantity:number;delivered_quantity:number;authorized_quantity:number;excess_quantity:number;unit:string}>; }
 
 const mapDiscrepancy = (item: any): ReceivingDiscrepancy => ({
   id: Number(item.id), receivingId: Number(item.receiving_id), type: item.type ?? item.discrepancy_type,
@@ -121,7 +126,7 @@ const PurchaseOrders: React.FC = () => {
   const [pageFrom, setPageFrom] = useState(0);
   const [pageTo, setPageTo] = useState(0);
   const [summary, setSummary] = useState<PurchaseOrderSummary>({ total: 0, pending: 0, approved: 0, completed: 0, cancelled: 0 });
-  const [productNames, setProductNames] = useState<string[]>([]);
+  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   // Mapped primary supplier of the linked product; applied only if it is in the ACTIVE list.
   const [preferredSupplierId, setPreferredSupplierId] = useState<number | null>(null);
@@ -145,11 +150,17 @@ const PurchaseOrders: React.FC = () => {
   const toastTimer = useRef<number | undefined>(undefined);
   const [showHistory, setShowHistory] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [excessReviews, setExcessReviews] = useState<ExcessReview[]>([]);
+  const [excessReviewDialog, setExcessReviewDialog] = useState<ExcessReview | null>(null);
+  const [excessReviewForm, setExcessReviewForm] = useState({ action: 'APPROVE', costResolution: 'NO_ADDITIONAL_CHARGE', documentationType: 'WRITTEN_SUPPLIER_CONFIRMATION', confirmationReference: '', notes: '', rejectionReason: 'EXCESS_NOT_AUTHORIZED', financialReviewReason: 'ADDITIONAL_SUPPLIER_CHARGE', evidence: null as File | null });
+  const excessEvidenceInputRef = useRef<HTMLInputElement | null>(null);
+  const [showExcessAdditionalDetails, setShowExcessAdditionalDetails] = useState(false);
+  const [excessReviewSaving, setExcessReviewSaving] = useState(false);
   const [newOrder, setNewOrder] = useState({
     replenishmentRequestId: null as number | null,
     requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '',
     deliveryDetails: '', signatureData: '',
-    items: [{ productName: '', quantity: 1, unitPrice: 0 }],
+    items: [{ productId: 0, productName: '', quantity: 1, unitPrice: 0, purchasingTermId: 0, pricingSource: '', agreementReference: '', unit: '' }],
   });
 
   const mapOrder = useCallback((order: any): PurchaseOrder => ({
@@ -185,7 +196,7 @@ const PurchaseOrders: React.FC = () => {
       expectedDeliveryDate: '',
       deliveryDetails: `Deliver to ${linkedRequest.warehouseLocation}`,
       signatureData: '',
-      items: [{ productName: linkedRequest.productName, quantity: Number(linkedRequest.orderedQuantity), unitPrice: 0 }],
+      items: [{ productId: Number(linkedRequest.productId), productName: linkedRequest.productName, quantity: Number(linkedRequest.orderedQuantity), unitPrice: 0, purchasingTermId: 0, pricingSource: '', agreementReference: '', unit: '' }],
     });
     setShowCreateModal(true);
     navigate(location.pathname, { replace: true, state: null });
@@ -221,38 +232,84 @@ const PurchaseOrders: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [loadOrders]);
 
-  useEffect(() => {
-    apiClient.get('/inventory').then((response) => {
-      const inventoryItems = (response.data?.data ?? []) as Array<{ product?: string }>;
-      setProductNames([...new Set(inventoryItems.map((item) => item.product).filter((name): name is string => Boolean(name)))]);
-    }).catch(() => setProductNames([]));
+  const loadExcessReviews = useCallback(async () => {
+    const response = await apiClient.get('/admin/excess-delivery-reviews', { params: { view: 'active' } });
+    setExcessReviews(response.data?.data ?? []);
   }, []);
+  useEffect(() => { void loadExcessReviews().catch(() => setExcessReviews([])); }, [loadExcessReviews]);
 
-  const loadActiveSuppliers = useCallback(async () => {
+  const submitExcessReview = async () => {
+    if (!excessReviewDialog) return;
+    setExcessReviewSaving(true);
+    try {
+      const payload = new FormData();
+      const action = excessReviewForm.action;
+      payload.append('action', action);
+      if (excessReviewForm.action === 'APPROVE') {
+        if (action === 'APPROVE') payload.append('cost_resolution', excessReviewForm.costResolution);
+        if (excessReviewForm.confirmationReference.trim()) payload.append('supplier_confirmation_reference', excessReviewForm.confirmationReference.trim());
+        if (excessReviewForm.evidence) payload.append('supplier_evidence', excessReviewForm.evidence);
+      }
+      if (excessReviewForm.action === 'REQUEST_DOCUMENTATION') payload.append('documentation_type', excessReviewForm.documentationType);
+      if (showExcessAdditionalDetails && excessReviewForm.notes.trim()) payload.append('review_notes', excessReviewForm.notes.trim());
+      if (excessReviewForm.action === 'REJECT') payload.append('rejection_reason', excessReviewForm.rejectionReason);
+      if (excessReviewForm.action === 'FINANCIAL_HOLD') payload.append('financial_review_reason', excessReviewForm.financialReviewReason);
+      await apiClient.post(`/admin/excess-delivery-reviews/${excessReviewDialog.id}`, payload);
+      setExcessReviewDialog(null);
+      await Promise.all([loadExcessReviews(), loadOrders()]);
+      showToast('success', excessReviewForm.action === 'FINANCIAL_HOLD' ? 'Financial review requirement recorded. External transmission remains pending a verified contract.' : 'Excess delivery review updated.');
+    } catch (requestError: any) {
+      const validation = Object.values(requestError?.response?.data?.errors ?? {}).flat().find(Boolean);
+      showToast('error', String(validation || requestError?.response?.data?.message || 'Unable to update excess delivery review.'));
+    } finally { setExcessReviewSaving(false); }
+  };
+
+  useEffect(() => {
+    apiClient.get('/products', { params: { per_page: 100 } }).then((response) => setProductOptions(response.data?.data ?? [])).catch(() => setProductOptions([]));
+  }, []);
+  useEffect(() => {
+    if (!productOptions.length) return;
+    setNewOrder(current => ({...current,items:current.items.map(item => item.productId ? item : {...item,productId:productOptions.find(product => product.name===item.productName)?.id??0})}));
+  }, [productOptions]);
+
+  const purchasingInputKey = newOrder.items.map(item => `${item.productId}:${item.quantity}`).join('|');
+  const purchasingRequestItems = useMemo(() => purchasingInputKey.split('|').filter(Boolean).map(value => { const [productId,quantity]=value.split(':'); return { product_id:Number(productId), ordered_quantity:Number(quantity) }; }), [purchasingInputKey]);
+  const loadPurchasingOptions = useCallback(async () => {
+    const complete = purchasingRequestItems.every(item => item.product_id > 0 && item.ordered_quantity > 0);
+    if (!complete) { setSupplierOptions([]); setSupplierError('Select products and quantities to load eligible suppliers.'); return; }
     setLoadingSuppliers(true);
     setSupplierError('');
     try {
-      const response = await apiClient.get('/suppliers', { params: { status: 'ACTIVE' } });
-      setSupplierOptions(response.data?.data ?? []);
+      const response = await apiClient.post('/purchase-orders/purchasing-options', { items: purchasingRequestItems });
+      const options:SupplierOption[] = response.data?.data?.suppliers ?? [];
+      setSupplierOptions(options);
+      const preferred = response.data?.data?.preferred_supplier_id ? Number(response.data.data.preferred_supplier_id) : preferredSupplierId;
+      setNewOrder(current => {
+        const stillEligible = options.some(option => String(option.id) === current.supplierId);
+        const selection = stillEligible ? current.supplierId : preferred && options.some(option => option.id === preferred) ? String(preferred) : options.length === 1 ? String(options[0].id) : '';
+        return { ...current, supplierId: selection };
+      });
+      setPreferredSupplierId(null);
     } catch (requestError: any) {
       setSupplierOptions([]);
-      setSupplierError(requestError?.response?.data?.message || 'Unable to load active suppliers.');
+      setSupplierError(requestError?.response?.data?.message || 'Unable to resolve eligible suppliers.');
     } finally {
       setLoadingSuppliers(false);
     }
-  }, []);
+  }, [purchasingRequestItems, preferredSupplierId]);
 
   useEffect(() => {
-    if (showCreateModal) void loadActiveSuppliers();
-  }, [showCreateModal, loadActiveSuppliers]);
+    if (!showCreateModal) return;
+    const timer = window.setTimeout(() => void loadPurchasingOptions(), 250);
+    return () => window.clearTimeout(timer);
+  }, [showCreateModal, loadPurchasingOptions]);
 
   useEffect(() => {
-    if (!preferredSupplierId || !supplierOptions.length) return;
-    if (supplierOptions.some((supplier) => Number(supplier.id) === preferredSupplierId)) {
-      setNewOrder((current) => current.supplierId ? current : { ...current, supplierId: String(preferredSupplierId) });
-    }
-    setPreferredSupplierId(null);
-  }, [preferredSupplierId, supplierOptions]);
+    const selected = supplierOptions.find(option => String(option.id) === newOrder.supplierId);
+    if (!selected) { setNewOrder(current => ({...current, expectedDeliveryDate:'', items:current.items.map(item=>({...item,unitPrice:0,purchasingTermId:0,pricingSource:'',agreementReference:'',unit:''}))})); return; }
+    const lines = new Map(selected.lines.map(line => [line.product_id,line]));
+    setNewOrder(current => ({...current, expectedDeliveryDate:selected.expected_delivery_date??'', items:current.items.map(item=>{const line=lines.get(item.productId);return {...item,unitPrice:line?Number(line.unit_price):0,purchasingTermId:line?.purchasing_term_id??0,pricingSource:line?'Verified Supplier Agreement':'',agreementReference:line?.agreement_reference??'',unit:line?.unit??''};})}));
+  }, [newOrder.supplierId, supplierOptions]);
 
   const paginationPages = useMemo(() => {
     if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -278,20 +335,22 @@ const PurchaseOrders: React.FC = () => {
         expected_delivery_date: newOrder.expectedDeliveryDate,
         delivery_details: newOrder.deliveryDetails,
         signature_data: newOrder.signatureData || null,
-        items: newOrder.items.map((item) => ({ product_name: item.productName, ordered_quantity: item.quantity, unit_price: item.unitPrice })),
+        items: newOrder.items.map((item) => ({ product_id:item.productId, product_name: item.productName, ordered_quantity: item.quantity, unit_price: item.unitPrice.toFixed(2), purchasing_term_id:item.purchasingTermId })),
       });
       await loadOrders();
       setShowCreateModal(false);
-      setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
+      setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', items: [{ productId: 0, productName: '', quantity: 1, unitPrice: 0, purchasingTermId: 0, pricingSource: '', agreementReference: '', unit: '' }] });
     } catch (requestError: any) {
-      setError(requestError?.response?.data?.message || 'Purchase order could not be created.');
+      const validation = Object.values(requestError?.response?.data?.errors ?? {}).flat().find(Boolean);
+      setError(String(validation || requestError?.response?.data?.message || 'Purchase order could not be created.'));
     } finally {
       setSaving(false);
     }
   };
 
-  const resetNewOrder = () => setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', items: [{ productName: '', quantity: 1, unitPrice: 0 }] });
+  const resetNewOrder = () => setNewOrder({ replenishmentRequestId: null, requestNo: '', warehouseLocation: '', supplierId: '', expectedDeliveryDate: '', deliveryDetails: '', signatureData: '', items: [{ productId: 0, productName: '', quantity: 1, unitPrice: 0, purchasingTermId: 0, pricingSource: '', agreementReference: '', unit: '' }] });
   const closeCreateModal = () => { setShowCreateModal(false); resetNewOrder(); };
+  const selectedPurchasingSupplier = supplierOptions.find(option => String(option.id) === newOrder.supplierId);
 
   const handleViewDetails = (order: PurchaseOrder) => {
     setSelectedOrder(order);
@@ -512,6 +571,32 @@ const PurchaseOrders: React.FC = () => {
           <p className="admin-kpi-helper text-xs text-gray-400">Cancelled orders</p>
         </div>
       </div>
+
+      <section className="rounded-xl border border-orange-500/25 bg-orange-500/5 p-4" aria-labelledby="excess-review-heading">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 id="excess-review-heading" className="font-semibold text-white">Active Excess Delivery Reviews</h2>
+              <p className="text-xs text-slate-400">Only unresolved exceptions appear here. Completed cases remain available in Admin Reports.</p>
+            </div>
+            <span className="whitespace-nowrap rounded-full border border-orange-500/30 px-2.5 py-1 text-xs text-orange-300">{excessReviews.length} open</span>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {excessReviews.length === 0 && <p className="rounded-xl border border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-400 lg:col-span-2">No active excess delivery reviews.</p>}
+            {excessReviews.map(item => (
+              <article key={item.id} className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><p className="truncate font-medium text-white">{item.reference} · {item.purchase_order}</p><p className="truncate text-xs text-slate-400">{item.supplier} · {item.receiving_no}</p></div>
+                  <span className="whitespace-nowrap rounded-full border border-orange-500/30 px-2 py-1 text-[11px] text-orange-300">{item.status.replaceAll('_',' ')}</span>
+                </div>
+                <p className="mt-2 text-xs text-slate-300"><span className="text-slate-500">Next:</span> {item.next_action}</p>
+                <p className="mt-2 text-xs text-slate-400">{item.items.map(line => `${line.product}: ${line.excess_quantity} ${line.unit} held`).join(' · ')}</p>
+                {['PENDING_REVIEW','DOCUMENTATION_SUBMITTED','AWAITING_FINANCIAL_RECONCILIATION'].includes(item.status) && (
+                  <button type="button" onClick={() => { setExcessReviewDialog(item); setShowExcessAdditionalDetails(false); setExcessReviewForm({ action:'APPROVE', costResolution:'NO_ADDITIONAL_CHARGE', documentationType:'WRITTEN_SUPPLIER_CONFIRMATION', confirmationReference:'', notes:'', rejectionReason:'EXCESS_NOT_AUTHORIZED', financialReviewReason:'ADDITIONAL_SUPPLIER_CHARGE', evidence:null }); }} className="mt-3 min-h-11 cursor-pointer rounded-lg border border-orange-500/40 px-3 text-sm text-orange-200 transition-colors hover:bg-orange-500/10 focus:outline-none focus:ring-2 focus:ring-orange-400/50">Review Exception</button>
+                )}
+              </article>
+            ))}
+          </div>
+      </section>
 
       {/* Filter Bar */}
       <div className="bg-[#0f172a] border border-[#1f2937] rounded-xl p-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center">
@@ -868,6 +953,36 @@ const PurchaseOrders: React.FC = () => {
         </div>
       )}
 
+      {excessReviewDialog && (
+        <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" role="presentation">
+          <div className="max-h-[100dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 text-slate-100 sm:max-h-[90vh] sm:rounded-2xl sm:p-5" role="dialog" aria-modal="true" aria-labelledby="excess-admin-review-title" aria-busy={excessReviewSaving}>
+            <div className="flex justify-between gap-3">
+              <div><h2 id="excess-admin-review-title" className="text-lg font-semibold text-white">Review Excess Delivery</h2><p className="text-sm text-slate-400">Choose one source-backed decision for {excessReviewDialog.reference}.</p></div>
+              <button type="button" onClick={() => setExcessReviewDialog(null)} disabled={excessReviewSaving} aria-label="Close review" className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-50"><X className="mx-auto h-5 w-5" /></button>
+            </div>
+            <dl className="mt-5 grid grid-cols-2 gap-3 rounded-xl border border-slate-700 bg-slate-950/50 p-4 text-sm sm:grid-cols-3">
+              <div><dt className="text-xs text-slate-500">Exception</dt><dd className="font-medium text-orange-200">{excessReviewDialog.reference}</dd></div>
+              <div><dt className="text-xs text-slate-500">Purchase Order</dt><dd className="font-medium text-white">{excessReviewDialog.purchase_order}</dd></div>
+              <div><dt className="text-xs text-slate-500">Receiving</dt><dd className="font-medium text-white">{excessReviewDialog.receiving_no}</dd></div>
+              <div><dt className="text-xs text-slate-500">Supplier</dt><dd className="font-medium text-white">{excessReviewDialog.supplier}</dd></div>
+              <div className="col-span-2 sm:col-span-1"><dt className="text-xs text-slate-500">Current Status</dt><dd className="font-medium text-white">{excessReviewDialog.status.replaceAll('_', ' ')}</dd></div>
+              <div className="col-span-2 sm:col-span-3"><dt className="text-xs text-slate-500">Quantity Summary</dt><dd className="mt-1 space-y-1 text-slate-200">{excessReviewDialog.items.map((line, index) => <span key={index} className="block">{line.product}: {line.authorized_quantity} PO-authorized · {line.delivered_quantity} delivered · <strong className="text-orange-300">{line.excess_quantity} {line.unit} held</strong></span>)}</dd></div>
+            </dl>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm text-slate-200 sm:col-span-2">Decision<select value={excessReviewForm.action} onChange={event => { setExcessReviewForm({...excessReviewForm,action:event.target.value,evidence:null,notes:''}); setShowExcessAdditionalDetails(false); }} className="mt-1 min-h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-800 px-3 focus:outline-none focus:ring-2 focus:ring-orange-400/50"><option value="APPROVE">Approve for Further Processing</option><option value="REJECT">Reject / Return Required</option><option value="REQUEST_DOCUMENTATION">Request Documentation</option><option value="FINANCIAL_HOLD">Financial Review Required</option></select></label>
+              {excessReviewForm.action === 'APPROVE' && <label className="block text-sm text-slate-200">Cost resolution<select value={excessReviewForm.costResolution} onChange={event => setExcessReviewForm({...excessReviewForm,costResolution:event.target.value})} className="mt-1 min-h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-800 px-3 focus:outline-none focus:ring-2 focus:ring-orange-400/50"><option value="NO_ADDITIONAL_CHARGE">No Additional Charge Confirmed</option></select></label>}
+              {excessReviewForm.action === 'REQUEST_DOCUMENTATION' && <label className="block text-sm text-slate-200 sm:col-span-2">Required document type<select value={excessReviewForm.documentationType} onChange={event => setExcessReviewForm({...excessReviewForm,documentationType:event.target.value})} className="mt-1 min-h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-800 px-3 focus:outline-none focus:ring-2 focus:ring-orange-400/50"><option value="WRITTEN_SUPPLIER_CONFIRMATION">Supplier Excess Quantity Confirmation</option><option value="SUPPLIER_AUTHORIZATION_TO_KEEP">Authorization to Keep Excess</option><option value="CORRECTED_DELIVERY_RECEIPT">Corrected Delivery Receipt</option><option value="REVISED_INVOICE_OR_CREDIT">Updated Invoice or Credit Note</option><option value="ADDITIONAL_QUANTITY_VERIFICATION">Supplier Cost / Quantity Confirmation</option><option value="SUPPLIER_RETURN_AUTHORIZATION">Supplier Return Authorization</option><option value="OTHER_SUPPORTING_DOCUMENT">Other Supporting Documentation</option></select></label>}
+              {excessReviewForm.action === 'REJECT' && <label className="block text-sm text-slate-200 sm:col-span-2">Rejection reason<select value={excessReviewForm.rejectionReason} onChange={event => setExcessReviewForm({...excessReviewForm,rejectionReason:event.target.value})} className="mt-1 min-h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-800 px-3 focus:outline-none focus:ring-2 focus:ring-orange-400/50"><option value="EXCESS_NOT_AUTHORIZED">Excess Quantity Not Authorized</option><option value="SUPPLIER_REQUESTED_RETURN">Supplier Requested Return</option><option value="INCORRECT_PRODUCT_OR_DELIVERY">Incorrect Product or Delivery</option><option value="INSUFFICIENT_SUPPORTING_DOCUMENTS">Insufficient Supplier Documentation</option><option value="QUANTITY_DISCREPANCY_UNRESOLVED">Quantity Discrepancy Unresolved</option><option value="COMPANY_DECLINED_EXCESS">Company Declined Excess Acceptance</option></select></label>}
+              {excessReviewForm.action === 'FINANCIAL_HOLD' && <><label className="block text-sm text-slate-200 sm:col-span-2">Financial review reason<select value={excessReviewForm.financialReviewReason} onChange={event => setExcessReviewForm({...excessReviewForm,financialReviewReason:event.target.value})} className="mt-1 min-h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-800 px-3 focus:outline-none focus:ring-2 focus:ring-orange-400/50"><option value="ADDITIONAL_SUPPLIER_CHARGE">Additional Supplier Charge</option><option value="INVOICE_ADJUSTMENT_REQUIRED">Invoice Adjustment Required</option><option value="CREDIT_NOTE_REQUIRED">Credit Note Required</option><option value="PRICE_OR_TAX_RECONCILIATION">Price or Tax Reconciliation</option><option value="OTHER_FINANCIAL_REVIEW">Other Financial Review</option></select></label><div className="sm:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100"><p className="font-medium">External Financial Integration Pending</p><p className="mt-1 text-xs text-amber-200/80">This records a safe internal hold only. No excess-reconciliation endpoint or partner acknowledgment is available under the verified contract.</p></div></>}
+              {excessReviewForm.action === 'APPROVE' && <><label className="block text-sm text-slate-200">Supplier confirmation reference <span className="text-slate-500">(optional)</span><input value={excessReviewForm.confirmationReference} maxLength={255} onChange={event => setExcessReviewForm({...excessReviewForm,confirmationReference:event.target.value})} className="mt-1 min-h-11 w-full rounded-xl border border-slate-700 bg-slate-800 px-3 focus:outline-none focus:ring-2 focus:ring-orange-400/50" /></label><div className="text-sm text-slate-200"><p>Supplier confirmation {excessReviewDialog.has_supplier_evidence ? <span className="text-emerald-400">(already on file)</span> : '*'}</p><input ref={excessEvidenceInputRef} id="excess-supplier-evidence" type="file" accept="image/jpeg,image/png,application/pdf" onChange={event => setExcessReviewForm({...excessReviewForm,evidence:event.target.files?.[0] ?? null})} className="sr-only"/><div className="mt-1 flex flex-wrap items-center gap-2"><label htmlFor="excess-supplier-evidence" className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-orange-500/40 px-3 font-medium text-orange-200 transition-colors hover:bg-orange-500/10 focus-within:ring-2 focus-within:ring-orange-400/50"><FileUp className="h-4 w-4"/>Upload Supplier Confirmation</label>{excessReviewForm.evidence && <button type="button" onClick={() => { setExcessReviewForm({...excessReviewForm,evidence:null}); if (excessEvidenceInputRef.current) excessEvidenceInputRef.current.value = ''; }} className="min-h-11 cursor-pointer rounded-lg px-3 text-slate-300 hover:bg-slate-800">Remove</button>}</div><p className="mt-1 break-all text-xs text-slate-400">{excessReviewForm.evidence?.name ?? 'JPG, PNG, or PDF · maximum 10 MB'}</p></div></>}
+              {['APPROVE','REJECT','REQUEST_DOCUMENTATION'].includes(excessReviewForm.action) && <div className="sm:col-span-2"><button type="button" aria-expanded={showExcessAdditionalDetails} onClick={() => setShowExcessAdditionalDetails(value => !value)} className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-300 hover:text-white"><ChevronDown className={`h-4 w-4 transition-transform ${showExcessAdditionalDetails ? 'rotate-180' : ''}`}/>Additional Details <span className="text-slate-500">(optional)</span></button>{showExcessAdditionalDetails && <textarea aria-label="Additional review details" rows={3} maxLength={1000} value={excessReviewForm.notes} onChange={event => setExcessReviewForm({...excessReviewForm,notes:event.target.value})} className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-3 focus:outline-none focus:ring-2 focus:ring-orange-400/50" />}</div>}
+            </div>
+            {excessReviewDialog.documents?.length > 0 && <div className="mt-5 border-t border-slate-700 pt-4"><h3 className="text-sm font-semibold text-white">Submitted evidence</h3><ul className="mt-2 grid gap-2 sm:grid-cols-2">{excessReviewDialog.documents.map(document => <li key={document.id} className="rounded-lg border border-slate-700 bg-slate-800/60 p-3 text-sm"><p className="truncate font-medium">{document.name}</p><p className="mt-1 text-xs text-slate-400">{document.internal_reference} · {document.document_type.replaceAll('_', ' ')}</p></li>)}</ul></div>}
+            <div className="mt-5 flex flex-col-reverse gap-3 border-t border-slate-700 pt-4 sm:flex-row sm:justify-end"><button type="button" onClick={() => setExcessReviewDialog(null)} disabled={excessReviewSaving} className="min-h-11 cursor-pointer rounded-xl border border-slate-700 px-4 disabled:cursor-not-allowed disabled:opacity-50">Cancel</button><button type="button" disabled={excessReviewSaving || (excessReviewForm.action === 'APPROVE' && !excessReviewDialog.has_supplier_evidence && !excessReviewForm.evidence)} onClick={() => void submitExcessReview()} className="min-h-11 cursor-pointer rounded-xl bg-orange-500 px-4 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">{excessReviewSaving ? 'Saving…' : excessReviewForm.action === 'APPROVE' ? 'Approve Excess' : excessReviewForm.action === 'REJECT' ? 'Require Supplier Return' : excessReviewForm.action === 'REQUEST_DOCUMENTATION' ? 'Request Documents' : 'Place on Financial Hold'}</button></div>
+          </div>
+        </div>
+      )}
+
       {discrepancyDialog && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="discrepancy-dialog-title">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:p-6">
@@ -897,11 +1012,11 @@ const PurchaseOrders: React.FC = () => {
       {/* CREATE PO MODAL */}
       {/* ============================================ */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="admin-create-po-modal bg-[#0f172a] border border-[#1f2937] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="admin-create-po-modal max-h-[96vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl border border-[#1f2937] bg-[#0f172a] p-4 sm:max-h-[90vh] sm:rounded-2xl sm:p-6">
             <div className="admin-create-po-header flex items-center justify-between mb-6">
               <h2 className="admin-create-po-title text-xl font-bold text-white">Create New Purchase Order</h2>
-              <button onClick={closeCreateModal} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <button type="button" onClick={closeCreateModal} aria-label="Close Create Purchase Order" className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -913,18 +1028,20 @@ const PurchaseOrders: React.FC = () => {
               )}
               <div className="admin-create-po-form grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Supplier *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Eligible Supplier *</label>
                   <select required disabled={loadingSuppliers} value={newOrder.supplierId} onChange={(e) => setNewOrder({ ...newOrder, supplierId: e.target.value })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-wait disabled:opacity-60">
-                    <option value="">{loadingSuppliers ? 'Loading active suppliers…' : 'Select an active supplier'}</option>
+                    <option value="">{loadingSuppliers ? 'Resolving eligible suppliers…' : 'Select an eligible supplier'}</option>
                     {supplierOptions.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.supplier_code})</option>)}
                   </select>
                   {supplierError && <p role="alert" className="mt-1 text-xs text-red-400">{supplierError}</p>}
-                  {!loadingSuppliers && !supplierError && supplierOptions.length === 0 && <p className="mt-1 text-xs text-amber-400">No active suppliers are available.</p>}
+                  {!loadingSuppliers && !supplierError && supplierOptions.length === 0 && <p className="mt-1 text-xs text-amber-400">No supplier is active, accredited, linked, and covered by current purchasing terms for every selected product.</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Expected Delivery Date *</label>
-                  <input type="date" required value={newOrder.expectedDeliveryDate} onChange={(e) => setNewOrder({ ...newOrder, expectedDeliveryDate: e.target.value })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Estimated Delivery Date</label>
+                  <input type="date" readOnly aria-readonly="true" value={newOrder.expectedDeliveryDate} className="w-full cursor-not-allowed bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 opacity-80 focus:outline-none" />
+                  <p className="mt-1 text-xs text-slate-400">Calculated from PO approval using the verified supplier agreement.</p>
                 </div>
+                {selectedPurchasingSupplier && !selectedPurchasingSupplier.can_create && <p role="alert" className="md:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">{selectedPurchasingSupplier.validation_message}</p>}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-300 mb-1">Target / Delivery Details *</label>
                   <textarea rows={2} value={newOrder.deliveryDetails} onChange={(e) => setNewOrder({ ...newOrder, deliveryDetails: e.target.value })} placeholder="Delivery target, destination, and instructions" className="w-full bg-[#1e293b] border border-[#1f2937] rounded-xl px-4 py-2 text-sm text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40" />
@@ -936,7 +1053,7 @@ const PurchaseOrders: React.FC = () => {
               </div>
               <div>
                 <h3 className="admin-create-po-items-title text-sm font-semibold text-white mb-2">Items</h3>
-                <button type="button" onClick={() => setNewOrder({ ...newOrder, items: [...newOrder.items, { productName: '', quantity: 1, unitPrice: 0 }] })} className="admin-create-po-add-item text-cyan-400 text-sm hover:text-cyan-300 transition-colors flex items-center gap-1 mb-2">
+                <button type="button" onClick={() => setNewOrder({ ...newOrder, items: [...newOrder.items, { productId:0, productName: '', quantity: 1, unitPrice: 0, purchasingTermId:0, pricingSource:'', agreementReference:'', unit:'' }] })} className="admin-create-po-add-item min-h-11 cursor-pointer text-cyan-400 text-sm hover:text-cyan-300 transition-colors flex items-center gap-1 mb-2">
                   <Plus className="w-4 h-4" /> Add Item
                 </button>
                 <div className="admin-table-scroll">
@@ -953,11 +1070,11 @@ const PurchaseOrders: React.FC = () => {
                     <tbody>
                       {newOrder.items.map((item, index) => (
                         <tr key={index} className="border-b border-[#1f2937]">
-                          <td className="px-3 py-2"><select value={item.productName} onChange={(e) => setNewOrder({ ...newOrder, items: newOrder.items.map((value, itemIndex) => itemIndex === index ? { ...value, productName: e.target.value } : value) })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-lg px-2 py-1 text-sm text-slate-100"><option value="">Select inventory product</option>{productNames.map((name) => <option key={name}>{name}</option>)}</select></td>
+                          <td className="px-3 py-2"><select value={item.productId||''} onChange={(e) => { const product=productOptions.find(option=>option.id===Number(e.target.value)); setNewOrder({ ...newOrder, supplierId:'', expectedDeliveryDate:'', items: newOrder.items.map((value, itemIndex) => itemIndex === index ? { ...value, productId:product?.id??0, productName:product?.name??'', unit:product?.unit??'', unitPrice:0, purchasingTermId:0, pricingSource:'', agreementReference:'' } : value) }); }} className="min-h-11 w-full bg-[#1e293b] border border-[#1f2937] rounded-lg px-2 text-sm text-slate-100"><option value="">Select catalog product</option>{productOptions.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>)}</select></td>
                           <td className="px-3 py-2"><input type="number" min="1" value={item.quantity} onChange={(e) => setNewOrder({ ...newOrder, items: newOrder.items.map((value, itemIndex) => itemIndex === index ? { ...value, quantity: Number(e.target.value) } : value) })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-lg px-2 py-1 text-sm text-slate-100 text-right" /></td>
-                          <td className="px-3 py-2"><input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(e) => setNewOrder({ ...newOrder, items: newOrder.items.map((value, itemIndex) => itemIndex === index ? { ...value, unitPrice: Number(e.target.value) } : value) })} className="w-full bg-[#1e293b] border border-[#1f2937] rounded-lg px-2 py-1 text-sm text-slate-100 text-right" /></td>
-                          <td className="px-3 py-2 text-right text-white">₱{(item.quantity * item.unitPrice).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-center"><button type="button" disabled={newOrder.items.length === 1} onClick={() => setNewOrder({ ...newOrder, items: newOrder.items.filter((_, itemIndex) => itemIndex !== index) })} className="text-red-400 hover:text-red-300 disabled:opacity-40"><Trash2 className="w-4 h-4" /></button></td>
+                          <td className="px-3 py-2"><div className="text-right text-slate-100">{item.purchasingTermId ? `${selectedPurchasingSupplier?.currency??'PHP'} ${item.unitPrice.toLocaleString(undefined,{minimumFractionDigits:2})}` : 'Not resolved'}</div>{item.pricingSource&&<p className="mt-1 text-right text-[11px] text-cyan-300" title={item.agreementReference}>{item.pricingSource}</p>}</td>
+                          <td className="px-3 py-2 text-right text-white">{selectedPurchasingSupplier?.currency??'PHP'} {(item.quantity * item.unitPrice).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                          <td className="px-3 py-2 text-center"><button type="button" aria-label={`Remove ${item.productName||'item'}`} disabled={newOrder.items.length === 1} onClick={() => setNewOrder({ ...newOrder, supplierId:'', items: newOrder.items.filter((_, itemIndex) => itemIndex !== index) })} className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center text-red-400 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="w-4 h-4" /></button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -967,7 +1084,7 @@ const PurchaseOrders: React.FC = () => {
             </div>
             <div className="admin-create-po-footer flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[#1f2937]">
             <button onClick={closeCreateModal} className="admin-create-po-action px-4 py-2 border border-[#1f2937] rounded-xl text-sm font-medium text-gray-300 hover:bg-slate-800/50 transition-colors">Cancel</button>
-              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierId} className="admin-create-po-action px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={() => void handleCreateOrder()} disabled={saving || loadingSuppliers || !newOrder.supplierId || !selectedPurchasingSupplier?.can_create || !newOrder.expectedDeliveryDate || newOrder.items.some(item=>!item.purchasingTermId)} className="admin-create-po-action px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <Save className="w-4 h-4" /> Create PO
               </button>
             </div>

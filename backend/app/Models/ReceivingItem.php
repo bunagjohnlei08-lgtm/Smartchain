@@ -54,4 +54,9 @@ class ReceivingItem extends Model
     {
         return $this->hasOne(QaInspectionItem::class);
     }
+
+    public function excessReviewItem(): HasOne
+    {
+        return $this->hasOne(ExcessDeliveryReviewItem::class);
+    }
 }

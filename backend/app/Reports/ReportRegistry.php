@@ -3,6 +3,7 @@
 namespace App\Reports;
 
 use App\Models\AuditLog;
+use App\Models\ExcessDeliveryReview;
 use App\Models\Order;
 use App\Models\ReplenishmentRequest;
 use App\Models\Supplier;
@@ -121,6 +122,7 @@ class ReportRegistry
             'transaction_ref' => ['Transaction Ref.', 'text'], 'performed_by' => ['Performed By', 'text'], 'order_status' => ['Order Status', 'status'],
         ];
         $receivingColumns = [
+            'receipt_count' => ['Receipt Attachments', 'number'], 'receipt_filenames' => ['Receipt Filenames', 'text'], 'receipt_references' => ['Document References', 'text'],
             'receiving_no' => ['Receiving No.', 'text'], 'po_no' => ['PO No.', 'text'], 'supplier' => ['Supplier', 'text'],
             'reference_no' => ['Delivery Ref. No.', 'text'], 'product' => ['Product', 'text'], 'expected_qty' => ['Expected Qty', 'number'],
             'delivered_qty' => ['Delivered Qty', 'number'], 'accepted_qty' => ['Accepted Qty', 'number'], 'rejected_qty' => ['Rejected Qty', 'number'],
@@ -211,18 +213,39 @@ class ReportRegistry
 
             // ---------------- Receiving ----------------
             new ReportDefinition('receiving.summary', 'Receiving Summary', 'Every receiving line with PO, supplier, quantities, QA state and replacement links.', 'receiving',
-                $receivingColumns, $receivingFilters, self::RECEIVING_STATUSES, dateLabel: 'Delivery date',
+                $receivingColumns, $receivingFilters, self::RECEIVING_STATUSES, formats: ['CSV','XLSX','PDF','ZIP'], dateLabel: 'Delivery date',
                 source: fn (ReportFilters $f) => $this->receivingQuery($f)),
             new ReportDefinition('receiving.pending', 'Pending Receiving', 'Receivings awaiting QA or an expected supplier replacement delivery.', 'receiving',
-                $receivingColumns, $receivingFilters, ['Pending QA' => 'Pending QA', 'Awaiting Replacement' => 'Awaiting Replacement'], dateLabel: 'Delivery date',
+                $receivingColumns, $receivingFilters, ['Pending QA' => 'Pending QA', 'Awaiting Replacement' => 'Awaiting Replacement'], formats: ['CSV','XLSX','PDF','ZIP'], dateLabel: 'Delivery date',
                 source: fn (ReportFilters $f) => $this->receivingQuery($f)->whereIn('r.status', ['Pending QA', 'Awaiting Replacement'])),
             new ReportDefinition('receiving.completed', 'Completed Receiving', 'Receivings whose QA inspection has been completed.', 'receiving',
-                $receivingColumns, $receivingFilters, ['Passed' => 'Passed', 'Partial' => 'Partial', 'Rejected' => 'Rejected'], dateLabel: 'Delivery date',
+                $receivingColumns, $receivingFilters, ['Passed' => 'Passed', 'Partial' => 'Partial', 'Rejected' => 'Rejected'], formats: ['CSV','XLSX','PDF','ZIP'], dateLabel: 'Delivery date',
                 source: fn (ReportFilters $f) => $this->receivingQuery($f)->whereNotNull('qi.completed_at')),
             new ReportDefinition('receiving.replacements', 'Replacement Receiving Report', 'Supplier replacement receivings linked to their original rejection case and receiving.', 'receiving',
-                $receivingColumns + ['case_status' => ['Rejection Case Status', 'status']], $receivingFilters, self::RECEIVING_STATUSES, dateLabel: 'Delivery date',
+                $receivingColumns + ['case_status' => ['Rejection Case Status', 'status']], $receivingFilters, self::RECEIVING_STATUSES, formats: ['CSV','XLSX','PDF','ZIP'], dateLabel: 'Delivery date',
                 source: fn (ReportFilters $f) => $this->receivingQuery($f)->whereNotNull('r.replacement_for_rejection_case_id')
                     ->addSelect(DB::raw('src.status as case_status'))),
+            new ReportDefinition('receiving.excess_resolution', 'Excess Delivery Resolution Report', 'Source-backed excess decisions, evidence, Financial hold, QA, Stock In and supplier-return outcomes.', 'receiving',
+                [
+                    'receipt_count' => ['Receipt Attachments', 'number'], 'receipt_filenames' => ['Receipt Filenames', 'text'], 'receipt_references' => ['Document References', 'text'],
+                    'exception_reference' => ['Exception', 'text'], 'receiving_reference' => ['Receiving', 'text'],
+                    'purchase_order_reference' => ['Purchase Order', 'text'], 'supplier' => ['Supplier', 'text'],
+                    'product' => ['Product', 'text'], 'excess_quantity' => ['Excess Qty', 'number'], 'unit' => ['Unit', 'text'],
+                    'admin_decision' => ['Admin Decision / State', 'status'], 'document_status' => ['Document Status', 'status'],
+                    'financial_status' => ['Financial Status', 'status'], 'qa_status' => ['QA Status', 'status'],
+                    'excess_stock_in_quantity' => ['Excess Stock In Qty', 'number'], 'returned_quantity' => ['Returned Qty', 'number'],
+                    'final_resolution' => ['Final Resolution', 'status'], 'submitted_at' => ['Submitted', 'datetime'],
+                    'reviewed_at' => ['Admin Reviewed', 'datetime'], 'qa_completed_at' => ['QA Completed', 'datetime'],
+                    'stocked_in_at' => ['Stocked In', 'datetime'], 'return_completed_at' => ['Return Completed', 'datetime'],
+                ],
+                ['date', 'supplier', 'product', 'status'],
+                collect([
+                    ExcessDeliveryReview::STATUS_PENDING, ExcessDeliveryReview::STATUS_DOCUMENTATION_REQUESTED,
+                    ExcessDeliveryReview::STATUS_DOCUMENTATION_SUBMITTED, ExcessDeliveryReview::STATUS_FINANCIAL_HOLD,
+                    ExcessDeliveryReview::STATUS_APPROVED, ExcessDeliveryReview::STATUS_RETURN_REQUIRED,
+                    ExcessDeliveryReview::STATUS_RETURN_IN_PROGRESS, ExcessDeliveryReview::STATUS_RETURNED,
+                ])->mapWithKeys(fn (string $status) => [$status => str_replace('_', ' ', $status)])->all(),
+                formats: ['CSV','XLSX','PDF','ZIP'], dateLabel: 'Exception submitted date', source: fn (ReportFilters $f) => $this->excessResolutionQuery($f)),
 
             // ---------------- Shipment ----------------
             new ReportDefinition('shipment.summary', 'Shipment Summary', 'Orders that reached the shipment stage, with recorded status timestamps.', 'shipment',
@@ -569,6 +592,38 @@ class ReportRegistry
         if ($f->status) $query->where('r.status', $f->status);
 
         return $this->dateRange($query, 'r.delivery_date', $f);
+    }
+
+    private function excessResolutionQuery(ReportFilters $f): Builder
+    {
+        $query = DB::table('excess_delivery_review_items as eri')
+            ->join('excess_delivery_reviews as er', 'er.id', '=', 'eri.excess_delivery_review_id')
+            ->join('receivings as r', 'r.id', '=', 'er.receiving_id')
+            ->leftJoin('purchase_orders as po', 'po.id', '=', 'er.purchase_order_id')
+            ->leftJoin('suppliers as s', 's.id', '=', 'er.supplier_id')
+            ->leftJoin('receiving_items as ri', 'ri.id', '=', 'eri.receiving_item_id')
+            ->leftJoin('qa_inspection_items as qii', 'qii.receiving_item_id', '=', 'ri.id')
+            ->leftJoin('qa_inspections as qi', 'qi.id', '=', 'qii.qa_inspection_id')
+            ->select([
+                'er.reference as exception_reference', 'r.receiving_no as receiving_reference',
+                'po.po_number as purchase_order_reference', DB::raw('COALESCE(s.name, po.supplier_name, r.supplier) as supplier'),
+                'ri.product_name as product', 'eri.excess_quantity', 'eri.unit', 'er.status as admin_decision',
+                DB::raw("CASE WHEN EXISTS (SELECT 1 FROM excess_delivery_documents ed WHERE ed.excess_delivery_review_id = er.id) THEN 'ON_FILE' ELSE 'NOT_ON_FILE' END as document_status"),
+                'er.financial_reconciliation_status as financial_status',
+                DB::raw("CASE WHEN qi.completed_at IS NOT NULL THEN qii.inspection_result WHEN qi.id IS NOT NULL THEN 'IN_PROGRESS' WHEN ri.inspection_status = 'Pending QA' THEN 'PENDING' ELSE ri.inspection_status END as qa_status"),
+                DB::raw('CASE WHEN ri.stocked_in_at IS NOT NULL THEN COALESCE(qii.accepted_quantity, 0) ELSE 0 END as excess_stock_in_quantity'),
+                'eri.returned_quantity',
+                DB::raw("CASE WHEN er.status = 'RETURNED_TO_SUPPLIER' AND eri.returned_quantity >= eri.excess_quantity THEN 'RETURNED_TO_SUPPLIER' WHEN er.status = 'APPROVED_FOR_QA' AND ri.stocked_in_at IS NOT NULL AND ri.inspection_status = 'Passed' THEN 'STOCKED_IN' ELSE 'ACTIVE' END as final_resolution"),
+                'er.created_at as submitted_at', 'er.reviewed_at', 'qi.completed_at as qa_completed_at',
+                'ri.stocked_in_at', 'er.return_completed_at',
+            ])
+            ->orderByDesc('er.updated_at')->orderByDesc('er.id')->orderBy('eri.id');
+
+        if ($f->supplierId) $query->where('er.supplier_id', $f->supplierId);
+        if ($f->productId) $query->where('eri.product_id', $f->productId);
+        if ($f->status) $query->where('er.status', $f->status);
+
+        return $this->dateRange($query, 'er.created_at', $f);
     }
 
     private function historyAt(string $status, string $alias, string $aggregate = 'MIN'): \Illuminate\Contracts\Database\Query\Expression

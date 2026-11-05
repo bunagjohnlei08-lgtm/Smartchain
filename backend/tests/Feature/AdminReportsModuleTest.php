@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Mail\ScheduledReportMail;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\ExcessDeliveryDocument;
+use App\Models\ExcessDeliveryReview;
+use App\Models\ExcessDeliveryReviewItem;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
@@ -184,7 +187,7 @@ class AdminReportsModuleTest extends TestCase
         $categories = collect($response->json('data'))->pluck('category')->unique()->values()->all();
         $this->assertEqualsCanonicalizing(['inventory', 'stock-movement', 'receiving', 'shipment', 'order', 'procurement', 'supplier', 'warehouse', 'ai-forecast', 'system'], $categories);
         $keys = collect($response->json('data'))->pluck('key');
-        foreach (['inventory.summary', 'inventory.low_stock', 'inventory.out_of_stock', 'stock.stock_in', 'stock.stock_out', 'stock.movement_summary', 'receiving.replacements', 'shipment.in_transit', 'orders.fulfillment', 'procurement.purchase_orders', 'procurement.rfqs', 'procurement.bid_awards', 'suppliers.rejections', 'suppliers.applications', 'warehouse.capacity', 'warehouse.inventory_audits', 'warehouse.production_material_usage', 'shipment.logistics_integration', 'system.audit_logs', 'system.user_activity'] as $key) {
+        foreach (['inventory.summary', 'inventory.low_stock', 'inventory.out_of_stock', 'stock.stock_in', 'stock.stock_out', 'stock.movement_summary', 'receiving.replacements', 'receiving.excess_resolution', 'shipment.in_transit', 'orders.fulfillment', 'procurement.purchase_orders', 'procurement.rfqs', 'procurement.bid_awards', 'suppliers.rejections', 'suppliers.applications', 'warehouse.capacity', 'warehouse.inventory_audits', 'warehouse.production_material_usage', 'shipment.logistics_integration', 'system.audit_logs', 'system.user_activity'] as $key) {
             $this->assertTrue($keys->contains($key), "Missing {$key}");
         }
     }
@@ -396,6 +399,64 @@ class AdminReportsModuleTest extends TestCase
         $this->assertSame(['RCV-00001'], array_column($this->rows('receiving.completed'), 'receiving_no'));
         $this->assertSame([], $this->rows('receiving.pending'));
         $this->assertSame(['RCV-00001'], array_column($this->rows('receiving.summary', ['supplier_id' => $this->supplier->id]), 'receiving_no'));
+    }
+
+    public function test_excess_resolution_report_uses_persisted_decision_evidence_qa_and_stock_in_data(): void
+    {
+        $po = $this->purchaseOrder('PO-EXCESS-REPORT');
+        $poItem = $po->items()->sole();
+        $receiving = Receiving::create([
+            'receiving_no' => 'RCV-EXCESS-REPORT', 'purchase_order_id' => $po->id,
+            'purchase_order' => $po->po_number, 'supplier' => $this->supplier->name,
+            'reference_no' => 'DR-EXCESS', 'delivery_date' => '2026-09-20', 'status' => 'Completed',
+            'prepared_by_id' => $this->manager->id, 'assigned_qa_user_id' => $this->qa->id,
+        ]);
+        $item = ReceivingItem::create([
+            'receiving_id' => $receiving->id, 'purchase_order_item_id' => $poItem->id,
+            'product_id' => $this->healthy->id, 'warehouse_id' => $this->main->id,
+            'product_name' => $this->healthy->name, 'ordered_quantity' => 1,
+            'delivered_quantity' => 1, 'unit' => 'SACK', 'inspection_status' => 'Passed',
+            'stocked_in_at' => '2026-09-21 09:00:00',
+        ]);
+        $inspection = QaInspection::create([
+            'receiving_id' => $receiving->id, 'cycle_number' => 2, 'status' => 'Passed',
+            'started_at' => '2026-09-20 10:00:00', 'completed_at' => '2026-09-20 11:00:00',
+            'inspected_by_id' => $this->qa->id,
+        ]);
+        QaInspectionItem::create([
+            'qa_inspection_id' => $inspection->id, 'receiving_item_id' => $item->id,
+            'accepted_quantity' => 1, 'rejected_quantity' => 0, 'inspection_result' => 'Passed',
+        ]);
+        $review = ExcessDeliveryReview::create([
+            'submission_key' => (string) Str::uuid(), 'delivery_identity' => hash('sha256', 'report-excess'),
+            'reference' => 'EXC-REPORT-001', 'receiving_id' => $receiving->id, 'purchase_order_id' => $po->id,
+            'supplier_id' => $this->supplier->id, 'warehouse_id' => $this->main->id,
+            'submitted_by_id' => $this->manager->id, 'status' => ExcessDeliveryReview::STATUS_APPROVED,
+            'cost_resolution' => ExcessDeliveryReview::COST_FREE,
+            'financial_reconciliation_status' => 'NO_ADDITIONAL_CHARGE_DOCUMENTED',
+            'reviewed_by_id' => $this->admin->id, 'reviewed_at' => '2026-09-20 08:00:00',
+        ]);
+        ExcessDeliveryReviewItem::create([
+            'excess_delivery_review_id' => $review->id, 'receiving_item_id' => $item->id,
+            'purchase_order_item_id' => $poItem->id, 'product_id' => $this->healthy->id,
+            'po_remaining_quantity' => 30, 'actual_delivered_quantity' => 31,
+            'authorized_quantity' => 30, 'excess_quantity' => 1, 'unit' => 'SACK',
+        ]);
+        ExcessDeliveryDocument::create([
+            'excess_delivery_review_id' => $review->id, 'internal_reference' => 'EXDOC-REPORT-001',
+            'purpose' => 'ADMIN_DECISION_EVIDENCE', 'document_type' => 'WRITTEN_SUPPLIER_CONFIRMATION',
+            'original_name' => 'supplier.pdf', 'stored_path' => 'private/report/supplier.pdf',
+            'mime_type' => 'application/pdf', 'file_size' => 100, 'file_sha256' => str_repeat('a', 64),
+            'uploaded_by_id' => $this->admin->id,
+        ]);
+
+        $rows = $this->rows('receiving.excess_resolution');
+        $this->assertCount(1, $rows);
+        $this->assertSame('EXC-REPORT-001', $rows[0]['exception_reference']);
+        $this->assertSame('ON_FILE', $rows[0]['document_status']);
+        $this->assertSame('Passed', $rows[0]['qa_status']);
+        $this->assertSame(1, $rows[0]['excess_stock_in_quantity']);
+        $this->assertSame('STOCKED_IN', $rows[0]['final_resolution']);
     }
 
     public function test_replacement_receiving_appears_linked_and_is_not_counted_as_received(): void

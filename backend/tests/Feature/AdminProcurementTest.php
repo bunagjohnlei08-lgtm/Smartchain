@@ -20,6 +20,7 @@ use Tests\TestCase;
 class AdminProcurementTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Support\VerifiedPurchasingTerms;
 
     private User $requester;
     private Product $product;
@@ -194,6 +195,7 @@ class AdminProcurementTest extends TestCase
             'request_no' => 'RR-REJECTED-PO',
             'status' => ReplenishmentRequest::STATUS_REJECTED,
         ]);
+        $term = $this->verifiedPurchasingTerm($supplier, $this->product, $admin, '100.00');
 
         $this->actingAs($admin)->postJson('/api/purchase-orders', [
             'supplier_id' => $supplier->id,
@@ -203,6 +205,7 @@ class AdminProcurementTest extends TestCase
             'items' => [[
                 'product_name' => $this->product->name,
                 'ordered_quantity' => 60,
+                'purchasing_term_id' => $term->id,
                 'unit_price' => 100,
             ]],
         ])->assertUnprocessable()
@@ -326,6 +329,7 @@ class AdminProcurementTest extends TestCase
             'request_no' => 'RR-APPROVED-PO',
             'status' => ReplenishmentRequest::STATUS_FOR_PURCHASE_ORDER,
         ]);
+        $term = $this->verifiedPurchasingTerm($supplier, $this->product, $admin, '100.00');
 
         $response = $this->actingAs($admin)->postJson('/api/purchase-orders', [
             'supplier_id' => $supplier->id,
@@ -336,6 +340,7 @@ class AdminProcurementTest extends TestCase
                 'product_name' => $this->product->name,
                 'ordered_quantity' => 60,
                 'unit_price' => 100,
+                'purchasing_term_id' => $term->id,
             ]],
         ])->assertCreated();
 

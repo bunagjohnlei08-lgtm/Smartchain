@@ -76,6 +76,13 @@ interface QaInspectionDetailApi {
     accepted_qty: number;
     rejected_qty: number;
   };
+  quantity_context: {
+    original_physical_delivery: number;
+    current_inspection: number;
+    previously_inspected: number;
+    previously_stocked_in: number;
+    held_excess: number;
+  };
   timeline: {
     status: string;
     performed_by: string;
@@ -138,6 +145,7 @@ interface ReceivingDetail extends ReceivingItem {
   inspectedBy: string;
   inspectionDate: string;
   summaryRemarks: string;
+  quantityContext: QaInspectionDetailApi['quantity_context'];
 }
 
 const statusOptions: Array<'All Status' | InspectionStatus> = ['All Status', 'Pending', 'In Progress', 'Passed', 'Rejected', 'Partial'];
@@ -342,6 +350,7 @@ const mapDetail = (detail: QaInspectionDetailApi): ReceivingDetail => {
     inspectedBy: detail.inspection.inspected_by ?? '-',
     inspectionDate: formatDateOnly(detail.inspection.completed_at ?? detail.inspection.started_at),
     summaryRemarks: summaryRemarks || '-',
+    quantityContext: detail.quantity_context,
   };
 };
 
@@ -1284,7 +1293,7 @@ const QualityInspection: React.FC = () => {
                             <tr className="text-left text-slate-400">
                               <th className="px-2 py-2 font-medium">Product</th>
                               <th className="px-2 py-2 font-medium text-center">PO Ordered Qty</th>
-                              <th className="px-2 py-2 font-medium text-center">Delivered Qty</th>
+                              <th className="px-2 py-2 font-medium text-center">This Inspection Qty</th>
                               <th className="px-2 py-2 font-medium text-center">Accepted Qty</th>
                               <th className="px-2 py-2 font-medium text-center">Rejected Qty</th>
                               <th className="px-2 py-2 font-medium">Unit</th>
@@ -1370,7 +1379,16 @@ const QualityInspection: React.FC = () => {
                     )}
 
                     {activeTab === 'summary' && (
-                      <div className="text-[13px]">
+                      <div className="space-y-4 text-[13px]">
+                        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                          {[
+                            ['Physical Delivery', selectedReceiving.quantityContext.original_physical_delivery],
+                            ['This Inspection', selectedReceiving.quantityContext.current_inspection],
+                            ['Previously Inspected', selectedReceiving.quantityContext.previously_inspected],
+                            ['Previously Stocked', selectedReceiving.quantityContext.previously_stocked_in],
+                            ['Held Excess', selectedReceiving.quantityContext.held_excess],
+                          ].map(([label, value]) => <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-[#090d16]"><dt className="text-[10px] text-slate-500 dark:text-slate-400">{label}</dt><dd className="mt-1 font-semibold text-slate-950 dark:text-white">{value}</dd></div>)}
+                        </dl>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                           <div>
                             <p className="text-[11px] text-slate-600 dark:text-slate-400 sm:text-xs">QA Inspector</p>

@@ -224,6 +224,17 @@ const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => {
 };
 
 const isPickListEligible = (order: Order): boolean => order.status === 'Assigned' || order.status === 'Preparing';
+const ORDERS_PER_PAGE = 8;
+
+const paginationItems = (currentPage: number, totalPages: number): Array<number | string> => {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  const pages: Array<number | string> = [1];
+  if (currentPage > 4) pages.push('start-ellipsis');
+  for (let page = Math.max(2, currentPage - 1); page <= Math.min(totalPages - 1, currentPage + 1); page += 1) pages.push(page);
+  if (currentPage < totalPages - 3) pages.push('end-ellipsis');
+  pages.push(totalPages);
+  return pages;
+};
 
 // KPI Card
 const KPICard: React.FC<{
@@ -264,6 +275,7 @@ const OrderManagement: React.FC = () => {
   const [warehouseFilter, setWarehouseFilter] = useState<string>('All');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isSelectionLoading, setIsSelectionLoading] = useState(false);
@@ -279,11 +291,16 @@ const OrderManagement: React.FC = () => {
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const loadOrders = useCallback(async () => {
-    const [ordersResponse, summaryResponse] = await Promise.all([
+    const [firstOrdersResponse, summaryResponse] = await Promise.all([
       apiClient.get('/plant-manager/orders', { params: { per_page: 100 } }),
       apiClient.get('/plant-manager/orders/summary'),
     ]);
-    setOrders(ordersResponse.data.data.map(mapOrder));
+    const lastPage = Number(firstOrdersResponse.data.last_page ?? 1);
+    const remainingResponses = lastPage > 1
+      ? await Promise.all(Array.from({ length: lastPage - 1 }, (_, index) => apiClient.get('/plant-manager/orders', { params: { per_page: 100, page: index + 2 } })))
+      : [];
+    const allOrders = [firstOrdersResponse, ...remainingResponses].flatMap((response) => response.data.data);
+    setOrders(allOrders.map(mapOrder));
     setSummary(summaryResponse.data);
   }, []);
 
@@ -315,14 +332,26 @@ const OrderManagement: React.FC = () => {
     });
   }, [orders, searchTerm, statusFilter, warehouseFilter, priorityFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+  const paginatedOrders = useMemo(
+    () => filteredOrders.slice((currentPage - 1) * ORDERS_PER_PAGE, currentPage * ORDERS_PER_PAGE),
+    [currentPage, filteredOrders],
+  );
+  const pageStart = filteredOrders.length === 0 ? 0 : (currentPage - 1) * ORDERS_PER_PAGE + 1;
+  const pageEnd = Math.min(currentPage * ORDERS_PER_PAGE, filteredOrders.length);
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, warehouseFilter, priorityFilter]);
+  useEffect(() => { setCurrentPage((page) => Math.min(page, totalPages)); }, [totalPages]);
+
   const filteredEligibleOrders = useMemo(() => filteredOrders.filter(isPickListEligible), [filteredOrders]);
+  const currentPageEligibleOrders = useMemo(() => paginatedOrders.filter(isPickListEligible), [paginatedOrders]);
   const selectedPickOrders = useMemo(
     () => orders.filter((order) => isPickListEligible(order) && selectedPickOrderIds.has(order.id)),
     [orders, selectedPickOrderIds],
   );
-  const allVisibleEligibleSelected = filteredEligibleOrders.length > 0
-    && filteredEligibleOrders.every((order) => selectedPickOrderIds.has(order.id));
-  const someVisibleEligibleSelected = filteredEligibleOrders.some((order) => selectedPickOrderIds.has(order.id));
+  const allVisibleEligibleSelected = currentPageEligibleOrders.length > 0
+    && currentPageEligibleOrders.every((order) => selectedPickOrderIds.has(order.id));
+  const someVisibleEligibleSelected = currentPageEligibleOrders.some((order) => selectedPickOrderIds.has(order.id));
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -463,7 +492,7 @@ const OrderManagement: React.FC = () => {
   const toggleAllVisibleEligible = () => {
     setSelectedPickOrderIds((current) => {
       const next = new Set(current);
-      filteredEligibleOrders.forEach((order) => {
+      currentPageEligibleOrders.forEach((order) => {
         if (allVisibleEligibleSelected) next.delete(order.id);
         else next.add(order.id);
       });
@@ -599,7 +628,7 @@ const OrderManagement: React.FC = () => {
           <table className="pm-status-table pm-order-status-table pm-responsive-table pm-cols-8 pm-sticky-1 w-full min-w-[1100px] text-sm">
             <thead className="bg-[#070a12] border-b border-slate-800/80">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400"><span className="flex items-center gap-3"><input ref={selectAllRef} type="checkbox" checked={allVisibleEligibleSelected} disabled={filteredEligibleOrders.length === 0} onChange={toggleAllVisibleEligible} aria-label="Select all currently visible eligible orders" className="h-4 w-4 cursor-pointer rounded border-slate-600 accent-cyan-500 disabled:cursor-not-allowed disabled:opacity-40" />Order No.</span></th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400"><span className="flex items-center gap-3"><input ref={selectAllRef} type="checkbox" checked={allVisibleEligibleSelected} disabled={currentPageEligibleOrders.length === 0} onChange={toggleAllVisibleEligible} aria-label="Select all eligible orders on this page" title="Select eligible orders on this page" className="h-4 w-4 cursor-pointer rounded border-slate-600 accent-cyan-500 disabled:cursor-not-allowed disabled:opacity-40" />Order No.</span></th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Customer / Destination</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Products</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">Items</th>
@@ -610,7 +639,7 @@ const OrderManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50">
-              {filteredOrders.map((order) => (
+              {paginatedOrders.map((order) => (
                 <tr
                   key={order.id}
                   onClick={() => void selectOrder(order)}
@@ -671,10 +700,24 @@ const OrderManagement: React.FC = () => {
           </table>
         </div>
         ) : filteredOrders.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{filteredOrders.map((order) => <article key={order.id} onClick={() => void selectOrder(order)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void selectOrder(order); } }} tabIndex={0} aria-selected={selectedOrderId === order.id} className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 dark:bg-slate-800 ${selectedOrderId === order.id ? 'border-cyan-500/60 ring-1 ring-cyan-500/30' : 'border-slate-200 dark:border-slate-700'}`}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3">{isPickListEligible(order) && <input type="checkbox" checked={selectedPickOrderIds.has(order.id)} onChange={() => togglePickOrder(order.id)} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} aria-label={`Select ${order.orderNumber} for pick list`} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-600 accent-cyan-500" />}<div className="min-w-0"><h3 className="font-mono font-semibold text-slate-900 dark:text-white">{order.orderNumber}</h3><p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">{order.customer}</p></div></div><StatusBadge status={order.status} /></div><p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Products</dt><dd className="text-slate-900 dark:text-white">{order.items[0]?.productName || 'No products'}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.totalItems}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned</dt><dd className="text-slate-900 dark:text-white">{order.assignedDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); void handleViewOrder(order); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View / Process Order"><Eye className="h-4 w-4" /></button></div></article>)}</div>
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">{paginatedOrders.map((order) => <article key={order.id} onClick={() => void selectOrder(order)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void selectOrder(order); } }} tabIndex={0} aria-selected={selectedOrderId === order.id} className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 dark:bg-slate-800 ${selectedOrderId === order.id ? 'border-cyan-500/60 ring-1 ring-cyan-500/30' : 'border-slate-200 dark:border-slate-700'}`}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3">{isPickListEligible(order) && <input type="checkbox" checked={selectedPickOrderIds.has(order.id)} onChange={() => togglePickOrder(order.id)} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} aria-label={`Select ${order.orderNumber} for pick list`} className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-600 accent-cyan-500" />}<div className="min-w-0"><h3 className="font-mono font-semibold text-slate-900 dark:text-white">{order.orderNumber}</h3><p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">{order.customer}</p></div></div><StatusBadge status={order.status} /></div><p className="mt-3 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{order.destination}</p><dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-slate-500 dark:text-slate-400">Products</dt><dd className="text-slate-900 dark:text-white">{order.items[0]?.productName || 'No products'}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Items</dt><dd className="text-slate-900 dark:text-white">{order.totalItems}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Assigned</dt><dd className="text-slate-900 dark:text-white">{order.assignedDate}</dd></div><div><dt className="text-slate-500 dark:text-slate-400">Target</dt><dd className="text-slate-900 dark:text-white">{order.targetDelivery}</dd></div></dl><div className="mt-4 flex justify-end border-t border-slate-200 pt-3 dark:border-slate-700"><button onClick={(event) => { event.stopPropagation(); void handleViewOrder(order); }} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white" title="View / Process Order"><Eye className="h-4 w-4" /></button></div></article>)}</div>
         ) : (
           <div className="px-4 py-8 text-center text-slate-400">No orders match your filters.</div>
         )}
+        <div className="flex flex-col gap-3 border-t border-slate-800/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-400 sm:text-sm" aria-live="polite">
+            Showing {pageStart}&ndash;{pageEnd} of {filteredOrders.length} orders
+          </p>
+          {totalPages > 1 && (
+            <nav className="flex max-w-full items-center justify-center gap-1 overflow-x-auto" aria-label="Order table pagination">
+              <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} className="min-h-11 rounded-lg border border-slate-700 px-3 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+              {paginationItems(currentPage, totalPages).map((item) => typeof item === 'number' ? (
+                <button key={item} type="button" onClick={() => setCurrentPage(item)} aria-current={currentPage === item ? 'page' : undefined} aria-label={`Go to page ${item}`} className={`min-h-11 min-w-11 rounded-lg px-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${currentPage === item ? 'bg-cyan-500 text-slate-950' : 'border border-slate-700 text-slate-300 hover:bg-slate-800'}`}>{item}</button>
+              ) : <span key={item} className="px-1 text-slate-500" aria-hidden="true">&hellip;</span>)}
+              <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} className="min-h-11 rounded-lg border border-slate-700 px-3 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+            </nav>
+          )}
+        </div>
       </div>
 
       {/* BOTTOM ANALYTICS & TIMELINE */}

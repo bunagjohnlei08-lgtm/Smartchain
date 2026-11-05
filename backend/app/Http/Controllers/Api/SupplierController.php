@@ -6,8 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use App\Models\SupplierAlias;
 use App\Models\PurchaseOrder;
+use App\Models\User;
 use App\Support\SupplierName;
 use App\Support\SupplierLifecycle;
+use App\Support\AuditLogger;
+use App\Support\UserInvitations;
+use App\Services\SupplierAccountInvitationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 class SupplierController extends Controller
 {
+    public function __construct(private readonly SupplierAccountInvitationService $accountInvitations) {}
+
     private const OPERATIONAL_STATUSES = [
         Supplier::STATUS_ACTIVE,
         Supplier::STATUS_ON_HOLD,
@@ -37,7 +43,7 @@ class SupplierController extends Controller
             'status' => ['nullable', Rule::in(self::FILTER_STATUSES)],
         ]);
 
-        $suppliers = Supplier::query()->with('aliases')
+        $suppliers = Supplier::query()->with(['aliases', 'authorizedAccount.role', 'authorizedAccount.latestInvitation'])
             ->withCount(['purchaseOrders as open_purchase_orders_count' => fn ($query) => $query->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)])
             ->when($validated['search'] ?? null, function ($query, string $search) {
                 $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $search).'%';
@@ -54,13 +60,20 @@ class SupplierController extends Controller
             ->orderBy('name')
             ->get();
 
-        return response()->json(['data' => $suppliers->map(fn (Supplier $supplier) => $this->present($supplier))]);
+        $emails = $suppliers->filter(fn (Supplier $supplier) => ! $supplier->authorizedAccount)
+            ->map(fn (Supplier $supplier) => mb_strtolower(trim((string) $supplier->email)))->filter()->unique();
+        $usedEmails = User::query()->whereIn(DB::raw('LOWER(email)'), $emails)
+            ->pluck('email')->mapWithKeys(fn (string $email) => [mb_strtolower($email) => true]);
+
+        return response()->json(['data' => $suppliers->map(fn (Supplier $supplier) => $this->present(
+            $supplier, isset($usedEmails[mb_strtolower(trim((string) $supplier->email))])
+        ))]);
     }
 
     public function show(Request $request, Supplier $supplier): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        $supplier->load('aliases')->loadCount(['purchaseOrders as open_purchase_orders_count' => fn ($query) => $query->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)]);
+        $supplier->load(['aliases', 'authorizedAccount.role', 'authorizedAccount.latestInvitation'])->loadCount(['purchaseOrders as open_purchase_orders_count' => fn ($query) => $query->whereIn('status', PurchaseOrder::ACTIVE_STATUSES)]);
 
         return response()->json(['data' => $this->present($supplier)]);
     }
@@ -111,6 +124,29 @@ class SupplierController extends Controller
             Supplier::STATUS_INACTIVE,
         ])]]));
         return response()->json(['data' => $this->present($supplier->fresh())]);
+    }
+
+    public function sendAccountInvitation(Request $request, Supplier $supplier): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $issued = $this->accountInvitations->issue($supplier, $request->user());
+        $sent = UserInvitations::send($issued['user'], $issued['invitation'], $issued['token']);
+
+        AuditLogger::log('SUPPLIER_ACCOUNT_INVITATION_SENT', AuditLogger::MODULE_SUPPLIERS, [
+            'status' => $sent ? 'SUCCESS' : 'FAILURE',
+            'actor' => $request->user(),
+            'resource' => $issued['user'],
+            'resource_label' => $supplier->supplier_code,
+            'details' => $sent ? 'Supplier activation invitation accepted by the mail transport.' : 'Supplier activation invitation could not be sent.',
+            'metadata' => ['supplier_id' => $supplier->id, 'invitation_id' => $issued['invitation']->id],
+        ]);
+
+        return response()->json([
+            'message' => $sent
+                ? 'Account activation invitation sent to the supplier\'s registered email. RFQ bidding remains subject to accreditation requirements.'
+                : 'The activation invitation could not be sent. Please try again.',
+            'account' => $this->accountInvitations->state($supplier->fresh()),
+        ], $sent ? 200 : 502);
     }
 
     public function destroy(Request $request, Supplier $supplier, SupplierLifecycle $lifecycle): JsonResponse
@@ -181,7 +217,7 @@ class SupplierController extends Controller
         ];
     }
 
-    private function present(Supplier $supplier): array
+    private function present(Supplier $supplier, ?bool $emailConflict = null): array
     {
         $deadline = $supplier->recoveryDeadline();
         $openPurchaseOrders = array_key_exists('open_purchase_orders_count', $supplier->getAttributes())
@@ -196,6 +232,7 @@ class SupplierController extends Controller
             'recovery_days_remaining' => $supplier->canBeRestored()
                 ? max(1, now(Supplier::BUSINESS_TIMEZONE)->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false))
                 : 0,
+            'account' => $this->accountInvitations->state($supplier, $emailConflict),
         ];
     }
 

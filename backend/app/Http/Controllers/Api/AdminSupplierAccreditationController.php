@@ -7,8 +7,7 @@ use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierAccreditationDocument;
 use App\Models\SupplierAccreditationRequest;
-use App\Models\SupplierApplication;
-use App\Models\SupplierApplicationAttachment;
+use App\Services\SupplierAccreditationEligibility;
 use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,7 +79,7 @@ class AdminSupplierAccreditationController extends Controller
             if($v['decision']===SupplierAccreditationRequest::APPROVED){
                 $updates=[];
                 if(in_array($row->request_type,[SupplierAccreditationRequest::COMPLETION,SupplierAccreditationRequest::RENEWAL],true)){$expiry=$this->expiry($this->evidence($supplier,$row));$updates=['accreditation_status'=>'ACTIVE','accredited_at'=>$supplier->accredited_at??now(),'accreditation_expires_on'=>$expiry];$row->proposed_expires_on=$expiry;}
-                if($row->request_type===SupplierAccreditationRequest::CATEGORY_EXPANSION){$known=$this->categories()->map(fn($v)=>mb_strtoupper($v));foreach($row->requested_categories??[]as$category)abort_unless($known->contains(mb_strtoupper($category)),422,'A requested category no longer exists in the Product Catalog.');$merged=collect(explode(',',(string)$supplier->supply_category))->merge($row->requested_categories??[])->map(fn($v)=>trim($v))->filter()->unique(fn($v)=>mb_strtoupper($v))->values()->join(', ');$updates['supply_category']=$merged;}
+                if($row->request_type===SupplierAccreditationRequest::CATEGORY_EXPANSION||($row->request_type===SupplierAccreditationRequest::COMPLETION&&!empty($row->requested_categories))){$known=$this->categories()->map(fn($v)=>mb_strtoupper($v));foreach($row->requested_categories??[]as$category)abort_unless($known->contains(mb_strtoupper($category)),422,'A requested category no longer exists in the Product Catalog.');$merged=collect(explode(',',(string)$supplier->supply_category))->merge($row->requested_categories??[])->map(fn($v)=>trim($v))->filter()->unique(fn($v)=>mb_strtoupper($v))->values()->join(', ');$updates['supply_category']=$merged;}
                 if($updates!==[])$supplier->update($updates);$approvedState=$this->supplierState($supplier->fresh());
             }
             $row->forceFill(['status'=>$v['decision'],'admin_reason'=>trim($v['reason']),'approved_state'=>$approvedState,'reviewed_by_id'=>$request->user()->id,'reviewed_at'=>now(),'lock_version'=>$row->lock_version+1])->save();
@@ -92,13 +91,26 @@ class AdminSupplierAccreditationController extends Controller
 
     private function evidence(Supplier $supplier,?SupplierAccreditationRequest $row):array
     {
-        $application=SupplierApplication::where('approved_supplier_id',$supplier->id)->where('status',SupplierApplication::STATUS_APPROVED)->first();abort_unless($application,422,'An approved supplier application is required.');
-        $result=[];foreach([SupplierAccreditationDocument::BUSINESS_CERTIFICATE,SupplierAccreditationDocument::BUSINESS_PERMIT]as$type){$fresh=$row?->documents->where('document_type',$type)->sortByDesc('id')->first();if($fresh){abort_unless($fresh->verification_status===SupplierAccreditationDocument::VERIFIED&&$fresh->expires_on&&!$fresh->expires_on->lt(today()),422,"{$type} must be verified and current.");$result[$type]=$fresh->expires_on;continue;}$old=SupplierApplicationAttachment::where('supplier_application_id',$application->id)->where('is_current',true)->where('attachment_type',$type)->where('verification_status',SupplierApplicationAttachment::STATUS_VERIFIED)->whereNotNull('expires_on')->whereDate('expires_on','>=',today())->orderByDesc('id')->first();abort_unless($old,422,"A current verified {$type} with an expiry date is required.");$result[$type]=$old->expires_on;}return$result;
+        $eligibility = app(SupplierAccreditationEligibility::class);
+        $application = $supplier->approvedApplication()->first();
+        abort_unless($application || $eligibility->isLegacy($supplier), 422, 'An approved supplier application is required.');
+        $effective = $eligibility->effectiveDocuments($supplier);
+        $result = [];
+        foreach ([SupplierAccreditationDocument::BUSINESS_CERTIFICATE, SupplierAccreditationDocument::BUSINESS_PERMIT] as $type) {
+            // A submitted replacement must itself pass review; never fall back past it.
+            $document = $row?->documents->where('document_type', $type)->sortByDesc('id')->first() ?? $effective->get($type);
+            abort_unless($eligibility->documentIsCurrent($document, true), 422, "A current verified {$type} with an expiry date is required.");
+            if ($eligibility->isLegacy($supplier)) {
+                abort_unless($document->verified_by_id && $document->verified_at, 422, "{$type} requires explicit Admin verification.");
+            }
+            $result[$type] = $document->expires_on;
+        }
+        return $result;
     }
     private function expiry(array $evidence){return collect($evidence)->min();}
     private function categories(){return Product::query()->whereNotNull('category')->where('category','!=','')->distinct()->orderBy('category')->pluck('category');}
     private function event($row,?int$actor,string$type,string$message,array$metadata=[]):void{$row->events()->create(['actor_user_id'=>$actor,'event_type'=>$type,'message'=>$message,'metadata'=>$metadata?:null,'created_at'=>now()]);}
     private function supplierState(Supplier$supplier):array{return['accreditation_status'=>$supplier->accreditation_status,'accredited_at'=>$supplier->accredited_at?->toIso8601String(),'accreditation_expires_on'=>$supplier->accreditation_expires_on?->toDateString(),'categories'=>collect(explode(',',(string)$supplier->supply_category))->map(fn($v)=>trim($v))->filter()->values()->all()];}
-    private function supplierData(Supplier$supplier):array{return[...$supplier->only(['id','supplier_code','name','status','accreditation_status','accredited_at','accreditation_expires_on','supply_category']),'stored_state'=>$this->supplierState($supplier),'legacy_correction_available'=>!$supplier->accreditation_expires_on];}
+    private function supplierData(Supplier$supplier):array{return[...$supplier->only(['id','supplier_code','name','status','accreditation_status','accredited_at','accreditation_expires_on','supply_category']),'stored_state'=>$this->supplierState($supplier),'legacy_correction_available'=>!$supplier->accreditation_expires_on&&$supplier->approvedApplication()->exists(),'bidding_eligibility'=>['eligible'=>app(SupplierAccreditationEligibility::class)->eligible($supplier),'blockers'=>app(SupplierAccreditationEligibility::class)->blockers($supplier)]];}
     private function data(SupplierAccreditationRequest$row):array{$row->loadMissing(['supplier','submittedBy:id,name','reviewedBy:id,name','documents.verifiedBy:id,name','events.actor:id,name']);return[...$row->only(['id','supplier_id','request_type','status','requested_categories','supplier_reason','admin_reason','proposed_expires_on','previous_state','approved_state','submitted_at','reviewed_at','lock_version']),'supplier'=>$row->supplier?->only(['id','supplier_code','name','status','accreditation_status','accreditation_expires_on','supply_category']),'submitted_by'=>$row->submittedBy?->name,'reviewed_by'=>$row->reviewedBy?->name,'documents'=>$row->documents->map(fn($d)=>[...$d->only(['id','document_type','original_name','mime_type','file_size','verification_status','valid_from','expires_on','verification_reason','updated_at']),'download_url'=>URL::temporarySignedRoute('accreditation-documents.download',now()->addMinutes(10),['document'=>$d]),'verified_by'=>$d->verifiedBy?->name]),'events'=>$row->events->map(fn($e)=>[...$e->only(['id','event_type','message','metadata','created_at']),'actor'=>$e->actor?->name])];}
 }

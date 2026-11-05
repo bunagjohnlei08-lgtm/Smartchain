@@ -1,4 +1,5 @@
 import React from 'react';
+import ReceivingReceiptButton from '../../../components/reports/ReceivingReceiptButton';
 import type { ReportColumn } from './reportApi';
 import { formatDateTime } from './reportApi';
 
@@ -32,6 +33,7 @@ const displayValue = (column: ReportColumn, value: string | number | null): Reac
 
 /** Column widths keep 10+ column reports readable; the container scrolls horizontally instead of squeezing. */
 const columnWidth = (column: ReportColumn) => {
+  if (column.key === 'receipt_count') return 180;
   if (column.type === 'number' || column.type === 'percent') return 110;
   if (column.type === 'status') return 140;
   if (column.type === 'datetime') return 170;
@@ -74,7 +76,7 @@ const ReportTable: React.FC<Props> = ({ columns, rows, loading = false, emptyMes
                 return (
                   <td key={column.key} title={raw === null || raw === undefined ? undefined : String(raw)}
                     className={`truncate px-3 py-2 text-xs text-slate-200 md:text-[13px] ${column.type === 'number' || column.type === 'percent' ? 'text-right tabular-nums' : ''}`}>
-                    {displayValue(column, raw ?? null)}
+                    {column.key==='receipt_count'?<ReceivingReceiptButton number={String(row.receiving_no||row.receiving_reference||'')} count={raw==null?null:Number(raw)}/>:displayValue(column, raw ?? null)}
                   </td>
                 );
               })}

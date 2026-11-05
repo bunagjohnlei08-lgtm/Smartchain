@@ -25,6 +25,19 @@ export type ForecastRecommendation = {
   model_quality?: { mae?: number };
   forecast?: Array<{ week_start: string; expected_quantity: number }>;
   existing_request?: { id: number; reference: string; status: string } | null;
+  purchasing_rule?: PurchasingRule;
+};
+
+export type PurchasingRule = {
+  mode: 'unique_agreement' | 'admin_validation';
+  eligible_supplier_count?: number;
+  term_id?: number;
+  supplier_id?: number;
+  supplier_name?: string;
+  unit?: string;
+  minimum_order_quantity?: number | null;
+  maximum_order_quantity?: number | null;
+  order_multiple?: number | null;
 };
 
 export type ForecastRecommendationsResponse = {

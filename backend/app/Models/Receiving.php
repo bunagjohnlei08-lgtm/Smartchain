@@ -32,7 +32,7 @@ class Receiving extends Model
 
     public function items(): HasMany
     {
-        return $this->hasMany(ReceivingItem::class);
+        return $this->hasMany(ReceivingItem::class)->orderBy('id');
     }
 
     public function receiptAttachments(): HasMany
@@ -43,6 +43,11 @@ class Receiving extends Model
     public function discrepancy(): HasOne
     {
         return $this->hasOne(ReceivingDiscrepancy::class);
+    }
+
+    public function excessDeliveryReview(): HasOne
+    {
+        return $this->hasOne(ExcessDeliveryReview::class);
     }
 
     public const STATUS_AWAITING_REPLACEMENT = 'Awaiting Replacement';
@@ -83,6 +88,11 @@ class Receiving extends Model
 
     public function qaInspection(): HasOne
     {
-        return $this->hasOne(QaInspection::class);
+        return $this->hasOne(QaInspection::class)->latestOfMany();
+    }
+
+    public function qaInspections(): HasMany
+    {
+        return $this->hasMany(QaInspection::class)->orderBy('cycle_number');
     }
 }

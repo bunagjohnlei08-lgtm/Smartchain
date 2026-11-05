@@ -238,6 +238,30 @@ class SupplierRejectionReplacementTest extends TestCase
         $this->actingAs($this->manager)->post("/api/receivings/{$original->id}/confirm-replacement", $payload(1), ['Accept' => 'application/json'])->assertUnprocessable();
     }
 
+    public function test_one_remaining_replacement_is_exposed_by_the_api_and_can_only_be_recorded_once(): void
+    {
+        $replacement = $this->route($this->sentCase(delivered: 2, accepted: 1, rejected: 1));
+        $item = $replacement->items()->sole();
+        $this->actingAs($this->manager)->getJson("/api/receivings/{$replacement->id}")->assertOk()
+            ->assertJsonPath('replacement.expected_quantity', 1)
+            ->assertJsonPath('replacement.awaiting_delivery', true)
+            ->assertJsonPath('items.0.ordered_quantity', 1)
+            ->assertJsonPath('items.0.delivered_quantity', 0);
+        $payload = fn (int $quantity) => [
+            'delivery_date'=>now()->toDateString(),
+            'items'=>[['receiving_item_id'=>$item->id, 'delivered_quantity'=>$quantity]],
+            'receipts'=>[UploadedFile::fake()->image("receipt-{$quantity}.png")],
+        ];
+        $this->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(0), ['Accept'=>'application/json'])->assertUnprocessable();
+        $this->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(2), ['Accept'=>'application/json'])->assertUnprocessable();
+        $this->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(1), ['Accept'=>'application/json'])->assertOk()
+            ->assertJsonPath('replacement.awaiting_delivery', false)
+            ->assertJsonPath('items.0.delivered_quantity', 1);
+        $this->post("/api/receivings/{$replacement->id}/confirm-replacement", $payload(1), ['Accept'=>'application/json'])->assertUnprocessable();
+        $this->assertSame(1, $item->fresh()->delivered_quantity);
+        $this->assertDatabaseCount('receiving_receipt_attachments', 1);
+    }
+
     public function test_replacement_confirmation_rejects_a_renamed_persisted_receipt_duplicate(): void
     {
         $replacement = $this->route($this->sentCase());

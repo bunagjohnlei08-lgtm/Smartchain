@@ -56,12 +56,18 @@ class Supplier extends Model
         return $this->belongsToMany(Product::class)->withPivot('is_primary')->withTimestamps();
     }
 
+    public function purchasingTerms(): HasMany
+    {
+        return $this->hasMany(SupplierProductPurchasingTerm::class);
+    }
+
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class);
     }
 
     public function authorizedUsers(): HasMany { return $this->hasMany(User::class); }
+    public function authorizedAccount(): HasOne { return $this->hasOne(User::class); }
     public function quotations(): HasMany { return $this->hasMany(SupplierQuotation::class); }
     public function approvedApplication(): HasOne { return $this->hasOne(SupplierApplication::class, 'approved_supplier_id')->where('status', SupplierApplication::STATUS_APPROVED); }
     public function performanceSnapshots(): HasMany { return $this->hasMany(SupplierPerformanceSnapshot::class)->orderByDesc('calculated_at'); }

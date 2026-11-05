@@ -61,4 +61,5 @@ class PurchaseOrder extends Model
     public function financialSubmission(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(FinancialPoSubmission::class); }
     public function receivings(): HasMany { return $this->hasMany(Receiving::class); }
     public function discrepancies(): HasMany { return $this->hasMany(ReceivingDiscrepancy::class); }
+    public function excessDeliveryReviews(): HasMany { return $this->hasMany(ExcessDeliveryReview::class); }
 }

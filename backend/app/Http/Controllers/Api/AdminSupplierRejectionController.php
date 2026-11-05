@@ -35,7 +35,7 @@ class AdminSupplierRejectionController extends Controller
         $workflow->syncCompleted();
         $validated = $request->validate([
             'search' => 'nullable|string|max:100',
-            'status' => ['nullable', Rule::in(['PENDING_REVIEW', 'SENT', 'FAILED', 'REPLACEMENT_PENDING', 'RESOLVED'])],
+            'status' => ['nullable', Rule::in(['PENDING_REVIEW', 'SENDING', 'SENT', 'FAILED', 'REPLACEMENT_PENDING', 'RESOLVED'])],
         ]);
         $search = trim((string) ($validated['search'] ?? ''));
 
@@ -79,7 +79,7 @@ class AdminSupplierRejectionController extends Controller
             abort(500, 'The rejection report PDF could not be generated.');
         }
 
-        DB::transaction(function () use ($supplierRejectionCase) {
+        $sending = DB::transaction(function () use ($supplierRejectionCase) {
             $locked = SupplierRejectionCase::query()->lockForUpdate()->findOrFail($supplierRejectionCase->id);
             abort_if($locked->status === 'RESOLVED', 422, 'Resolved cases cannot be sent.');
             abort_if($locked->status === 'REPLACEMENT_PENDING', 422, 'Cases routed to Receiving cannot be resent.');
@@ -89,12 +89,17 @@ class AdminSupplierRejectionController extends Controller
                 'status' => 'SENDING', 'send_attempts' => $locked->send_attempts + 1,
                 'last_send_attempt_at' => now(), 'last_error' => null, 'last_error_at' => null,
             ]);
+            return ['number'=>$locked->send_attempts, 'started_at'=>$locked->last_send_attempt_at->toIso8601String()];
         });
 
+        $attempt = $sending['number'];
         $item = $supplierRejectionCase->inspectionItem;
         $receiving = $item->inspection->receiving;
+        $mailInvoked = false;
         try {
-            Mail::to($email, $supplier->name)->send(new SupplierRejectionMail(
+            $pendingMail = Mail::to($email, $supplier->name);
+            $mailInvoked = true;
+            $sentMessage = $pendingMail->send(new SupplierRejectionMail(
                 supplierName: $supplier->name,
                 caseReference: $this->reference($supplierRejectionCase),
                 poNumber: $receiving->purchaseOrder->po_number,
@@ -111,7 +116,13 @@ class AdminSupplierRejectionController extends Controller
             ));
         } catch (Throwable $exception) {
             report($exception);
-            $supplierRejectionCase->update([
+            // A timeout or unexpected error after handoff may follow provider acceptance.
+            $providerFailure = $exception instanceof \App\Exceptions\BrevoDeliveryException;
+            $requestUncertain = $providerFailure && str_starts_with($exception->getMessage(), 'Brevo API request failed:');
+            if ($requestUncertain || ($mailInvoked && ! $providerFailure)) {
+                return response()->json(['message'=>'The email outcome is uncertain. Do not resend; verify this attempt with the provider before reconciliation.'], 503);
+            }
+            $this->finishSend($supplierRejectionCase->id, $attempt, [
                 'status' => 'FAILED', 'last_error_at' => now(),
                 'last_error' => 'Delivery was not accepted by the configured email provider.',
             ]);
@@ -119,13 +130,62 @@ class AdminSupplierRejectionController extends Controller
             return response()->json(['message' => 'The rejection report could not be emailed. You can retry this case.'], 502);
         }
 
+        $context = $this->auditContext($supplierRejectionCase, $supplier);
+        $context['metadata'] += ['send_attempt'=>$attempt, 'attempted_at'=>$sending['started_at'],
+            'provider_message_id'=>$sentMessage?->getMessageId()];
+        AuditLogger::success('REJECTION_REPORT_PROVIDER_ACCEPTED', AuditLogger::MODULE_REJECTED_ITEMS, $context);
         $action = $supplierRejectionCase->sent_at ? 'REJECTION_REPORT_RESENT' : 'REJECTION_REPORT_SENT';
-        $supplierRejectionCase->update(['status' => 'SENT', 'sent_at' => now(), 'sent_by_id' => $request->user()->id]);
-        AuditLogger::success($action, AuditLogger::MODULE_REJECTED_ITEMS, $this->auditContext($supplierRejectionCase, $supplier));
+        try {
+            $this->finishSend($supplierRejectionCase->id, $attempt, [
+                'status'=>'SENT', 'sent_at'=>now(), 'sent_by_id'=>$request->user()->id,
+                'last_error'=>null, 'last_error_at'=>null,
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+            return response()->json(['message'=>'The provider accepted the report, but its final case status could not be saved. Do not resend; refresh and reconcile this attempt.'], 503);
+        }
+        AuditLogger::success($action, AuditLogger::MODULE_REJECTED_ITEMS, $this->auditContext($supplierRejectionCase->fresh(), $supplier));
         return response()->json([
             'message' => 'Rejection report sent to the original supplier.',
             'data' => $this->present($supplierRejectionCase->fresh()->load(self::WITH_GRAPH)),
         ]);
+    }
+
+    /** Never write terminal state through the stale route-bound model. */
+    private function finishSend(int $id, int $attempt, array $values): void
+    {
+        DB::transaction(function () use ($id, $attempt, $values) {
+            $locked = SupplierRejectionCase::query()->lockForUpdate()->findOrFail($id);
+            abort_unless($locked->status === 'SENDING' && $locked->send_attempts === $attempt, 409, 'This sending attempt changed. Refresh before continuing.');
+            $locked->update($values);
+        }, 3);
+    }
+
+    public function reconcileSend(Request $request, SupplierRejectionCase $supplierRejectionCase): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+        $values = $request->validate([
+            'send_attempt'=>['required','integer','min:1'], 'attempted_at'=>['required','date'],
+            'outcome'=>['required',Rule::in(['ACCEPTED','NOT_ACCEPTED'])],
+            'provider_reference'=>['required','string','min:5','max:255'],
+            'evidence'=>['required','string','min:20','max:2000'],
+            'provider_verified'=>['required','accepted'],
+        ]);
+        DB::transaction(function () use ($request, $supplierRejectionCase, $values) {
+            $locked = SupplierRejectionCase::query()->lockForUpdate()->findOrFail($supplierRejectionCase->id);
+            abort_unless($locked->status === 'SENDING' && $locked->send_attempts === (int)$values['send_attempt']
+                && $locked->last_send_attempt_at?->equalTo($values['attempted_at']), 409, 'The case or sending attempt changed. Refresh before reconciling.');
+            abort_unless($locked->last_send_attempt_at->lte(now()->subMinutes(15)), 422, 'Wait at least 15 minutes before reconciling a sending attempt.');
+            $locked->update($values['outcome'] === 'ACCEPTED'
+                ? ['status'=>'SENT','sent_at'=>now(),'sent_by_id'=>$request->user()->id,'last_error'=>null,'last_error_at'=>null]
+                : ['status'=>'FAILED','last_error_at'=>now(),'last_error'=>'Admin verified the provider did not accept this sending attempt.']);
+            $context = $this->auditContext($locked);
+            $context['details'] = 'Admin reconciled an abandoned sending attempt using verified provider evidence.';
+            $context['metadata'] += $values;
+            AuditLogger::success('REJECTION_REPORT_SEND_RECONCILED', AuditLogger::MODULE_REJECTED_ITEMS, $context);
+        }, 3);
+        return response()->json(['message'=>'Sending attempt reconciled. Existing rejection resolution rules still apply.',
+            'data'=>$this->present($supplierRejectionCase->fresh()->load(self::WITH_GRAPH))]);
     }
 
     public function resolve(Request $request, SupplierRejectionCase $supplierRejectionCase, SupplierRejectionWorkflow $workflow): JsonResponse
@@ -177,7 +237,9 @@ class AdminSupplierRejectionController extends Controller
         }
         if ($case->status === 'RESOLVED') $sendBlockReason = 'Resolved cases cannot be sent.';
         if ($case->status === 'REPLACEMENT_PENDING') $sendBlockReason = 'Cases routed to Receiving cannot be resent.';
-        if ($case->status === 'SENDING') $sendBlockReason = 'This report is already being sent.';
+        if ($case->status === 'SENDING') $sendBlockReason = $case->last_send_attempt_at?->lte(now()->subMinutes(15))
+            ? 'Sending is unconfirmed. Do not resend. An Admin must correlate provider evidence with this attempt before reconciliation.'
+            : 'This report is already being sent.';
         $resendAvailableAt = $case->sent_at?->copy()->addSeconds(60);
         if (! $sendBlockReason && $resendAvailableAt?->isFuture()) {
             $sendBlockReason = 'This report was just sent. Please wait one minute before resending.';

@@ -49,6 +49,18 @@ class XlsxReportWriter implements ReportWriter
             $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
             $zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>');
             $zip->addFile($sheetPath, 'xl/worksheets/sheet1.xml');
+            if (!empty($meta['receipts'])) {
+                $receipts = $meta['receipts']();
+                $register = '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+                $register .= $this->row(1, ['Receiving Number','PO Number','Supplier','Product','Filename','File Type','File Size','Uploaded Date','Document Reference','Evidence Type'], 1);
+                foreach ($receipts as $index => $receipt) {
+                    $register .= $this->row($index+2, array_map(fn ($key) => $receipt[$key], ['receiving_no','purchase_order','supplier','product','filename','mime','size','uploaded_at','reference','kind']));
+                }
+                $zip->addFromString('xl/worksheets/sheet2.xml', $register.'</sheetData></worksheet>');
+                $zip->addFromString('xl/workbook.xml', str_replace('</sheets>', '<sheet name="Receipt Register" sheetId="2" r:id="rId3"/></sheets>', $zip->getFromName('xl/workbook.xml')));
+                $zip->addFromString('xl/_rels/workbook.xml.rels', str_replace('</Relationships>', '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>', $zip->getFromName('xl/_rels/workbook.xml.rels')));
+                $zip->addFromString('[Content_Types].xml', str_replace('</Types>', '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>', $zip->getFromName('[Content_Types].xml')));
+            }
             if (! $zip->close()) throw new RuntimeException('Unable to create the Excel export.');
         } catch (\Throwable $exception) {
             @unlink($path);

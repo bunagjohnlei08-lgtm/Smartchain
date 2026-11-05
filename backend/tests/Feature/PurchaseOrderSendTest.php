@@ -8,6 +8,9 @@ use App\Models\PurchaseOrder;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\Supplier;
+use App\Models\SupplierApplication;
+use App\Models\SupplierApplicationAttachment;
+use App\Models\SupplierProductPurchasingTerm;
 use App\Models\User;
 use App\Support\BrevoTransactionalMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,6 +31,8 @@ class PurchaseOrderSendTest extends TestCase
 
     private User $admin;
     private Supplier $supplier;
+    private Product $product;
+    private SupplierProductPurchasingTerm $purchasingTerm;
     private PurchaseOrder $order;
 
     protected function setUp(): void
@@ -39,8 +44,13 @@ class PurchaseOrderSendTest extends TestCase
 
         $this->supplier = Supplier::create([
             'supplier_code' => 'SUP-900', 'name' => 'Acme Chemicals', 'email' => 'orders@acme.test', 'status' => 'ACTIVE',
+            'accreditation_status' => 'ACTIVE', 'supply_category' => 'Chemicals', 'accredited_at' => now(), 'accreditation_expires_on' => now()->addYear(),
         ]);
-        Product::create(['name' => 'TOMAHAWK EC', 'unit' => 'pcs', 'cost_price' => 250]);
+        $application = SupplierApplication::create(['application_number'=>'APP-SUP-900','company_name'=>'Acme Chemicals','normalized_company_name'=>'acme chemicals','address'=>'Manila','contact_person'=>'Contact','email'=>'orders@acme.test','normalized_email'=>'orders@acme.test','phone'=>'09170000000','business_type'=>'Corporation','supply_category'=>'Chemicals','status'=>SupplierApplication::STATUS_APPROVED,'submitted_at'=>now(),'approved_supplier_id'=>$this->supplier->id]);
+        foreach ([SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE, SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT] as $type) $application->attachments()->create(['attachment_type'=>$type,'original_name'=>strtolower($type).'.pdf','stored_path'=>"tests/send/{$type}.pdf",'mime_type'=>'application/pdf','file_size'=>10,'is_current'=>true,'verification_status'=>SupplierApplicationAttachment::STATUS_VERIFIED,'verified_at'=>now(),'expires_on'=>now()->addYear()]);
+        $this->product = Product::create(['name' => 'TOMAHAWK EC', 'unit' => 'pcs', 'cost_price' => 250]);
+        $this->product->suppliers()->attach($this->supplier->id, ['is_primary'=>true]);
+        $this->purchasingTerm = SupplierProductPurchasingTerm::create(['supplier_id'=>$this->supplier->id,'product_id'=>$this->product->id,'unit'=>'pcs','agreed_unit_price'=>'250.00','currency'=>'PHP','delivery_lead_time_days'=>1,'lead_time_basis'=>'CALENDAR_DAYS','lead_time_start_event'=>'PO_APPROVAL','effective_from'=>today()->subDay(),'status'=>'ACTIVE','agreement_reference'=>'SEND-TEST','verified_by'=>$this->admin->id,'verified_at'=>now()]);
         $this->order = $this->purchaseOrder('PO-2026-0019', 'Acme Chemicals');
     }
 
@@ -159,7 +169,7 @@ class PurchaseOrderSendTest extends TestCase
             'supplier_name' => 'Forged Supplier Name',
             'delivery_details' => 'Main warehouse',
             'expected_delivery_date' => now()->addDay()->toDateString(),
-            'items' => [['product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250]],
+            'items' => [['product_id'=>$this->product->id,'product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250, 'purchasing_term_id'=>$this->purchasingTerm->id]],
         ]);
 
         $response->assertUnprocessable()->assertJsonValidationErrors('supplier_name');
@@ -168,7 +178,7 @@ class PurchaseOrderSendTest extends TestCase
             'supplier_id' => $this->supplier->id,
             'delivery_details' => 'Main warehouse',
             'expected_delivery_date' => now()->addDay()->toDateString(),
-            'items' => [['product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250]],
+            'items' => [['product_id'=>$this->product->id,'product_name' => 'TOMAHAWK EC', 'ordered_quantity' => 2, 'unit_price' => 250, 'purchasing_term_id'=>$this->purchasingTerm->id]],
         ])->assertCreated()->assertJsonPath('supplier_id', $this->supplier->id)
             ->assertJsonPath('supplier_name', 'Acme Chemicals')
             ->assertJsonPath('status', PurchaseOrder::STATUS_APPROVED);

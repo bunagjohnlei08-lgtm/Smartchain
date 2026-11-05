@@ -119,6 +119,7 @@ const StatusBadge: React.FC<{ status: Exclude<DefinitionStatus, 'all'> }> = ({ s
 
 const FormatBadge: React.FC<{ format: ReportFormat }> = ({ format }) => {
   const styles: Record<ReportFormat, string> = {
+    ZIP: 'text-cyan-700 dark:text-cyan-300 bg-cyan-500/10 border-cyan-500/20',
     PDF: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
     XLSX: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     CSV: 'text-white dark:text-slate-400 bg-slate-500/10 border-slate-500/20',

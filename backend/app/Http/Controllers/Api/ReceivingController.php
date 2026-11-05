@@ -7,6 +7,8 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Receiving;
 use App\Models\ReceivingDiscrepancy;
+use App\Models\ExcessDeliveryReview;
+use App\Models\QaInspection;
 use App\Models\ReceivingItem;
 use App\Models\ReceivingReceiptAttachment;
 use App\Models\ReceivingTimeline;
@@ -31,7 +33,7 @@ class ReceivingController extends Controller
 {
     private function present(Receiving $receiving): array
     {
-        $receiving->loadMissing(['items.purchaseOrderItem', 'items.product:id,item_classification', 'receiptAttachments', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
+        $receiving->loadMissing(['items.purchaseOrderItem', 'items.product:id,item_classification', 'items.qaInspectionItem.inspection', 'items.excessReviewItem.review', 'receiptAttachments', 'timeline', 'preparedBy', 'assignedQa', 'discrepancy', 'excessDeliveryReview.items.receivingItem', 'excessDeliveryReview.items.authorizedReceivingItem', 'excessDeliveryReview.documents.uploadedBy:id,name', 'excessDeliveryReview.documentationRequestedBy:id,name', 'excessDeliveryReview.documentationAssignedTo:id,name', 'excessDeliveryReview.reviewedBy:id,name', 'replacementForCase.inspectionItem.inspection.receiving:id,receiving_no']);
 
         $items = $receiving->items;
         $productSummary = match (true) {
@@ -39,6 +41,45 @@ class ReceivingController extends Controller
             $items->count() === 1 => $items->first()->product_name,
             default => $items->first()->product_name.' +'.($items->count() - 1).' more',
         };
+        $physicalQuantity = $receiving->excessDeliveryReview
+            ? (int) $receiving->excessDeliveryReview->items->sum('actual_delivered_quantity')
+            : (int) $items->sum('delivered_quantity');
+        $authorizedQuantity = $receiving->excessDeliveryReview
+            ? (int) $receiving->excessDeliveryReview->items->sum('authorized_quantity')
+            : $physicalQuantity;
+        $qaProcessedQuantity = (int) $items
+            ->filter(fn (ReceivingItem $item) => $item->qaInspectionItem?->inspection?->completed_at)
+            ->sum('delivered_quantity');
+        $stockedQuantity = (int) $items
+            ->filter(fn (ReceivingItem $item) => $item->stocked_in_at)
+            ->sum(fn (ReceivingItem $item) => (int) ($item->qaInspectionItem?->accepted_quantity ?? 0));
+        $heldQuantity = (int) $items->where('inspection_status', 'On Hold')->sum('delivered_quantity');
+        $qaEligibleQuantity = (int) $items
+            ->filter(fn (ReceivingItem $item) => $item->inspection_status === 'Pending QA' && ! $item->stocked_in_at)
+            ->sum('delivered_quantity');
+        $excessItems = $items->filter(fn (ReceivingItem $item) => $item->excessReviewItem !== null);
+        $normalItems = $items->reject(fn (ReceivingItem $item) => $item->excessReviewItem !== null);
+        $excessQuantity = (int) $excessItems->sum('delivered_quantity');
+        $returnedExcessQuantity = (int) ($receiving->excessDeliveryReview?->items->sum('returned_quantity') ?? 0);
+        $stockedExcessQuantity = (int) $excessItems->filter(fn (ReceivingItem $item) => $item->stocked_in_at)
+            ->sum(fn (ReceivingItem $item) => (int) ($item->qaInspectionItem?->accepted_quantity ?? 0));
+        $normalStockedQuantity = (int) $normalItems->filter(fn (ReceivingItem $item) => $item->stocked_in_at)
+            ->sum(fn (ReceivingItem $item) => (int) ($item->qaInspectionItem?->accepted_quantity ?? 0));
+        $quantitiesByUnit = $items->groupBy('unit')->map(function ($unitItems, $unit) use ($receiving) {
+            $reviewItems = $receiving->excessDeliveryReview?->items->where('unit', $unit) ?? collect();
+            $unitExcessItems = $unitItems->filter(fn (ReceivingItem $item) => $item->excessReviewItem !== null);
+            $unitNormalItems = $unitItems->reject(fn (ReceivingItem $item) => $item->excessReviewItem !== null);
+            return [
+                'unit' => $unit,
+                'physical_delivered' => $reviewItems->isNotEmpty() ? (int) $reviewItems->sum('actual_delivered_quantity') : (int) $unitItems->sum('delivered_quantity'),
+                'po_authorized' => $reviewItems->isNotEmpty() ? (int) $reviewItems->sum('authorized_quantity') : (int) $unitItems->sum('delivered_quantity'),
+                'normal_stocked_in' => (int) $unitNormalItems->filter(fn ($item) => $item->stocked_in_at)->sum(fn ($item) => (int) ($item->qaInspectionItem?->accepted_quantity ?? 0)),
+                'excess_total' => (int) $unitExcessItems->sum('delivered_quantity'),
+                'excess_stocked_in' => (int) $unitExcessItems->filter(fn ($item) => $item->stocked_in_at)->sum(fn ($item) => (int) ($item->qaInspectionItem?->accepted_quantity ?? 0)),
+                'returned_excess' => (int) $reviewItems->sum('returned_quantity'),
+                'qa_eligible' => (int) $unitItems->filter(fn ($item) => $item->inspection_status === 'Pending QA' && ! $item->stocked_in_at)->sum('delivered_quantity'),
+            ];
+        })->values();
 
         return [
             'id' => $receiving->id,
@@ -60,6 +101,23 @@ class ReceivingController extends Controller
             ] : null,
             'product_summary' => $productSummary,
             'items_count' => $items->sum('delivered_quantity'),
+            'quantity_summary' => [
+                'physical_delivered' => $physicalQuantity,
+                'po_authorized' => $authorizedQuantity,
+                'qa_processed' => $qaProcessedQuantity,
+                'stocked_in' => $stockedQuantity,
+                'held_excess' => $heldQuantity,
+                'qa_eligible' => $qaEligibleQuantity,
+                'normal_stocked_in' => $normalStockedQuantity,
+                'excess_total' => $excessQuantity,
+                'excess_stocked_in' => $stockedExcessQuantity,
+                'returned_excess' => $returnedExcessQuantity,
+                'remaining_unresolved_excess' => max(0, $excessQuantity - $stockedExcessQuantity - $returnedExcessQuantity),
+                'normal_status' => $normalItems->isNotEmpty() && $normalItems->every(fn (ReceivingItem $item) => $item->stocked_in_at !== null)
+                    ? 'Completed'
+                    : 'In Progress',
+                'by_unit' => $quantitiesByUnit,
+            ],
             'receipt_attachments' => $receiving->receiptAttachments->map(
                 fn (ReceivingReceiptAttachment $attachment) => $this->presentReceiptAttachment($attachment, $receiving->id)
             )->values(),
@@ -70,6 +128,7 @@ class ReceivingController extends Controller
                 'short_quantity' => $receiving->discrepancy->short_quantity,
                 'status' => $receiving->discrepancy->status,
             ] : null,
+            'excess_review' => $this->presentExcessReview($receiving->excessDeliveryReview),
             'items' => $items->map(fn (ReceivingItem $item) => [
                 'id' => $item->id,
                 'product_id' => $item->product_id,
@@ -79,6 +138,7 @@ class ReceivingController extends Controller
                 'delivered_quantity' => $item->delivered_quantity,
                 'unit' => $item->unit,
                 'inspection_status' => $item->inspection_status,
+                'quantity_disposition' => $item->excessReviewItem ? 'EXCESS_HELD' : 'PO_AUTHORIZED',
                 'created_at' => $item->created_at,
                 'updated_at' => $item->updated_at,
             ])->values(),
@@ -89,6 +149,24 @@ class ReceivingController extends Controller
             ])->values(),
             'created_at' => $receiving->created_at,
             'updated_at' => $receiving->updated_at,
+        ];
+    }
+
+    private function presentExcessReview(?ExcessDeliveryReview $review): ?array
+    {
+        if (! $review) return null;
+        return [
+            'id' => $review->id, 'reference' => $review->reference, 'status' => $review->status,
+            'cost_resolution' => $review->cost_resolution, 'financial_reconciliation_status' => $review->financial_reconciliation_status,
+            'rejection_reason' => $review->rejection_reason, 'reviewed_by' => $review->reviewedBy?->name,
+            'documentation_type' => $review->documentation_type, 'documentation_requested_by' => $review->documentationRequestedBy?->name,
+            'documentation_assigned_to' => $review->documentationAssignedTo?->name,
+            'documentation_requested_at' => $review->documentation_requested_at?->toIso8601String(),
+            'documentation_submitted_at' => $review->documentation_submitted_at?->toIso8601String(),
+            'return_status' => $review->return_status, 'return_date' => $review->return_date?->toDateString(),
+            'return_completed_at' => $review->return_completed_at?->toIso8601String(),
+            'items' => $review->items->map(fn ($item) => ['id' => $item->id, 'product' => $item->receivingItem?->product_name ?? $item->authorizedReceivingItem?->product_name, 'authorized_quantity' => $item->authorized_quantity, 'actual_delivered_quantity' => $item->actual_delivered_quantity, 'excess_quantity' => $item->excess_quantity, 'return_requested_quantity' => $item->return_requested_quantity, 'returned_quantity' => $item->returned_quantity, 'unit' => $item->unit])->values(),
+            'documents' => $review->documents->map(fn ($document) => ['id' => $document->id, 'internal_reference' => $document->internal_reference, 'purpose' => $document->purpose, 'document_type' => $document->document_type, 'external_reference' => $document->external_reference, 'name' => $document->original_name, 'mime_type' => $document->mime_type, 'file_size' => $document->file_size, 'uploaded_by' => $document->uploadedBy?->name, 'created_at' => $document->created_at?->toIso8601String(), 'url' => "/api/excess-delivery-reviews/{$review->id}/documents/{$document->id}"])->values(),
         ];
     }
 
@@ -347,6 +425,8 @@ class ReceivingController extends Controller
                 $previouslyReceived = ReceivingItem::query()
                     // Replacement deliveries re-supply rejected goods and do not consume the PO balance.
                     ->whereHas('receiving', fn ($query) => $query->where('purchase_order_id', $purchaseOrder->id)->whereNull('replacement_for_rejection_case_id'))
+                    // Authorized lines already consume the PO even while the separate excess is held.
+                    ->where(fn ($query) => $query->whereDoesntHave('excessReviewItem')->orWhereHas('excessReviewItem.review', fn ($review) => $review->where('status', ExcessDeliveryReview::STATUS_APPROVED)))
                     ->selectRaw('product_name, SUM(delivered_quantity) as quantity')
                     ->groupBy('product_name')->pluck('quantity', 'product_name');
 
@@ -502,7 +582,15 @@ class ReceivingController extends Controller
     {
         abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
 
-        $validated = $request->validate(['qa_user_id' => ['required', 'integer', 'exists:users,id']]);
+        $validated = $request->validate([
+            'qa_user_id' => ['required', 'integer', 'exists:users,id'],
+            'operation' => ['nullable', Rule::in(['assign', 'reassign', 'assign_excess', 'reassign_excess'])],
+            'excess_review_id' => ['nullable', 'integer', 'exists:excess_delivery_reviews,id'],
+        ]);
+        $operation = $validated['operation'] ?? 'assign';
+        if (in_array($operation, ['assign_excess', 'reassign_excess'], true) && empty($validated['excess_review_id'])) {
+            throw ValidationException::withMessages(['excess_review_id' => ['The excess exception is required for excess QA assignment.']]);
+        }
         $qa = User::query()->with('role')->find($validated['qa_user_id']);
 
         if (! $qa || $qa->status !== 'ACTIVE' || ! $qa->isQaSupervisor()) {
@@ -512,45 +600,141 @@ class ReceivingController extends Controller
             ], 422);
         }
 
-        if ($receiving->qaInspection?->completed_at) {
-            return response()->json(['message' => 'A completed inspection cannot be reassigned.'], 422);
-        }
-
         if ($receiving->status === Receiving::STATUS_AWAITING_REPLACEMENT) {
             return response()->json(['message' => 'Confirm the replacement delivery before assigning QA.'], 422);
         }
 
-        $previousQaId = $receiving->assigned_qa_user_id;
-        $receiving->update(['assigned_qa_user_id' => $qa->id]);
+        $previousQaId = null;
+        $assignmentOutcome = 'assigned';
+        $inspectionCycle = 1;
+        $shouldNotify = true;
+        $receiving = DB::transaction(function () use ($receiving, $qa, $request, $operation, $validated, &$previousQaId, &$assignmentOutcome, &$inspectionCycle, &$shouldNotify) {
+            $excessReview = in_array($operation, ['assign_excess', 'reassign_excess'], true)
+                ? ExcessDeliveryReview::query()->lockForUpdate()->findOrFail($validated['excess_review_id'])
+                : null;
+            if ($excessReview) {
+                abort_unless($excessReview->receiving_id === $receiving->id, 422, 'The excess exception does not belong to this Receiving.');
+                abort_unless($excessReview->submitted_by_id === $request->user()->id, 403, 'Only the responsible Plant Manager may assign this excess to QA.');
+                abort_unless($excessReview->status === ExcessDeliveryReview::STATUS_APPROVED, 422, 'Only Admin-approved excess may be assigned to QA.');
+            }
+            $locked = Receiving::query()
+                ->with(['items.excessReviewItem.review', 'qaInspection.items'])
+                ->lockForUpdate()
+                ->findOrFail($receiving->id);
 
-        ReceivingTimeline::create([
-            'receiving_id' => $receiving->id,
-            'status' => $previousQaId ? 'QA Reassigned' : 'QA Assigned',
-            'performed_by' => $request->user()->name,
-            'occurred_at' => now(),
+            $previousQaId = $locked->assigned_qa_user_id;
+            $inspection = $locked->qaInspection;
+
+            if ($inspection && ! $inspection->completed_at) {
+                $assignedItemIds = $inspection->items->pluck('receiving_item_id')->sort()->values();
+                abort_if($assignedItemIds->isEmpty(), 422, 'This QA assignment has no quantity snapshot.');
+                if ($excessReview) {
+                    $snapshotItems = $locked->items->whereIn('id', $assignedItemIds);
+                    abort_unless($snapshotItems->count() === $assignedItemIds->count(), 422, 'The active QA cycle snapshot is invalid.');
+                    abort_unless($snapshotItems->every(fn (ReceivingItem $item) => $item->excessReviewItem?->excess_delivery_review_id === $excessReview->id), 422, 'A different QA cycle is already active for this Receiving.');
+                }
+                $inspectionCycle = (int) $inspection->cycle_number;
+                if ((int) $inspection->inspected_by_id === (int) $qa->id) {
+                    $assignmentOutcome = 'unchanged';
+                    $shouldNotify = false;
+                } else {
+                    abort_if(
+                        in_array($operation, ['assign', 'assign_excess'], true),
+                        422,
+                        'This QA cycle is already assigned. Use the reassignment action to select a different QA Supervisor.'
+                    );
+                    abort_if($inspection->started_at, 422, 'An inspection that has already started cannot be reassigned.');
+                    $inspection->update(['inspected_by_id' => $qa->id]);
+                    $assignmentOutcome = 'reassigned';
+                }
+            } else {
+                abort_if(
+                    in_array($operation, ['reassign', 'reassign_excess'], true),
+                    422,
+                    'There is no active QA cycle eligible for reassignment.'
+                );
+                $eligibleItems = $locked->items
+                    ->filter(fn (ReceivingItem $item) => $item->inspection_status === 'Pending QA' && ! $item->stocked_in_at)
+                    ->values();
+                abort_if($eligibleItems->isEmpty(), 422, 'This receiving has no uninspected quantity eligible for QA.');
+
+                if ($excessReview) {
+                    abort_unless($eligibleItems->every(fn (ReceivingItem $item) => $item->excessReviewItem?->excess_delivery_review_id === $excessReview->id), 422, 'Only the approved excess quantity may enter this QA cycle.');
+                }
+
+                foreach ($eligibleItems as $item) {
+                    if ($item->excessReviewItem) {
+                        abort_unless(
+                            $item->excessReviewItem->review?->status === ExcessDeliveryReview::STATUS_APPROVED,
+                            422,
+                            'Held excess requires valid Admin approval before QA assignment.'
+                        );
+                    }
+                }
+
+                $cycleNumber = (int) QaInspection::query()
+                    ->where('receiving_id', $locked->id)
+                    ->max('cycle_number') + 1;
+                $inspection = $locked->qaInspections()->create([
+                    'cycle_number' => max(1, $cycleNumber),
+                    'status' => 'Pending',
+                    'inspected_by_id' => $qa->id,
+                ]);
+                $inspectionCycle = (int) $inspection->cycle_number;
+                $assignmentOutcome = $excessReview ? 'excess_cycle_created' : 'assigned';
+                $inspection->items()->createMany($eligibleItems->map(fn (ReceivingItem $item) => [
+                    'receiving_item_id' => $item->id,
+                    'accepted_quantity' => 0,
+                    'rejected_quantity' => 0,
+                    'inspection_result' => 'Pending',
+                ])->all());
+            }
+
+            $locked->update(['assigned_qa_user_id' => $qa->id]);
+
+            return $locked->fresh(['items', 'qaInspection.items']);
+        });
+
+        if ($assignmentOutcome !== 'unchanged') {
+            $timelineStatus = match ($assignmentOutcome) {
+                'excess_cycle_created' => "Excess QA Cycle {$inspectionCycle} Assigned",
+                'reassigned' => "QA Cycle {$inspectionCycle} Reassigned",
+                default => 'QA Assigned',
+            };
+            ReceivingTimeline::create(['receiving_id' => $receiving->id, 'status' => $timelineStatus, 'performed_by' => $request->user()->name, 'occurred_at' => now()]);
+        }
+
+        if ($assignmentOutcome !== 'unchanged') {
+            AuditLogger::success('QA_ASSIGNED', AuditLogger::MODULE_RECEIVING, [
+                'resource' => $receiving,
+                'resource_label' => $receiving->receiving_no,
+                'details' => $assignmentOutcome === 'reassigned' ? "Reassigned QA cycle {$inspectionCycle} to {$qa->name}" : "Assigned QA cycle {$inspectionCycle} to {$qa->name}",
+                'metadata' => [
+                    'receiving_id' => $receiving->id,
+                    'assigned_qa_user_id' => $qa->id,
+                    'assigned_qa_name' => $qa->name,
+                    'previous_assigned_qa_user_id' => $previousQaId,
+                    'assignment_outcome' => $assignmentOutcome,
+                    'cycle_number' => $inspectionCycle,
+                ],
+            ]);
+        }
+
+        if ($shouldNotify) {
+            $notificationMessage = $inspectionCycle > 1
+                ? "Receiving #{$receiving->receiving_no}, QA cycle {$inspectionCycle}, was assigned to you."
+                : "Receiving #{$receiving->receiving_no} was assigned to you.";
+            WorkflowNotificationSender::send($qa, new WorkflowNotification(
+                $assignmentOutcome === 'excess_cycle_created' ? 'Excess QA Inspection Assigned' : 'QA Inspection Assigned',
+                $notificationMessage,
+                'info', $receiving->receiving_no, 'Quality Inspection',
+            ));
+        }
+
+        return response()->json([
+            ...$this->present($receiving->fresh()),
+            'qa_assignment' => ['outcome' => $assignmentOutcome, 'cycle_number' => $inspectionCycle],
         ]);
-
-        AuditLogger::success('QA_ASSIGNED', AuditLogger::MODULE_RECEIVING, [
-            'resource' => $receiving,
-            'resource_label' => $receiving->receiving_no,
-            'details' => $previousQaId ? "Reassigned QA Supervisor to {$qa->name}" : "Assigned QA Supervisor {$qa->name}",
-            'metadata' => [
-                'receiving_id' => $receiving->id,
-                'assigned_qa_user_id' => $qa->id,
-                'assigned_qa_name' => $qa->name,
-                'previous_assigned_qa_user_id' => $previousQaId,
-            ],
-        ]);
-
-        WorkflowNotificationSender::send($qa, new WorkflowNotification(
-            'QA Inspection Assigned',
-            "Receiving #{$receiving->receiving_no} was assigned to you.",
-            'info',
-            $receiving->receiving_no,
-            'Quality Inspection',
-        ));
-
-        return response()->json($this->present($receiving->fresh()));
     }
 
     public function confirmReplacementDelivery(Request $request, Receiving $receiving)
@@ -648,7 +832,7 @@ class ReceivingController extends Controller
         Receiving $receiving,
         ReceivingReceiptAttachment $receiptAttachment
     ): JsonResponse|StreamedResponse {
-        abort_unless($request->user()?->isPlantManager(), 403, 'Plant Manager access is required.');
+        abort_unless($request->user()?->isPlantManager() || $request->user()?->isAdmin(), 403, 'Receiving access is required.');
         abort_unless($receiptAttachment->receiving_id === $receiving->id, 404);
 
         if (! Storage::disk('local')->exists($receiptAttachment->stored_path)) {

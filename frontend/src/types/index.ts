@@ -145,9 +145,62 @@ export interface ApiReceivingItem {
   expected_quantity?: number | null;
   delivered_quantity: number;
   unit: string;
-  inspection_status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial' | 'Awaiting Replacement';
+  inspection_status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial' | 'Awaiting Replacement' | 'On Hold' | 'Returned to Supplier';
+  quantity_disposition?: 'PO_AUTHORIZED' | 'EXCESS_HELD';
   created_at: string;
   updated_at: string;
+}
+
+export interface ApiExcessReviewDocument {
+  id: number;
+  internal_reference: string;
+  purpose: string;
+  document_type: string;
+  external_reference: string | null;
+  name: string;
+  mime_type: string;
+  file_size: number;
+  uploaded_by: string | null;
+  created_at: string;
+  url: string;
+}
+
+export interface ApiExcessReview {
+  id: number;
+  reference: string;
+  status: string;
+  is_resolved?: boolean;
+  next_action?: string;
+  receiving_id?: number;
+  receiving_no?: string | null;
+  purchase_order?: string | null;
+  supplier?: string | null;
+  delivery_date?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  qa_assignment?: {
+    can_assign: boolean;
+    can_reassign: boolean;
+    state: 'NOT_ASSIGNED' | 'ASSIGNED_PENDING_QA' | 'AWAITING_STOCK_IN' | 'RESOLVED';
+    cycle_number: number | null;
+    next_cycle_number: number;
+    assigned_qa: { id: number; name: string } | null;
+    eligible_quantity: number;
+  };
+  cost_resolution: string | null;
+  financial_reconciliation_status: string;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  documentation_type: string | null;
+  documentation_requested_by: string | null;
+  documentation_assigned_to: string | null;
+  documentation_requested_at: string | null;
+  documentation_submitted_at: string | null;
+  return_status: string | null;
+  return_date: string | null;
+  return_completed_at: string | null;
+  items: Array<{ id:number; product:string; authorized_quantity:number; actual_delivered_quantity:number; excess_quantity:number; return_requested_quantity:number; returned_quantity:number; unit:string }>;
+  documents: ApiExcessReviewDocument[];
 }
 
 export interface ApiReceivingTimelineEvent {
@@ -181,19 +234,45 @@ export interface ApiReceiving {
   supplier: string;
   reference_no: string | null;
   delivery_date: string;
-  status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial' | 'Awaiting Replacement';
+  status: 'Pending QA' | 'Passed' | 'Rejected' | 'Partial' | 'Awaiting Replacement' | 'Pending Excess Review';
   is_replacement?: boolean;
   replacement?: ApiReceivingReplacement | null;
+  excess_review?: ApiExcessReview | null;
   prepared_by: string | null;
   assigned_qa_user_id: number | null;
   assigned_qa: { id: number; name: string } | null;
   product_summary: string;
   items_count: number;
+  quantity_summary?: {
+    physical_delivered: number;
+    po_authorized: number;
+    qa_processed: number;
+    stocked_in: number;
+    held_excess: number;
+    qa_eligible: number;
+    normal_stocked_in: number;
+    excess_total: number;
+    excess_stocked_in: number;
+    returned_excess: number;
+    remaining_unresolved_excess: number;
+    normal_status: string;
+    by_unit: Array<{
+      unit: string;
+      physical_delivered: number;
+      po_authorized: number;
+      normal_stocked_in: number;
+      excess_total: number;
+      excess_stocked_in: number;
+      returned_excess: number;
+      qa_eligible: number;
+    }>;
+  };
   receipt_attachments?: ApiReceivingReceiptAttachment[];
   items: ApiReceivingItem[];
   timeline: ApiReceivingTimelineEvent[];
   created_at: string;
   updated_at: string;
+  qa_assignment?: { outcome: string; cycle_number: number };
 }
 
 export interface ApiUser {

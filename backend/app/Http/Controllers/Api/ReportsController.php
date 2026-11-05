@@ -161,6 +161,10 @@ class ReportsController extends Controller
 
         [$columns, $rows, $summary] = $this->reportData($validated['type'], $from, $to);
         $rows = array_map(fn (array $row) => $this->toBusinessTime($row), $rows);
+        if ($validated['type'] === 'receiving') {
+            $rows = app(\App\Reports\ReceivingReportEvidence::class)->decorate($rows, $request->user());
+            $columns = [...$columns, 'receipt_count','receipt_filenames','receipt_references'];
+        }
 
         ReportExport::create([
             'user_id' => $request->user()->id,
@@ -187,6 +191,24 @@ class ReportsController extends Controller
             'rows' => $rows,
             'summary' => $summary,
         ]]);
+    }
+
+    public function receivingExport(Request $request, ReportAccessAuthorization $authorizations)
+    {
+        $this->authorizePlantManager($request);
+        $input = $request->validate(['format'=>['required', \Illuminate\Validation\Rule::in(['pdf','excel','zip','csv'])]]);
+        $authorizations->consume($request, 'plant-manager:receiving', $input['format'], 'EXPORT');
+        [$from,$to] = $this->validatedRange($request);
+        [$columns,$rows] = $this->receivingReport($from,$to);
+        $evidence = app(\App\Reports\ReceivingReportEvidence::class);
+        $allowed = $evidence->query($request->user())->whereIn('receiving_no', array_column($rows,'receiving_no'))->pluck('receiving_no')->all();
+        $rows = array_values(array_filter($rows, fn ($row) => in_array($row['receiving_no'], $allowed, true)));
+        $definition = new \App\Reports\ReportDefinition('receiving.pm', 'Receiving Report', 'Warehouse-scoped receiving evidence.', 'receiving',
+            collect([...$columns,'receipt_count','receipt_filenames','receipt_references'])->mapWithKeys(fn ($key) => [$key=>[ucwords(str_replace('_',' ',$key)), $key==='receipt_count'?'number':'text']])->all(),
+            source: fn ($filters) => collect($rows)->map(fn ($row) => (object)$row));
+        $format = ['pdf'=>'PDF','excel'=>'XLSX','zip'=>'ZIP','csv'=>'CSV'][$input['format']];
+        $file = app(\App\Reports\ReportRunner::class)->export($definition, new \App\Reports\ReportFilters(dateFrom:$from?->toMutable(), dateTo:$to?->toMutable()), $format, $request->user());
+        return response()->download($file['path'], $file['filename'], ['Content-Type'=>$file['mime'], 'Cache-Control'=>'private, no-store'])->deleteFileAfterSend();
     }
 
     public function recent(Request $request): JsonResponse

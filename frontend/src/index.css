@@ -923,26 +923,25 @@
   .admin-main .admin-inventory-table {
     table-layout: fixed;
     width: 100%;
-    min-width: 1282px;
+    min-width: 1270px;
   }
   .admin-main .admin-inventory-table :is(th, td) { padding: 12px 10px; }
   .admin-main .admin-inventory-table th { white-space: nowrap; }
-  .admin-main .admin-inventory-table :is(th, td):nth-child(1) { width: 140px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(1) { width: 210px; }
   .admin-main .admin-inventory-table :is(th, td):nth-child(2) { width: 260px; }
   .admin-main .admin-inventory-table :is(th, td):nth-child(3) { width: 152px; }
   .admin-main .admin-inventory-table :is(th, td):nth-child(4) { width: 140px; }
   .admin-main .admin-inventory-table :is(th, td):nth-child(5),
-  .admin-main .admin-inventory-table :is(th, td):nth-child(6),
-  .admin-main .admin-inventory-table :is(th, td):nth-child(7) { width: 82px; padding-inline: 8px; }
-  .admin-main .admin-inventory-table :is(th, td):nth-child(8) { width: 128px; }
-  .admin-main .admin-inventory-table :is(th, td):nth-child(9) { width: 104px; }
-  .admin-main .admin-inventory-table :is(th, td):nth-child(10) { width: 112px; padding-inline: 6px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(6) { width: 82px; padding-inline: 8px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(7) { width: 128px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(8) { width: 104px; }
+  .admin-main .admin-inventory-table :is(th, td):nth-child(9) { width: 112px; padding-inline: 6px; }
 
   /* Barcode: the SVG scales to the cell instead of setting the column width. */
   .admin-main .admin-inventory-table td:nth-child(1) > div {
     width: 100%;
     min-width: 0;
-    max-width: 120px;
+    max-width: 190px;
   }
   .admin-main .admin-inventory-table td:nth-child(1) > div > span {
     overflow: hidden;
@@ -951,14 +950,14 @@
   }
   .admin-main .admin-inventory-table td:nth-child(1) svg {
     width: 100%;
-    height: 36px;
+    height: 46px;
   }
 
   .admin-main .admin-inventory-table td:nth-child(2) > div { min-width: 0; }
   .admin-main .admin-inventory-table td:nth-child(2) > div > div { flex-shrink: 0; }
   .admin-main .admin-inventory-table td:nth-child(4) { overflow-wrap: anywhere; white-space: normal; }
-  .admin-main .admin-inventory-table td:nth-child(8) .admin-badge { white-space: nowrap; }
-  .admin-main .admin-inventory-table td:nth-child(10) > div { gap: 8px; }
+  .admin-main .admin-inventory-table td:nth-child(7) .admin-badge { white-space: nowrap; }
+  .admin-main .admin-inventory-table td:nth-child(9) > div { gap: 8px; }
 }
 
 /* Plant Manager operational tables keep usable columns inside a contained scroller. */
@@ -1219,11 +1218,11 @@
   /* Inventory: explicit fixed-layout geometry so the 115px barcode fits its cell; table scrolls horizontally. */
   .pm-inventory-table :is(th, td):nth-child(1) { width: 8.5rem; }
   .pm-inventory-table :is(th, td):nth-child(2) { width: 13rem; }
-  .pm-inventory-table :is(th, td):nth-child(3) { width: 8rem; }
+  .pm-inventory-table :is(th, td):nth-child(3) { width: 10rem; }
   .pm-inventory-table :is(th, td):nth-child(4) { width: 9rem; }
-  .pm-inventory-table :is(th, td):is(:nth-child(5), :nth-child(6), :nth-child(7)) { width: 5.5rem; }
-  .pm-inventory-table :is(th, td):nth-child(8) { width: 7.5rem; }
-  .pm-inventory-table :is(th, td):nth-child(9) { width: 8.5rem; }
+  .pm-inventory-table :is(th, td):is(:nth-child(5), :nth-child(6)) { width: 5.5rem; }
+  .pm-inventory-table :is(th, td):nth-child(7) { width: 7.5rem; }
+  .pm-inventory-table :is(th, td):nth-child(8) { width: 8.5rem; }
   .pm-inventory-table td:first-child > div > span {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1578,23 +1577,22 @@
   /* Admin Inventory: realistic mobile column widths. The table keeps its full
      width and scrolls inside .admin-table-scroll instead of squeezing columns
      until the header labels collide. */
-  .admin-inventory-table { min-width: 1152px !important; }
+  .admin-inventory-table { min-width: 1190px !important; }
   .admin-inventory-table th { white-space: nowrap; }
   .admin-inventory-table :is(th, td):nth-child(1) {
-    width: 130px;
-    min-width: 130px;
-    max-width: 130px;
+    width: 190px;
+    min-width: 190px;
+    max-width: 190px;
   }
   .admin-inventory-table :is(th, td):nth-child(2) { width: 200px; min-width: 200px; max-width: 200px; }
   .admin-inventory-table :is(th, td):nth-child(3) { width: 152px; min-width: 152px; max-width: 152px; }
   .admin-inventory-table :is(th, td):nth-child(4) { width: 120px; min-width: 120px; max-width: 120px; }
   .admin-inventory-table :is(th, td):nth-child(5),
-  .admin-inventory-table :is(th, td):nth-child(6),
-  .admin-inventory-table :is(th, td):nth-child(7) { width: 80px; min-width: 80px; max-width: 80px; }
-  .admin-inventory-table :is(th, td):nth-child(8) { width: 110px; min-width: 110px; max-width: 110px; }
+  .admin-inventory-table :is(th, td):nth-child(6) { width: 80px; min-width: 80px; max-width: 80px; }
+  .admin-inventory-table :is(th, td):nth-child(7) { width: 110px; min-width: 110px; max-width: 110px; }
+  .admin-inventory-table :is(th, td):nth-child(8) { width: 100px; min-width: 100px; max-width: 100px; }
+  .admin-inventory-table td:nth-child(8) { white-space: normal; }
   .admin-inventory-table :is(th, td):nth-child(9) { width: 100px; min-width: 100px; max-width: 100px; }
-  .admin-inventory-table td:nth-child(9) { white-space: normal; }
-  .admin-inventory-table :is(th, td):nth-child(10) { width: 100px; min-width: 100px; max-width: 100px; }
   .admin-inventory-table th:nth-child(1) { padding-inline: 4px !important; }
   .admin-inventory-table td:nth-child(1) { padding: 2px 4px !important; }
   .admin-inventory-table td:nth-child(1) > div {
@@ -1607,7 +1605,7 @@
   }
   .admin-inventory-table td:nth-child(1) > div > span {
     display: block;
-    max-width: 115px;
+    max-width: 175px;
     overflow: hidden;
     font-size: 9px !important;
     line-height: 10px !important;
@@ -1615,17 +1613,17 @@
     white-space: nowrap;
   }
   .admin-inventory-table td:nth-child(1) svg {
-    width: 115px;
-    max-width: 115px;
-    height: 28px;
+    width: 175px;
+    max-width: 175px;
+    height: 42px;
   }
   .admin-inventory-table td:nth-child(2) > div { min-width: 0; }
   .admin-inventory-table td:nth-child(2) > div > div { flex-shrink: 0; }
   .admin-inventory-table td:nth-child(4) { overflow-wrap: anywhere; white-space: normal; }
-  .admin-inventory-table td:nth-child(8) .admin-badge { justify-content: center; padding-inline: 0.375rem !important; font-size: 0.5625rem !important; }
-  .admin-inventory-table td:nth-child(10) { overflow: hidden; padding-inline: 0.25rem !important; }
-  .admin-inventory-table td:nth-child(10) > div { max-width: 100%; gap: 0.125rem !important; }
-  .admin-inventory-table td:nth-child(10) button { min-width: 28px; min-height: 28px; }
+  .admin-inventory-table td:nth-child(7) .admin-badge { justify-content: center; padding-inline: 0.375rem !important; font-size: 0.5625rem !important; }
+  .admin-inventory-table td:nth-child(9) { overflow: hidden; padding-inline: 0.25rem !important; }
+  .admin-inventory-table td:nth-child(9) > div { max-width: 100%; gap: 0.125rem !important; }
+  .admin-inventory-table td:nth-child(9) button { min-width: 28px; min-height: 28px; }
 
   /* Admin Inventory product details drawer: compact mobile-only presentation. */
   .admin-main .admin-inventory-detail-drawer > div:first-child {

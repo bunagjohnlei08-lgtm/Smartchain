@@ -10,12 +10,14 @@ use Tests\Support\ProductionFixture;
 
 class SharedClassifiedSupplyTest extends ProductionFixture
 {
+    use \Tests\Support\VerifiedPurchasingTerms;
     public function test_raw_and_production_capable_finished_products_share_the_supplier_lifecycle(): void
     {
         $raw = $this->product(Product::RAW_MATERIAL, 'DRUM');
         $finished = $this->product(Product::FINISHED_PRODUCT, 'SACK');
         $this->bom($finished, [['product_id' => $raw->id, 'required_quantity' => '1']]);
         foreach ([$raw, $finished] as $product) {
+            $term = $this->verifiedPurchasingTerm($this->supplier, $product, $this->admin, '1.00', 0);
             $requestId = $this->actingAs($this->manager)->postJson('/api/plant-manager/procurement/requests', [
                 'product_id' => $product->id, 'warehouse_id' => $this->warehouse->id, 'requested_qty' => 6, 'status' => 'draft',
             ])->assertCreated()->json('id');
@@ -27,7 +29,7 @@ class SharedClassifiedSupplyTest extends ProductionFixture
             $po = $this->postJson('/api/purchase-orders', [
                 'supplier_id' => $this->supplier->id, 'delivery_details' => 'Isolated fixture warehouse',
                 'expected_delivery_date' => now()->toDateString(), 'replenishment_request_id' => $requestId,
-                'items' => [['product_name' => $product->name, 'ordered_quantity' => 6, 'unit_price' => 1]],
+                'items' => [['product_name' => $product->name, 'ordered_quantity' => 6, 'unit_price' => 1, 'purchasing_term_id'=>$term->id]],
             ])->assertCreated()->json();
             $this->assertDatabaseHas('purchase_order_items', ['purchase_order_id' => $po['id'], 'product_id' => $product->id,
                 'unit' => $product->unit, 'item_classification' => $product->item_classification]);

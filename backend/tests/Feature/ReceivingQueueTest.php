@@ -197,6 +197,9 @@ class ReceivingQueueTest extends TestCase
 
     public function test_receiving_reports_still_include_history_records(): void
     {
+        $branch = \App\Models\Branch::create(['name'=>'Report Branch', 'code'=>'REPORT']);
+        $warehouse = \App\Models\Warehouse::create(['name'=>'Report Warehouse', 'code'=>'WH-REPORT', 'branch_id'=>$branch->id]);
+        $this->manager->update(['warehouse_id'=>$warehouse->id]);
         [$history, $originalInspectionItem] = $this->receiving(5, 0, true, true);
         $purchaseOrder = $this->purchaseOrder('PO-REPORT', 'Closed with Shortage');
         $history->update(['purchase_order_id' => $purchaseOrder->id]);

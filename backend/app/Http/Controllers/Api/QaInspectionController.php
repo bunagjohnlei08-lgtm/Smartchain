@@ -66,7 +66,7 @@ class QaInspectionController extends Controller
         $qaInspection = $receiving->qaInspection;
 
         if ($qaInspection && ! $qaInspection->completed_at) {
-            return 'In Progress';
+            return $qaInspection->started_at ? 'In Progress' : 'Pending';
         }
 
         return match ($receiving->status) {
@@ -82,6 +82,17 @@ class QaInspectionController extends Controller
             'In Progress' => 'Continue',
             default => 'View Inspection',
         };
+    }
+
+    private function qaEligibleItems(Receiving $receiving): Collection
+    {
+        $inspectionItemIds = $receiving->qaInspection?->items?->pluck('receiving_item_id');
+
+        if ($inspectionItemIds?->isNotEmpty()) {
+            return $receiving->items->whereIn('id', $inspectionItemIds)->values();
+        }
+
+        return $receiving->items->where('inspection_status', 'Pending QA')->values();
     }
 
     private function buildItemPresentation(ReceivingItem $item, ?QaInspectionItem $inspectionItem): array
@@ -113,7 +124,8 @@ class QaInspectionController extends Controller
         $receiving->loadMissing(['items', 'preparedBy', 'qaInspection.items']);
 
         $status = $this->normalizeInspectionStatus($receiving);
-        $firstProduct = $receiving->items->first()?->product_name ?? '—';
+        $eligibleItems = $this->qaEligibleItems($receiving);
+        $firstProduct = $eligibleItems->first()?->product_name ?? '—';
 
         return [
             'id' => $receiving->id,
@@ -122,7 +134,7 @@ class QaInspectionController extends Controller
             'product' => $firstProduct,
             'supplier' => $receiving->supplier,
             'delivery_date' => $receiving->delivery_date?->toDateString(),
-            'items' => $receiving->items->sum('delivered_quantity'),
+            'items' => $eligibleItems->sum('delivered_quantity'),
             'prepared_by' => $receiving->preparedBy?->name,
             'inspection_status' => $status,
             'action' => $this->actionForStatus($status),
@@ -134,6 +146,7 @@ class QaInspectionController extends Controller
         $receiving->loadMissing([
             'items.purchaseOrderItem',
             'items.product',
+            'items.qaInspectionItem.inspection',
             'preparedBy',
             'receiptAttachments.uploadedBy',
             'timeline',
@@ -141,12 +154,29 @@ class QaInspectionController extends Controller
             'qaInspection.attachments',
             'qaInspection.inspectedBy',
             'qaInspection.submittedBy',
+            'excessDeliveryReview.items',
         ]);
 
         $inspectionItems = $receiving->qaInspection?->items?->keyBy('receiving_item_id') ?? collect();
-        $items = $receiving->items->map(
+        $items = $this->qaEligibleItems($receiving)->map(
             fn (ReceivingItem $item) => $this->buildItemPresentation($item, $inspectionItems->get($item->id))
         )->values();
+        $currentItemIds = $items->pluck('receiving_item_id');
+        $originalPhysicalQuantity = $receiving->excessDeliveryReview
+            ? (int) $receiving->excessDeliveryReview->items->sum('actual_delivered_quantity')
+            : (int) $receiving->items->sum('delivered_quantity');
+        $previouslyInspectedQuantity = (int) $receiving->items
+            ->reject(fn (ReceivingItem $item) => $currentItemIds->contains($item->id))
+            ->filter(fn (ReceivingItem $item) => $item->qaInspectionItem?->inspection?->completed_at)
+            ->sum('delivered_quantity');
+        $previouslyStockedQuantity = (int) $receiving->items
+            ->filter(fn (ReceivingItem $item) => $item->stocked_in_at)
+            ->sum(fn (ReceivingItem $item) => (int) ($item->qaInspectionItem?->accepted_quantity ?? 0));
+        $heldExcessQuantity = $receiving->excessDeliveryReview
+            ? (int) $receiving->excessDeliveryReview->items->sum(
+                fn ($item) => max(0, $item->excess_quantity - $item->returned_quantity)
+            )
+            : 0;
 
         return [
             'id' => $receiving->id,
@@ -158,13 +188,20 @@ class QaInspectionController extends Controller
             'prepared_by' => $receiving->preparedBy?->name,
             'inspection_status' => $this->normalizeInspectionStatus($receiving),
             'action' => $this->actionForStatus($this->normalizeInspectionStatus($receiving)),
-            'items_count' => $receiving->items->sum('delivered_quantity'),
+            'items_count' => $items->sum('delivered_qty'),
             'products' => $items,
             'totals' => [
                 'ordered_qty' => $items->sum('ordered_qty'),
                 'delivered_qty' => $items->sum('delivered_qty'),
                 'accepted_qty' => $items->sum('accepted_qty'),
                 'rejected_qty' => $items->sum('rejected_qty'),
+            ],
+            'quantity_context' => [
+                'original_physical_delivery' => $originalPhysicalQuantity,
+                'current_inspection' => (int) $items->sum('delivered_qty'),
+                'previously_inspected' => $previouslyInspectedQuantity,
+                'previously_stocked_in' => $previouslyStockedQuantity,
+                'held_excess' => $heldExcessQuantity,
             ],
             'timeline' => $receiving->timeline->map(fn (ReceivingTimeline $event) => [
                 'status' => $event->status,
@@ -324,7 +361,8 @@ class QaInspectionController extends Controller
                     abort(404, 'Receiving not found.');
                 }
 
-                if ($receiving->items->isEmpty()) {
+                $eligibleItems = $this->qaEligibleItems($receiving);
+                if ($eligibleItems->isEmpty()) {
                     abort(422, 'Receiving has no products.');
                 }
 
@@ -336,7 +374,7 @@ class QaInspectionController extends Controller
                     abort(422, 'This inspection has already been submitted and can no longer be changed.');
                 }
 
-                $expectedItemIds = $receiving->items->pluck('id')->sort()->values();
+                $expectedItemIds = $eligibleItems->pluck('id')->sort()->values();
                 $submittedItems = collect($validated['items']);
                 $submittedIds = $submittedItems->pluck('receiving_item_id')->sort()->values();
 
@@ -344,8 +382,8 @@ class QaInspectionController extends Controller
                     abort(422, 'QA inspection items must match the products on this receiving.');
                 }
 
-                $submittedItems = $submittedItems->map(function (array $itemPayload) use ($receiving, $shouldSubmit) {
-                    $receivingItem = $receiving->items->firstWhere('id', $itemPayload['receiving_item_id']);
+                $submittedItems = $submittedItems->map(function (array $itemPayload) use ($eligibleItems, $shouldSubmit) {
+                    $receivingItem = $eligibleItems->firstWhere('id', $itemPayload['receiving_item_id']);
                     $itemPayload['accepted_quantity'] = (int) $itemPayload['accepted_quantity'];
                     $itemPayload['rejected_quantity'] = (int) $itemPayload['rejected_quantity'];
                     $total = $itemPayload['accepted_quantity'] + $itemPayload['rejected_quantity'];
@@ -366,14 +404,17 @@ class QaInspectionController extends Controller
                     return $itemPayload;
                 });
 
-                $inspection = QaInspection::firstOrCreate(
-                    ['receiving_id' => $receiving->id],
-                    [
+                $inspection = $receiving->qaInspection;
+                if (! $inspection) {
+                    $inspection = QaInspection::create([
+                        'receiving_id' => $receiving->id,
+                        'cycle_number' => 1,
                         'status' => 'In Progress',
                         'started_at' => now(),
                         'inspected_by_id' => $user->id,
-                    ]
-                );
+                    ]);
+                    $receiving->setRelation('qaInspection', $inspection);
+                }
 
                 $inspection->load('attachments');
                 $removeIds = collect($validated['remove_attachment_ids'] ?? [])->map(fn ($id) => (int) $id);
@@ -438,7 +479,7 @@ class QaInspectionController extends Controller
                 }
 
                 foreach ($submittedItems as $itemPayload) {
-                    $receivingItem = $receiving->items->firstWhere('id', $itemPayload['receiving_item_id']);
+                    $receivingItem = $eligibleItems->firstWhere('id', $itemPayload['receiving_item_id']);
 
                     QaInspectionItem::updateOrCreate(
                         [
@@ -460,7 +501,10 @@ class QaInspectionController extends Controller
                     }
                 }
 
-                $this->ensureTimelineEvent($receiving, 'Inspection Started', $inspection->inspectedBy?->name ?? $user->name);
+                $startedLabel = $inspection->cycle_number > 1
+                    ? "Inspection Cycle {$inspection->cycle_number} Started"
+                    : 'Inspection Started';
+                $this->ensureTimelineEvent($receiving, $startedLabel, $inspection->inspectedBy?->name ?? $user->name);
 
                 if ($shouldSubmit) {
                     $overallStatus = $this->resolveOverallStatus($submittedItems);
@@ -472,11 +516,20 @@ class QaInspectionController extends Controller
                     ]);
 
                     $receiving->update(['status' => $overallStatus]);
-                    $this->ensureTimelineEvent($receiving, 'Inspection Completed', $user->name);
-                    $this->ensureTimelineEvent($receiving, 'QA '.$overallStatus, $user->name);
+                    $completedLabel = $inspection->cycle_number > 1
+                        ? "Inspection Cycle {$inspection->cycle_number} Completed"
+                        : 'Inspection Completed';
+                    $this->ensureTimelineEvent($receiving, $completedLabel, $user->name);
+                    $qaLabel = $inspection->cycle_number > 1
+                        ? "QA Cycle {$inspection->cycle_number} {$overallStatus}"
+                        : 'QA '.$overallStatus;
+                    $this->ensureTimelineEvent($receiving, $qaLabel, $user->name);
 
                     if ($submittedItems->sum('accepted_quantity') > 0) {
-                        $this->ensureTimelineEvent($receiving, 'Ready for Stock In', 'System');
+                        $readyLabel = $inspection->cycle_number > 1
+                            ? "QA Cycle {$inspection->cycle_number} Ready for Stock In"
+                            : 'Ready for Stock In';
+                        $this->ensureTimelineEvent($receiving, $readyLabel, 'System');
                     }
                 } else {
                     $inspection->update([
@@ -563,10 +616,15 @@ class QaInspectionController extends Controller
         $inspection = QaInspection::query()
             ->with('attachments')
             ->where('receiving_id', $receivingId)
+            ->when($attachmentId, fn ($query) => $query->whereHas(
+                'attachments',
+                fn ($attachments) => $attachments->whereKey($attachmentId)
+            ))
             ->when($request->user()?->isQaSupervisor(), fn ($query) => $query->whereHas(
                 'receiving',
                 fn ($receiving) => $receiving->where('assigned_qa_user_id', $request->user()->id)
             ))
+            ->orderByDesc('cycle_number')
             ->first();
 
         if (! $inspection) {
@@ -704,7 +762,7 @@ class QaInspectionController extends Controller
             return response()->json(['message' => 'Receiving not found.'], 404);
         }
 
-        if ($receiving->items->isEmpty()) {
+        if ($this->qaEligibleItems($receiving)->isEmpty()) {
             return response()->json(['message' => 'Receiving has no products.'], 422);
         }
 

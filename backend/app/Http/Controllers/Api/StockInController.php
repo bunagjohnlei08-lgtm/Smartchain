@@ -7,6 +7,7 @@ use App\Models\Inventory;
 use App\Models\Receiving;
 use App\Models\ReceivingItem;
 use App\Models\ReceivingTimeline;
+use App\Models\ExcessDeliveryReview;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Notifications\WorkflowNotification;
@@ -225,7 +226,7 @@ class StockInController extends Controller
         try {
             $receiving = DB::transaction(function () use ($id, $request) {
                 $receiving = Receiving::query()
-                    ->with(['items.qaInspectionItem.inspection', 'items.product'])
+                    ->with(['items.qaInspectionItem.inspection', 'items.product', 'excessDeliveryReview'])
                     ->lockForUpdate()
                     ->findOrFail($id);
 
@@ -237,7 +238,9 @@ class StockInController extends Controller
                     abort(422, 'This receiving has no QA-approved quantity awaiting stock in.');
                 }
 
-                $warehouse = $this->resolveDefaultWarehouse();
+                $warehouse = $receiving->excessDeliveryReview
+                    ? Warehouse::query()->find($receiving->excessDeliveryReview->warehouse_id)
+                    : $this->resolveDefaultWarehouse();
                 if (! $warehouse) {
                     abort(422, 'No warehouse is configured to receive stock.');
                 }
@@ -285,8 +288,20 @@ class StockInController extends Controller
                     $item->save();
                 }
 
+                if ($receiving->excessDeliveryReview) {
+                    $receiving->load('items');
+                    $hasUnresolvedHeldQuantity = $receiving->items->contains(
+                        fn (ReceivingItem $item) => in_array($item->inspection_status, ['On Hold', 'Pending QA'], true)
+                    );
+                    $receiving->update(['status' => $hasUnresolvedHeldQuantity ? 'Partially Resolved' : 'Completed']);
+                }
+
+                $stockInCycle = (int) $eligibleItems
+                    ->map(fn (ReceivingItem $item) => $item->qaInspectionItem?->inspection?->cycle_number ?? 1)
+                    ->max();
+                $stockInLabel = $stockInCycle > 1 ? "Stock In Cycle {$stockInCycle} Completed" : 'Stock In Completed';
                 ReceivingTimeline::firstOrCreate(
-                    ['receiving_id' => $receiving->id, 'status' => 'Stock In Completed'],
+                    ['receiving_id' => $receiving->id, 'status' => $stockInLabel],
                     ['performed_by' => $request->user()->name, 'occurred_at' => now()]
                 );
 

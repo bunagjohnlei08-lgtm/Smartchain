@@ -24,8 +24,8 @@ use Throwable;
  */
 class ReportRunner
 {
-    public const WRITERS = ['CSV' => CsvReportWriter::class, 'XLSX' => XlsxReportWriter::class, 'PDF' => PdfReportWriter::class];
-    public const FORMAT_LABELS = ['CSV' => 'CSV', 'XLSX' => 'Excel (.xlsx)', 'PDF' => 'PDF'];
+    public const WRITERS = ['CSV' => CsvReportWriter::class, 'XLSX' => XlsxReportWriter::class, 'PDF' => PdfReportWriter::class, 'ZIP' => \App\Reports\Writers\ReceiptZipReportWriter::class];
+    public const FORMAT_LABELS = ['CSV' => 'CSV', 'XLSX' => 'Excel (.xlsx)', 'PDF' => 'PDF', 'ZIP' => 'Export with Attachments (.zip)'];
 
     /** @return array{rows: list<array<string, mixed>>, total: int, page: int, per_page: int, last_page: int, generated_at: string, filters_applied: list<string>} */
     public function preview(ReportDefinition $definition, ReportFilters $filters, int $page, int $perPage, User $user): array
@@ -55,7 +55,9 @@ class ReportRunner
         }
 
         return [
-            'rows' => $items->map(fn ($row) => $this->formatRow($definition, $row, false))->values()->all(),
+            'rows' => isset($definition->columns['receipt_count'])
+                ? app(ReceivingReportEvidence::class)->decorate($items->map(fn ($row) => $this->formatRow($definition, $row, false))->values()->all(), $user)
+                : $items->map(fn ($row) => $this->formatRow($definition, $row, false))->values()->all(),
             'total' => $total,
             'page' => $page,
             'per_page' => $perPage,
@@ -80,7 +82,7 @@ class ReportRunner
         ?ReportSchedule $schedule = null,
     ): array {
         $title = $title ?: $definition->name;
-        if ($format === 'PDF' && $this->count($definition, $filters) > PdfReportWriter::MAX_ROWS) {
+        if (in_array($format, ['PDF','ZIP'], true) && $this->count($definition, $filters) > PdfReportWriter::MAX_ROWS) {
             throw ValidationException::withMessages([
                 'format' => 'PDF export is limited to '.number_format(PdfReportWriter::MAX_ROWS).' rows. Narrow the filters or export as CSV or Excel.',
             ]);
@@ -94,13 +96,24 @@ class ReportRunner
         $auditContext = ['actor' => $user, 'resource_type' => 'Report', 'resource_id' => $definition->key, 'resource_label' => $title];
 
         try {
-            $rows = (function () use ($definition, $filters, &$count) {
+            $numbers = []; $evidenceCache = null;
+            $receipts = function () use (&$numbers, &$evidenceCache, $user, $format) {
+                return $evidenceCache ??= app(ReceivingReportEvidence::class)->register(array_keys($numbers), $user, in_array($format, ['PDF','ZIP'], true), $format === 'ZIP');
+            };
+            $rows = (function () use ($definition, $filters, &$count, &$numbers, $user) {
+                $batch = [];
                 foreach ($this->iterate($definition, $filters) as $row) {
                     $count++;
-                    yield $this->formatRow($definition, $row, true);
+                    if (isset($definition->columns['receipt_count'])) {
+                        $numbers[$row->receiving_no ?? $row->receiving_reference] = true;
+                        $batch[] = $this->formatRow($definition, $row, true);
+                        if (count($batch) === 100) { yield from app(ReceivingReportEvidence::class)->decorate($batch, $user); $batch=[]; }
+                    } else yield $this->formatRow($definition, $row, true);
                 }
+                if ($batch) yield from app(ReceivingReportEvidence::class)->decorate($batch, $user);
             })();
             $path = $writer->write($definition, $rows, [
+                'receipts' => isset($definition->columns['receipt_count']) ? $receipts : null,
                 'title' => $title,
                 'category' => $definition->categoryLabel(),
                 'generated_at' => $generatedAt->format('M d, Y g:i A T'),
@@ -116,6 +129,7 @@ class ReportRunner
                 'details' => "Failed to export {$title} as {$format}", 'metadata' => $metadata,
             ]);
 
+            if ($exception instanceof ValidationException) throw $exception;
             throw new ReportGenerationFailed('The report could not be generated. Please try again.', previous: $exception);
         }
 

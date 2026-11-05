@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Warehouse extends Model
 {
+    /** The configured primary location used by Manage Locations. */
+    public static function configuredMain(): ?self
+    {
+        return static::query()->where('code', 'WH-MAIN')->first()
+            ?? static::query()->orderBy('id')->first();
+    }
+
     protected $fillable = ['name', 'code', 'branch_id', 'address', 'latitude', 'longitude', 'capacity', 'capacity_kg', 'capacity_pcs', 'capacity_l', 'capacity_powder', 'capacity_liquid', 'capacity_solid', 'capacity_returned', 'status', 'show_on_public_website'];
 
     protected function casts(): array

@@ -20,7 +20,6 @@ import {
   X,
   Save,
   Coins,
-  Layers,
   Truck,
   AlertTriangle,
   Info,
@@ -223,9 +222,9 @@ const BarcodeSvg: React.FC<{ value: string; className?: string }> = ({ value, cl
 };
 
 const BarcodeDisplay: React.FC<{ value: string; responsive?: boolean }> = ({ value, responsive = false }) => (
-  <div className={responsive ? 'flex w-full min-w-0 max-w-40 flex-col gap-1' : 'inline-flex min-w-[150px] flex-col gap-1'}>
+  <div className={responsive ? 'flex w-full min-w-0 max-w-48 flex-col gap-1' : 'inline-flex min-w-[180px] flex-col gap-1'}>
     <span className={`font-mono text-xs text-slate-900 dark:text-slate-300 sm:text-sm ${responsive ? 'break-all' : ''}`}>{value}</span>
-    <BarcodeSvg value={value} className={responsive ? 'h-10 w-full max-w-40 rounded bg-white' : 'h-10 w-40 rounded bg-white'} />
+    <BarcodeSvg value={value} className={responsive ? 'h-12 w-full max-w-48 rounded bg-white' : 'h-12 w-48 rounded bg-white'} />
   </div>
 );
 
@@ -512,17 +511,6 @@ const InventoryFormModal: React.FC<{
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5 text-slate-300">Reserved Stock *</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.reserved_stock}
-                onChange={(e) => setFormData({ ...formData, reserved_stock: Number(e.target.value) })}
-                className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                required
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium mb-1.5 text-slate-300">Backload *</label>
               <input
                 type="number"
@@ -568,79 +556,6 @@ const InventoryFormModal: React.FC<{
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {mode === 'create' ? 'Create Record' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// ----- Reserve Stock Modal -----
-const ReserveStockModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  product: InventoryItem | null;
-  onReserve: (id: number, qty: number, reason: string) => void;
-}> = ({ isOpen, onClose, product, onReserve }) => {
-  const [qty, setQty] = useState<number>(0);
-  const [reason, setReason] = useState('');
-
-  if (!isOpen || !product) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (qty <= 0 || qty > product.available_stock) return;
-    onReserve(product.id, qty, reason);
-    setQty(0);
-    setReason('');
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#0d1322] border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Reserve Stock</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="mb-4 p-4 bg-slate-800/30 rounded-xl border border-slate-700">
-          <p className="text-sm text-slate-400">Product</p>
-          <p className="text-white font-medium">{product.product}</p>
-          <p className="text-slate-400 text-xs">Available: {product.available_stock} {product.unit}</p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-300">Quantity to Reserve *</label>
-            <input
-              type="number"
-              min="1"
-              max={product.available_stock}
-              value={qty}
-              onChange={(e) => setQty(Number(e.target.value))}
-              className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-              required
-            />
-            <p className="text-xs text-slate-500 mt-1">Max: {product.available_stock}</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5 text-slate-300">Reason (e.g., Order #)</label>
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Customer order, internal use, etc."
-              className="w-full bg-[#0b0f19] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-            />
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-            <button type="button" onClick={onClose} className="px-5 py-2.5 border border-slate-700 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-              Cancel
-            </button>
-            <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950">
-              <Save className="w-4 h-4" /> Reserve
             </button>
           </div>
         </form>
@@ -772,14 +687,10 @@ const DetailsDrawer: React.FC<{
 
           <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-3 sm:p-4">
             <p className="text-slate-400 text-xs mb-2">Stock Breakdown</p>
-            <div className="grid grid-cols-3 gap-1 text-xs min-[350px]:gap-2 min-[350px]:text-[13px] sm:text-sm">
+            <div className="grid grid-cols-2 gap-1 text-xs min-[350px]:gap-2 min-[350px]:text-[13px] sm:text-sm">
               <div className="text-center">
                 <p className="text-emerald-400">Available</p>
                 <p className="text-white font-medium">{product.available_stock}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-blue-400">Reserved</p>
-                <p className="text-white font-medium">{product.reserved_stock}</p>
               </div>
               <div className="text-center">
                 <p className="text-red-400">Backload</p>
@@ -817,13 +728,11 @@ const DetailsDrawer: React.FC<{
 const InventoryGrid: React.FC<{
   items: InventoryItem[];
   onViewDetails: (item: InventoryItem) => void;
-  onReserveStock: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onMovementHistory: (item: InventoryItem) => void;
 }> = ({
   items,
   onViewDetails,
-  onReserveStock,
   onEdit,
   onMovementHistory,
 }) => {
@@ -857,14 +766,10 @@ const InventoryGrid: React.FC<{
             </div>
 
             {/* Stock Quantities */}
-            <div className="grid grid-cols-3 gap-2 text-center mb-3">
+            <div className="grid grid-cols-2 gap-2 text-center mb-3">
               <div className="bg-slate-800/30 rounded-xl p-2">
                 <p className="admin-inventory-grid-stock-label text-emerald-400 text-xs font-medium">Available</p>
                 <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.available_stock} {item.unit}</p>
-              </div>
-              <div className="bg-slate-800/30 rounded-xl p-2">
-                <p className="admin-inventory-grid-stock-label text-blue-400 text-xs font-medium">Reserved</p>
-                <p className="admin-inventory-grid-stock-value text-white text-lg font-bold">{item.reserved_stock} {item.unit}</p>
               </div>
               <div className="bg-slate-800/30 rounded-xl p-2">
                 <p className="admin-inventory-grid-stock-label text-red-400 text-xs font-medium">Backload</p>
@@ -894,13 +799,6 @@ const InventoryGrid: React.FC<{
                 title="View Details"
               >
                 <Eye className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => onReserveStock(item)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-white"
-                title="Reserve Stock"
-              >
-                <Layers className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onEdit(item)}
@@ -1008,7 +906,6 @@ export const InventoryList: React.FC = () => {
   // Modal states
   const [showFormModal, setShowFormModal] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
-  const [showReserveModal, setShowReserveModal] = useState(false);
   const [showBackloadModal, setShowBackloadModal] = useState(false);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
@@ -1092,11 +989,6 @@ export const InventoryList: React.FC = () => {
     setShowDetailsDrawer(true);
   };
 
-  const handleReserveStock = (product: InventoryItem) => {
-    setSelectedProduct(product);
-    setShowReserveModal(true);
-  };
-
   const handleEdit = (product: InventoryItem) => {
     setSelectedProduct(product);
     setFormMode('edit');
@@ -1122,20 +1014,6 @@ export const InventoryList: React.FC = () => {
       await fetchInventory();
       setShowFormModal(false);
       setSelectedProduct(null);
-    } catch (e) {
-      alert(getApiErrorMessage(e));
-    }
-  };
-
-  const handleReserveSubmit = async (id: number, qty: number, _reason: string) => {
-    const item = items.find((i) => i.id === id);
-    if (!item) return;
-    try {
-      await apiClient.put(`/inventory/${id}`, {
-        available_stock: item.available_stock - qty,
-        reserved_stock: item.reserved_stock + qty,
-      });
-      await fetchInventory();
     } catch (e) {
       alert(getApiErrorMessage(e));
     }
@@ -1210,14 +1088,12 @@ export const InventoryList: React.FC = () => {
 
   // KPI calculations (from full backend dataset, not just the current page)
   const totalAvailable = items.reduce((sum, item) => sum + item.available_stock, 0);
-  const totalReserved = items.reduce((sum, item) => sum + item.reserved_stock, 0);
   const totalBackload = items.reduce((sum, item) => sum + item.backload, 0);
   const lowStockCount = items.filter(item => item.status === 'Low Stock').length;
   const outOfStockCount = items.filter(item => item.status === 'Out of Stock').length;
   const pendingReceivingCount = items.filter(item => item.pending_receiving).length;
   const inventoryValue = items.reduce((sum, item) => sum + (item.available_stock + item.reserved_stock + item.backload) * item.cost_price, 0);
 
-  const reservedForShipmentCount = items.filter(item => item.reserved_stock > 0).length;
   const readyForStockInCount = items.filter(item => item.pending_receiving && item.available_stock === 0).length;
 
   const resetFilters = () => {
@@ -1257,18 +1133,12 @@ export const InventoryList: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4 xl:gap-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 xl:gap-5">
         <KPICard
           label="Available Stock"
           value={totalAvailable}
           subtitle="Across all warehouses"
           icon={<Package className="w-5 h-5 text-emerald-400" />}
-        />
-        <KPICard
-          label="Reserved Stock"
-          value={totalReserved}
-          subtitle="For shipments"
-          icon={<Layers className="w-5 h-5 text-blue-400" />}
         />
         <KPICard
           label="Backload Stock"
@@ -1315,14 +1185,6 @@ export const InventoryList: React.FC = () => {
             count={pendingReceivingCount}
             color="orange"
             icon={<Truck className="w-4 h-4" />}
-          />
-        )}
-        {reservedForShipmentCount > 0 && (
-          <AlertPill
-            title="Reserved Shipment"
-            count={reservedForShipmentCount}
-            color="blue"
-            icon={<Layers className="w-4 h-4" />}
           />
         )}
         {readyForStockInCount > 0 && (
@@ -1432,7 +1294,7 @@ export const InventoryList: React.FC = () => {
         // Table View
         <div className="min-w-0 bg-[#0d1322] border border-slate-800 rounded-2xl">
           <div className="admin-table-scroll w-full min-w-0 max-w-full overflow-x-auto custom-scrollbar">
-            <table className="admin-responsive-table admin-inventory-table admin-cols-10 admin-sticky-1 w-full">
+            <table className="admin-responsive-table admin-inventory-table admin-cols-9 admin-sticky-1 w-full">
               <thead className="bg-[#0b0f19]/50 border-b border-slate-800 sticky top-0 z-10">
                 <tr>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Barcode</th>
@@ -1440,7 +1302,6 @@ export const InventoryList: React.FC = () => {
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Classification</th>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Warehouse</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Available</th>
-                  <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Reserved</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Backload</th>
                   <th className="px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Status</th>
                   <th className="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 sm:px-4 sm:py-3.5">Last Updated</th>
@@ -1466,7 +1327,6 @@ export const InventoryList: React.FC = () => {
                     </td>
                     <td className="px-2 py-2 text-xs text-slate-300 sm:px-4 sm:py-3.5 sm:text-sm truncate">{item.warehouse}</td>
                     <td className="px-2 py-2 text-center text-xs text-white font-medium sm:px-4 sm:py-3.5 sm:text-sm">{item.available_stock} {item.unit}</td>
-                    <td className="px-2 py-2 text-center text-xs text-slate-900 dark:text-blue-400 sm:px-4 sm:py-3.5 sm:text-sm">{item.reserved_stock} {item.unit}</td>
                     <td className={`px-2 py-2 text-center text-xs sm:px-4 sm:py-3.5 sm:text-sm ${item.backload > 0 ? 'text-slate-900 dark:text-red-400' : 'text-slate-900 dark:text-slate-500'}`}>{item.backload} {item.unit}</td>
                     <td className="px-2 py-2 sm:px-4 sm:py-3.5"><StatusBadge status={item.status} /></td>
                     <td className="px-2 py-2 text-xs text-slate-400 sm:px-4 sm:py-3.5 sm:text-sm">{formatLastUpdated(item.updated_at)}</td>
@@ -1478,13 +1338,6 @@ export const InventoryList: React.FC = () => {
                           title="View Details"
                         >
                           <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleReserveStock(item)}
-                          className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
-                          title="Reserve Stock"
-                        >
-                          <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                         <button
                           onClick={() => handleEdit(item)}
@@ -1522,7 +1375,6 @@ export const InventoryList: React.FC = () => {
             <InventoryGrid
               items={paginatedItems}
               onViewDetails={handleViewDetails}
-              onReserveStock={handleReserveStock}
               onEdit={handleEdit}
               onMovementHistory={handleMovementHistory}
             />
@@ -1594,12 +1446,6 @@ export const InventoryList: React.FC = () => {
         product={selectedProduct}
         warehouses={warehouses}
         onSubmit={handleFormSubmit}
-      />
-      <ReserveStockModal
-        isOpen={showReserveModal}
-        onClose={() => setShowReserveModal(false)}
-        product={selectedProduct}
-        onReserve={handleReserveSubmit}
       />
       <BackloadStockModal
         isOpen={showBackloadModal}

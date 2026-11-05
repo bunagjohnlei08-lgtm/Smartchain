@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{PurchaseOrder,Rfq,Supplier,SupplierApplication,SupplierApplicationAttachment,SupplierAward,SupplierBidRevision,User};
+use App\Models\{PurchaseOrder,Rfq,Supplier,SupplierAward,SupplierBidRevision,User};
 use App\Notifications\WorkflowNotification;
 use App\Support\AuditLogger;
 use App\Support\WorkflowNotificationSender;
@@ -30,6 +30,12 @@ class AwardPurchaseOrderService
                 }
                 $supplier = Supplier::query()->lockForUpdate()->findOrFail($supplierId);
                 $this->assertEligible($supplier);
+                $categories = collect(explode(',', (string) $supplier->supply_category))
+                    ->map(fn ($category) => mb_strtoupper(trim($category)))->filter();
+                foreach ($lines as $line) {
+                    abort_unless($categories->contains(mb_strtoupper(trim((string) $line->rfqLine->category))), 422,
+                        'The awarded supplier accreditation no longer covers an awarded product category.');
+                }
                 $quotation = $lines->first()->revision->bidLine->quotation;
                 $items = $lines->map(function ($line) use ($locked, $supplier) {
                     $revision = SupplierBidRevision::query()->lockForUpdate()->with('bidLine.quotation')->findOrFail($line->supplier_bid_revision_id);
@@ -39,7 +45,7 @@ class AwardPurchaseOrderService
                     $request = $line->rfqLine->replenishmentRequest;
                     abort_unless($request && $request->sourcing_method === $request::SOURCING_COMPETITIVE, 422, 'Award line is not linked to a competitive procurement requirement.');
                     abort_if(PurchaseOrder::whereHas('items', fn($query)=>$query->where('supplier_award_line_id',$line->id))->exists(), 409, 'An award allocation has already been consumed.');
-                    return ['product_id'=>$line->rfqLine->product_id,'product_name'=>$line->rfqLine->product_name,'unit'=>$line->rfqLine->unit,'item_classification'=>$line->rfqLine->product?->item_classification,'ordered_quantity'=>(int)$line->awarded_quantity,'unit_price'=>$line->awarded_unit_price,'total_price'=>$this->lineTotal((int)$line->awarded_quantity,(string)$line->awarded_unit_price),'supplier_award_line_id'=>$line->id,'replenishment_request_id'=>$request->id];
+                    return ['product_id'=>$line->rfqLine->product_id,'product_name'=>$line->rfqLine->product_name,'unit'=>$line->rfqLine->unit,'item_classification'=>$line->rfqLine->product?->item_classification,'ordered_quantity'=>(int)$line->awarded_quantity,'unit_price'=>$line->awarded_unit_price,'total_price'=>$this->lineTotal((int)$line->awarded_quantity,(string)$line->awarded_unit_price),'supplier_award_line_id'=>$line->id,'price_source'=>'AWARDED_BID','agreement_reference'=>$revision->bidLine->quotation->quotation_number,'replenishment_request_id'=>$request->id];
                 });
                 $order = PurchaseOrder::create(['po_number'=>$this->nextNumber(),'replenishment_request_id'=>null,'supplier_award_id'=>$locked->id,'conversion_key'=>$conversionKey,'supplier_id'=>$supplier->id,'supplier_name'=>$supplier->name,'delivery_details'=>$rfq->delivery_destination,'expected_delivery_date'=>$rfq->required_delivery_date,'total_amount'=>$items->sum('total_price'),'currency'=>$rfq->currency,'tax_included'=>$quotation->tax_included,'freight_included'=>$quotation->freight_included,'commercial_terms'=>$quotation->commercial_terms,'status'=>PurchaseOrder::STATUS_PENDING_APPROVAL,'created_by'=>$actor->id,'approved_by'=>null]);
                 $order->items()->createMany($items->all());
@@ -55,11 +61,9 @@ class AwardPurchaseOrderService
 
     private function assertEligible(Supplier $supplier): void
     {
-        abort_unless($supplier->status===Supplier::STATUS_ACTIVE && $supplier->accreditation_status==='ACTIVE' && $supplier->accreditation_expires_on && !$supplier->accreditation_expires_on->lt(today()),422,'The awarded supplier is no longer eligible for PO conversion.');
-        $application=SupplierApplication::where('approved_supplier_id',$supplier->id)->where('status',SupplierApplication::STATUS_APPROVED)->lockForUpdate()->first();
-        abort_unless($application,422,'The awarded supplier has no approved application.');
-        $documents=SupplierApplicationAttachment::where('supplier_application_id',$application->id)->where('is_current',true)->lockForUpdate()->get();
-        foreach([SupplierApplicationAttachment::TYPE_BUSINESS_CERTIFICATE,SupplierApplicationAttachment::TYPE_BUSINESS_PERMIT] as $type) abort_unless($documents->where('attachment_type',$type)->contains(fn($document)=>$document->verification_status===SupplierApplicationAttachment::STATUS_VERIFIED&&!$document->expires_on?->lt(today())),422,"The awarded supplier has no current verified {$type}.");
+        $blockers = app(SupplierAccreditationEligibility::class)->blockersForUpdate($supplier);
+        abort_if($blockers !== [], 422, 'The awarded supplier is no longer eligible for PO conversion. '
+            .implode(' ', array_column($blockers, 'message')));
     }
     private function nextNumber(): string {$year=now()->format('Y');$last=PurchaseOrder::where('po_number','like',"PO-{$year}-%")->lockForUpdate()->latest('id')->value('po_number');return sprintf('PO-%s-%04d',$year,$last?((int)substr($last,-4))+1:1);}
     private function lineTotal(int $quantity,string $price): string {[$whole,$decimal]=array_pad(explode('.',$price,2),2,'');$cents=(((int)$whole*100)+(int)str_pad($decimal,2,'0'))*$quantity;return intdiv($cents,100).'.'.str_pad((string)($cents%100),2,'0',STR_PAD_LEFT);}

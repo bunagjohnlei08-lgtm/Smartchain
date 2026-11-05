@@ -213,6 +213,91 @@ class AdminSupplierRejectionTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/admin/rejected-items/{$case->id}/send")->assertUnprocessable();
     }
 
+    public function test_resend_from_sent_persists_sent_after_the_sending_lock_and_preserves_evidence(): void
+    {
+        Mail::fake();$case=$this->rejectedCase();
+        $case->update(['status'=>'SENT','sent_at'=>now()->subMinutes(5),'sent_by_id'=>$this->admin->id,'send_attempts'=>1]);
+        $this->actingAs($this->admin)->postJson("/api/admin/rejected-items/{$case->id}/send")->assertOk()
+            ->assertJsonPath('data.status','SENT')->assertJsonPath('data.can_resolve',true);
+        $this->assertSame('SENT',$case->fresh()->status);$this->assertSame(2,$case->fresh()->send_attempts);
+        $this->getJson("/api/admin/rejected-items/{$case->id}")->assertOk()->assertJsonPath('data.status','SENT');
+        $this->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(429);Mail::assertSentCount(1);
+        $this->assertDatabaseCount('supplier_rejection_cases',1);$this->assertDatabaseCount('receivings',1);$this->assertDatabaseCount('inventories',0);
+    }
+
+    public function test_failure_retry_from_failed_persists_failed_instead_of_sticking_in_sending(): void
+    {
+        $case=$this->rejectedCase();$case->update(['status'=>'FAILED','send_attempts'=>1]);
+        Mail::shouldReceive('to')->once()->andThrow(new \RuntimeException('Provider unavailable'));
+        $this->actingAs($this->admin)->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(502);
+        $this->assertSame('FAILED',$case->fresh()->status);$this->assertSame(2,$case->fresh()->send_attempts);
+        $this->assertNull($case->fresh()->sent_at);
+    }
+
+    public function test_provider_acceptance_followed_by_database_failure_does_not_offer_automatic_resend(): void
+    {
+        Mail::fake();$case=$this->rejectedCase();
+        \Illuminate\Support\Facades\Event::listen('eloquent.updating: '.SupplierRejectionCase::class,function($model){
+            if($model->status==='SENT')throw new \RuntimeException('Simulated final persistence failure');
+        });
+        $this->actingAs($this->admin)->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(503);
+        $this->assertSame('SENDING',$case->fresh()->status);$this->assertNull($case->fresh()->sent_at);
+        $this->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(429);Mail::assertSentCount(1);
+        $this->postJson("/api/admin/rejected-items/{$case->id}/resolve",['resolution_type'=>'NO_REPLACEMENT','resolution_notes'=>'Not authorized yet.'])->assertUnprocessable();
+        $this->assertDatabaseCount('inventories',0);
+    }
+
+    public function test_brevo_timeout_is_ambiguous_and_cannot_be_blindly_retried(): void
+    {
+        $case=$this->rejectedCase();
+        Mail::shouldReceive('to')->once()->andThrow(new \App\Exceptions\BrevoDeliveryException('Brevo API request failed: ConnectionException'));
+        $this->actingAs($this->admin)->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(503);
+        $this->assertSame('SENDING',$case->fresh()->status);
+        $this->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(429);
+    }
+
+    public function test_unexpected_exception_after_mail_handoff_preserves_uncertain_state(): void
+    {
+        $case = $this->rejectedCase();
+        $pending = \Mockery::mock(\Illuminate\Mail\PendingMail::class);
+        $pending->shouldReceive('send')->once()->andThrow(new \RuntimeException('Post-send callback failed'));
+        Mail::shouldReceive('to')->once()->andReturn($pending);
+        $this->actingAs($this->admin)->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(503);
+        $this->assertSame('SENDING', $case->fresh()->status);
+        $this->assertNull($case->fresh()->sent_at);
+        $this->postJson("/api/admin/rejected-items/{$case->id}/send")->assertStatus(429);
+    }
+
+    public function test_stale_attempt_requires_explicit_admin_evidence_and_never_resends_during_reconciliation(): void
+    {
+        Mail::fake();$case=$this->rejectedCase();$case->update(['status'=>'SENDING','send_attempts'=>1,'last_send_attempt_at'=>now()->subMinutes(20)]);
+        $payload=['send_attempt'=>1,'attempted_at'=>$case->last_send_attempt_at->toIso8601String(),'outcome'=>'ACCEPTED',
+            'provider_reference'=>'provider-message-id-test','provider_verified'=>true,'evidence'=>'Provider accepted event matches this exact attempt, recipient and case.'];
+        $url="/api/admin/rejected-items/{$case->id}/reconcile-send";
+        $this->actingAs($this->manager)->postJson($url,$payload)->assertForbidden();
+        $this->actingAs($this->admin)->postJson($url,[])->assertUnprocessable();
+        $this->postJson($url,[...$payload,'send_attempt'=>2])->assertStatus(409);
+        $this->postJson($url,[...$payload,'provider_verified'=>false])->assertUnprocessable();
+        $this->getJson("/api/admin/rejected-items/{$case->id}")->assertOk()->assertJsonPath('data.can_send',false)->assertJsonPath('data.can_resolve',false);
+        $this->postJson($url,$payload)->assertOk()->assertJsonPath('data.status','SENT')->assertJsonPath('data.can_resolve',true);
+        $this->postJson($url,$payload)->assertStatus(409);Mail::assertNothingSent();
+        $this->assertDatabaseHas('audit_logs',['action'=>'REJECTION_REPORT_SEND_RECONCILED','resource_id'=>(string)$case->id]);
+        $this->postJson("/api/admin/rejected-items/{$case->id}/resolve",['resolution_type'=>'NO_REPLACEMENT','resolution_notes'=>'Verified supplier credit confirmed.'])->assertOk()->assertJsonPath('data.status','RESOLVED');
+        $this->assertDatabaseCount('receivings',1);$this->assertDatabaseCount('inventories',0);
+    }
+
+    public function test_recent_attempt_cannot_be_reconciled_and_confirmed_nonacceptance_allows_retry(): void
+    {
+        Mail::fake();$case=$this->rejectedCase();$case->update(['status'=>'SENDING','send_attempts'=>1,'last_send_attempt_at'=>now()]);
+        $payload=['send_attempt'=>1,'attempted_at'=>$case->last_send_attempt_at->toIso8601String(),'outcome'=>'NOT_ACCEPTED',
+            'provider_reference'=>'provider-rejected-event','provider_verified'=>true,'evidence'=>'Provider explicitly rejected this exact attempt before acceptance.'];
+        $url="/api/admin/rejected-items/{$case->id}/reconcile-send";
+        $this->actingAs($this->admin)->postJson($url,$payload)->assertUnprocessable();
+        $this->travel(16)->minutes();$this->postJson($url,$payload)->assertOk()->assertJsonPath('data.status','FAILED');
+        Mail::assertNothingSent();
+        $this->postJson("/api/admin/rejected-items/{$case->id}/send")->assertOk()->assertJsonPath('data.status','SENT');Mail::assertSentCount(1);
+    }
+
     private const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
     private function attachEvidence(SupplierRejectionCase $case, string $originalName, string $storedPath, string $mime, ?string $bytes): void
