@@ -113,11 +113,15 @@ class AdminOrderController extends Controller
             $items = collect($validated['items'])->map(function (array $item, int $index) {
                 $product = Product::query()->lockForUpdate()->findOrFail($item['product_id']);
                 if ($product->item_classification !== Product::FINISHED_PRODUCT) throw ValidationException::withMessages(['items' => 'Raw materials cannot be customer order items.']);
+                $catalogUnit = \App\Support\WarehouseCapacity::normalizeUnit($product->unit);
+                if (!in_array($catalogUnit, Product::PACKAGE_UNITS, true)) {
+                    throw ValidationException::withMessages(["items.{$index}.unit" => 'New orders require a Product Catalog Stock Unit of PCS, DRUM or SACK. Legacy units cannot be converted.']);
+                }
                 if (filled($item['unit'] ?? null) && \App\Support\WarehouseCapacity::normalizeUnit($item['unit']) !== \App\Support\WarehouseCapacity::normalizeUnit($product->unit)) {
                     throw ValidationException::withMessages(["items.{$index}.unit" => 'Order unit must match the selected catalog Stock Unit.']);
                 }
                 $item['product_name'] = $product->name;
-                $item['unit'] = ($item['unit'] ?? null) ?: $product->unit;
+                $item['unit'] = $catalogUnit;
                 if (!filled($item['unit'])) {
                     throw ValidationException::withMessages([
                         "items.{$index}.unit" => 'Unit is required when the selected Product Catalog record has no unit.',

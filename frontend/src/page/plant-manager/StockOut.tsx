@@ -16,6 +16,8 @@ import {
   X,
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import { usePlantManagerDetailOverlay } from '../../components/layout/PlantManagerDetailOverlayContext';
+import { stockOutProgressByUnit } from './stockOutProgress';
 import { BrowserCodeReader, type IScannerControls } from '@zxing/browser';
 import { ChecksumException, Code128Reader, DecodeHintType, FormatException, NotFoundException, type BinaryBitmap, type Result } from '@zxing/library';
 
@@ -217,6 +219,9 @@ const StockOut: React.FC = () => {
   const [orders, setOrders] = useState<StockOutOrder[]>([]);
   const [summary, setSummary] = useState<Summary>({ ordersReady: 0, pickingToday: 0, forPacking: 0, waitingLogistics: 0, releasedToday: 0, itemsReleased: 0, valueReleased: 0 });
   const [selectedOrder, setSelectedOrder] = useState<StockOutOrder | null>(null);
+  const [detailTarget, setDetailTarget] = useState<StockOutOrder | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
@@ -242,6 +247,15 @@ const StockOut: React.FC = () => {
   const feedbackTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const selectedOrderRef = useRef<StockOutOrder | null>(null);
+  const detailsRequestRef = useRef(0);
+  const cameraSessionRef = useRef(0);
+  const detailsDialogRef = useRef<HTMLDivElement>(null);
+  const scannerDialogRef = useRef<HTMLDivElement>(null);
+  const detailsCloseRef = useRef<HTMLButtonElement>(null);
+  const detailsTriggerRef = useRef<HTMLElement | null>(null);
+  const modalActionsRef = useRef({ scannerOpen: false, closeDetails: () => {}, closeScanner: () => {} });
+  const detailsOpen = detailTarget !== null;
+  usePlantManagerDetailOverlay(detailsOpen);
   const lastDetectionRef = useRef({ value: '', at: 0 });
 
   useEffect(() => { selectedOrderRef.current = selectedOrder; }, [selectedOrder]);
@@ -325,8 +339,10 @@ const StockOut: React.FC = () => {
   }, [search, status]);
 
   const loadDetails = useCallback(async (orderId: string) => {
+    const request = ++detailsRequestRef.current;
     const response = await apiClient.get(`/stock-out/orders/${orderId}`);
     const order = mapOrder(response.data);
+    if (request !== detailsRequestRef.current) return order;
     selectedOrderRef.current = order;
     setSelectedOrder(order);
     return order;
@@ -335,6 +351,7 @@ const StockOut: React.FC = () => {
   useEffect(() => { void loadOrders(); }, [loadOrders]);
 
   const stopCamera = useCallback(() => {
+    cameraSessionRef.current += 1;
     scannerControlsRef.current?.stop();
     scannerControlsRef.current = null;
     const stream = videoRef.current?.srcObject;
@@ -345,17 +362,68 @@ const StockOut: React.FC = () => {
 
   useEffect(() => () => {
     stopCamera();
+    detailsRequestRef.current += 1;
     if (cooldownTimerRef.current) window.clearTimeout(cooldownTimerRef.current);
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
   }, [stopCamera]);
 
   const closeScanner = useCallback(() => {
+    if (scanBusyRef.current) return;
     stopCamera();
     setScannerOpen(false);
     setScannerError('');
     setScanSuccess('');
   }, [stopCamera]);
+
+  const closeDetails = useCallback(() => {
+    if (scanBusyRef.current) return;
+    if (manualBarcode.trim() && !window.confirm('Discard the unsubmitted barcode entry and close Stock Out Details?')) return;
+    closeScanner();
+    detailsRequestRef.current += 1;
+    setDetailTarget(null);
+    setSelectedOrder(null);
+    selectedOrderRef.current = null;
+    setDetailsError('');
+    setManualBarcode('');
+    setManualQuantity('1');
+    setRecentScan(null);
+  }, [closeScanner, manualBarcode]);
+
+  useEffect(() => { modalActionsRef.current = { scannerOpen, closeDetails, closeScanner }; }, [scannerOpen, closeDetails, closeScanner]);
+  useEffect(() => {
+    if (!detailsOpen) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    detailsCloseRef.current?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (modalActionsRef.current.scannerOpen) modalActionsRef.current.closeScanner();
+        else modalActionsRef.current.closeDetails();
+      }
+      if (event.key !== 'Tab') return;
+      const scope = modalActionsRef.current.scannerOpen ? scannerDialogRef.current : detailsDialogRef.current;
+      const controls = scope?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]');
+      if (!controls?.length) { event.preventDefault(); scope?.focus(); return; }
+      const first = controls[0]; const last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !scope?.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !scope?.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener('keydown', keydown);
+      if (detailsTriggerRef.current?.isConnected) detailsTriggerRef.current.focus();
+      else document.getElementById('stock-out-page-heading')?.focus();
+    };
+  }, [detailsOpen]);
+  useEffect(() => {
+    if (!scannerOpen) return;
+    const trigger = document.activeElement as HTMLElement | null;
+    scannerDialogRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    return () => { if (trigger?.isConnected) trigger.focus(); };
+  }, [scannerOpen]);
 
   const processScan = useCallback(async (barcode: string, quantity = 1, resetManualEntry = false) => {
     const order = selectedOrderRef.current;
@@ -400,6 +468,10 @@ const StockOut: React.FC = () => {
         setScannerOpen(false);
         selectedOrderRef.current = null;
         setSelectedOrder(null);
+        setDetailTarget(null);
+        detailsRequestRef.current += 1;
+        setManualBarcode('');
+        setManualQuantity('1');
         setCompletionNotice(`${order.orderNo} is fully released and moved to Shipment for packing.`);
         await loadOrders();
         return;
@@ -418,13 +490,16 @@ const StockOut: React.FC = () => {
   }, [beginScanCooldown, loadDetails, loadOrders, showScanFeedback, stopCamera]);
 
   const startCamera = async () => {
+    if (!selectedOrderRef.current || scanBusyRef.current) return;
     stopCamera();
+    let session = cameraSessionRef.current;
     setScannerOpen(true);
     setScannerError('');
     setScanSuccess('');
     setRecentScan(null);
     try {
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      if (session !== cameraSessionRef.current) return;
       if (!videoRef.current) {
         throw new Error('The scanner preview could not be opened. Please use manual barcode entry.');
       }
@@ -433,7 +508,7 @@ const StockOut: React.FC = () => {
       const handleResult = (result: { getText: () => string } | undefined) => {
         const value = result ? String(result.getText()).trim() : '';
         const now = Date.now();
-        if (!value || scanBusyRef.current || now < cooldownUntilRef.current) return;
+        if (session !== cameraSessionRef.current || !value || scanBusyRef.current || now < cooldownUntilRef.current) return;
         if (lastDetectionRef.current.value === value && now - lastDetectionRef.current.at < SCAN_COOLDOWN_MS) return;
         if (import.meta.env.DEV) console.debug('[scanner] decoded CODE_128:', value);
         void processScan(value, 1);
@@ -450,10 +525,13 @@ const StockOut: React.FC = () => {
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         });
       } catch (preferredCameraError: unknown) {
+        if (session !== cameraSessionRef.current) return;
         if (!['NotFoundError', 'OverconstrainedError'].includes(getCameraErrorName(preferredCameraError))) throw preferredCameraError;
         stopCamera();
+        session = cameraSessionRef.current;
         controls = await startDecoder({ audio: false, video: true });
       }
+      if (session !== cameraSessionRef.current) { controls.stop(); return; }
       scannerControlsRef.current = controls;
       setCameraActive(true);
 
@@ -465,26 +543,27 @@ const StockOut: React.FC = () => {
         track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] }).catch(() => undefined);
       }
     } catch (error: unknown) {
+      if (session !== cameraSessionRef.current) return;
       stopCamera();
       setScannerError(getCameraErrorMessage(error));
     }
   };
 
-  const openDetails = async (order: StockOutOrder) => {
-    setPageError('');
-    try {
-      await loadDetails(order.id);
-    } catch (error) {
-      setPageError(getError(error));
-    }
+  const openDetails = async (order: StockOutOrder, trigger?: HTMLElement) => {
+    if (scanBusyRef.current) return;
+    if (trigger) detailsTriggerRef.current = trigger;
+    setDetailTarget(order);
+    setSelectedOrder(null);
+    selectedOrderRef.current = null;
+    setDetailsLoading(true);
+    setDetailsError('');
+    const request = detailsRequestRef.current + 1;
+    try { await loadDetails(order.id); }
+    catch (error) { if (request === detailsRequestRef.current) setDetailsError(getError(error)); }
+    finally { if (request === detailsRequestRef.current) setDetailsLoading(false); }
   };
 
-  const progress = useMemo(() => {
-    const items = selectedOrder?.items || [];
-    const ordered = items.reduce((sum, item) => sum + item.orderedQty, 0);
-    const released = items.reduce((sum, item) => sum + item.releasedQty, 0);
-    return { ordered, released, percentage: ordered ? Math.min(100, released / ordered * 100) : 0 };
-  }, [selectedOrder]);
+  const progress = useMemo(() => stockOutProgressByUnit(selectedOrder?.items ?? []), [selectedOrder]);
 
   const cards = [
     { label: 'Orders Ready', value: summary.ordersReady, icon: Package, color: 'text-amber-400' },
@@ -497,17 +576,15 @@ const StockOut: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full space-y-6 overflow-x-hidden bg-[#070a12] p-4 text-slate-100 sm:p-6 lg:p-8">
+      <div inert={detailsOpen} aria-hidden={detailsOpen || undefined} className="space-y-6">
       <header className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Stock Out & Inventory Release</h1>
+          <h1 id="stock-out-page-heading" tabIndex={-1} className="text-2xl font-bold tracking-tight text-white">Stock Out & Inventory Release</h1>
           <p className="mt-1 text-sm text-slate-400">Validate prepared orders by barcode and release inventory from your assigned warehouse.</p>
         </div>
         <div className="flex gap-3">
           <button onClick={() => void loadOrders()} disabled={loading} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
-          <button onClick={() => void startCamera()} disabled={!selectedOrder || selectedOrder.status === 'For Packing'} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
-            <ScanLine className="h-4 w-4" /> Scan Barcode
           </button>
         </div>
       </header>
@@ -549,7 +626,7 @@ const StockOut: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-              {orders.map(order => <tr key={order.id} onClick={() => void openDetails(order)} className={`cursor-pointer transition-colors hover:bg-slate-800/30 ${selectedOrder?.id === order.id ? 'bg-cyan-500/5' : ''}`}>
+              {orders.map(order => <tr key={order.id} onClick={event => void openDetails(order, event.currentTarget.querySelector<HTMLButtonElement>('button') ?? undefined)} className={`cursor-pointer transition-colors hover:bg-slate-800/30 ${selectedOrder?.id === order.id ? 'bg-cyan-500/5' : ''}`}>
                 <td className="px-4 py-3 font-mono font-medium text-white">{order.orderNo}</td>
                 <td className="px-4 py-3"><p className="text-slate-200">{order.customer}</p><p className="max-w-[150px] truncate text-xs text-slate-400">{order.destination}</p></td>
                 <td className="max-w-56 px-4 py-3"><p className="truncate text-slate-200" title={order.products[0]}>{order.products[0] || 'No products'}</p>{order.products.length > 1 && <p className="text-xs text-slate-500">+ {order.products.length - 1} more</p>}</td>
@@ -557,7 +634,7 @@ const StockOut: React.FC = () => {
                 <td className="px-4 py-3 text-slate-300">{order.assignedDate}</td>
                 <td className="px-4 py-3 text-slate-300">{order.requiredDelivery}</td>
                 <td className="w-28 px-1 py-3 sm:w-auto sm:px-4"><StatusBadge status={order.status} compact /></td>
-                <td className="w-16 px-1 py-3 text-center sm:w-auto sm:px-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-[13px] w-[13px] sm:h-4 sm:w-4" /></button></td>
+                <td className="w-16 px-1 py-3 text-center sm:w-auto sm:px-3"><button aria-label={`View ${order.orderNo}`} onClick={event => { event.stopPropagation(); void openDetails(order, event.currentTarget); }} className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><Eye className="mx-auto h-[13px] w-[13px] sm:h-4 sm:w-4" /></button></td>
               </tr>)}
               {!loading && orders.length === 0 && <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400">No eligible Stock Out orders found.</td></tr>}
             </tbody>
@@ -565,13 +642,22 @@ const StockOut: React.FC = () => {
         </div>
       </section>
 
-      {selectedOrder && <section className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="pm-stock-out-detail-card min-w-0 space-y-3 overflow-hidden rounded-xl border border-slate-800/80 bg-[#0b101d] p-3 sm:space-y-5 sm:p-5 xl:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 sm:gap-3 sm:pb-4">
-            <div><div className="flex items-center gap-2 sm:gap-3"><h2 className="text-[15px] font-semibold text-white sm:text-lg">{selectedOrder.orderNo}</h2><StatusBadge status={selectedOrder.status} /></div><p className="mt-1 text-[12px] text-slate-400 sm:text-sm">{selectedOrder.customer} · {selectedOrder.warehouse}</p></div>
-            <button onClick={() => void startCamera()} disabled={actionBusy} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:text-slate-950 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"><ScanLine className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Scan Barcode</button>
-          </div>
-          <div><div className="flex justify-between text-sm"><span className="text-slate-400">Release progress</span><span className="font-medium text-white">{progress.released} / {progress.ordered} units</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress.percentage}%` }} /></div></div>
+      </div>
+      {detailTarget && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overscroll-contain bg-slate-950/75 p-2 sm:p-5" onClick={event => { if (event.target === event.currentTarget) closeDetails(); }}>
+        <div ref={detailsDialogRef} role="dialog" aria-modal={!scannerOpen} aria-hidden={scannerOpen || undefined} inert={scannerOpen} aria-labelledby="stock-out-details-title" tabIndex={-1} className="flex max-h-[94dvh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-[#0b101d] dark:text-slate-100">
+          <header className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-[#0b101d] sm:px-5">
+            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 id="stock-out-details-title" className="break-words text-lg font-semibold">Stock Out Details — {selectedOrder?.orderNo ?? detailTarget.orderNo}</h2>{selectedOrder && <StatusBadge status={selectedOrder.status} compact />}</div><p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Current release information for the selected order.</p></div>
+            <button ref={detailsCloseRef} type="button" onClick={closeDetails} disabled={actionBusy} aria-label="Close Stock Out Details" title={actionBusy ? 'Wait for the current scan to finish.' : 'Close Stock Out Details'} className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:cursor-wait disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button>
+          </header>
+          <div aria-busy={detailsLoading} className="min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-5">
+            {detailsLoading && <p role="status" className="py-10 text-center text-sm text-slate-600 dark:text-slate-400">Loading current Stock Out details…</p>}
+            {detailsError && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-50 p-4 text-sm text-rose-800 dark:bg-rose-500/10 dark:text-rose-200"><p className="break-words">{detailsError}</p><button type="button" onClick={() => void openDetails(detailTarget)} className="mt-2 min-h-11 cursor-pointer rounded-lg border border-current px-3 font-semibold focus-visible:outline-2 focus-visible:outline-cyan-500">Retry loading details</button></div>}
+            {!detailsLoading && !detailsError && selectedOrder && <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-3">
+              <section className="pm-stock-out-detail-card min-w-0 space-y-4 overflow-hidden rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-[#0b101d] sm:p-4 xl:col-span-2">
+                <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{Object.entries({ Customer: selectedOrder.customer, 'Assigned warehouse': selectedOrder.warehouse, 'Order reference': selectedOrder.orderNo, 'Target delivery': selectedOrder.requiredDelivery }).map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-slate-600 dark:text-slate-400">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div>)}</dl>
+                <button type="button" onClick={() => void startCamera()} disabled={actionBusy || selectedOrder.status === 'For Packing'} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-[#092635] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163b4a] focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:cursor-wait disabled:opacity-50 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"><ScanLine className="h-4 w-4" />Scan Barcode</button>
+                {manualBarcode.trim() && !scannerOpen && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">An unsubmitted barcode entry is retained. Reopen the scanner to review it.</p>}
+                <div className="space-y-3"><h3 className="text-sm font-semibold">Release Progress</h3>{progress.map(group => <div key={group.unit}><div className="flex flex-wrap justify-between gap-2 text-sm"><span>{group.unit}</span><span className="font-medium tabular-nums">{group.released} / {group.ordered} {group.unit}</span></div><div role="progressbar" aria-label={`${group.unit} release progress`} aria-valuenow={group.released} aria-valuemin={0} aria-valuemax={group.ordered} className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${group.percentage}%` }} /></div></div>)}</div>
           <div className="pm-table-scroll max-w-full overflow-x-auto overscroll-x-contain">
             <table className="pm-stock-out-table pm-responsive-table pm-cols-10 pm-sticky-2 w-full min-w-[1050px] text-xs">
               <thead className="border-b border-slate-800 bg-[#070a12] text-slate-400"><tr>{['Barcode', 'Product', 'Ordered Qty', 'Scanned / Required', 'Remaining Qty', 'Unit', 'Batch / Lot', 'Expiry', 'Location', 'Status'].map(label => <th key={label} className="px-3 py-2 text-left font-medium">{label}</th>)}</tr></thead>
@@ -580,8 +666,7 @@ const StockOut: React.FC = () => {
               </tr>)}</tbody>
             </table>
           </div>
-        </div>
-
+              </section>
         <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800/80 dark:bg-[#0b101d]">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white"><Clock className="h-4 w-4 text-cyan-400" /> Stock Out History</h2>
           <div className="mt-4 max-h-[460px] space-y-4 overflow-y-auto pr-1">
@@ -593,11 +678,14 @@ const StockOut: React.FC = () => {
             {!selectedOrder.history?.length && <p className="text-sm text-slate-600 dark:text-slate-400">No Stock Out events recorded yet.</p>}
           </div>
         </section>
-      </section>}
+            </div>}
+          </div>
+        </div>
+      </div>}
 
-      {scannerOpen && selectedOrder && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
-        <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl">
-          <div className="flex items-start justify-between gap-4"><div><h2 id="scanner-title" className="text-lg font-semibold text-white">Scan Inventory Barcode</h2><p className="mt-1 text-sm text-slate-400">{selectedOrder.orderNo} · releases are validated against this order and warehouse.</p></div><div className="flex items-center gap-1"><button type="button" onClick={() => setSoundEnabled(value => !value)} aria-label={soundEnabled ? 'Mute scanner sounds' : 'Enable scanner sounds'} title={soundEnabled ? 'Mute scanner sounds' : 'Enable scanner sounds'} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">{soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button><button onClick={closeScanner} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="h-5 w-5" /> Close Scanner</button></div></div>
+      {scannerOpen && selectedOrder && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
+        <div ref={scannerDialogRef} tabIndex={-1} className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-[#0b101d] p-5 shadow-2xl">
+          <div className="flex items-start justify-between gap-4"><div><h2 id="scanner-title" className="text-lg font-semibold text-white">Scan Inventory Barcode</h2><p className="mt-1 text-sm text-slate-400">{selectedOrder.orderNo} · releases are validated against this order and warehouse.</p></div><div className="flex items-center gap-1"><button type="button" onClick={() => setSoundEnabled(value => !value)} aria-label={soundEnabled ? 'Mute scanner sounds' : 'Enable scanner sounds'} title={soundEnabled ? 'Mute scanner sounds' : 'Enable scanner sounds'} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">{soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button><button disabled={actionBusy} onClick={closeScanner} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm text-slate-300 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><X className="h-5 w-5" /> Close Scanner</button></div></div>
 
           <div className={`relative mt-5 aspect-video overflow-hidden rounded-xl border bg-black transition-colors duration-200 ${scannerFlash === 'success' ? 'border-emerald-400 ring-4 ring-emerald-500/30' : scannerFlash === 'error' ? 'border-rose-400 ring-4 ring-rose-500/30' : 'border-slate-700'}`}>
             <video ref={videoRef} muted playsInline autoPlay aria-label="Barcode scanner camera preview" className="h-full w-full object-cover" />
@@ -629,7 +717,7 @@ const StockOut: React.FC = () => {
           </form>
         </div>
       </div>}
-      {scanToast && <div role={scanToast.type === 'error' ? 'alert' : 'status'} aria-live="polite" className={`fixed bottom-4 right-4 z-[60] max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur ${scanToast.type === 'success' ? 'border-emerald-400/30 bg-emerald-950/90 text-emerald-100' : 'border-rose-400/30 bg-rose-950/90 text-rose-100'}`}>{scanToast.message}</div>}
+      {scanToast && <div role={scanToast.type === 'error' ? 'alert' : 'status'} aria-live="polite" className={`fixed bottom-4 right-4 z-[70] max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur ${scanToast.type === 'success' ? 'border-emerald-400/30 bg-emerald-950/90 text-emerald-100' : 'border-rose-400/30 bg-rose-950/90 text-rose-100'}`}>{scanToast.message}</div>}
     </div>
   );
 };

@@ -154,10 +154,32 @@ class AdminOrderManagementTest extends TestCase
             ->assertJsonFragment(['name' => 'Industrial Valve DN50', 'category' => 'INDUSTRIAL CHEMICALS', 'unit' => 'pcs']);
     }
 
+    public function test_new_order_units_follow_catalog_and_reject_mismatches_and_legacy_units(): void
+    {
+        $this->actingAs($this->userWithRole('ADMIN'));
+        foreach (['PCS', 'DRUM', 'SACK'] as $unit) {
+            $product = Product::create(['name'=>'Canonical '.$unit, 'unit'=>$unit]);
+            $this->postJson('/api/admin/orders', $this->payload(['items'=>[['product_id'=>$product->id, 'unit'=>$unit]]]))
+                ->assertCreated()->assertJsonPath('items.0.unit', $unit);
+            foreach (array_diff(['PCS', 'DRUM', 'SACK', 'kg', 'bulk'], [$unit]) as $forged) {
+                $this->postJson('/api/admin/orders', $this->payload(['items'=>[['product_id'=>$product->id, 'unit'=>$forged]]]))
+                    ->assertUnprocessable()->assertJsonValidationErrors('items.0.unit');
+            }
+            $this->assertSame($unit, $product->fresh()->unit);
+        }
+        foreach (['kg', 'bulk', 'box'] as $unit) {
+            $product = Product::create(['name'=>'Legacy '.$unit, 'unit'=>$unit]);
+            $this->postJson('/api/admin/orders', $this->payload(['items'=>[['product_id'=>$product->id, 'unit'=>$unit]]]))
+                ->assertUnprocessable()->assertJsonValidationErrors('items.0.unit');
+            $this->assertSame($unit, $product->fresh()->unit);
+        }
+        $this->assertDatabaseCount('orders', 3);
+    }
+
     public function test_multiple_products_are_derived_and_returned_in_the_order_list(): void
     {
         $admin = $this->userWithRole('ADMIN');
-        $second = Product::create(['name' => 'Welding Rod', 'unit' => 'box', 'cost_price' => 50]);
+        $second = Product::create(['name' => 'Welding Rod', 'unit' => 'SACK', 'cost_price' => 50]);
         $payload = $this->payload(['items' => [
             ['product_id' => $this->product->id, 'quantity' => 2, 'unit_price' => 125.50],
             ['product_id' => $second->id, 'quantity' => 3, 'unit_price' => 60],

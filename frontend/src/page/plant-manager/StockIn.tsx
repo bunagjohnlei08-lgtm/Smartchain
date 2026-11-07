@@ -1,3 +1,4 @@
+import CustomerReturnWorkspace from '../../components/returns/CustomerReturnWorkspace';
 import CapacitySummary from '../../components/warehouse/CapacitySummary';
 import { stockAdditionIssue } from '../../lib/warehouseCapacity';
 import type { CapacitySnapshot } from '../../lib/warehouseCapacity';
@@ -1029,4 +1030,6 @@ const StockIn: React.FC = () => {
   );
 };
 
-export default StockIn;
+export default function StockInWithCustomerReturns() {
+  return <CustomerReturnWorkspace mode="stock-in" normalLabel="Receiving Stock In"><StockIn /></CustomerReturnWorkspace>;
+}

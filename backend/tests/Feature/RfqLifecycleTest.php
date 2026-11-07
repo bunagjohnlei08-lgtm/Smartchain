@@ -146,6 +146,73 @@ class RfqLifecycleTest extends TestCase
         $this->assertDatabaseCount('rfqs', 0);
     }
 
+    public function test_package_unit_casing_is_canonical_at_rfq_boundaries_without_rewriting_catalog(): void
+    {
+        [$admin, $requester, $warehouse] = $this->actors();
+        $units = ['PCS', 'pcs', 'SACK', 'sack', 'DRUM', 'drum'];
+        $requirements = collect($units)->map(fn ($unit, $index) => $this->requirement($requester, $warehouse, 'Unit Product '.$index, $unit));
+        $payload = $this->payload($requirements);
+        $payload['lines'][0]['unit'] = ' pcs ';
+        $this->actingAs($admin);
+        $eligible = collect($this->getJson('/api/admin/procurement/rfq-requirements')->assertOk()->json('data'))->keyBy('id');
+        foreach ($requirements as $requirement) {
+            $this->assertSame(strtoupper($requirement->product->unit), $eligible[$requirement->id]['unit']);
+        }
+        $id = $this->postJson('/api/admin/procurement/rfqs', $payload)->assertCreated()
+            ->assertJsonPath('data.status', Rfq::DRAFT)->json('data.id');
+        $this->assertEqualsCanonicalizing(['PCS', 'PCS', 'SACK', 'SACK', 'DRUM', 'DRUM'], Rfq::findOrFail($id)->lines->pluck('unit')->all());
+        foreach ($requirements as $index => $requirement) {
+            $this->assertSame($units[$index], $requirement->product->fresh()->unit);
+            $this->assertSame(5, (int) $requirement->fresh()->requested_qty);
+        }
+        $this->postJson('/api/admin/procurement/rfqs', $payload)->assertUnprocessable();
+        $this->assertDatabaseCount('rfqs', 1);
+        $payload['version'] = 1;
+        $this->putJson("/api/admin/procurement/rfqs/{$id}", $payload)->assertOk()->assertJsonPath('data.status', Rfq::DRAFT);
+        $this->assertDatabaseCount('rfqs', 1);
+    }
+
+    public function test_unit_mismatches_and_unrecognized_units_remain_rejected_with_no_draft(): void
+    {
+        [$admin, $requester, $warehouse] = $this->actors();
+        $requirement = $this->requirement($requester, $warehouse, 'Authoritative PCS Product', 'PCS');
+        foreach (['SACK', 'DRUM', 'KG', 'L', 'BULK'] as $wrongUnit) {
+            $payload = $this->payload(collect([$requirement]));
+            $payload['lines'][0]['unit'] = $wrongUnit;
+            $response = $this->actingAs($admin)->postJson('/api/admin/procurement/rfqs', $payload)
+                ->assertUnprocessable()->assertJsonValidationErrors('lines.0.unit');
+            if ($wrongUnit !== 'BULK') {
+                $this->assertStringContainsString('Expected PCS', $response->json('errors')['lines.0.unit'][0]);
+                $this->assertStringContainsString($requirement->product->name, $response->json('errors')['lines.0.unit'][0]);
+            }
+        }
+        $this->assertDatabaseCount('rfqs', 0);
+        $this->assertSame('PCS', $requirement->product->fresh()->unit);
+    }
+
+    public function test_stale_catalog_and_legacy_units_cannot_be_converted_by_rfq_submission(): void
+    {
+        [$admin, $requester, $warehouse] = $this->actors();
+        $this->actingAs($admin);
+        foreach (['KG' => 'SACK', 'L' => 'DRUM'] as $catalogUnit => $submittedUnit) {
+            $requirement = $this->requirement($requester, $warehouse, 'Legacy '.$catalogUnit, $catalogUnit);
+            $payload = $this->payload(collect([$requirement]));
+            $payload['lines'][0]['unit'] = $submittedUnit;
+            $response = $this->postJson('/api/admin/procurement/rfqs', $payload)->assertUnprocessable()->assertJsonValidationErrors('lines.0.unit');
+            $this->assertStringContainsString('Expected '.$catalogUnit, $response->json('errors')['lines.0.unit'][0]);
+            $this->assertSame($catalogUnit, $requirement->product->fresh()->unit);
+        }
+        $requirement = $this->requirement($requester, $warehouse, 'Changed Catalog Product', 'PCS');
+        $payload = $this->payload(collect([$requirement]));
+        $requirement->product->update(['unit' => 'DRUM']);
+        $response = $this->postJson('/api/admin/procurement/rfqs', $payload)->assertUnprocessable()->assertJsonValidationErrors('lines.0.unit');
+        $this->assertStringContainsString('Expected DRUM', $response->json('errors')['lines.0.unit'][0]);
+        $payload['lines'][0]['unit'] = 'DRUM';
+        $payload['lines'][0]['required_quantity'] = 99;
+        $this->postJson('/api/admin/procurement/rfqs', $payload)->assertUnprocessable()->assertJsonValidationErrors('lines.0.required_quantity');
+        $this->assertDatabaseCount('rfqs', 0);
+    }
+
     private function actors(): array
     {
         $adminRole = Role::firstOrCreate(['slug' => 'ADMIN'], ['name' => 'Admin']);

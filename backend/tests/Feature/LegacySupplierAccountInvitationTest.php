@@ -115,7 +115,7 @@ class LegacySupplierAccountInvitationTest extends TestCase
         $conflict = $this->supplier(['supplier_code' => 'SUP-CON', 'email' => 'used@example.test']);
         User::factory()->create(['email' => 'used@example.test', 'status' => 'ACTIVE']);
         $this->actingAs($this->admin)->postJson("/api/suppliers/{$conflict->id}/account-invitation")
-            ->assertStatus(409)->assertJsonPath('message', 'The supplier email already belongs to another user account. Resolve the account before inviting.');
+            ->assertStatus(409)->assertJsonPath('message', 'The registered supplier email already belongs to a non-Supplier user account. Verify the supplier contact email. If it was entered incorrectly, correct it through Edit Supplier using a verified supplier-owned address. Keep the existing user and staff role unchanged.');
 
         foreach ([
             ['supplier_code' => 'SUP-OH', 'status' => Supplier::STATUS_ON_HOLD, 'email' => 'hold@example.test'],
@@ -238,6 +238,105 @@ class LegacySupplierAccountInvitationTest extends TestCase
         $this->assertDatabaseCount('users', 2);
         $this->assertDatabaseCount('suppliers', 1);
         $this->assertDatabaseCount('supplier_applications', 0);
+    }
+
+    public function test_missing_link_conflict_is_actionable_and_never_takes_over_the_matching_account(): void
+    {
+        $supplier = $this->supplier();
+        $user = User::factory()->create(['email'=>$supplier->email, 'role_id'=>$this->supplierRole->id, 'status'=>'ACTIVE', 'supplier_id'=>null]);
+        $password = $user->password;
+        $this->actingAs($this->admin)->getJson("/api/suppliers/{$supplier->id}")->assertOk()
+            ->assertJsonPath('data.account.status', 'CONFLICT')
+            ->assertJsonPath('data.account.can_invite', false)
+            ->assertJsonPath('data.account.conflict.code', 'SUPPLIER_LINK_MISSING')
+            ->assertJsonPath('data.account.conflict.account.user_id', $user->id)
+            ->assertJsonPath('data.account.conflict.account.supplier_id', null)
+            ->assertJsonMissingPath('data.account.conflict.account.password')
+            ->assertJsonMissingPath('data.account.conflict.account.token');
+        $this->getJson('/api/suppliers')->assertOk()->assertJsonPath('data.0.account.conflict.code', 'SUPPLIER_LINK_MISSING');
+        $response = $this->postJson("/api/suppliers/{$supplier->id}/account-invitation")->assertStatus(409);
+        $this->assertStringContainsString('independent', $response->json('message'));
+        $this->assertNull($user->fresh()->supplier_id);
+        $this->assertSame($password, $user->fresh()->password);
+        $this->assertSame($this->supplierRole->id, $user->fresh()->role_id);
+        $this->assertDatabaseCount('users', 2);
+        $this->assertDatabaseCount('user_invitations', 0);
+        $this->assertDatabaseCount('supplier_applications', 0);
+    }
+
+    public function test_staff_and_other_supplier_email_conflicts_have_distinct_explanations_without_reassignment(): void
+    {
+        $supplier = $this->supplier();
+        $user = User::factory()->create(['email'=>$supplier->email, 'role_id'=>$this->admin->role_id, 'status'=>'ACTIVE']);
+        $this->actingAs($this->admin)->getJson("/api/suppliers/{$supplier->id}")->assertOk()
+            ->assertJsonPath('data.account.conflict.code', 'EMAIL_ROLE_CONFLICT')
+            ->assertJsonPath('data.account.conflict.account.role', 'ADMIN');
+        $this->postJson("/api/suppliers/{$supplier->id}/account-invitation")->assertStatus(409);
+        $other = $this->supplier(['supplier_code'=>'SUP-OTHER', 'name'=>'Other supplier', 'email'=>'other@example.test']);
+        $user->update(['role_id'=>$this->supplierRole->id, 'supplier_id'=>$other->id]);
+        $this->getJson("/api/suppliers/{$supplier->id}")->assertOk()
+            ->assertJsonPath('data.account.conflict.code', 'EMAIL_LINKED_TO_OTHER_SUPPLIER')
+            ->assertJsonPath('data.account.conflict.account.supplier_id', $other->id);
+        $this->postJson("/api/suppliers/{$supplier->id}/account-invitation")->assertStatus(409);
+        $this->assertSame($other->id, $user->fresh()->supplier_id);
+        $this->actingAs($user)->getJson("/api/suppliers/{$supplier->id}")->assertForbidden();
+        $this->getJson('/api/suppliers')->assertForbidden();
+        $this->assertDatabaseCount('user_invitations', 0);
+    }
+
+    public function test_active_linked_user_is_not_misclassified_by_business_status_or_contact_email(): void
+    {
+        $supplier = $this->supplier(['status'=>Supplier::STATUS_ON_HOLD]);
+        $user = User::factory()->create(['email'=>'existing-login@example.test', 'role_id'=>$this->supplierRole->id, 'status'=>'ACTIVE', 'supplier_id'=>$supplier->id]);
+        $this->actingAs($this->admin)->getJson("/api/suppliers/{$supplier->id}")->assertOk()
+            ->assertJsonPath('data.account.status', 'ACCOUNT_ACTIVE')
+            ->assertJsonPath('data.account.can_invite', false)
+            ->assertJsonPath('data.account.conflict', null);
+        $this->getJson('/api/suppliers')->assertOk()->assertJsonPath('data.0.account.status', 'ACCOUNT_ACTIVE');
+        $this->postJson("/api/suppliers/{$supplier->id}/account-invitation")->assertUnprocessable();
+        $this->assertFalse(app(\App\Services\SupplierAccreditationEligibility::class)->eligible($supplier));
+        $this->assertSame($supplier->id, $user->fresh()->supplier_id);
+        $this->assertDatabaseCount('user_invitations', 0);
+    }
+
+    public function test_case_insensitive_duplicate_accounts_require_review_and_are_never_merged(): void
+    {
+        $supplier = $this->supplier();
+        foreach ([$supplier->email, strtoupper($supplier->email)] as $email) {
+            User::factory()->create(['email'=>$email, 'role_id'=>$this->supplierRole->id, 'status'=>'PENDING', 'supplier_id'=>null]);
+        }
+        $this->actingAs($this->admin)->getJson("/api/suppliers/{$supplier->id}")->assertOk()
+            ->assertJsonPath('data.account.conflict.code', 'AMBIGUOUS_EMAIL');
+        $this->getJson('/api/suppliers')->assertOk()->assertJsonPath('data.0.account.conflict.code', 'AMBIGUOUS_EMAIL');
+        $this->postJson("/api/suppliers/{$supplier->id}/account-invitation")->assertStatus(409);
+        $this->assertDatabaseCount('users', 3);
+        $this->assertSame(0, User::whereNotNull('supplier_id')->count());
+        $this->assertDatabaseCount('user_invitations', 0);
+    }
+
+    public function test_verified_contact_correction_uses_existing_edit_and_invitation_without_reassigning_staff(): void
+    {
+        $supplier = $this->supplier();
+        $staff = User::factory()->create(['email'=>$supplier->email, 'role_id'=>$this->admin->role_id, 'status'=>'ACTIVE']);
+        $hash = $staff->password;
+        $this->actingAs($this->admin)->getJson("/api/suppliers/{$supplier->id}")->assertOk()
+            ->assertJsonPath('data.account.conflict.code', 'EMAIL_ROLE_CONFLICT');
+        // An explicit Admin edit models a verified contact correction, not an account transfer.
+        $this->putJson("/api/suppliers/{$supplier->id}", ['name'=>$supplier->name, 'status'=>'ACTIVE', 'email'=>'verified-supplier@example.test'])
+            ->assertOk()->assertJsonPath('data.account.status', 'NO_ACCOUNT');
+        $this->postJson("/api/suppliers/{$supplier->id}/account-invitation")->assertOk()
+            ->assertJsonPath('account.status', 'INVITATION_PENDING');
+        $pending = User::where('supplier_id', $supplier->id)->sole();
+        $this->assertSame('verified-supplier@example.test', $pending->email);
+        $this->assertSame('PENDING', $pending->status);
+        $this->assertSame($this->supplierRole->id, $pending->role_id);
+        $this->assertNull($staff->fresh()->supplier_id);
+        $this->assertSame($this->admin->role_id, $staff->fresh()->role_id);
+        $this->assertSame($hash, $staff->fresh()->password);
+        $this->assertSame('legacy@example.test', $staff->fresh()->email);
+        $this->assertDatabaseCount('suppliers', 1);
+        $this->assertDatabaseCount('supplier_applications', 0);
+        $this->assertFalse(app(\App\Services\SupplierAccreditationEligibility::class)->eligible($supplier->fresh()));
     }
 
     private function supplier(array $attributes = []): Supplier

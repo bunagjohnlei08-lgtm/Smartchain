@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
+use App\Support\RfqLineUnits;
 
 use App\Http\Controllers\Controller;
 use App\Models\ReplenishmentRequest;
@@ -46,12 +47,13 @@ class AdminRfqController extends Controller
     public function store(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(),403);
+        RfqLineUnits::normalizeRequest($request);
         $v=$request->validate($this->rules());
         $this->validateCriteriaWeights($v);
         $rfq=DB::transaction(function()use($request,$v){
             $requests=ReplenishmentRequest::query()->whereIn('id',collect($v['lines'])->pluck('replenishment_request_id'))->lockForUpdate()->get()->keyBy('id');
             abort_unless($requests->count()===count($v['lines']),422,'Every RFQ line must reference an existing requirement.');
-            foreach($v['lines'] as $line){ $requirement=$requests[$line['replenishment_request_id']]; abort_unless(in_array($requirement->status,ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES,true)&&$requirement->sourcing_method===ReplenishmentRequest::SOURCING_COMPETITIVE&&!$requirement->purchaseOrder()->exists()&&!$requirement->rfqLine()->exists(),422,"Requirement {$requirement->request_no} is not available for competitive bidding."); abort_unless($requirement->product_id===$line['product_id']&&(int)$requirement->requested_qty===(int)$line['required_quantity']&&$requirement->product->unit===$line['unit'],422,"RFQ line values must match {$requirement->request_no}."); }
+            foreach($v['lines'] as $index=>$line){ $requirement=$requests[$line['replenishment_request_id']]; abort_unless(in_array($requirement->status,ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES,true)&&$requirement->sourcing_method===ReplenishmentRequest::SOURCING_COMPETITIVE&&!$requirement->purchaseOrder()->exists()&&!$requirement->rfqLine()->exists(),422,"Requirement {$requirement->request_no} is not available for competitive bidding."); RfqLineUnits::assertMatches($requirement,$line,$index); }
             $rfq=Rfq::create([...collect($v)->except('lines')->all(),'rfq_number'=>$v['rfq_number']??$this->number(),'status'=>Rfq::DRAFT,'created_by'=>$request->user()->id]);
             foreach($v['lines'] as $line){$product=$requests[$line['replenishment_request_id']]->product;$rfqLine=$rfq->lines()->create([...$line,'product_name'=>$product->name,'category'=>$product->category]);RfqCatalogImageSnapshot::copy($product,$rfqLine);}
             return $rfq->load(['lines','creator:id,name']);

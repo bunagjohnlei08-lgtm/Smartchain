@@ -1,3 +1,5 @@
+import FinancialCaseReadiness from '../../components/financial/FinancialCaseReadiness';
+import CustomerReturnWorkspace from '../../components/returns/CustomerReturnWorkspace';
 import { ClassificationBadge } from '../../components/catalog/ProductFields';
 // src/page/plant-manager/ReceivingManagement.tsx
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -1440,6 +1442,8 @@ const ReceivingManagement: React.FC = () => {
                 </ul>
               </section>
 
+              {selectedReceiving.discrepancy && <FinancialCaseReadiness type="discrepancy" caseId={selectedReceiving.discrepancy.id} revision={selectedReceiving.discrepancy.status} />}
+              {selectedReceiving.excess_review && <FinancialCaseReadiness type="excess" caseId={selectedReceiving.excess_review.id} revision={selectedReceiving.excess_review.status} />}
               {selectedReceiving.excess_review && (
                 <section className="border-t border-[#1f2937] p-4 sm:p-5" aria-labelledby="excess-resolution-title">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1668,4 +1672,6 @@ const ReceivingManagement: React.FC = () => {
   );
 };
 
-export default ReceivingManagement;
+export default function ReceivingManagementWithCustomerReturns() {
+  return <CustomerReturnWorkspace mode="receiving" normalLabel="Supplier Receiving"><ReceivingManagement /></CustomerReturnWorkspace>;
+}

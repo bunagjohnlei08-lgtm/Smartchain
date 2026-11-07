@@ -1,0 +1,23 @@
+/* RFQ main-content controls only. Do not inherit the global dark-surface hover shim. */
+html:not(.dark) .product-sourcing-page .rfq-primary-button {
+  background-color: var(--accent-primary, #0f172a) !important;
+  color: #fff !important;
+}
+html:not(.dark) .product-sourcing-page .rfq-primary-button:is(:hover, :focus-visible):not(:disabled) {
+  background-color: var(--accent-hover, #1e293b) !important;
+  color: #fff !important;
+}
+html:not(.dark) .product-sourcing-page .rfq-secondary-button {
+  background-color: var(--bg-card, #fff);
+  color: var(--text-primary, #0f172a) !important;
+}
+html:not(.dark) .product-sourcing-page .rfq-secondary-button:is(:hover, :focus-visible):not(:disabled) {
+  background-color: var(--bg-hover, #e2e8f0) !important;
+  color: var(--text-primary, #0f172a) !important;
+}
+html:not(.dark) .product-sourcing-page :is(.rfq-primary-button, .rfq-secondary-button):disabled {
+  background-color: #e2e8f0 !important;
+  color: #475569 !important;
+  opacity: 1;
+  cursor: not-allowed;
+}

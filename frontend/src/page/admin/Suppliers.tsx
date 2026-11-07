@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import AdminAccreditationReview from '../../components/supplier/AdminAccreditationReview';
 import SupplierPurchasingTerms from '../../components/supplier/SupplierPurchasingTerms';
+import SupplierAccountConflictDialog from '../../components/supplier/SupplierAccountConflictDialog';
+import { mapSupplierAccount, type SupplierAccountInfo } from '../../lib/supplierAccount';
 
 // ============================================
 // TYPES
@@ -52,12 +54,7 @@ interface Supplier {
   recoveryDeadline: string | null;
   recoveryDaysRemaining: number;
   restoreAllowed: boolean;
-  account: {
-    status: 'NO_ACCOUNT' | 'INVITATION_PENDING' | 'INVITATION_EXPIRED' | 'ACCOUNT_ACTIVE' | 'EMAIL_REQUIRED' | 'CONFLICT' | 'UNAVAILABLE';
-    canInvite: boolean;
-    reason: string;
-    expiresAt: string | null;
-  };
+  account: SupplierAccountInfo;
 }
 
 // ============================================
@@ -119,12 +116,13 @@ const Suppliers: React.FC = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [accreditationSupplierId, setAccreditationSupplierId] = useState<string | null>(null);
   const [termsSupplier, setTermsSupplier] = useState<Supplier | null>(null);
+  const [accountSupplier, setAccountSupplier] = useState<Supplier | null>(null);
   const [actionSupplier, setActionSupplier] = useState<Supplier | null>(null);
   const [lifecycleAction, setLifecycleAction] = useState<'remove' | 'restore' | null>(null);
   const actionDialogRef = useRef<HTMLDivElement>(null);
   const cancelActionRef = useRef<HTMLButtonElement>(null);
   const actionTriggerRef = useRef<HTMLElement | null>(null);
-  useAdminDetailOverlay((showEditModal && selectedSupplier !== null) || actionSupplier !== null || accreditationSupplierId !== null || termsSupplier !== null);
+  useAdminDetailOverlay((showEditModal && selectedSupplier !== null) || actionSupplier !== null || accreditationSupplierId !== null || termsSupplier !== null || accountSupplier !== null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -141,12 +139,7 @@ const Suppliers: React.FC = () => {
     status: uiStatus(supplier.status), notes: supplier.notes || '',
     removedAt: supplier.removal_requested_at || null, recoveryDeadline: supplier.recovery_deadline || null,
     recoveryDaysRemaining: Number(supplier.recovery_days_remaining || 0), restoreAllowed: Boolean(supplier.restore_allowed),
-    account: {
-      status: supplier.account?.status || 'UNAVAILABLE',
-      canInvite: Boolean(supplier.account?.can_invite),
-      reason: supplier.account?.reason || 'Supplier Account status is unavailable.',
-      expiresAt: supplier.account?.expires_at || null,
-    },
+    account: mapSupplierAccount(supplier.account),
   });
 
   const loadSuppliers = useCallback(async () => {
@@ -290,9 +283,12 @@ const Suppliers: React.FC = () => {
     }
   };
 
+  const closeAccountReview = useCallback(() => { setAccountSupplier(null); void loadSuppliers(); }, [loadSuppliers]);
+
   const accountAction = (supplier: Supplier, compact = false) => {
     if (supplier.account.status === 'ACCOUNT_ACTIVE') return <span title={supplier.account.reason} className="inline-flex min-h-11 items-center gap-2 px-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4"/><span>Account Active</span></span>;
-    if (!supplier.account.canInvite) return <span title={supplier.account.reason} className="inline-flex min-h-11 items-center gap-2 px-3 text-xs font-semibold text-[var(--text-muted)]"><Ban className="h-4 w-4"/><span>{supplier.account.status === 'CONFLICT' ? 'Account conflict' : supplier.account.status === 'EMAIL_REQUIRED' ? 'Valid email required' : 'Activation unavailable'}</span></span>;
+    if (supplier.account.status === 'CONFLICT') return <div className="flex max-w-xs flex-col items-start gap-1"><button type="button" onClick={() => setAccountSupplier(supplier)} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-xs font-semibold text-amber-800 hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-amber-500 dark:text-amber-300 dark:hover:bg-amber-500/10"><AlertTriangle className="h-4 w-4 shrink-0"/>View Account Conflict</button><p className="px-3 text-xs leading-5 text-[var(--text-muted)]">{supplier.account.reason}</p></div>;
+    if (!supplier.account.canInvite) return <div className="max-w-xs"><span className="inline-flex min-h-11 items-center gap-2 px-3 text-xs font-semibold text-[var(--text-muted)]"><Ban className="h-4 w-4"/><span>{supplier.account.status === 'EMAIL_REQUIRED' ? 'Valid email required' : 'Activation unavailable'}</span></span><p className="px-3 text-xs leading-5 text-[var(--text-muted)]">{supplier.account.reason}</p></div>;
     const resend = supplier.account.status === 'INVITATION_PENDING' || supplier.account.status === 'INVITATION_EXPIRED';
     const label = resend ? 'Resend Activation Link' : 'Send Account Activation Link';
     return <div className="flex flex-col items-center gap-1">
@@ -996,6 +992,7 @@ const Suppliers: React.FC = () => {
           </div>
         </div>
       )}
+      {accountSupplier && <SupplierAccountConflictDialog supplier={accountSupplier} onClose={closeAccountReview} onReviewSupplier={() => { const supplier = accountSupplier; setAccountSupplier(null); void handleViewDetails(supplier); }} />}
     </div>
   );
 };

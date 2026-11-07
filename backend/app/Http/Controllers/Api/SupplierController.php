@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -63,10 +64,12 @@ class SupplierController extends Controller
         $emails = $suppliers->filter(fn (Supplier $supplier) => ! $supplier->authorizedAccount)
             ->map(fn (Supplier $supplier) => mb_strtolower(trim((string) $supplier->email)))->filter()->unique();
         $usedEmails = User::query()->whereIn(DB::raw('LOWER(email)'), $emails)
-            ->pluck('email')->mapWithKeys(fn (string $email) => [mb_strtolower($email) => true]);
+            ->with('role:id,slug')->get(['id','email','role_id','status','supplier_id'])
+            ->groupBy(fn (User $user) => mb_strtolower($user->email));
 
         return response()->json(['data' => $suppliers->map(fn (Supplier $supplier) => $this->present(
-            $supplier, isset($usedEmails[mb_strtolower(trim((string) $supplier->email))])
+            $supplier, isset($usedEmails[mb_strtolower(trim((string) $supplier->email))]),
+            $usedEmails->get(mb_strtolower(trim((string) $supplier->email)), collect())
         ))]);
     }
 
@@ -217,7 +220,7 @@ class SupplierController extends Controller
         ];
     }
 
-    private function present(Supplier $supplier, ?bool $emailConflict = null): array
+    private function present(Supplier $supplier, ?bool $emailConflict = null, ?Collection $matchingUsers = null): array
     {
         $deadline = $supplier->recoveryDeadline();
         $openPurchaseOrders = array_key_exists('open_purchase_orders_count', $supplier->getAttributes())
@@ -232,7 +235,7 @@ class SupplierController extends Controller
             'recovery_days_remaining' => $supplier->canBeRestored()
                 ? max(1, now(Supplier::BUSINESS_TIMEZONE)->startOfDay()->diffInDays($deadline->copy()->startOfDay(), false))
                 : 0,
-            'account' => $this->accountInvitations->state($supplier, $emailConflict),
+            'account' => $this->accountInvitations->state($supplier, $emailConflict, $matchingUsers),
         ];
     }
 

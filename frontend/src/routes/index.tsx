@@ -13,6 +13,8 @@ import AdminLayout from '../components/layout/AdminLayout';
 import PlantManagerLayout from '../layouts/PlantManagerLayout';
 import QALayout from '../layouts/QALayout';
 import ProtectedRoute from '../components/ProtectedRoute';
+import { CustomerReturns } from '../components/returns/CustomerReturnWorkspace';
+import { RETURN_ORDER_NAVIGATION } from '../components/returns/customerReturnUi';
 
 import AdminDashboard from '../page/admin/AdminDashboard';
 import AdminProductCatalog from '../page/admin/ProductCatalog';
@@ -109,6 +111,8 @@ const router = createBrowserRouter([
       { path: 'reports', element: <AdminReports /> },
       { path: 'users', element: <AdminUserManagement /> },
       { path: 'order-management', element: <AdminOrderManagement /> },
+      { path: 'return-orders', element: <CustomerReturns mode="admin" /> },
+      { path: 'order-management/returns', element: <Navigate to={RETURN_ORDER_NAVIGATION.admin.path} replace /> },
       { path: 'notifications', element: <AdminNotifications /> },
       { path: 'profile', element: <AdminProfile /> },
     ],
@@ -145,6 +149,8 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/qa/dashboard" replace /> },
       { path: 'dashboard', element: <QADashboard /> },
       { path: 'inspection', element: <QAInspection /> },
+      { path: 'return-order-inspection', element: <CustomerReturns mode="qa" /> },
+      { path: 'inspection/returns', element: <Navigate to={RETURN_ORDER_NAVIGATION.qa.path} replace /> },
       { path: 'production', element: <ProductionRolePage role="qa" /> },
       { path: 'rejected-items', element: <QARejectedItems /> },
       { path: 'history', element: <QAInspectionHistory /> },

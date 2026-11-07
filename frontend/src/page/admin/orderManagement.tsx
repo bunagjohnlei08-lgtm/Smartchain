@@ -1,5 +1,8 @@
+import ReturnOrderNavigation from '../../components/returns/ReturnOrderNavigation';
 // src/pages/admin/OrderManagement.tsx
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ADMIN_ORDERS_PER_PAGE, adminOrderPage, adminOrderPageButtons } from './adminOrderPagination';
+import { catalogOrderUnit, orderUnitOptions } from './createOrderUnits';
 import { apiClient } from '../../lib/api';
 import { useAdminDetailOverlay } from '../../components/layout/AdminDetailOverlayContext';
 import {
@@ -101,7 +104,6 @@ interface CreateOrderForm {
   unitPrice: string;
 }
 
-const orderUnitOptions = ['pcs', 'bulk', 'kg'] as const;
 
 const dateInputValue = (date: Date) => {
   const offset = date.getTimezoneOffset();
@@ -336,6 +338,11 @@ const OrderManagement: React.FC = () => {
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState(() => adminOrderPage(0, 1));
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState('');
+  const ordersRequestRef = useRef(0);
   const [summary, setSummary] = useState<OrderSummary>({});
   const [plantManagers, setPlantManagers] = useState<Array<{ id: number; name: string; employee_id?: string }>>([]);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
@@ -351,15 +358,37 @@ const OrderManagement: React.FC = () => {
   const [createOrderError, setCreateOrderError] = useState('');
 
   const loadOrders = useCallback(async () => {
-    const [ordersResponse, summaryResponse] = await Promise.all([
-      apiClient.get('/admin/orders', { params: { search: search || undefined, status: status || undefined, date_from: dateFrom || undefined, per_page: 100 } }),
-      apiClient.get('/admin/orders/summary'),
-    ]);
-    setOrders(ordersResponse.data.data.map(mapOrder));
-    setSummary(summaryResponse.data);
-  }, [search, status, dateFrom]);
+    const request = ++ordersRequestRef.current;
+    setOrdersLoading(true);
+    setOrdersError('');
+    setOrders([]);
+    try {
+      const [ordersResponse, summaryResponse] = await Promise.all([
+        apiClient.get('/admin/orders', { params: { search: search || undefined, status: status || undefined, date_from: dateFrom || undefined, page: currentPage, per_page: ADMIN_ORDERS_PER_PAGE } }),
+        apiClient.get('/admin/orders/summary'),
+      ]);
+      if (request !== ordersRequestRef.current) return;
+      const next = adminOrderPage(Number(ordersResponse.data.total), currentPage);
+      if (next.currentPage !== currentPage) {
+        // A refresh may remove the last page. Fetch the actual last server page.
+        ordersRequestRef.current += 1;
+        setCurrentPage(next.currentPage);
+        return;
+      }
+      setOrders(ordersResponse.data.data.map(mapOrder));
+      setPagination(next);
+      setSummary(summaryResponse.data);
+    } catch (error: any) {
+      if (request === ordersRequestRef.current) setOrdersError(error?.response?.data?.message || 'Unable to load orders. Please retry.');
+    } finally {
+      if (request === ordersRequestRef.current) setOrdersLoading(false);
+    }
+  }, [search, status, dateFrom, currentPage]);
 
-  useEffect(() => { void loadOrders(); }, [loadOrders]);
+  useEffect(() => {
+    void loadOrders();
+    return () => { ordersRequestRef.current += 1; };
+  }, [loadOrders]);
 
   const handleViewOrder = async (order: Order) => {
     const response = await apiClient.get(`/admin/orders/${order.id}`);
@@ -432,17 +461,21 @@ const OrderManagement: React.FC = () => {
 
   const selectCreateOrderProduct = (productId: string) => {
     const product = catalogProducts.find((item) => String(item.id) === productId);
-    const productUnit = product?.unit?.trim().toLowerCase() ?? '';
+    const productUnit = catalogOrderUnit(product?.unit);
     setCreateOrderForm((current) => ({
       ...current,
       productId,
-      unit: orderUnitOptions.some((unit) => unit === productUnit) ? productUnit : '',
+      unit: productUnit,
     }));
   };
 
   const submitCreateOrder = async () => {
     setCreateOrderError('');
     const product = catalogProducts.find((item) => String(item.id) === createOrderForm.productId);
+    if (product && (!catalogOrderUnit(product.unit) || createOrderForm.unit !== catalogOrderUnit(product.unit))) {
+      setCreateOrderError('The selected product must have a supported PCS, DRUM or SACK Stock Unit, and the order unit must match it. Refresh the Product Catalog selection.');
+      return;
+    }
     if (!createOrderForm.customerName.trim() || !createOrderForm.customerAddress.trim()
       || !createOrderForm.orderDate || !createOrderForm.requiredDeliveryDate || !product
       || product.category !== selectedProductCategory
@@ -464,7 +497,7 @@ const OrderManagement: React.FC = () => {
         items: [{
           product_id: product.id,
           quantity: Number(createOrderForm.quantity),
-          unit: createOrderForm.unit.trim(),
+          unit: catalogOrderUnit(product.unit),
           unit_price: Number(createOrderForm.unitPrice),
         }],
       });
@@ -511,7 +544,7 @@ const OrderManagement: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={() => void loadOrders()} className="admin-orders-refresh inline-flex h-8 w-auto cursor-pointer items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[12px] font-medium leading-4 text-slate-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 sm:h-auto sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2 sm:text-sm sm:leading-5">
+          <button disabled={ordersLoading} onClick={() => void loadOrders()} className="admin-orders-refresh inline-flex h-8 w-auto cursor-pointer items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[12px] font-medium leading-4 text-slate-300 transition-colors hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 sm:h-auto sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2 sm:text-sm sm:leading-5">
             <RotateCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             Refresh
           </button>
@@ -541,13 +574,13 @@ const OrderManagement: React.FC = () => {
             <input
               type="text"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }}
               placeholder="Search Order No., Customer, Product, Reference No..."
               className="admin-orders-toolbar-search h-11 w-full rounded-lg border border-slate-800 bg-[#070a12] py-1.5 pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:py-2 sm:pr-4 sm:text-sm"
             />
           </div>
 
-          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Order status" className="admin-orders-toolbar-status h-11 w-full min-w-0 rounded-lg border border-slate-800 bg-[#070a12] px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:w-auto sm:px-3 sm:py-2 sm:text-sm">
+          <select value={status} onChange={(event) => { setStatus(event.target.value); setCurrentPage(1); }} aria-label="Order status" className="admin-orders-toolbar-status h-11 w-full min-w-0 rounded-lg border border-slate-800 bg-[#070a12] px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:w-auto sm:px-3 sm:py-2 sm:text-sm">
             <option value="">All Status</option>
             <option value="NEW">New</option>
             <option value="ASSIGNED">Assigned</option>
@@ -568,7 +601,7 @@ const OrderManagement: React.FC = () => {
             <input
               type="date"
               value={dateFrom}
-              onChange={(event) => setDateFrom(event.target.value)}
+              onChange={(event) => { setDateFrom(event.target.value); setCurrentPage(1); }}
               aria-label="Order date from"
               className="admin-orders-toolbar-date h-11 w-full min-w-0 rounded-lg border border-slate-800 bg-[#070a12] py-1.5 pl-2.5 pr-8 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:h-auto sm:w-36 sm:px-3 sm:py-2 sm:text-sm"
             />
@@ -584,6 +617,7 @@ const OrderManagement: React.FC = () => {
           </div>
         </div>
 
+        {ordersError && <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-500/30 bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-500/10 dark:text-rose-200"><span>{ordersError}</span><button type="button" onClick={() => void loadOrders()} className="min-h-11 cursor-pointer rounded-lg border border-current px-3 font-medium focus-visible:outline-2 focus-visible:outline-cyan-500">Retry</button></div>}
         {/* Table */}
         {viewMode === 'list' ? (
         <div className="admin-table-scroll w-full max-w-full overflow-x-auto overscroll-x-contain custom-scrollbar">
@@ -664,6 +698,7 @@ const OrderManagement: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {orders.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-600 dark:text-slate-400">{ordersLoading ? 'Loading orders…' : ordersError ? 'Orders could not be loaded.' : 'No orders found matching your criteria.'}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -679,8 +714,17 @@ const OrderManagement: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-sm text-slate-400">No orders found matching your criteria.</div>
+          <div className="py-8 text-center text-sm text-slate-400">{ordersLoading ? 'Loading orders…' : ordersError ? 'Orders could not be loaded.' : 'No orders found matching your criteria.'}</div>
         )}
+      </div>
+
+      <div className="flex min-w-0 flex-col items-center justify-between gap-3 px-1 text-sm sm:flex-row">
+        <p role="status" aria-live="polite" className="shrink-0 text-slate-600 dark:text-slate-400">{ordersLoading ? 'Loading orders…' : ordersError ? 'Order count unavailable.' : `Showing ${pagination.from}–${pagination.to} of ${pagination.total} orders`}</p>
+        <nav aria-label="Admin order pagination" className="flex max-w-full flex-wrap items-center justify-center gap-1">
+          <button type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={ordersLoading || currentPage <= 1} className="min-h-11 cursor-pointer rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Previous</button>
+          {adminOrderPageButtons(currentPage, pagination.totalPages).map(item => typeof item === 'number' ? <button key={item} type="button" disabled={ordersLoading} onClick={() => setCurrentPage(item)} aria-current={currentPage === item ? 'page' : undefined} aria-label={`Go to order page ${item}`} className={`min-h-11 min-w-11 cursor-pointer rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:cursor-wait ${currentPage === item ? 'bg-cyan-500 text-slate-950' : 'border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}>{item}</button> : <span key={item} aria-hidden="true" className="px-1 text-slate-500">…</span>)}
+          <button type="button" onClick={() => setCurrentPage(page => Math.min(pagination.totalPages, page + 1))} disabled={ordersLoading || currentPage >= pagination.totalPages} className="min-h-11 cursor-pointer rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-cyan-500 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Next</button>
+        </nav>
       </div>
 
       {/* ============================================================
@@ -929,7 +973,7 @@ const OrderManagement: React.FC = () => {
             <label className="text-sm text-slate-300 sm:col-span-2">Category <span className="text-rose-400">*</span><select value={selectedProductCategory} onChange={event => selectProductCategory(event.target.value)} disabled={productsLoading || catalogProducts.length === 0} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"><option value="">{productsLoading ? 'Loading Product Catalog…' : catalogProducts.length ? 'Select Category' : 'No catalog categories available'}</option>{productCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
             <label className="text-sm text-slate-300 sm:col-span-2">Product <span className="text-rose-400">*</span><select value={createOrderForm.productId} onChange={event => selectCreateOrderProduct(event.target.value)} disabled={!selectedProductCategory || filteredCatalogProducts.length === 0} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"><option value="">{!selectedProductCategory ? 'Select a category first' : filteredCatalogProducts.length ? 'Select Product' : 'No products available in this category'}</option>{filteredCatalogProducts.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
             <label className="text-sm text-slate-300">Quantity <span className="text-rose-400">*</span><input type="number" min="0.001" step="0.001" value={createOrderForm.quantity} onChange={event => setCreateOrderForm(current => ({ ...current, quantity: event.target.value }))} placeholder="0" className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
-            <label className="text-sm text-slate-300">Unit <span className="text-rose-400">*</span><select value={createOrderForm.unit} onChange={event => setCreateOrderForm(current => ({ ...current, unit: event.target.value }))} className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><option value="">Select unit</option>{orderUnitOptions.map(unit => <option key={unit} value={unit}>{unit}</option>)}</select></label>
+            <label className="text-sm text-slate-300">Unit <span className="text-rose-400">*</span><select value={createOrderForm.unit} disabled aria-readonly="true" aria-describedby="create-order-unit-help" className="mt-1 min-h-11 w-full cursor-pointer rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"><option value="">{createOrderForm.productId ? 'Unsupported catalog unit' : 'Select a product first'}</option>{orderUnitOptions.map(unit => <option key={unit} value={unit}>{unit}</option>)}</select><span id="create-order-unit-help" className="mt-1 block text-xs text-slate-600 dark:text-slate-400">Stock Unit follows the selected Product Catalog item and cannot be changed here.</span></label>
             <label className="text-sm text-slate-300 sm:col-span-2">Unit price <span className="text-rose-400">*</span><input type="number" min="0" step="0.01" value={createOrderForm.unitPrice} onChange={event => setCreateOrderForm(current => ({ ...current, unitPrice: event.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-[#070a12] px-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" /></label>
           </div>
           <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t border-slate-800 pt-5 sm:flex-row"><button onClick={() => setCreateOrderOpen(false)} className="min-h-11 cursor-pointer rounded-lg border border-slate-700 px-4 text-slate-300 transition-colors hover:bg-slate-800">Cancel</button><button onClick={() => void submitCreateOrder()} disabled={createOrderBusy || productsLoading} className="min-h-11 cursor-pointer rounded-lg bg-slate-900 px-5 font-semibold text-white transition-colors hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50">{createOrderBusy ? 'Creating…' : 'Create Order'}</button></div>
@@ -940,4 +984,6 @@ const OrderManagement: React.FC = () => {
   );
 };
 
-export default OrderManagement;
+export default function OrderManagementWithReturnNavigation() {
+  return <ReturnOrderNavigation mode="admin"><OrderManagement /></ReturnOrderNavigation>;
+}

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { AI_FORECAST_ENABLED } from '../../config/features';
+import { RETURN_ORDER_NAVIGATION } from '../returns/customerReturnUi';
 
 interface NavChild {
   id: string;
@@ -56,6 +57,7 @@ const navGroups: NavGroup[] = [
           { id: 'boms', label: 'BOM / Formulas', path: '/admin/boms' },
           { id: 'production', label: 'Production Oversight', path: '/admin/production' },
           { id: 'order-management', label: 'Order Management', path: '/admin/order-management' },
+          { id: 'return-orders', ...RETURN_ORDER_NAVIGATION.admin },
         ],
       },
       {

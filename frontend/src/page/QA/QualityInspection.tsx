@@ -1,3 +1,4 @@
+import ReturnOrderNavigation from '../../components/returns/ReturnOrderNavigation';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { useSearchParams } from 'react-router-dom';
@@ -1533,4 +1534,6 @@ const QualityInspection: React.FC = () => {
   );
 };
 
-export default QualityInspection;
+export default function QualityInspectionWithReturnNavigation() {
+  return <ReturnOrderNavigation mode="qa"><QualityInspection /></ReturnOrderNavigation>;
+}

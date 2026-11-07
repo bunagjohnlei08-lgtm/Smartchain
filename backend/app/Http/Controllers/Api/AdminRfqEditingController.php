@@ -7,6 +7,7 @@ use App\Models\Rfq;
 use App\Models\Warehouse;
 use App\Support\AuditLogger;
 use App\Support\RfqCatalogImageSnapshot;
+use App\Support\RfqLineUnits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -69,15 +70,15 @@ class AdminRfqEditingController extends Controller
         ]);
     }
 
-    public function eligibleRequirements(Request $request): JsonResponse { abort_unless($request->user()->isAdmin(),403);$rows=ReplenishmentRequest::query()->whereIn('status',ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES)->where('sourcing_method',ReplenishmentRequest::SOURCING_COMPETITIVE)->whereDoesntHave('purchaseOrder')->whereDoesntHave('rfqLine')->with(['product:id,name,category,unit,image_path','warehouse:id,name','requester:id,name'])->get();$main=Warehouse::configuredMain();if($main?->status!=='Active')$main=null;return response()->json(['data'=>$rows->map(fn($r)=>['id'=>$r->id,'request_no'=>$r->request_no,'product_id'=>$r->product_id,'product_name'=>$r->product?->name,'category'=>$r->product?->category,'unit'=>$r->product?->unit,'requested_qty'=>$r->requested_qty,'warehouse_name'=>$r->warehouse?->name,'requested_by'=>$r->requester?->name,'sourcing_method'=>$r->sourcing_method,'image_url'=>$r->product?->image_path?route('public.products.image',$r->product):null]),'delivery_destination'=>$main?['name'=>$main->name,'address'=>$main->address]:null]); }
+    public function eligibleRequirements(Request $request): JsonResponse { abort_unless($request->user()->isAdmin(),403);$rows=ReplenishmentRequest::query()->whereIn('status',ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES)->where('sourcing_method',ReplenishmentRequest::SOURCING_COMPETITIVE)->whereDoesntHave('purchaseOrder')->whereDoesntHave('rfqLine')->with(['product:id,name,category,unit,image_path','warehouse:id,name','requester:id,name'])->get();$main=Warehouse::configuredMain();if($main?->status!=='Active')$main=null;return response()->json(['data'=>$rows->map(fn($r)=>['id'=>$r->id,'request_no'=>$r->request_no,'product_id'=>$r->product_id,'product_name'=>$r->product?->name,'category'=>$r->product?->category,'unit'=>RfqLineUnits::canonical($r->product?->unit),'requested_qty'=>$r->requested_qty,'warehouse_name'=>$r->warehouse?->name,'requested_by'=>$r->requester?->name,'sourcing_method'=>$r->sourcing_method,'image_url'=>$r->product?->image_path?route('public.products.image',$r->product):null]),'delivery_destination'=>$main?['name'=>$main->name,'address'=>$main->address]:null]); }
     public function show(Request $request,Rfq $rfq): JsonResponse { abort_unless($request->user()->isAdmin(),403);return response()->json(['data'=>$this->data($rfq->load(['lines','creator:id,name','amendments.creator:id,name']))]); }
     public function update(Request $request,Rfq $rfq): JsonResponse { return $this->save($request,$rfq,false); }
     public function amend(Request $request,Rfq $rfq): JsonResponse { return $this->save($request,$rfq,true); }
     private function save(Request $request,Rfq $rfq,bool $amend): JsonResponse
     {
-        abort_unless($request->user()->isAdmin(),403);$v=$request->validate($this->rules($amend));$this->validateCriteriaWeights($v);
+        abort_unless($request->user()->isAdmin(),403);RfqLineUnits::normalizeRequest($request);$v=$request->validate($this->rules($amend));$this->validateCriteriaWeights($v);
         $row=DB::transaction(function()use($request,$rfq,$v,$amend){$row=Rfq::query()->lockForUpdate()->findOrFail($rfq->id);abort_if($row->version!==(int)$v['version'],409,'This RFQ changed after you opened it. Reload before saving.');if($amend){abort_unless($row->published_at&&in_array($row->status,[Rfq::SCHEDULED,Rfq::OPEN],true)&&$row->closes_at->isFuture(),422,'Only an active published RFQ can be amended.');abort_if($row->quotations()->exists(),409,'An RFQ with submitted bids cannot be amended. Cancel it and issue a new RFQ instead.');}else abort_unless($row->status===Rfq::DRAFT,422,'Only draft RFQs can be edited directly.');
-            $before=$this->snapshot($row->load('lines'));$requirements=ReplenishmentRequest::query()->whereIn('id',collect($v['lines'])->pluck('replenishment_request_id'))->with('product')->lockForUpdate()->get()->keyBy('id');abort_unless($requirements->count()===count($v['lines']),422,'Every line must reference an available requirement.');foreach($v['lines'] as $line){$req=$requirements[$line['replenishment_request_id']];$existing=$req->rfqLine;abort_unless(in_array($req->status,ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES,true)&&$req->sourcing_method===ReplenishmentRequest::SOURCING_COMPETITIVE&&!$req->purchaseOrder()->exists()&&(!$existing||$existing->rfq_id===$row->id),422,"Requirement {$req->request_no} is unavailable.");abort_unless($req->product_id===$line['product_id']&&(int)$req->requested_qty===(int)$line['required_quantity']&&$req->product->unit===$line['unit'],422,"Line values must match {$req->request_no}.");}
+            $before=$this->snapshot($row->load('lines'));$requirements=ReplenishmentRequest::query()->whereIn('id',collect($v['lines'])->pluck('replenishment_request_id'))->with('product')->lockForUpdate()->get()->keyBy('id');abort_unless($requirements->count()===count($v['lines']),422,'Every line must reference an available requirement.');foreach($v['lines'] as $index=>$line){$req=$requirements[$line['replenishment_request_id']];$existing=$req->rfqLine;abort_unless(in_array($req->status,ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES,true)&&$req->sourcing_method===ReplenishmentRequest::SOURCING_COMPETITIVE&&!$req->purchaseOrder()->exists()&&(!$existing||$existing->rfq_id===$row->id),422,"Requirement {$req->request_no} is unavailable.");RfqLineUnits::assertMatches($req,$line,$index);}
             $row->lines()->whereNotIn('replenishment_request_id',collect($v['lines'])->pluck('replenishment_request_id'))->delete();foreach($v['lines'] as $line){$product=$requirements[$line['replenishment_request_id']]->product;$rfqLine=$row->lines()->updateOrCreate(['replenishment_request_id'=>$line['replenishment_request_id']],[...$line,'product_name'=>$product->name,'category'=>$product->category]);RfqCatalogImageSnapshot::copy($product,$rfqLine);}$row->update([...collect($v)->except(['lines','version','reason'])->all(),'version'=>$row->version+1]);$after=$this->snapshot($row->fresh('lines'));$row->amendments()->create(['version'=>$row->version,'reason'=>$amend?$v['reason']:'Draft edited','changes'=>['before'=>$before,'after'=>$after],'created_by'=>$request->user()->id]);return $row->fresh(['lines','creator:id,name','amendments.creator:id,name']);});
         AuditLogger::success($amend?'RFQ_AMENDED':'RFQ_DRAFT_UPDATED',AuditLogger::MODULE_PROCUREMENT,['actor'=>$request->user(),'resource'=>$row,'resource_label'=>$row->rfq_number,'details'=>$amend?$v['reason']:'Draft edited','metadata'=>['version'=>$row->version]]);return response()->json(['data'=>$this->data($row)]);
     }
@@ -104,7 +105,7 @@ class AdminRfqEditingController extends Controller
             'name' => $product->name,
             'category' => $product->category,
             'classification' => $product->item_classification,
-            'unit' => $product->unit,
+            'unit' => RfqLineUnits::canonical($product->unit),
             'image_url' => $product->image_path ? route('public.products.image', $product) : null,
             'specifications' => null,
             'sourcing_status' => $status,
@@ -118,7 +119,7 @@ class AdminRfqEditingController extends Controller
             ] : null,
             'eligible_requirements' => $requirements->filter(fn ($r) => in_array($r->status, ReplenishmentRequest::AWAITING_PURCHASE_ORDER_STATUSES, true)
                 && $r->sourcing_method === ReplenishmentRequest::SOURCING_COMPETITIVE && ! $r->purchaseOrder && ! $r->rfqLine)
-                ->map(fn ($r) => ['id'=>$r->id,'request_no'=>$r->request_no,'product_id'=>$product->id,'product_name'=>$product->name,'category'=>$product->category,'unit'=>$product->unit,'requested_qty'=>$r->requested_qty,'warehouse_name'=>$r->warehouse?->name,'image_url'=>$product->image_path?route('public.products.image',$product):null])
+                ->map(fn ($r) => ['id'=>$r->id,'request_no'=>$r->request_no,'product_id'=>$product->id,'product_name'=>$product->name,'category'=>$product->category,'unit'=>RfqLineUnits::canonical($product->unit),'requested_qty'=>$r->requested_qty,'warehouse_name'=>$r->warehouse?->name,'image_url'=>$product->image_path?route('public.products.image',$product):null])
                 ->values(),
             'rfq' => $rfq ? ['id'=>$rfq->id,'rfq_number'=>$rfq->rfq_number,'status'=>$rfq->effectiveStatus()] : null,
         ];

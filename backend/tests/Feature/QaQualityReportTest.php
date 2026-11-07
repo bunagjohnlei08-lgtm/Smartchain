@@ -78,6 +78,43 @@ class QaQualityReportTest extends TestCase
             ->assertJsonPath('data.inspection_evidence.1.inspection_id', $olderId->id);
     }
 
+    public function test_evidence_report_keeps_cycle_metadata_files_and_private_access_separate(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $role = Role::create(['name' => 'QA Supervisor', 'slug' => 'QA_SUPERVISOR']);
+        $qa = User::factory()->create(['role_id' => $role->id]);
+        $otherQa = User::factory()->create(['role_id' => $role->id]);
+        $first = $this->completedInspection($qa, 'RCV-CYCLES', 'Cycle Supplier', 'Partial', 8, 2, '2026-09-15 10:00:00');
+        $first->receiving->update(['purchase_order' => 'PO-CYCLES']);
+        $second = QaInspection::create(['receiving_id' => $first->receiving_id, 'cycle_number' => 2,
+            'status' => 'Passed', 'completed_at' => '2026-09-16 10:00:00', 'inspected_by_id' => $qa->id]);
+        $files = [];
+        foreach ([$first, $second] as $index => $inspection) {
+            $path = 'qa-attachments/cycle'.($index + 1).'.pdf';
+            \Illuminate\Support\Facades\Storage::disk('local')->put($path, "%PDF-1.4\n%%EOF\n");
+            $files[] = $inspection->attachments()->create(['original_name' => 'cycle-'.($index + 1).'.pdf',
+                'stored_path' => $path, 'mime_type' => 'application/pdf', 'file_size' => 15, 'uploaded_by' => $qa->id]);
+        }
+        $response = $this->actingAs($qa)->getJson('/api/qa/quality-reports')->assertOk()
+            ->assertJsonCount(2, 'data.inspection_evidence')
+            ->assertJsonPath('data.inspection_evidence.0.inspection_id', $second->id)
+            ->assertJsonPath('data.inspection_evidence.0.cycle_number', 2)
+            ->assertJsonPath('data.inspection_evidence.0.status', 'Passed')
+            ->assertJsonPath('data.inspection_evidence.0.purchase_order', 'PO-CYCLES')
+            ->assertJsonPath('data.inspection_evidence.0.inspected_by', $qa->name)
+            ->assertJsonCount(1, 'data.inspection_evidence.0.attachments')
+            ->assertJsonPath('data.inspection_evidence.0.attachments.0.id', $files[1]->id)
+            ->assertJsonPath('data.inspection_evidence.1.cycle_number', 1)
+            ->assertJsonPath('data.inspection_evidence.1.status', 'Partial')
+            ->assertJsonCount(1, 'data.inspection_evidence.1.attachments')
+            ->assertJsonPath('data.inspection_evidence.1.attachments.0.id', $files[0]->id);
+        foreach ($response->json('data.inspection_evidence') as $row) {
+            $url = '/api'.$row['attachments'][0]['view_url'];
+            $this->actingAs($qa)->get($url)->assertOk()->assertHeader('Cache-Control', 'no-store, private');
+            $this->actingAs($otherQa)->get($url)->assertNotFound();
+        }
+    }
+
     public function test_date_filters_apply_to_summary_percentages_trend_and_evidence_with_inclusive_boundaries(): void
     {
         $role = Role::create(['name' => 'QA Supervisor', 'slug' => 'QA_SUPERVISOR']);

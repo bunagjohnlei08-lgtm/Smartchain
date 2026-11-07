@@ -238,6 +238,7 @@ export interface ApiReceiving {
   is_replacement?: boolean;
   replacement?: ApiReceivingReplacement | null;
   excess_review?: ApiExcessReview | null;
+  discrepancy?: { id: number; type: string; short_quantity: number; status: string } | null;
   prepared_by: string | null;
   assigned_qa_user_id: number | null;
   assigned_qa: { id: number; name: string } | null;

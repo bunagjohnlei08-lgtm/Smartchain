@@ -1,0 +1,195 @@
+{
+  "notice": "NOT YET PARTNER-APPROVED. Synthetic documentation fixtures only, not production records or successful external transactions. Source-ready examples assume the authoritative source checks described in financial-case-events-readiness.md have passed. No Financial endpoint, authentication header or response contract is proposed here.",
+  "examples": [
+    {
+      "contract_status": "CONTRACT_PENDING",
+      "transport_status": "NOT_SUBMITTED",
+      "can_submit": false,
+      "financial_event_reference": null,
+      "external_status": null,
+      "source_ready": true,
+      "validation_errors": {},
+      "payload": {
+        "schema_version": "1.0",
+        "source_system": "SMARTCHAIN",
+        "event_type": "EXCESS_DELIVERY",
+        "event_id": "smartchain:financial:EXCESS_DELIVERY:42:v1",
+        "external_reference_id": "EX-SYNTHETIC-42",
+        "purchase_order_reference": "PO-SYNTHETIC-42",
+        "financial_reference": null,
+        "supplier": {
+          "supplier_id": 7,
+          "supplier_code": "SUP-SYNTHETIC",
+          "name": "Synthetic documentation supplier"
+        },
+        "receiving_reference": "RCV-SYNTHETIC-42",
+        "occurred_at": "2026-11-06T08:00:00+08:00",
+        "details": {
+          "case_status": "AWAITING_FINANCIAL_RECONCILIATION",
+          "review_reason": "ADDITIONAL_SUPPLIER_CHARGE",
+          "cost_resolution": null,
+          "financial_reconciliation_status": "MANUAL_RECONCILIATION_REQUIRED",
+          "supplier_confirmation_reference": null,
+          "reviewed_at": "2026-11-06T09:00:00+08:00",
+          "currency": "PHP",
+          "lines": [
+            {
+              "source_line_id": 21,
+              "purchase_order_line_id": 31,
+              "product_id": 9,
+              "product_name": "Synthetic product",
+              "unit": "SACK",
+              "original_ordered_quantity": 10,
+              "po_remaining_quantity_at_receipt": 10,
+              "actual_delivered_quantity": 12,
+              "authorized_quantity": 10,
+              "confirmed_excess_quantity": 2,
+              "qa_status": "On Hold",
+              "historical_po_unit_price": "123.45",
+              "agreement_reference": "SYNTHETIC-AGREEMENT"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "reference": "receiving_receipt_attachments:11",
+            "type": "RECEIVING_RECEIPT",
+            "label": "synthetic-delivery.pdf",
+            "mime_type": "application/pdf",
+            "source_reference": "RCV-SYNTHETIC-42"
+          }
+        ]
+      }
+    },
+    {
+      "contract_status": "CONTRACT_PENDING",
+      "transport_status": "NOT_SUBMITTED",
+      "can_submit": false,
+      "financial_event_reference": null,
+      "external_status": null,
+      "source_ready": true,
+      "validation_errors": {},
+      "payload": {
+        "schema_version": "1.0",
+        "source_system": "SMARTCHAIN",
+        "event_type": "QA_REJECTED_ITEMS",
+        "event_id": "smartchain:financial:QA_REJECTED_ITEMS:42:v1",
+        "external_reference_id": "RJ-000042",
+        "purchase_order_reference": "PO-SYNTHETIC-42",
+        "financial_reference": null,
+        "supplier": {
+          "supplier_id": 7,
+          "supplier_code": "SUP-SYNTHETIC",
+          "name": "Synthetic documentation supplier"
+        },
+        "receiving_reference": "RCV-SYNTHETIC-42",
+        "occurred_at": "2026-11-06T08:00:00+08:00",
+        "details": {
+          "case_status": "SENDING",
+          "resolution_request": null,
+          "resolution_notes": null,
+          "qa_inspection_id": 51,
+          "qa_cycle_number": 1,
+          "inspection_result": "Partial",
+          "rejection_date": "2026-11-06T08:00:00+08:00",
+          "rejection_reason": "Synthetic example: damaged seals",
+          "product_id": 9,
+          "product_name": "Synthetic product",
+          "purchase_order_line_id": 31,
+          "delivered_quantity": 8,
+          "rejected_quantity": 3,
+          "unit": "SACK",
+          "supplier_notification": {
+            "state": "SENDING",
+            "sent_at": null
+          }
+        },
+        "evidence": [
+          {
+            "reference": "receiving_receipt_attachments:11",
+            "type": "RECEIVING_RECEIPT",
+            "label": "synthetic-delivery.pdf",
+            "mime_type": "application/pdf",
+            "source_reference": "RCV-SYNTHETIC-42"
+          },
+          {
+            "reference": "qa_inspection_attachments:61",
+            "type": "QA_EVIDENCE",
+            "label": "synthetic-qa.jpg",
+            "mime_type": "image/jpeg",
+            "source_reference": "qa_inspections:51"
+          }
+        ]
+      }
+    },
+    {
+      "contract_status": "CONTRACT_PENDING",
+      "transport_status": "NOT_SUBMITTED",
+      "can_submit": false,
+      "financial_event_reference": null,
+      "external_status": null,
+      "source_ready": false,
+      "validation_errors": {
+        "shipment_confirmation": [
+          "Current-delivery shipment expectation and partial/short classification are not stored."
+        ],
+        "line_allocation": [
+          "Confirmed per-product/unit shortage allocation is not stored."
+        ]
+      },
+      "payload": {
+        "schema_version": "1.0",
+        "source_system": "SMARTCHAIN",
+        "event_type": "DELIVERY_DISCREPANCY",
+        "event_id": "smartchain:financial:DELIVERY_DISCREPANCY:42:v1",
+        "external_reference_id": "receiving_discrepancies:42",
+        "purchase_order_reference": "PO-SYNTHETIC-42",
+        "financial_reference": null,
+        "supplier": {
+          "supplier_id": 7,
+          "supplier_code": "SUP-SYNTHETIC",
+          "name": "Synthetic documentation supplier"
+        },
+        "receiving_reference": "RCV-SYNTHETIC-42",
+        "occurred_at": "2026-11-06T08:00:00+08:00",
+        "details": {
+          "case_status": "AWAITING_BALANCE_DELIVERY",
+          "discrepancy_type": "SHORT_DELIVERY",
+          "supplier_response_code": "WILL_FULFILL",
+          "response_notes": null,
+          "resolution_notes": null,
+          "recorded_aggregate": {
+            "po_balance_expected": 10,
+            "delivered": 8,
+            "short_balance": 2,
+            "unit": null
+          },
+          "expected_current_delivery_quantity": null,
+          "shipment_classification": null,
+          "receiving_lines": [
+            {
+              "receiving_line_id": 21,
+              "purchase_order_line_id": 31,
+              "product_id": 9,
+              "product_name": "Synthetic product",
+              "original_ordered_quantity": 10,
+              "actual_received_line_quantity": 8,
+              "unit": "SACK",
+              "previously_received_quantity": null,
+              "confirmed_short_quantity": null
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "reference": "receiving_receipt_attachments:11",
+            "type": "RECEIVING_RECEIPT",
+            "label": "synthetic-delivery.pdf",
+            "mime_type": "application/pdf",
+            "source_reference": "RCV-SYNTHETIC-42"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -41,7 +41,7 @@ class QaQualityReportController extends Controller
         $trendEnd = now()->addDay()->startOfDay();
 
         $inspections = QaInspection::query()
-            ->with(['receiving', 'items.receivingItem', 'attachments'])
+            ->with(['receiving', 'inspectedBy:id,name', 'items.receivingItem', 'attachments'])
             ->whereNotNull('completed_at')
             ->whereIn('status', self::FINAL_STATUSES)
             ->when($fromDate, fn ($query) => $query->where('completed_at', '>=', $fromDate))
@@ -204,6 +204,9 @@ class QaQualityReportController extends Controller
                         'inspection_id' => $inspection->id,
                         'receiving_id' => $receiving?->id,
                         'receiving_no' => $receiving?->receiving_no,
+                        'purchase_order' => $receiving?->purchase_order,
+                        'cycle_number' => $inspection->cycle_number,
+                        'inspected_by' => $inspection->inspectedBy?->name,
                         'supplier' => $receiving?->supplier,
                         'status' => $inspection->status,
                         'completed_at' => $inspection->completed_at,

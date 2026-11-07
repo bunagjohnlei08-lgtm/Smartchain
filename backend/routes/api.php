@@ -106,6 +106,15 @@ Route::middleware('throttle:invitations')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'active', 'idle'])->group(function () {
+    Route::get('/financial-case-events/{type}/{id}/preview', [\App\Http\Controllers\Api\FinancialCaseEventController::class, 'preview'])
+        ->whereIn('type', ['excess', 'rejection', 'discrepancy'])->whereNumber('id');
+
+    Route::get('/customer-returns/options', [\App\Http\Controllers\Api\CustomerReturnController::class, 'options']);
+    Route::get('/customer-returns', [\App\Http\Controllers\Api\CustomerReturnController::class, 'index']);
+    Route::post('/customer-returns', [\App\Http\Controllers\Api\CustomerReturnController::class, 'store']);
+    Route::get('/customer-returns/{customerReturn}', [\App\Http\Controllers\Api\CustomerReturnController::class, 'show'])->whereNumber('customerReturn');
+    Route::post('/customer-returns/{customerReturn}/{action}', [\App\Http\Controllers\Api\CustomerReturnController::class, 'action'])->whereNumber('customerReturn');
+    Route::get('/customer-returns/{customerReturn}/evidence/{evidence}', [\App\Http\Controllers\Api\CustomerReturnController::class, 'evidence'])->whereNumber(['customerReturn','evidence']);
     Route::get('/reports/receivings/{number}/receipts', [\App\Http\Controllers\Api\ReceivingReportEvidenceController::class, 'show'])->middleware('throttle:60,1');
     Route::get('/reports/receivings/{number}/receipts/{attachment}', [\App\Http\Controllers\Api\ReceivingReportEvidenceController::class, 'file'])->middleware('throttle:30,1');
     Route::get('/plant-manager/reports/receiving/export', [ReportsController::class, 'receivingExport'])->middleware('throttle:10,1');

@@ -1,4 +1,5 @@
 import logo from '../../assets/logo.png';
+import { RETURN_ORDER_NAVIGATION } from '../returns/customerReturnUi';
 import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
@@ -20,6 +21,7 @@ const navGroups = [
     items: [
       { id: 'dashboard', icon: ClipboardList, label: 'Dashboard', path: '/qa/dashboard' },
       { id: 'inspection', icon: Search, label: 'Quality Inspection', path: '/qa/inspection' },
+      { id: 'return-order-inspection', icon: ClipboardCheck, ...RETURN_ORDER_NAVIGATION.qa },
       { id: 'production', icon: Factory, label: 'Production Inspections', path: '/qa/production' },
       { id: 'rejected-items', icon: Ban, label: 'Rejected Items', path: '/qa/rejected-items' },
       { id: 'history', icon: History, label: 'Inspection History', path: '/qa/history' },
@@ -81,6 +83,7 @@ const QASidebar = ({ onClose }: QASidebarProps) => {
                   <Link
                     key={item.id}
                     to={item.path}
+                    aria-current={active ? 'page' : undefined}
                     className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all text-sm border-l-2 ${
                       active
                         ? 'bg-cyan-500/10 text-cyan-400 font-semibold border-l-cyan-400'

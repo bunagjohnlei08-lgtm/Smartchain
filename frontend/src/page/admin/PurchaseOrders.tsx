@@ -1,3 +1,4 @@
+import FinancialCaseReadiness from '../../components/financial/FinancialCaseReadiness';
 import { ClassificationBadge } from '../../components/catalog/ProductFields';
 import type { Classification } from '../../lib/catalog';
 // src/page/admin/PurchaseOrders.tsx
@@ -878,6 +879,7 @@ const PurchaseOrders: React.FC = () => {
                       <li key={item.id} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                         <div className="flex justify-between gap-2"><span className="font-medium text-amber-700 dark:text-amber-300">Short Delivery</span><span className="text-slate-900 dark:text-white">{item.shortQuantity} short</span></div>
                         <p className="mt-1 font-medium text-slate-600 dark:text-slate-400">{item.status.replaceAll('_', ' ')}</p>
+                        <FinancialCaseReadiness type="discrepancy" caseId={item.id} revision={item.status} />
                         <ol className="mt-3 space-y-3 border-l border-slate-300 pl-3 text-slate-700 dark:border-slate-700 dark:text-slate-300" aria-label="Short delivery activity">
                           <li><p className="font-semibold text-slate-900 dark:text-white">Short delivery detected</p><p>{item.reportedAt ? new Date(item.reportedAt).toLocaleString() : 'Recorded'}{item.reportedBy ? ` by ${item.reportedBy}` : ''}</p><p>Ordered: {item.expectedQuantity} · Delivered: {item.deliveredQuantity} · Short: {item.shortQuantity}</p></li>
                           {item.contactedAt && <li><p className="font-semibold text-slate-900 dark:text-white">Supplier contacted</p><p>{new Date(item.contactedAt).toLocaleString()}{item.contactedBy ? ` by ${item.contactedBy}` : ''}</p><p>Method: {item.contactMethod?.replaceAll('_', ' ')}</p>{item.contactNote && <p>Note: {item.contactNote}</p>}</li>}
@@ -960,6 +962,7 @@ const PurchaseOrders: React.FC = () => {
               <div><h2 id="excess-admin-review-title" className="text-lg font-semibold text-white">Review Excess Delivery</h2><p className="text-sm text-slate-400">Choose one source-backed decision for {excessReviewDialog.reference}.</p></div>
               <button type="button" onClick={() => setExcessReviewDialog(null)} disabled={excessReviewSaving} aria-label="Close review" className="min-h-11 min-w-11 cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-50"><X className="mx-auto h-5 w-5" /></button>
             </div>
+            <FinancialCaseReadiness type="excess" caseId={excessReviewDialog.id} revision={excessReviewDialog.status} />
             <dl className="mt-5 grid grid-cols-2 gap-3 rounded-xl border border-slate-700 bg-slate-950/50 p-4 text-sm sm:grid-cols-3">
               <div><dt className="text-xs text-slate-500">Exception</dt><dd className="font-medium text-orange-200">{excessReviewDialog.reference}</dd></div>
               <div><dt className="text-xs text-slate-500">Purchase Order</dt><dd className="font-medium text-white">{excessReviewDialog.purchase_order}</dd></div>
